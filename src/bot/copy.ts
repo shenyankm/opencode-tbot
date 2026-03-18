@@ -6,7 +6,6 @@ export interface BotCopy {
         health: string;
         path: string;
         agents: string;
-        projects: string;
         sessions: string;
         abort: string;
         model: string;
@@ -72,13 +71,6 @@ export interface BotCopy {
         worktree(path: string): string;
         directory(path: string): string;
     };
-    projects: {
-        none: string;
-        title: string;
-        current(worktree: string): string;
-        switched: string;
-        expired: string;
-    };
     sessions: {
         none: string;
         title: string;
@@ -123,13 +115,12 @@ export interface BotCopy {
 export const DEFAULT_BOT_LANGUAGE: BotLanguage = "en";
 export const SUPPORTED_BOT_LANGUAGES: readonly BotLanguage[] = ["en", "zh-CN"];
 
-const EN_BOT_COPY: BotCopy = {
+const EN_BOT_COPY = {
     commands: {
         start: "Show bot overview",
         health: "Check server health",
         path: "Show current paths",
         agents: "View and switch agents",
-        projects: "View and switch projects",
         sessions: "View and switch sessions",
         abort: "Abort running request",
         model: "View and switch models",
@@ -212,17 +203,8 @@ const EN_BOT_COPY: BotCopy = {
             return `Worktree: ${path}`;
         },
         directory(path: string) {
-            return `Directory: ${path}`;
+            return `Current working directory: ${path}`;
         },
-    },
-    projects: {
-        none: "No projects available.",
-        title: "Project List",
-        current(worktree: string) {
-            return `Current project: ${worktree}`;
-        },
-        switched: "Project switched.",
-        expired: "The project is no longer available. Run /projects again.",
     },
     sessions: {
         none: "No sessions available in the current project.",
@@ -248,7 +230,7 @@ const EN_BOT_COPY: BotCopy = {
     models: {
         none: "No models available.",
         title: "Model List",
-        configuredOnly: "Configured models, connected-provider models, and available custom-provider models in OpenCode are shown.",
+        configuredOnly: "Only models currently available in OpenCode and connected providers are shown.",
         current(model: string) {
             return `Current model: ${model}`;
         },
@@ -286,7 +268,7 @@ const EN_BOT_COPY: BotCopy = {
     },
 };
 
-const ZH_CN_BOT_COPY: BotCopy = {
+const ZH_CN_BOT_COPY = {
     commands: {
         start: "查看机器人说明",
         health: "检查服务健康状态",
@@ -375,7 +357,7 @@ const ZH_CN_BOT_COPY: BotCopy = {
             return `工作树: ${path}`;
         },
         directory(path: string) {
-            return `当前目录: ${path}`;
+            return `当前工作目录: ${path}`;
         },
     },
     projects: {
@@ -411,7 +393,7 @@ const ZH_CN_BOT_COPY: BotCopy = {
     models: {
         none: "没有可用模型。",
         title: "模型列表",
-        configuredOnly: "显示 OpenCode 中已配置的模型、已连接 provider 的模型，以及可用的自定义 provider 模型。",
+        configuredOnly: "仅显示当前在 OpenCode 和已连接 provider 中实际可用的模型。",
         current(model: string) {
             return `当前模型: ${model}`;
         },

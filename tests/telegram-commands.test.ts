@@ -31,10 +31,6 @@ test("TELEGRAM_COMMANDS only advertises implemented commands", () => {
             description: "View and switch agents",
         },
         {
-            command: "projects",
-            description: "View and switch projects",
-        },
-        {
             command: "sessions",
             description: "View and switch sessions",
         },

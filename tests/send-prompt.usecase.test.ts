@@ -100,7 +100,19 @@ test("SendPromptUseCase creates a session in the current project when the chat i
             return {};
         },
         async listModels() {
-            return [];
+            return [
+                {
+                    id: "gpt-5",
+                    providerID: "openai",
+                    providerName: "OpenAI",
+                    name: "GPT-5",
+                    qualifiedId: "openai/gpt-5",
+                    reasoning: true,
+                    variants: {
+                        high: {},
+                    },
+                },
+            ];
         },
         async listAgents() {
             return [createAgent("build")];
@@ -197,7 +209,19 @@ test("SendPromptUseCase preserves a selected model when it needs to create a ses
             return {};
         },
         async listModels() {
-            return [];
+            return [
+                {
+                    id: "gpt-5",
+                    providerID: "openai",
+                    providerName: "OpenAI",
+                    name: "GPT-5",
+                    qualifiedId: "openai/gpt-5",
+                    reasoning: true,
+                    variants: {
+                        high: {},
+                    },
+                },
+            ];
         },
         async listAgents() {
             return [createAgent("build")];
@@ -254,6 +278,98 @@ test("SendPromptUseCase preserves a selected model when it needs to create a ses
         modelProviderId: "openai",
         modelId: "gpt-5",
         modelVariant: "high",
+        language: null,
+        updatedAt: binding?.updatedAt,
+    });
+});
+
+test("SendPromptUseCase clears a stale model selection before prompting", async () => {
+    const repo = new InMemorySessionRepository();
+    await repo.setCurrent({
+        chatId: 55,
+        sessionId: "session-1",
+        projectId: "project-1",
+        directory: "E:/repo-1",
+        agentName: null,
+        modelProviderId: "openai",
+        modelId: "gpt-5.2-pro",
+        modelVariant: "xhigh",
+        language: null,
+        updatedAt: new Date(0).toISOString(),
+    });
+
+    const promptCalls: unknown[] = [];
+    const client: OpenCodeClientLike = {
+        async abortSession() {
+            return true;
+        },
+        async createSessionForDirectory(directory) {
+            return createSession("session-1", "project-1", directory);
+        },
+        async getCurrentProject() {
+            return createProject("project-1", "E:/repo-1");
+        },
+        async getSessionStatuses() {
+            return {};
+        },
+        async listModels() {
+            return [
+                {
+                    id: "gpt-5.2",
+                    providerID: "openai",
+                    providerName: "OpenAI",
+                    name: "GPT-5.2",
+                    qualifiedId: "openai/gpt-5.2",
+                    reasoning: true,
+                    variants: {
+                        high: {},
+                    },
+                },
+            ];
+        },
+        async listAgents() {
+            return [createAgent("build")];
+        },
+        async listProjects() {
+            return [createProject("project-1", "E:/repo-1")];
+        },
+        async listSessions() {
+            return [];
+        },
+        async getPath() {
+            throw new Error("unused");
+        },
+        async promptSession(input) {
+            promptCalls.push(input);
+            return createPromptReply("reply from default model");
+        },
+    };
+
+    const useCase = new SendPromptUseCase(repo, client, logger);
+    const result = await useCase.execute({
+        chatId: 55,
+        text: "hello",
+    });
+    const binding = await repo.getByChatId(55);
+
+    assert.deepEqual(promptCalls, [
+        {
+            sessionId: "session-1",
+            prompt: "hello",
+            structured: true,
+            agent: "build",
+        },
+    ]);
+    assert.equal(result.assistantReply.fallbackText, "reply from default model");
+    assert.deepEqual(binding, {
+        chatId: 55,
+        sessionId: "session-1",
+        projectId: "project-1",
+        directory: "E:/repo-1",
+        agentName: null,
+        modelProviderId: null,
+        modelId: null,
+        modelVariant: null,
         language: null,
         updatedAt: binding?.updatedAt,
     });

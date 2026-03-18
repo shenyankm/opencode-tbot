@@ -86,6 +86,7 @@ type OpenCodeProviderCatalog = {
     providers: OpenCodeProvider[];
     default: Record<string, string>;
 };
+type OpenCodeProviderAvailability = Map<string, Set<string> | null>;
 type OpenCodeProviderConfig = NonNullable<OpenCodeConfig["provider"]>[string];
 type OpenCodeModelConfig = NonNullable<OpenCodeProviderConfig["models"]>[string];
 type OpenCodePromptResponse = {
@@ -133,11 +134,13 @@ export interface OpenCodeClientLike {
 
 export class OpenCodeClient implements OpenCodeClientLike {
     private readonly client: OpenCodeSdkClient;
+    private readonly fetchFn: typeof fetch;
 
-    constructor(options: OpenCodeClientOptions, client?: OpenCodeSdkClient) {
+    constructor(options: OpenCodeClientOptions, client?: OpenCodeSdkClient, fetchFn: typeof fetch = fetch) {
         this.client = client ?? createOpencodeClient({
             baseUrl: options.baseUrl,
         });
+        this.fetchFn = fetchFn;
     }
 
     async getHealth(): Promise<OpenCodeHealth> {
@@ -210,10 +213,12 @@ export class OpenCodeClient implements OpenCodeClientLike {
         ]);
         const config = unwrapSdkData(configResponse);
         const providerCatalog = unwrapSdkData(providersResponse);
+        const providerAvailability = await resolveProviderAvailability(config, this.fetchFn);
 
         return buildSelectableModels(
             config,
             providerCatalog.providers,
+            providerAvailability,
         );
     }
 
@@ -252,6 +257,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
 function buildSelectableModels(
     config: OpenCodeConfig,
     providers: OpenCodeProvider[],
+    providerAvailability: OpenCodeProviderAvailability = new Map(),
 ): OpenCodeConfiguredModel[] {
     const configuredProviders = config.provider ?? {};
     const providersById = new Map(providers.map((provider) => [provider.id, provider]));
@@ -267,6 +273,7 @@ function buildSelectableModels(
                 configuredModelKey,
                 modelConfig,
                 providersById.get(providerId),
+                providerAvailability.get(providerId) ?? null,
             );
 
             if (model) {
@@ -276,7 +283,7 @@ function buildSelectableModels(
     }
 
     for (const provider of providers) {
-        for (const model of buildCatalogProviderModels(provider)) {
+        for (const model of buildCatalogProviderModels(provider, providerAvailability.get(provider.id) ?? null)) {
             if (!models.has(model.qualifiedId)) {
                 models.set(model.qualifiedId, model);
             }
@@ -292,11 +299,16 @@ function buildConfiguredModel(
     configuredModelKey: string,
     modelConfig: OpenCodeModelConfig,
     providerCatalog: OpenCodeProvider | undefined,
+    availableModelIds: Set<string> | null,
 ): OpenCodeConfiguredModel | null {
     const modelId = modelConfig.id ?? configuredModelKey;
     const catalogModel = providerCatalog?.models[modelId];
 
     if (!isTextModel(modelConfig, catalogModel)) {
+        return null;
+    }
+
+    if (!isModelAvailable(modelId, availableModelIds)) {
         return null;
     }
 
@@ -311,9 +323,12 @@ function buildConfiguredModel(
     };
 }
 
-function buildCatalogProviderModels(provider: OpenCodeProvider): OpenCodeConfiguredModel[] {
+function buildCatalogProviderModels(
+    provider: OpenCodeProvider,
+    availableModelIds: Set<string> | null,
+): OpenCodeConfiguredModel[] {
     return Object.values(provider.models)
-        .filter((model) => isCatalogTextModel(model))
+        .filter((model) => isCatalogTextModel(model) && isModelAvailable(model.id, availableModelIds))
         .map((model) => ({
             id: model.id,
             providerID: provider.id,
@@ -339,6 +354,10 @@ function isTextModel(modelConfig: OpenCodeModelConfig, catalogModel: OpenCodeMod
 
 function isCatalogTextModel(catalogModel: OpenCodeModel): boolean {
     return catalogModel.capabilities.input.text && catalogModel.capabilities.output.text;
+}
+
+function isModelAvailable(modelId: string, availableModelIds: Set<string> | null): boolean {
+    return availableModelIds === null || availableModelIds.has(modelId);
 }
 
 function resolveProviderDisplayName(
@@ -498,4 +517,107 @@ function unwrapSdkData<T>(response: MaybeWrappedResponse<T>): T {
     }
 
     return response;
+}
+
+async function resolveProviderAvailability(
+    config: OpenCodeConfig,
+    fetchFn: typeof fetch,
+): Promise<OpenCodeProviderAvailability> {
+    const configuredProviders = Object.entries(config.provider ?? {});
+    const availabilityEntries = await Promise.all(
+        configuredProviders.map(async ([providerId, providerConfig]) => [
+            providerId,
+            await fetchProviderAvailableModelIds(providerConfig, fetchFn),
+        ] as const),
+    );
+
+    return new Map(availabilityEntries);
+}
+
+async function fetchProviderAvailableModelIds(
+    providerConfig: OpenCodeProviderConfig,
+    fetchFn: typeof fetch,
+): Promise<Set<string> | null> {
+    const baseUrl = extractConfiguredBaseUrl(providerConfig);
+    const apiKey = extractConfiguredApiKey(providerConfig);
+
+    if (!baseUrl || !apiKey) {
+        return null;
+    }
+
+    try {
+        const response = await fetchFn(
+            buildModelsEndpointUrl(baseUrl),
+            {
+                headers: {
+                    Authorization: `Bearer ${apiKey}`,
+                    Accept: "application/json",
+                },
+                signal: AbortSignal.timeout(10_000),
+            },
+        );
+
+        if (!response.ok) {
+            return null;
+        }
+
+        const payload = await response.json();
+        const modelIds = extractModelIdsFromPayload(payload);
+
+        return modelIds ? new Set(modelIds) : null;
+    } catch {
+        return null;
+    }
+}
+
+function extractConfiguredApiKey(providerConfig: OpenCodeProviderConfig): string | null {
+    const options = providerConfig.options;
+
+    if (!options || typeof options !== "object") {
+        return null;
+    }
+
+    const apiKey = "apiKey" in options ? options.apiKey : null;
+
+    return typeof apiKey === "string" && apiKey.trim().length > 0
+        ? apiKey.trim()
+        : null;
+}
+
+function buildModelsEndpointUrl(baseUrl: string): string {
+    const normalizedBaseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+
+    return new URL("models", normalizedBaseUrl).toString();
+}
+
+function extractModelIdsFromPayload(payload: unknown): string[] | null {
+    if (Array.isArray(payload)) {
+        return payload
+            .map(extractModelId)
+            .filter((id): id is string => !!id);
+    }
+
+    if (payload && typeof payload === "object" && "data" in payload && Array.isArray(payload.data)) {
+        return payload.data
+            .map(extractModelId)
+            .filter((id): id is string => !!id);
+    }
+
+    return null;
+}
+
+function extractModelId(value: unknown): string | null {
+    if (typeof value === "string" && value.trim().length > 0) {
+        return value.trim();
+    }
+
+    if (value && typeof value === "object" && "id" in value) {
+        const id = (value as { id?: unknown }).id;
+
+        return typeof id === "string" && id.trim().length > 0
+            ? id.trim()
+            : null;
+    }
+
+    return null;
 }

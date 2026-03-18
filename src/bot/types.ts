@@ -5,12 +5,10 @@ import type { GetPathUseCase } from "../use-cases/get-path.usecase.js";
 import type { AbortPromptUseCase } from "../use-cases/abort-prompt.usecase.js";
 import type { ListAgentsUseCase } from "../use-cases/list-agents.usecase.js";
 import type { ListModelsUseCase } from "../use-cases/list-models.usecase.js";
-import type { ListProjectsUseCase } from "../use-cases/list-projects.usecase.js";
 import type { ListSessionsUseCase } from "../use-cases/list-sessions.usecase.js";
 import type { SendPromptUseCase } from "../use-cases/send-prompt.usecase.js";
 import type { SwitchAgentUseCase } from "../use-cases/switch-agent.usecase.js";
 import type { SwitchModelUseCase } from "../use-cases/switch-model.usecase.js";
-import type { SwitchProjectUseCase } from "../use-cases/switch-project.usecase.js";
 import type { SwitchSessionUseCase } from "../use-cases/switch-session.usecase.js";
 
 export interface BotDependencies {
@@ -20,19 +18,16 @@ export interface BotDependencies {
     listAgentsUseCase: ListAgentsUseCase;
     logger: Logger;
     listModelsUseCase: ListModelsUseCase;
-    listProjectsUseCase: ListProjectsUseCase;
     listSessionsUseCase: ListSessionsUseCase;
     sessionRepo: SessionRepository;
     sendPromptUseCase: SendPromptUseCase;
     switchAgentUseCase: SwitchAgentUseCase;
     switchModelUseCase: SwitchModelUseCase;
-    switchProjectUseCase: SwitchProjectUseCase;
     switchSessionUseCase: SwitchSessionUseCase;
 }
 
 export type AgentsCallbackData = `agents:page:${number}` | `agents:select:${number}`;
 export type LanguageCallbackData = `language:select:${"en" | "zh-CN"}`;
-export type ProjectsCallbackData = `projects:page:${number}` | `projects:select:${string}`;
 export type SessionsCallbackData = `sessions:page:${number}` | `sessions:select:${string}`;
 export type ModelCallbackData =
     | `model:page:${number}`

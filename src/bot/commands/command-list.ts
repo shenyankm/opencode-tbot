@@ -22,10 +22,6 @@ export function getTelegramCommands(language: BotLanguage = "en"): BotCommand[] 
             description: copy.commands.agents,
         },
         {
-            command: "projects",
-            description: copy.commands.projects,
-        },
-        {
             command: "sessions",
             description: copy.commands.sessions,
         },

@@ -42,6 +42,45 @@ export class SendPromptUseCase {
             );
         }
 
+        if (binding?.modelProviderId && binding?.modelId) {
+            const availableModels = await this.opencodeClient.listModels();
+            const selectedModel = availableModels.find((model) =>
+                model.providerID === binding?.modelProviderId && model.id === binding?.modelId,
+            );
+
+            if (!selectedModel) {
+                binding = {
+                    ...binding,
+                    modelProviderId: null,
+                    modelId: null,
+                    modelVariant: null,
+                    updatedAt: new Date().toISOString(),
+                };
+                await this.sessionRepo.setCurrent(binding);
+                this.logger.warn?.(
+                    {
+                        chatId: input.chatId,
+                    },
+                    "selected model is no longer available, falling back to OpenCode default",
+                );
+            } else if (binding.modelVariant && !(binding.modelVariant in selectedModel.variants)) {
+                binding = {
+                    ...binding,
+                    modelVariant: null,
+                    updatedAt: new Date().toISOString(),
+                };
+                await this.sessionRepo.setCurrent(binding);
+                this.logger.warn?.(
+                    {
+                        chatId: input.chatId,
+                        providerId: selectedModel.providerID,
+                        modelId: selectedModel.id,
+                    },
+                    "selected model variant is no longer available, falling back to default variant",
+                );
+            }
+        }
+
         if (!binding || !binding.sessionId || !binding.projectId) {
             throw new Error("Failed to initialize chat session.");
         }

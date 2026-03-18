@@ -758,3 +758,104 @@ test("listModels returns configured models, connected-provider models, and avail
         },
     ]);
 });
+
+test("listModels filters configured providers against the upstream /models endpoint when baseURL is configured", async () => {
+    const configuredModel = createModel("openai", "gpt-5.3-codex", "GPT-5.3 Codex");
+    const unavailableConfiguredModel = createModel("openai", "gpt-5-codex", "GPT-5 Codex");
+    const availableCatalogModel = createModel("openai", "gpt-5.2", "GPT-5.2");
+    const unavailableCatalogModel = createModel("openai", "gpt-5.2-pro", "GPT-5.2 Pro");
+    const provider = createProvider("openai", "OpenAI", [
+        configuredModel,
+        unavailableConfiguredModel,
+        availableCatalogModel,
+        unavailableCatalogModel,
+    ]);
+    const fetchCalls: Array<{ input: unknown; init: unknown }> = [];
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            config: {
+                get: async () => ({
+                    data: {
+                        provider: {
+                            openai: {
+                                models: {
+                                    "gpt-5.3-codex": {
+                                        name: "GPT-5.3 Codex",
+                                    },
+                                    "gpt-5-codex": {
+                                        name: "GPT-5 Codex",
+                                    },
+                                },
+                                options: {
+                                    apiKey: "test-key",
+                                    baseURL: "https://gateway.example/v1",
+                                },
+                            },
+                        },
+                    },
+                }),
+                providers: async () => ({
+                    data: {
+                        providers: [provider],
+                        default: {},
+                    },
+                }),
+            },
+            path: {
+                get: async () => ({ data: createPath() }),
+            },
+            project: {
+                list: async () => ({ data: [] }),
+                current: async () => ({ data: createProject("project-1", "E:/repo-1") }),
+            },
+            session: {
+                create: async () => ({ data: createSession("session-1", "project-1", "E:/repo-1") }),
+                prompt: async () => ({
+                    data: {
+                        info: {} as never,
+                        parts: [],
+                    },
+                }),
+            },
+        } as never,
+        async (input, init) => {
+            fetchCalls.push({ input, init });
+
+            return new Response(JSON.stringify({
+                data: [
+                    { id: "gpt-5.3-codex" },
+                    { id: "gpt-5.2" },
+                ],
+            }), {
+                status: 200,
+                headers: {
+                    "content-type": "application/json",
+                },
+            });
+        },
+    );
+
+    assert.deepEqual(await client.listModels(), [
+        {
+            id: "gpt-5.3-codex",
+            providerID: "openai",
+            providerName: "OpenAI (gateway.example)",
+            name: "GPT-5.3 Codex",
+            qualifiedId: "openai/gpt-5.3-codex",
+            reasoning: true,
+            variants: {},
+        },
+        {
+            id: "gpt-5.2",
+            providerID: "openai",
+            providerName: "OpenAI",
+            name: "GPT-5.2",
+            qualifiedId: "openai/gpt-5.2",
+            reasoning: true,
+            variants: {},
+        },
+    ]);
+    assert.equal(fetchCalls.length, 1);
+    assert.equal(fetchCalls[0].input, "https://gateway.example/v1/models");
+});

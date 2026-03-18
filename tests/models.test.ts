@@ -97,23 +97,9 @@ function createDependencies(client: OpenCodeClientLike) {
         },
         logger,
         listModelsUseCase: new ListModelsUseCase(repo, client),
-        listProjectsUseCase: {
-            async execute() {
-                return {
-                    projects: [],
-                    currentProjectId: null,
-                    currentDirectory: null,
-                };
-            },
-        } as never,
         sessionRepo: repo,
         sendPromptUseCase: new SendPromptUseCase(repo, client, logger),
         switchModelUseCase: new SwitchModelUseCase(repo, client, logger),
-        switchProjectUseCase: {
-            async execute() {
-                return { found: false };
-            },
-        } as never,
     };
 
     return { dependencies, repo };
@@ -158,7 +144,7 @@ test("/model only shows configured models with numeric inline buttons", async ()
 
     assert.equal(replies.length, 1);
     assert.match(replies[0].text, /Model List/);
-    assert.match(replies[0].text, /Configured models, connected-provider models, and available custom-provider models in OpenCode are shown\./);
+    assert.match(replies[0].text, /Only models currently available in OpenCode and connected providers are shown\./);
     assert.match(replies[0].text, /Current model: Not selected \(using OpenCode default\)/);
     assert.match(replies[0].text, /Page 1\/2/);
     assert.match(replies[0].text, /1\. OpenAI \/ Model 1/);

@@ -39,15 +39,13 @@ function createDependencies() {
         },
         listAgentsUseCase: {} as never,
         listModelsUseCase: {} as never,
-        listProjectsUseCase: {} as never,
         sendPromptUseCase: {} as never,
         switchAgentUseCase: {} as never,
         switchModelUseCase: {} as never,
-        switchProjectUseCase: {} as never,
     } as unknown as BotDependencies;
 }
 
-test("/path returns the current path information", async () => {
+test("/path returns the current working directory only", async () => {
     const dependencies = createDependencies();
     const replies: string[] = [];
 
@@ -62,17 +60,7 @@ test("/path returns the current path information", async () => {
         dependencies,
     );
 
-    assert.equal(
-        replies[0],
-        [
-            "Current Paths",
-            "Home: E:/Users/demo",
-            "State: E:/Users/demo/.opencode",
-            "Config: E:/repo/opencode.json",
-            "Worktree: E:/repo",
-            "Directory: E:/repo/src",
-        ].join("\n"),
-    );
+    assert.equal(replies[0], "Current working directory: E:/repo/src");
 });
 
 test("/path uses the selected chat language for bot-generated output", async () => {
@@ -102,15 +90,5 @@ test("/path uses the selected chat language for bot-generated output", async () 
         dependencies,
     );
 
-    assert.equal(
-        replies[0],
-        [
-            "当前路径",
-            "主目录: E:/Users/demo",
-            "状态目录: E:/Users/demo/.opencode",
-            "配置文件: E:/repo/opencode.json",
-            "工作树: E:/repo",
-            "当前目录: E:/repo/src",
-        ].join("\n"),
-    );
+    assert.equal(replies[0], "当前工作目录: E:/repo/src");
 });

@@ -3,7 +3,6 @@ import type {
     OpenCodeConfiguredModel,
     OpenCodeHealth,
     OpenCodePath,
-    OpenCodeProject,
     OpenCodeSession,
 } from "../../services/opencode/opencode.client.js";
 import {
@@ -15,16 +14,8 @@ import {
 import {
     getAgentsPage,
     getModelsPage,
-    getProjectsPage,
     getSessionsPage,
 } from "./keyboard.presenter.js";
-
-interface ProjectsMessageInput {
-    currentDirectory: string | null;
-    currentProjectId: string | null;
-    page: number;
-    projects: OpenCodeProject[];
-}
 
 interface ModelsMessageInput {
     currentModelId: string | null;
@@ -57,40 +48,7 @@ export function presentHealthMessage(health: OpenCodeHealth, copy: BotCopy = BOT
 }
 
 export function presentPathMessage(path: OpenCodePath, copy: BotCopy = BOT_COPY): string {
-    return [
-        copy.path.title,
-        copy.path.home(path.home),
-        copy.path.state(path.state),
-        copy.path.config(path.config),
-        copy.path.worktree(path.worktree),
-        copy.path.directory(path.directory),
-    ].join("\n");
-}
-
-export function presentProjectsMessage(input: ProjectsMessageInput, copy: BotCopy = BOT_COPY): string {
-    if (input.projects.length === 0) {
-        return copy.projects.none;
-    }
-
-    const page = getProjectsPage(input.projects, input.page);
-    const currentProject = input.projects.find((project) => project.id === input.currentProjectId);
-    const currentDirectory = currentProject?.worktree ?? input.currentDirectory ?? copy.common.notSelected;
-    const lines = [
-        copy.projects.title,
-        copy.projects.current(currentDirectory),
-        copy.common.page(page.page + 1, page.totalPages),
-        "",
-        ...page.items.map((project, index) => `${page.startIndex + index + 1}. ${project.worktree}`),
-    ];
-
-    return lines.join("\n");
-}
-
-export function presentProjectSwitchMessage(worktree: string, copy: BotCopy = BOT_COPY): string {
-    return [
-        copy.projects.switched,
-        copy.projects.current(worktree),
-    ].join("\n");
+    return copy.path.directory(path.directory);
 }
 
 export function presentSessionsMessage(input: SessionsMessageInput, copy: BotCopy = BOT_COPY): string {

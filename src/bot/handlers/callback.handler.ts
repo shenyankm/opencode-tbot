@@ -6,7 +6,6 @@ import type {
     BotDependencies,
     LanguageCallbackData,
     ModelCallbackData,
-    ProjectsCallbackData,
     SessionsCallbackData,
 } from "../types.js";
 import {
@@ -14,7 +13,6 @@ import {
     buildLanguageKeyboard,
     buildModelsKeyboard,
     buildModelVariantsKeyboard,
-    buildProjectsKeyboard,
     buildSessionsKeyboard,
 } from "../presenters/keyboard.presenter.js";
 import { presentError } from "../presenters/error.presenter.js";
@@ -26,16 +24,12 @@ import {
     presentModelsMessage,
     presentModelSwitchMessage,
     presentModelVariantsMessage,
-    presentProjectsMessage,
-    presentProjectSwitchMessage,
     presentSessionsMessage,
     presentSessionSwitchMessage,
 } from "../presenters/message.presenter.js";
 
 const AGENTS_PAGE_PREFIX = "agents:page:";
 const AGENTS_SELECT_PREFIX = "agents:select:";
-const PROJECTS_PAGE_PREFIX = "projects:page:";
-const PROJECTS_SELECT_PREFIX = "projects:select:";
 const SESSIONS_PAGE_PREFIX = "sessions:page:";
 const SESSIONS_SELECT_PREFIX = "sessions:select:";
 const MODEL_PAGE_PREFIX = "model:page:";
@@ -120,70 +114,6 @@ export async function handleAgentsCallback(ctx: CallbackContext, dependencies: B
         }
     } catch (error) {
         dependencies.logger.error({ error }, "failed to handle agent callback");
-        await ctx.editMessageText(presentError(error, copy));
-    }
-}
-
-export async function handleProjectsCallback(ctx: CallbackContext, dependencies: BotDependencies) {
-    const data = ctx.callbackQuery.data as ProjectsCallbackData;
-
-    if (!data.startsWith("projects:")) {
-        return;
-    }
-
-    await ctx.answerCallbackQuery();
-
-    if (!ctx.chat) {
-        return;
-    }
-
-    const copy = await getChatCopy(dependencies.sessionRepo, ctx.chat.id);
-
-    try {
-        if (data.startsWith(PROJECTS_PAGE_PREFIX)) {
-            const requestedPage = Number(data.slice(PROJECTS_PAGE_PREFIX.length));
-            const result = await dependencies.listProjectsUseCase.execute({
-                chatId: ctx.chat.id,
-            });
-
-            if (result.projects.length === 0) {
-                await ctx.editMessageText(copy.projects.none);
-                return;
-            }
-
-            const { keyboard, page } = buildProjectsKeyboard(result.projects, requestedPage, copy);
-
-            await ctx.editMessageText(
-                presentProjectsMessage({
-                    currentDirectory: result.currentDirectory,
-                    currentProjectId: result.currentProjectId,
-                    page: page.page,
-                    projects: result.projects,
-                }, copy),
-                {
-                    reply_markup: keyboard,
-                },
-            );
-
-            return;
-        }
-
-        if (data.startsWith(PROJECTS_SELECT_PREFIX)) {
-            const projectId = data.slice(PROJECTS_SELECT_PREFIX.length);
-            const result = await dependencies.switchProjectUseCase.execute({
-                chatId: ctx.chat.id,
-                projectId,
-            });
-
-            if (!result.found) {
-                await ctx.editMessageText(copy.projects.expired);
-                return;
-            }
-
-            await ctx.editMessageText(presentProjectSwitchMessage(result.project.worktree, copy));
-        }
-    } catch (error) {
-        dependencies.logger.error({ error }, "failed to handle project callback");
         await ctx.editMessageText(presentError(error, copy));
     }
 }
@@ -424,10 +354,6 @@ export async function handleLanguageCallback(ctx: CallbackContext, dependencies:
 export function registerCallbackHandler(bot: Bot, dependencies: BotDependencies) {
     bot.callbackQuery(/^agents:/, async (ctx) => {
         await handleAgentsCallback(ctx, dependencies);
-    });
-
-    bot.callbackQuery(/^projects:/, async (ctx) => {
-        await handleProjectsCallback(ctx, dependencies);
     });
 
     bot.callbackQuery(/^sessions:/, async (ctx) => {

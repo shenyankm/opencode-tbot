@@ -9,22 +9,13 @@ import {
 import type {
     OpenCodeAgent,
     OpenCodeConfiguredModel,
-    OpenCodeProject,
     OpenCodeSession,
 } from "../../services/opencode/opencode.client.js";
 
-export const PROJECTS_PAGE_SIZE = 10;
 export const MODELS_PAGE_SIZE = 10;
 export const AGENTS_PAGE_SIZE = 10;
 export const SESSIONS_PAGE_SIZE = 10;
 const NUMBERED_BUTTONS_PER_ROW = 5;
-
-export interface ProjectsPage {
-    items: OpenCodeProject[];
-    page: number;
-    startIndex: number;
-    totalPages: number;
-}
 
 export interface ModelsPage {
     items: OpenCodeConfiguredModel[];
@@ -45,23 +36,6 @@ export interface SessionsPage {
     page: number;
     startIndex: number;
     totalPages: number;
-}
-
-export function buildProjectsKeyboard(
-    projects: OpenCodeProject[],
-    requestedPage: number,
-    copy: BotCopy = BOT_COPY,
-) {
-    const page = getProjectsPage(projects, requestedPage);
-    const keyboard = buildNumberedKeyboard(
-        page.items,
-        page.startIndex,
-        (project) => `projects:select:${project.id}`,
-    );
-
-    appendPaginationButtons(keyboard, page.page, page.totalPages, "projects:page", copy);
-
-    return { keyboard, page };
 }
 
 export function buildModelsKeyboard(
@@ -141,10 +115,6 @@ export function buildLanguageKeyboard(currentLanguage: BotLanguage, copy: BotCop
     return keyboard;
 }
 
-export function getProjectsPage(projects: OpenCodeProject[], requestedPage: number): ProjectsPage {
-    return getPagedItems(projects, requestedPage, PROJECTS_PAGE_SIZE);
-}
-
 export function getModelsPage(models: OpenCodeConfiguredModel[], requestedPage: number): ModelsPage {
     return getPagedItems(models, requestedPage, MODELS_PAGE_SIZE);
 }
@@ -181,7 +151,7 @@ function appendPaginationButtons(
     keyboard: InlineKeyboard,
     page: number,
     totalPages: number,
-    prefix: "agents:page" | "projects:page" | "sessions:page" | "model:page",
+    prefix: "agents:page" | "sessions:page" | "model:page",
     copy: BotCopy,
 ) {
     if (totalPages <= 1) {

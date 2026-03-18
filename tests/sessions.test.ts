@@ -52,12 +52,10 @@ function createDependencies(client: OpenCodeClientLike) {
         getPathUseCase: {} as never,
         listAgentsUseCase: {} as never,
         listModelsUseCase: {} as never,
-        listProjectsUseCase: {} as never,
         listSessionsUseCase: new ListSessionsUseCase(repo, client),
         sendPromptUseCase: {} as never,
         switchAgentUseCase: {} as never,
         switchModelUseCase: {} as never,
-        switchProjectUseCase: {} as never,
         switchSessionUseCase: new SwitchSessionUseCase(repo, client, logger),
     };
 
