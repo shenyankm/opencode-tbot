@@ -1,7 +1,7 @@
-import type { Session } from "./session.entity.js";
+import type { ChatSessionBinding } from "./session.entity.js";
 
 export interface SessionRepository {
-    getByChatId(chatId: number): Promise<Session | null>;
-    create(chatId: number): Promise<Session>;
-    touch(sessionId: string): Promise<void>;
+    getByChatId(chatId: number): Promise<ChatSessionBinding | null>;
+    setCurrent(binding: ChatSessionBinding): Promise<void>;
+    touch(chatId: number): Promise<void>;
 }

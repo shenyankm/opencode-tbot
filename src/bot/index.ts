@@ -1,13 +1,18 @@
 import type { Bot } from "grammy";
+import type { BotDependencies } from "./types.js";
+import { registerProjectsCommand } from "./commands/projects.js";
 import { registerStartCommand } from "./commands/start.js";
+import { registerCallbackHandler } from "./handlers/callback.handler.js";
 import { registerMessageHandler } from "./handlers/message.handler.js";
 import { authMiddleware } from "./middlewares/auth.js";
 import { loggingMiddleware } from "./middlewares/logging.js";
 
-export function registerBot(bot: Bot, _container: unknown) {
+export function registerBot(bot: Bot, container: BotDependencies) {
     bot.use(loggingMiddleware);
     bot.use(authMiddleware);
 
     registerStartCommand(bot);
-    registerMessageHandler(bot);
+    registerProjectsCommand(bot, container);
+    registerCallbackHandler(bot, container);
+    registerMessageHandler(bot, container);
 }

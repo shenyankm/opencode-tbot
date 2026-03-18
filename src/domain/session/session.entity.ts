@@ -1,6 +1,7 @@
-export interface Session {
-    id: string;
+export interface ChatSessionBinding {
     chatId: number;
-    createdAt: string;
+    sessionId: string;
+    projectId: string;
+    directory: string;
     updatedAt: string;
 }
