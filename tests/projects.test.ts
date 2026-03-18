@@ -23,13 +23,15 @@ function createProject(id: string, worktree: string): OpenCodeProject {
     return {
         id,
         worktree,
-        time: { created: 1 },
-    };
+        time: { created: 1, updated: 1 },
+        sandboxes: [],
+    } as OpenCodeProject;
 }
 
 function createSession(id: string, projectID: string, directory: string): OpenCodeSession {
     return {
         id,
+        slug: id,
         projectID,
         directory,
         title: "Session",
@@ -38,15 +40,30 @@ function createSession(id: string, projectID: string, directory: string): OpenCo
             created: 1,
             updated: 1,
         },
-    };
+    } as OpenCodeSession;
 }
 
 function createDependencies(client: OpenCodeClientLike) {
     const repo = new InMemorySessionRepository();
     const dependencies: BotDependencies = {
         logger,
+        listModelsUseCase: {
+            async execute() {
+                return {
+                    models: [],
+                    currentModelProviderId: null,
+                    currentModelId: null,
+                    currentModelVariant: null,
+                };
+            },
+        } as never,
         listProjectsUseCase: new ListProjectsUseCase(repo, client),
         sendPromptUseCase: new SendPromptUseCase(repo, client, logger),
+        switchModelUseCase: {
+            async execute() {
+                return { found: false };
+            },
+        } as never,
         switchProjectUseCase: new SwitchProjectUseCase(repo, client, logger),
     };
 
@@ -63,6 +80,9 @@ test("/projects shows the first page of projects with an inline keyboard", async
         },
         async getCurrentProject() {
             return projects[1];
+        },
+        async listModels() {
+            return [];
         },
         async listProjects() {
             return projects;
@@ -116,6 +136,9 @@ test("project page callbacks re-render the requested page", async () => {
         },
         async getCurrentProject() {
             return projects[0];
+        },
+        async listModels() {
+            return [];
         },
         async listProjects() {
             return projects;
@@ -173,6 +196,9 @@ test("project selection callbacks switch the binding to the selected project", a
         async getCurrentProject() {
             return projects[0];
         },
+        async listModels() {
+            return [];
+        },
         async listProjects() {
             return projects;
         },
@@ -200,8 +226,16 @@ test("project selection callbacks switch the binding to the selected project", a
     const binding = await repo.getByChatId(7);
 
     assert.equal(edits[0], "已切换项目。\n当前项目：E:/repo-2");
-    assert.equal(binding?.projectId, "project-2");
-    assert.equal(binding?.sessionId, "session-2");
+    assert.deepEqual(binding, {
+        chatId: 7,
+        sessionId: "session-2",
+        projectId: "project-2",
+        directory: "E:/repo-2",
+        modelProviderId: null,
+        modelId: null,
+        modelVariant: null,
+        updatedAt: binding?.updatedAt,
+    });
 });
 
 test("invalid project selections ask the user to rerun /projects", async () => {
@@ -211,6 +245,9 @@ test("invalid project selections ask the user to rerun /projects", async () => {
         },
         async getCurrentProject() {
             return createProject("project-1", "E:/repo-1");
+        },
+        async listModels() {
+            return [];
         },
         async listProjects() {
             return [createProject("project-1", "E:/repo-1")];
@@ -246,6 +283,9 @@ test("/projects surfaces SDK errors without leaking a stack trace", async () => 
         },
         async getCurrentProject() {
             throw new Error("boom");
+        },
+        async listModels() {
+            return [];
         },
         async listProjects() {
             throw new Error("boom");

@@ -18,6 +18,10 @@ test("TELEGRAM_COMMANDS only advertises implemented commands", () => {
             command: "projects",
             description: "查看并切换项目",
         },
+        {
+            command: "model",
+            description: "查看并切换模型",
+        },
     ]);
 });
 

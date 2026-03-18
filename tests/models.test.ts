@@ -1,0 +1,397 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import type { Logger } from "pino";
+import { handleModelsCommand } from "../src/bot/commands/models.js";
+import { handleModelsCallback } from "../src/bot/handlers/callback.handler.js";
+import type { BotDependencies } from "../src/bot/types.js";
+import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
+import type {
+    OpenCodeClientLike,
+    OpenCodeConfiguredModel,
+    OpenCodeProject,
+    OpenCodeSession,
+} from "../src/services/opencode/opencode.client.js";
+import { ListModelsUseCase } from "../src/use-cases/list-models.usecase.js";
+import { SendPromptUseCase } from "../src/use-cases/send-prompt.usecase.js";
+import { SwitchModelUseCase } from "../src/use-cases/switch-model.usecase.js";
+
+const logger = {
+    error() { },
+    info() { },
+} as unknown as Logger;
+
+function createProject(id: string, worktree: string): OpenCodeProject {
+    return {
+        id,
+        worktree,
+        time: { created: 1, updated: 1 },
+        sandboxes: [],
+    } as OpenCodeProject;
+}
+
+function createSession(id: string, projectID: string, directory: string): OpenCodeSession {
+    return {
+        id,
+        slug: id,
+        projectID,
+        directory,
+        title: "Session",
+        version: "1",
+        time: {
+            created: 1,
+            updated: 1,
+        },
+    } as OpenCodeSession;
+}
+
+function createConfiguredModel(
+    providerID: string,
+    id: string,
+    name: string,
+    providerName: string,
+    variants: Record<string, Record<string, unknown>> = {},
+): OpenCodeConfiguredModel {
+    return {
+        id,
+        providerID,
+        providerName,
+        name,
+        qualifiedId: `${providerID}/${id}`,
+        reasoning: Object.keys(variants).length > 0,
+        variants,
+    };
+}
+
+function createDependencies(client: OpenCodeClientLike) {
+    const repo = new InMemorySessionRepository();
+    const dependencies: BotDependencies = {
+        logger,
+        listModelsUseCase: new ListModelsUseCase(repo, client),
+        listProjectsUseCase: {
+            async execute() {
+                return {
+                    projects: [],
+                    currentProjectId: null,
+                    currentDirectory: null,
+                };
+            },
+        } as never,
+        sendPromptUseCase: new SendPromptUseCase(repo, client, logger),
+        switchModelUseCase: new SwitchModelUseCase(repo, client, logger),
+        switchProjectUseCase: {
+            async execute() {
+                return { found: false };
+            },
+        } as never,
+    };
+
+    return { dependencies, repo };
+}
+
+test("/model only shows configured models with numeric inline buttons", async () => {
+    const models = Array.from({ length: 12 }, (_, index) =>
+        createConfiguredModel("openai", `model-${index + 1}`, `Model ${index + 1}`, "OpenAI"),
+    );
+    const { dependencies } = createDependencies({
+        async createSessionForDirectory(directory) {
+            return createSession("session-1", "project-1", directory);
+        },
+        async getCurrentProject() {
+            return createProject("project-1", "E:/repo-1");
+        },
+        async listModels() {
+            return models;
+        },
+        async listProjects() {
+            return [];
+        },
+        async promptSession() {
+            return { text: "unused" };
+        },
+    });
+    const replies: Array<{ text: string; other?: { reply_markup?: unknown } }> = [];
+
+    await handleModelsCommand(
+        {
+            chat: { id: 1 },
+            async reply(text, other) {
+                replies.push({ text, other });
+                return {};
+            },
+        },
+        dependencies,
+    );
+
+    assert.equal(replies.length, 1);
+    assert.match(replies[0].text, /模型列表/);
+    assert.match(replies[0].text, /仅显示 OpenCode 当前已配置的模型。/);
+    assert.match(replies[0].text, /当前模型：未选择（使用 OpenCode 默认）/);
+    assert.match(replies[0].text, /第 1\/2 页/);
+    assert.match(replies[0].text, /1\. OpenAI \/ Model 1/);
+    assert.doesNotMatch(replies[0].text, /13\. /);
+
+    const keyboard = replies[0].other?.reply_markup as {
+        inline_keyboard: Array<Array<{ callback_data: string; text: string }>>;
+    };
+    assert.deepEqual(
+        keyboard.inline_keyboard[0].map((button) => button.text),
+        ["1", "2", "3", "4", "5"],
+    );
+    assert.equal(keyboard.inline_keyboard[0][0].callback_data, "model:pick:1");
+    assert.equal(keyboard.inline_keyboard.at(-1)?.at(-1)?.callback_data, "model:page:1");
+});
+
+test("model page callbacks re-render the requested page", async () => {
+    const models = Array.from({ length: 12 }, (_, index) =>
+        createConfiguredModel("openai", `model-${index + 1}`, `Model ${index + 1}`, "OpenAI"),
+    );
+    const { dependencies } = createDependencies({
+        async createSessionForDirectory(directory) {
+            return createSession("session-1", "project-1", directory);
+        },
+        async getCurrentProject() {
+            return createProject("project-1", "E:/repo-1");
+        },
+        async listModels() {
+            return models;
+        },
+        async listProjects() {
+            return [];
+        },
+        async promptSession() {
+            return { text: "unused" };
+        },
+    });
+    const edits: Array<{ text: string; other?: { reply_markup?: unknown } }> = [];
+    let answered = 0;
+
+    await handleModelsCallback(
+        {
+            chat: { id: 1 },
+            callbackQuery: { data: "model:page:1" },
+            async answerCallbackQuery() {
+                answered += 1;
+                return {};
+            },
+            async editMessageText(text, other) {
+                edits.push({ text, other });
+                return {};
+            },
+        },
+        dependencies,
+    );
+
+    assert.equal(answered, 1);
+    assert.equal(edits.length, 1);
+    assert.match(edits[0].text, /第 2\/2 页/);
+    assert.match(edits[0].text, /11\. OpenAI \/ Model 11/);
+    assert.doesNotMatch(edits[0].text, /^1\. OpenAI \/ Model 1$/m);
+
+    const keyboard = edits[0].other?.reply_markup as {
+        inline_keyboard: Array<Array<{ callback_data: string; text: string }>>;
+    };
+    assert.deepEqual(
+        keyboard.inline_keyboard[0].map((button) => button.text),
+        ["11", "12"],
+    );
+    assert.equal(keyboard.inline_keyboard.at(-1)?.[0]?.callback_data, "model:page:0");
+});
+
+test("picking a model with variants opens a second numeric choice list", async () => {
+    const models = [
+        createConfiguredModel("openai", "gpt-5", "GPT-5", "OpenAI"),
+        createConfiguredModel("openai", "gpt-5-thinking", "GPT-5 Thinking", "OpenAI", {
+            high: {},
+            low: {},
+            medium: {},
+        }),
+    ];
+    const { dependencies } = createDependencies({
+        async createSessionForDirectory(directory) {
+            return createSession("session-1", "project-1", directory);
+        },
+        async getCurrentProject() {
+            return createProject("project-1", "E:/repo-1");
+        },
+        async listModels() {
+            return models;
+        },
+        async listProjects() {
+            return [];
+        },
+        async promptSession() {
+            return { text: "unused" };
+        },
+    });
+    const edits: Array<{ text: string; other?: { reply_markup?: unknown } }> = [];
+
+    await handleModelsCallback(
+        {
+            chat: { id: 1 },
+            callbackQuery: { data: "model:pick:2" },
+            async answerCallbackQuery() {
+                return {};
+            },
+            async editMessageText(text, other) {
+                edits.push({ text, other });
+                return {};
+            },
+        },
+        dependencies,
+    );
+
+    assert.equal(edits.length, 1);
+    assert.match(edits[0].text, /推理强度列表/);
+    assert.match(edits[0].text, /模型编号：2/);
+    assert.match(edits[0].text, /1\. low/);
+    assert.match(edits[0].text, /2\. medium/);
+    assert.match(edits[0].text, /3\. high/);
+
+    const keyboard = edits[0].other?.reply_markup as {
+        inline_keyboard: Array<Array<{ callback_data: string; text: string }>>;
+    };
+    assert.deepEqual(
+        keyboard.inline_keyboard[0].map((button) => button.text),
+        ["1", "2", "3"],
+    );
+    assert.equal(keyboard.inline_keyboard[0][0].callback_data, "model:variant:2:1");
+});
+
+test("picking a model without variants switches immediately", async () => {
+    const models = [
+        createConfiguredModel("openai", "gpt-5", "GPT-5", "OpenAI"),
+    ];
+    const { dependencies, repo } = createDependencies({
+        async createSessionForDirectory(directory) {
+            return createSession("session-1", "project-1", directory);
+        },
+        async getCurrentProject() {
+            return createProject("project-1", "E:/repo-1");
+        },
+        async listModels() {
+            return models;
+        },
+        async listProjects() {
+            return [];
+        },
+        async promptSession() {
+            return { text: "unused" };
+        },
+    });
+    const edits: string[] = [];
+
+    await handleModelsCallback(
+        {
+            chat: { id: 9 },
+            callbackQuery: { data: "model:pick:1" },
+            async answerCallbackQuery() {
+                return {};
+            },
+            async editMessageText(text) {
+                edits.push(text);
+                return {};
+            },
+        },
+        dependencies,
+    );
+
+    const binding = await repo.getByChatId(9);
+
+    assert.equal(edits[0], "已切换模型。\n当前模型：OpenAI / GPT-5\n当前强度：默认");
+    assert.deepEqual(binding, {
+        chatId: 9,
+        sessionId: null,
+        projectId: null,
+        directory: null,
+        modelProviderId: "openai",
+        modelId: "gpt-5",
+        modelVariant: null,
+        updatedAt: binding?.updatedAt,
+    });
+});
+
+test("variant selection updates the binding and later prompts use the selected model", async () => {
+    const models = [
+        createConfiguredModel("openai", "gpt-5-thinking", "GPT-5 Thinking", "OpenAI", {
+            high: {},
+            low: {},
+            medium: {},
+        }),
+    ];
+    const promptCalls: unknown[] = [];
+    const { dependencies, repo } = createDependencies({
+        async createSessionForDirectory(directory) {
+            return createSession("session-1", "project-1", directory);
+        },
+        async getCurrentProject() {
+            return createProject("project-1", "E:/repo-1");
+        },
+        async listModels() {
+            return models;
+        },
+        async listProjects() {
+            return [];
+        },
+        async promptSession(input) {
+            promptCalls.push(input);
+            return { text: "reply from selected model" };
+        },
+    });
+    const edits: string[] = [];
+
+    await handleModelsCallback(
+        {
+            chat: { id: 12 },
+            callbackQuery: { data: "model:variant:1:3" },
+            async answerCallbackQuery() {
+                return {};
+            },
+            async editMessageText(text) {
+                edits.push(text);
+                return {};
+            },
+        },
+        dependencies,
+    );
+
+    const bindingAfterSwitch = await repo.getByChatId(12);
+    const promptResult = await dependencies.sendPromptUseCase.execute({
+        chatId: 12,
+        text: "continue",
+    });
+    const bindingAfterPrompt = await repo.getByChatId(12);
+
+    assert.equal(edits[0], "已切换模型。\n当前模型：OpenAI / GPT-5 Thinking\n当前强度：high");
+    assert.deepEqual(bindingAfterSwitch, {
+        chatId: 12,
+        sessionId: null,
+        projectId: null,
+        directory: null,
+        modelProviderId: "openai",
+        modelId: "gpt-5-thinking",
+        modelVariant: "high",
+        updatedAt: bindingAfterSwitch?.updatedAt,
+    });
+    assert.deepEqual(promptCalls, [
+        {
+            sessionId: "session-1",
+            prompt: "continue",
+            model: {
+                providerID: "openai",
+                modelID: "gpt-5-thinking",
+            },
+            variant: "high",
+        },
+    ]);
+    assert.equal(promptResult.replyText, "reply from selected model");
+    assert.deepEqual(bindingAfterPrompt, {
+        chatId: 12,
+        sessionId: "session-1",
+        projectId: "project-1",
+        directory: "E:/repo-1",
+        modelProviderId: "openai",
+        modelId: "gpt-5-thinking",
+        modelVariant: "high",
+        updatedAt: bindingAfterPrompt?.updatedAt,
+    });
+});

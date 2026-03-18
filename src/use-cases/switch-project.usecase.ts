@@ -20,6 +20,7 @@ export class SwitchProjectUseCase {
     ) { }
 
     async execute(input: { chatId: number; projectId: string }): Promise<SwitchProjectResult> {
+        const existingBinding = await this.sessionRepo.getByChatId(input.chatId);
         const projects = await this.opencodeClient.listProjects();
         const project = projects.find((item) => item.id === input.projectId);
 
@@ -34,6 +35,10 @@ export class SwitchProjectUseCase {
             sessionId: session.id,
             projectId: project.id,
             directory: project.worktree,
+            agentName: existingBinding?.agentName ?? null,
+            modelProviderId: existingBinding?.modelProviderId ?? null,
+            modelId: existingBinding?.modelId ?? null,
+            modelVariant: existingBinding?.modelVariant ?? null,
             updatedAt: new Date().toISOString(),
         });
 

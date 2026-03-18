@@ -17,7 +17,7 @@ export class ListProjectsUseCase {
         const binding = await this.sessionRepo.getByChatId(input.chatId);
         const projects = await this.opencodeClient.listProjects();
 
-        if (binding) {
+        if (binding?.projectId && binding.directory) {
             return {
                 projects,
                 currentProjectId: binding.projectId,

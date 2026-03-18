@@ -12,7 +12,7 @@ export class SendPromptUseCase {
     async execute(input: { chatId: number; text: string }) {
         let binding = await this.sessionRepo.getByChatId(input.chatId);
 
-        if (!binding) {
+        if (!binding || !binding.sessionId || !binding.projectId || !binding.directory) {
             const project = await this.opencodeClient.getCurrentProject();
             const session = await this.opencodeClient.createSessionForDirectory(project.worktree);
 
@@ -21,6 +21,10 @@ export class SendPromptUseCase {
                 sessionId: session.id,
                 projectId: project.id,
                 directory: project.worktree,
+                agentName: binding?.agentName ?? null,
+                modelProviderId: binding?.modelProviderId ?? null,
+                modelId: binding?.modelId ?? null,
+                modelVariant: binding?.modelVariant ?? null,
                 updatedAt: new Date().toISOString(),
             };
 
@@ -36,9 +40,21 @@ export class SendPromptUseCase {
             );
         }
 
+        if (!binding || !binding.sessionId || !binding.projectId) {
+            throw new Error("Failed to initialize chat session.");
+        }
+
         const result = await this.opencodeClient.promptSession({
             sessionId: binding.sessionId,
             prompt: input.text,
+            agent: binding.agentName,
+            model: binding.modelProviderId && binding.modelId
+                ? {
+                    providerID: binding.modelProviderId,
+                    modelID: binding.modelId,
+                }
+                : undefined,
+            variant: binding.modelVariant,
         });
 
         await this.sessionRepo.touch(input.chatId);

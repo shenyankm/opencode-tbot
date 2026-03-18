@@ -8,7 +8,6 @@ import type {
     OpenCodeSession,
 } from "../src/services/opencode/opencode.client.js";
 import { SendPromptUseCase } from "../src/use-cases/send-prompt.usecase.js";
-import { SwitchProjectUseCase } from "../src/use-cases/switch-project.usecase.js";
 
 const logger = {
     error() { },
@@ -19,13 +18,15 @@ function createProject(id: string, worktree: string): OpenCodeProject {
     return {
         id,
         worktree,
-        time: { created: 1 },
-    };
+        time: { created: 1, updated: 1 },
+        sandboxes: [],
+    } as OpenCodeProject;
 }
 
 function createSession(id: string, projectID: string, directory: string): OpenCodeSession {
     return {
         id,
+        slug: id,
         projectID,
         directory,
         title: "Session",
@@ -34,7 +35,7 @@ function createSession(id: string, projectID: string, directory: string): OpenCo
             created: 1,
             updated: 1,
         },
-    };
+    } as OpenCodeSession;
 }
 
 test("SendPromptUseCase creates a session in the current project when the chat is unbound", async () => {
@@ -48,6 +49,9 @@ test("SendPromptUseCase creates a session in the current project when the chat i
         },
         async getCurrentProject() {
             return currentProject;
+        },
+        async listModels() {
+            return [];
         },
         async listProjects() {
             return [currentProject];
@@ -76,6 +80,9 @@ test("SendPromptUseCase creates a session in the current project when the chat i
         sessionId: "session-1",
         projectId: "project-1",
         directory: "E:/repo-1",
+        modelProviderId: null,
+        modelId: null,
+        modelVariant: null,
         updatedAt: binding?.updatedAt,
     });
     assert.deepEqual(calls, [
@@ -84,58 +91,71 @@ test("SendPromptUseCase creates a session in the current project when the chat i
     ]);
 });
 
-test("SwitchProjectUseCase updates the binding and later prompts use the switched session", async () => {
+test("SendPromptUseCase preserves a selected model when it needs to create a session later", async () => {
     const repo = new InMemorySessionRepository();
-    const projects = [
-        createProject("project-1", "E:/repo-1"),
-        createProject("project-2", "E:/repo-2"),
-    ];
-    const calls: Array<{ type: string; directory?: string; sessionId?: string }> = [];
+    await repo.setCurrent({
+        chatId: 42,
+        sessionId: null,
+        projectId: null,
+        directory: null,
+        modelProviderId: "openai",
+        modelId: "gpt-5",
+        modelVariant: "high",
+        updatedAt: new Date(0).toISOString(),
+    });
+
+    const currentProject = createProject("project-1", "E:/repo-1");
+    const promptCalls: unknown[] = [];
     const client: OpenCodeClientLike = {
         async createSessionForDirectory(directory) {
-            calls.push({ type: "create", directory });
-
-            if (directory === "E:/repo-2") {
-                return createSession("session-2", "project-2", directory);
-            }
-
-            return createSession("session-1", "project-1", directory);
+            return createSession("session-1", currentProject.id, directory);
         },
         async getCurrentProject() {
-            throw new Error("getCurrentProject should not be called after a project switch");
+            return currentProject;
+        },
+        async listModels() {
+            return [];
         },
         async listProjects() {
-            return projects;
+            return [currentProject];
         },
         async promptSession(input) {
-            calls.push({ type: "prompt", sessionId: input.sessionId });
-            return { text: `reply from ${input.sessionId}` };
+            promptCalls.push(input);
+            return { text: "reply from model" };
         },
     };
 
-    const switchUseCase = new SwitchProjectUseCase(repo, client, logger);
-    const switchResult = await switchUseCase.execute({
-        chatId: 42,
-        projectId: "project-2",
-    });
-    const sendUseCase = new SendPromptUseCase(repo, client, logger);
-    const promptResult = await sendUseCase.execute({
+    const useCase = new SendPromptUseCase(repo, client, logger);
+    const result = await useCase.execute({
         chatId: 42,
         text: "continue",
     });
     const binding = await repo.getByChatId(42);
 
-    assert.deepEqual(switchResult, {
-        found: true,
-        project: projects[1],
-        sessionId: "session-2",
+    assert.deepEqual(result, {
+        sessionId: "session-1",
+        projectId: "project-1",
+        replyText: "reply from model",
     });
-    assert.equal(binding?.projectId, "project-2");
-    assert.equal(binding?.sessionId, "session-2");
-    assert.equal(promptResult.sessionId, "session-2");
-    assert.equal(promptResult.replyText, "reply from session-2");
-    assert.deepEqual(calls, [
-        { type: "create", directory: "E:/repo-2" },
-        { type: "prompt", sessionId: "session-2" },
+    assert.deepEqual(promptCalls, [
+        {
+            sessionId: "session-1",
+            prompt: "continue",
+            model: {
+                providerID: "openai",
+                modelID: "gpt-5",
+            },
+            variant: "high",
+        },
     ]);
+    assert.deepEqual(binding, {
+        chatId: 42,
+        sessionId: "session-1",
+        projectId: "project-1",
+        directory: "E:/repo-1",
+        modelProviderId: "openai",
+        modelId: "gpt-5",
+        modelVariant: "high",
+        updatedAt: binding?.updatedAt,
+    });
 });
