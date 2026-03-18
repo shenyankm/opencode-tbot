@@ -8,6 +8,7 @@ import { CreateSessionUseCase } from "../use-cases/create-session.usecase.js";
 import { GetHealthUseCase } from "../use-cases/get-health.usecase.js";
 import { GetPathUseCase } from "../use-cases/get-path.usecase.js";
 import { ListAgentsUseCase } from "../use-cases/list-agents.usecase.js";
+import { ListLspUseCase } from "../use-cases/list-lsp.usecase.js";
 import { ListMcpUseCase } from "../use-cases/list-mcp.usecase.js";
 import { ListModelsUseCase } from "../use-cases/list-models.usecase.js";
 import { ListSessionsUseCase } from "../use-cases/list-sessions.usecase.js";
@@ -31,6 +32,7 @@ const createSessionUseCase = new CreateSessionUseCase(sessionRepo, opencodeClien
 const getHealthUseCase = new GetHealthUseCase(opencodeClient);
 const getPathUseCase = new GetPathUseCase(opencodeClient);
 const listAgentsUseCase = new ListAgentsUseCase(sessionRepo, opencodeClient);
+const listLspUseCase = new ListLspUseCase(sessionRepo, opencodeClient);
 const listMcpUseCase = new ListMcpUseCase(sessionRepo, opencodeClient);
 const listModelsUseCase = new ListModelsUseCase(sessionRepo, opencodeClient);
 const listSessionsUseCase = new ListSessionsUseCase(sessionRepo, opencodeClient);
@@ -48,6 +50,7 @@ export const container = {
     getHealthUseCase,
     getPathUseCase,
     listAgentsUseCase,
+    listLspUseCase,
     listMcpUseCase,
     listModelsUseCase,
     listSessionsUseCase,

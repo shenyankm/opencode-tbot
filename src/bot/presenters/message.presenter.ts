@@ -2,6 +2,7 @@ import type {
     OpenCodeAgent,
     OpenCodeConfiguredModel,
     OpenCodeHealth,
+    OpenCodeLspStatus,
     OpenCodeMcpStatus,
     OpenCodePath,
     OpenCodeSession,
@@ -47,6 +48,11 @@ interface McpMessageInput {
     }>;
 }
 
+interface LspMessageInput {
+    currentDirectory: string;
+    statuses: OpenCodeLspStatus[];
+}
+
 const VARIANT_ORDER = ["minimal", "none", "low", "medium", "high", "xhigh", "max"];
 export function presentHealthMessage(health: OpenCodeHealth, copy: BotCopy = BOT_COPY): string {
     return [
@@ -73,6 +79,23 @@ export function presentMcpMessage(input: McpMessageInput, copy: BotCopy = BOT_CO
     }
 
     lines.push(...input.statuses.map(({ name, status }) => `${name}: ${formatMcpStatus(status, copy)}`));
+
+    return lines.join("\n");
+}
+
+export function presentLspMessage(input: LspMessageInput, copy: BotCopy = BOT_COPY): string {
+    const lines = [
+        copy.lsp.title,
+        copy.lsp.currentProject(input.currentDirectory),
+        "",
+    ];
+
+    if (input.statuses.length === 0) {
+        lines.push(copy.lsp.none);
+        return lines.join("\n");
+    }
+
+    lines.push(...input.statuses.map((status) => `${status.name}: ${formatLspStatus(status, copy)}`));
 
     return lines.join("\n");
 }
@@ -285,6 +308,19 @@ function formatMcpStatus(status: OpenCodeMcpStatus, copy: BotCopy): string {
     }
 
     const exhaustiveStatus: never = status;
+
+    return exhaustiveStatus;
+}
+
+function formatLspStatus(status: OpenCodeLspStatus, copy: BotCopy): string {
+    switch (status.status) {
+        case "connected":
+            return copy.lsp.connected;
+        case "error":
+            return copy.lsp.error;
+    }
+
+    const exhaustiveStatus: never = status.status;
 
     return exhaustiveStatus;
 }

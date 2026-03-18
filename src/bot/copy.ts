@@ -5,6 +5,7 @@ export interface BotCopy {
         start: string;
         health: string;
         path: string;
+        lsp: string;
         mcp: string;
         new: string;
         agents: string;
@@ -82,6 +83,13 @@ export interface BotCopy {
         created: string;
         expired: string;
     };
+    lsp: {
+        none: string;
+        title: string;
+        currentProject(worktree: string): string;
+        connected: string;
+        error: string;
+    };
     mcp: {
         none: string;
         title: string;
@@ -133,6 +141,7 @@ const EN_BOT_COPY: BotCopy = {
         start: "Show bot overview",
         health: "Check server health",
         path: "Show current paths",
+        lsp: "Show LSP servers",
         mcp: "Show MCP servers",
         new: "Create a new session",
         agents: "View and switch agents",
@@ -234,6 +243,15 @@ const EN_BOT_COPY: BotCopy = {
         created: "Session created.",
         expired: "The session is no longer available. Run /sessions again.",
     },
+    lsp: {
+        none: "No LSP servers detected for the current project.",
+        title: "LSP Servers",
+        currentProject(worktree: string) {
+            return `Current project: ${worktree}`;
+        },
+        connected: "connected",
+        error: "error",
+    },
     mcp: {
         none: "No MCP servers configured for the current project.",
         title: "MCP Servers",
@@ -305,6 +323,7 @@ const ZH_CN_BOT_COPY: BotCopy = {
         start: "查看机器人说明",
         health: "检查服务健康状态",
         path: "查看当前路径",
+        lsp: "查看 LSP 服务",
         mcp: "查看 MCP 服务",
         new: "新建会话",
         agents: "查看并切换代理",
@@ -405,6 +424,15 @@ const ZH_CN_BOT_COPY: BotCopy = {
         switched: "会话已切换。",
         created: "会话已创建。",
         expired: "该会话已不可用。请重新运行 /sessions。",
+    },
+    lsp: {
+        none: "当前项目未检测到 LSP。",
+        title: "LSP 服务",
+        currentProject(worktree: string) {
+            return `当前项目: ${worktree}`;
+        },
+        connected: "已连接",
+        error: "异常",
     },
     mcp: {
         none: "当前项目未配置 MCP。",

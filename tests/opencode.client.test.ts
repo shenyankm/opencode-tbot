@@ -202,6 +202,62 @@ test("getPath forwards to the SDK path endpoint", async () => {
     ]);
 });
 
+test("listLspStatuses forwards the current directory to the SDK LSP endpoint", async () => {
+    const calls: Array<{ input: unknown; options: unknown }> = [];
+    const statuses = [
+        {
+            id: "ts",
+            name: "TypeScript",
+            root: "E:/repo-1",
+            status: "connected",
+        },
+    ];
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            config: {
+                get: async () => ({ provider: {} }),
+                providers: async () => ({ providers: [], default: {} }),
+            },
+            lsp: {
+                async status(input: unknown, options: unknown) {
+                    calls.push({ input, options });
+                    return { data: statuses };
+                },
+            },
+            path: {
+                get: async () => createPath(),
+            },
+            project: {
+                list: async () => [],
+                current: async () => createProject("project-1", "E:/repo-1"),
+            },
+            session: {
+                create: async () => createSession("session-1", "project-1", "E:/repo-1"),
+                prompt: async () => ({
+                    data: {
+                        info: {} as never,
+                        parts: [],
+                    },
+                }),
+            },
+        } as never,
+    );
+
+    assert.deepEqual(await client.listLspStatuses("E:/repo-1"), statuses as never);
+    assert.deepEqual(calls, [
+        {
+            input: {
+                directory: "E:/repo-1",
+            },
+            options: {
+                responseStyle: "data",
+                throwOnError: true,
+            },
+        },
+    ]);
+});
+
 test("listSessions forwards to the SDK session list endpoint", async () => {
     const calls: Array<{ input: unknown; options: unknown }> = [];
     const sessions = [

@@ -27,6 +27,10 @@ test("TELEGRAM_COMMANDS only advertises implemented commands", () => {
             description: "Show current paths",
         },
         {
+            command: "lsp",
+            description: "Show LSP servers",
+        },
+        {
             command: "mcp",
             description: "Show MCP servers",
         },

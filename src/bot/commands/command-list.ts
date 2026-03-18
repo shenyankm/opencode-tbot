@@ -18,6 +18,10 @@ export function getTelegramCommands(language: BotLanguage = "en"): BotCommand[] 
             description: copy.commands.path,
         },
         {
+            command: "lsp",
+            description: copy.commands.lsp,
+        },
+        {
             command: "mcp",
             description: copy.commands.mcp,
         },

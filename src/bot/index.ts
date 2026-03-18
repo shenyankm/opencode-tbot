@@ -3,6 +3,7 @@ import { registerAbortCommand } from "./commands/abort.js";
 import { registerAgentsCommand } from "./commands/agents.js";
 import { registerHealthCommand } from "./commands/health.js";
 import { registerLanguageCommand } from "./commands/language.js";
+import { registerLspCommand } from "./commands/lsp.js";
 import { registerMcpCommand } from "./commands/mcp.js";
 import { registerModelsCommand } from "./commands/models.js";
 import { registerNewCommand } from "./commands/new.js";
@@ -23,6 +24,7 @@ export function registerBot(bot: Bot, container: BotDependencies) {
     registerAbortCommand(bot, container);
     registerHealthCommand(bot, container);
     registerPathCommand(bot, container);
+    registerLspCommand(bot, container);
     registerMcpCommand(bot, container);
     registerNewCommand(bot, container);
     registerAgentsCommand(bot, container);
