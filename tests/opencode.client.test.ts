@@ -256,6 +256,54 @@ test("getConfig forwards to the SDK config endpoint", async () => {
     ]);
 });
 
+test("listSessions forwards to the SDK session list endpoint", async () => {
+    const calls: Array<{ input: unknown; options: unknown }> = [];
+    const sessions = [
+        createSession("session-1", "project-1", "E:/repo-1"),
+        createSession("session-2", "project-2", "E:/repo-2"),
+    ];
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            config: {
+                get: async () => ({ provider: {} }),
+                providers: async () => ({ providers: [], default: {} }),
+            },
+            path: {
+                get: async () => createPath(),
+            },
+            project: {
+                list: async () => [],
+                current: async () => createProject("project-1", "E:/repo-1"),
+            },
+            session: {
+                async list(input: unknown, options: unknown) {
+                    calls.push({ input, options });
+                    return { data: sessions };
+                },
+                create: async () => createSession("session-1", "project-1", "E:/repo-1"),
+                prompt: async () => ({
+                    data: {
+                        info: {} as never,
+                        parts: [],
+                    },
+                }),
+            },
+        } as never,
+    );
+
+    assert.deepEqual(await client.listSessions(), sessions);
+    assert.deepEqual(calls, [
+        {
+            input: undefined,
+            options: {
+                responseStyle: "data",
+                throwOnError: true,
+            },
+        },
+    ]);
+});
+
 test("promptSession forwards model selection and returns a fallback message when no text parts are returned", async () => {
     const calls: Array<{ input: unknown; options: unknown }> = [];
     const client = new OpenCodeClient(

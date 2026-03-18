@@ -6,6 +6,7 @@ export const BOT_COPY = {
         config: "Show configuration",
         agents: "View and switch agents",
         projects: "View and switch projects",
+        sessions: "View and switch sessions",
         model: "View and switch models",
     },
     start: {
@@ -66,6 +67,18 @@ export const BOT_COPY = {
         },
         switched: "Project switched.",
         expired: "The project is no longer available. Run /projects again.",
+    },
+    sessions: {
+        none: "No sessions available in the current project.",
+        title: "Session List",
+        currentProject(worktree: string) {
+            return `Current project: ${worktree}`;
+        },
+        currentSession(session: string) {
+            return `Current session: ${session}`;
+        },
+        switched: "Session switched.",
+        expired: "The session is no longer available. Run /sessions again.",
     },
     agents: {
         none: "No agents available.",

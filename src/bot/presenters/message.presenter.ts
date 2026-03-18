@@ -5,12 +5,14 @@ import type {
     OpenCodeHealth,
     OpenCodePath,
     OpenCodeProject,
+    OpenCodeSession,
 } from "../../services/opencode/opencode.client.js";
 import { BOT_COPY } from "../copy.js";
 import {
     getAgentsPage,
     getModelsPage,
     getProjectsPage,
+    getSessionsPage,
 } from "./keyboard.presenter.js";
 
 interface ProjectsMessageInput {
@@ -32,6 +34,13 @@ interface AgentsMessageInput {
     agents: OpenCodeAgent[];
     currentAgentName: string | null;
     page: number;
+}
+
+interface SessionsMessageInput {
+    currentDirectory: string;
+    currentSessionId: string | null;
+    page: number;
+    sessions: OpenCodeSession[];
 }
 
 const VARIANT_ORDER = ["minimal", "none", "low", "medium", "high", "xhigh", "max"];
@@ -92,6 +101,34 @@ export function presentProjectSwitchMessage(worktree: string): string {
     return [
         BOT_COPY.projects.switched,
         BOT_COPY.projects.current(worktree),
+    ].join("\n");
+}
+
+export function presentSessionsMessage(input: SessionsMessageInput): string {
+    if (input.sessions.length === 0) {
+        return BOT_COPY.sessions.none;
+    }
+
+    const page = getSessionsPage(input.sessions, input.page);
+    const currentSession = input.currentSessionId
+        ? input.sessions.find((session) => session.id === input.currentSessionId) ?? null
+        : null;
+    const lines = [
+        BOT_COPY.sessions.title,
+        BOT_COPY.sessions.currentProject(input.currentDirectory),
+        BOT_COPY.sessions.currentSession(currentSession ? formatSessionLabel(currentSession) : BOT_COPY.common.notSelected),
+        BOT_COPY.common.page(page.page + 1, page.totalPages),
+        "",
+        ...page.items.map((session, index) => `${page.startIndex + index + 1}. ${formatSessionLabel(session)}`),
+    ];
+
+    return lines.join("\n");
+}
+
+export function presentSessionSwitchMessage(session: OpenCodeSession): string {
+    return [
+        BOT_COPY.sessions.switched,
+        BOT_COPY.sessions.currentSession(formatSessionLabel(session)),
     ].join("\n");
 }
 
@@ -215,6 +252,14 @@ function formatModelSelection(model: OpenCodeConfiguredModel, variant: string | 
 
 function formatModelLabel(model: OpenCodeConfiguredModel): string {
     return `${model.providerName} / ${model.name}`;
+}
+
+function formatSessionLabel(session: OpenCodeSession): string {
+    const title = session.title.trim() || session.slug || session.id;
+
+    return title === session.slug
+        ? title
+        : `${title} [${session.slug}]`;
 }
 
 function safePrettyJson(value: unknown): string {

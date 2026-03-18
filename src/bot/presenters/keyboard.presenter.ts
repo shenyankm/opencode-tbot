@@ -4,11 +4,13 @@ import type {
     OpenCodeAgent,
     OpenCodeConfiguredModel,
     OpenCodeProject,
+    OpenCodeSession,
 } from "../../services/opencode/opencode.client.js";
 
 export const PROJECTS_PAGE_SIZE = 10;
 export const MODELS_PAGE_SIZE = 10;
 export const AGENTS_PAGE_SIZE = 10;
+export const SESSIONS_PAGE_SIZE = 10;
 const NUMBERED_BUTTONS_PER_ROW = 5;
 
 export interface ProjectsPage {
@@ -27,6 +29,13 @@ export interface ModelsPage {
 
 export interface AgentsPage {
     items: OpenCodeAgent[];
+    page: number;
+    startIndex: number;
+    totalPages: number;
+}
+
+export interface SessionsPage {
+    items: OpenCodeSession[];
     page: number;
     startIndex: number;
     totalPages: number;
@@ -71,6 +80,19 @@ export function buildAgentsKeyboard(agents: OpenCodeAgent[], requestedPage: numb
     return { keyboard, page };
 }
 
+export function buildSessionsKeyboard(sessions: OpenCodeSession[], requestedPage: number) {
+    const page = getSessionsPage(sessions, requestedPage);
+    const keyboard = buildNumberedKeyboard(
+        page.items,
+        page.startIndex,
+        (session) => `sessions:select:${session.id}`,
+    );
+
+    appendPaginationButtons(keyboard, page.page, page.totalPages, "sessions:page");
+
+    return { keyboard, page };
+}
+
 export function buildModelVariantsKeyboard(variants: string[], modelIndex: number) {
     return buildNumberedKeyboard(
         variants,
@@ -89,6 +111,10 @@ export function getModelsPage(models: OpenCodeConfiguredModel[], requestedPage: 
 
 export function getAgentsPage(agents: OpenCodeAgent[], requestedPage: number): AgentsPage {
     return getPagedItems(agents, requestedPage, AGENTS_PAGE_SIZE);
+}
+
+export function getSessionsPage(sessions: OpenCodeSession[], requestedPage: number): SessionsPage {
+    return getPagedItems(sessions, requestedPage, SESSIONS_PAGE_SIZE);
 }
 
 function buildNumberedKeyboard<T>(
@@ -115,7 +141,7 @@ function appendPaginationButtons(
     keyboard: InlineKeyboard,
     page: number,
     totalPages: number,
-    prefix: "agents:page" | "projects:page" | "model:page",
+    prefix: "agents:page" | "projects:page" | "sessions:page" | "model:page",
 ) {
     if (totalPages <= 1) {
         return;

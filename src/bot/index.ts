@@ -6,6 +6,7 @@ import { registerModelsCommand } from "./commands/models.js";
 import { registerPathCommand } from "./commands/path.js";
 import type { BotDependencies } from "./types.js";
 import { registerProjectsCommand } from "./commands/projects.js";
+import { registerSessionsCommand } from "./commands/sessions.js";
 import { registerStartCommand } from "./commands/start.js";
 import { registerCallbackHandler } from "./handlers/callback.handler.js";
 import { registerMessageHandler } from "./handlers/message.handler.js";
@@ -23,6 +24,7 @@ export function registerBot(bot: Bot, container: BotDependencies) {
     registerAgentsCommand(bot, container);
     registerModelsCommand(bot, container);
     registerProjectsCommand(bot, container);
+    registerSessionsCommand(bot, container);
     registerCallbackHandler(bot, container);
     registerMessageHandler(bot, container);
 }

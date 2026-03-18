@@ -27,6 +27,10 @@ export const TELEGRAM_COMMANDS: BotCommand[] = [
         description: BOT_COPY.commands.projects,
     },
     {
+        command: "sessions",
+        description: BOT_COPY.commands.sessions,
+    },
+    {
         command: "model",
         description: BOT_COPY.commands.model,
     },

@@ -5,12 +5,14 @@ import type {
     BotDependencies,
     ModelCallbackData,
     ProjectsCallbackData,
+    SessionsCallbackData,
 } from "../types.js";
 import {
     buildAgentsKeyboard,
     buildModelsKeyboard,
     buildModelVariantsKeyboard,
     buildProjectsKeyboard,
+    buildSessionsKeyboard,
 } from "../presenters/keyboard.presenter.js";
 import { presentError } from "../presenters/error.presenter.js";
 import {
@@ -22,12 +24,16 @@ import {
     presentModelVariantsMessage,
     presentProjectsMessage,
     presentProjectSwitchMessage,
+    presentSessionsMessage,
+    presentSessionSwitchMessage,
 } from "../presenters/message.presenter.js";
 
 const AGENTS_PAGE_PREFIX = "agents:page:";
 const AGENTS_SELECT_PREFIX = "agents:select:";
 const PROJECTS_PAGE_PREFIX = "projects:page:";
 const PROJECTS_SELECT_PREFIX = "projects:select:";
+const SESSIONS_PAGE_PREFIX = "sessions:page:";
+const SESSIONS_SELECT_PREFIX = "sessions:select:";
 const MODEL_PAGE_PREFIX = "model:page:";
 const MODEL_PICK_PREFIX = "model:pick:";
 const MODEL_VARIANT_PREFIX = "model:variant:";
@@ -298,6 +304,68 @@ export async function handleModelsCallback(ctx: CallbackContext, dependencies: B
     }
 }
 
+export async function handleSessionsCallback(ctx: CallbackContext, dependencies: BotDependencies) {
+    const data = ctx.callbackQuery.data as SessionsCallbackData;
+
+    if (!data.startsWith("sessions:")) {
+        return;
+    }
+
+    await ctx.answerCallbackQuery();
+
+    if (!ctx.chat) {
+        return;
+    }
+
+    try {
+        if (data.startsWith(SESSIONS_PAGE_PREFIX)) {
+            const requestedPage = Number(data.slice(SESSIONS_PAGE_PREFIX.length));
+            const result = await dependencies.listSessionsUseCase.execute({
+                chatId: ctx.chat.id,
+            });
+
+            if (result.sessions.length === 0) {
+                await ctx.editMessageText(BOT_COPY.sessions.none);
+                return;
+            }
+
+            const { keyboard, page } = buildSessionsKeyboard(result.sessions, requestedPage);
+
+            await ctx.editMessageText(
+                presentSessionsMessage({
+                    currentDirectory: result.currentDirectory,
+                    currentSessionId: result.currentSessionId,
+                    page: page.page,
+                    sessions: result.sessions,
+                }),
+                {
+                    reply_markup: keyboard,
+                },
+            );
+
+            return;
+        }
+
+        if (data.startsWith(SESSIONS_SELECT_PREFIX)) {
+            const sessionId = data.slice(SESSIONS_SELECT_PREFIX.length);
+            const result = await dependencies.switchSessionUseCase.execute({
+                chatId: ctx.chat.id,
+                sessionId,
+            });
+
+            if (!result.found) {
+                await ctx.editMessageText(BOT_COPY.sessions.expired);
+                return;
+            }
+
+            await ctx.editMessageText(presentSessionSwitchMessage(result.session));
+        }
+    } catch (error) {
+        dependencies.logger.error({ error }, "failed to handle session callback");
+        await ctx.editMessageText(presentError(error));
+    }
+}
+
 export function registerCallbackHandler(bot: Bot, dependencies: BotDependencies) {
     bot.callbackQuery(/^agents:/, async (ctx) => {
         await handleAgentsCallback(ctx, dependencies);
@@ -305,6 +373,10 @@ export function registerCallbackHandler(bot: Bot, dependencies: BotDependencies)
 
     bot.callbackQuery(/^projects:/, async (ctx) => {
         await handleProjectsCallback(ctx, dependencies);
+    });
+
+    bot.callbackQuery(/^sessions:/, async (ctx) => {
+        await handleSessionsCallback(ctx, dependencies);
     });
 
     bot.callbackQuery(/^model:/, async (ctx) => {

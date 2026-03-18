@@ -73,6 +73,7 @@ export interface OpenCodeClientLike {
     getPath(): Promise<OpenCodePath>;
     getConfig(): Promise<OpenCodeConfig>;
     listProjects(): Promise<OpenCodeProject[]>;
+    listSessions(): Promise<OpenCodeSession[]>;
     getCurrentProject(): Promise<OpenCodeProject>;
     createSessionForDirectory(directory: string, title?: string): Promise<OpenCodeSession>;
     listAgents(): Promise<OpenCodeAgent[]>;
@@ -109,6 +110,12 @@ export class OpenCodeClient implements OpenCodeClientLike {
 
     async listProjects(): Promise<OpenCodeProject[]> {
         const response = await this.client.project.list(undefined, SDK_OPTIONS) as MaybeWrappedResponse<OpenCodeProject[]>;
+
+        return unwrapSdkData(response);
+    }
+
+    async listSessions(): Promise<OpenCodeSession[]> {
+        const response = await this.client.session.list(undefined, SDK_OPTIONS) as MaybeWrappedResponse<OpenCodeSession[]>;
 
         return unwrapSdkData(response);
     }
