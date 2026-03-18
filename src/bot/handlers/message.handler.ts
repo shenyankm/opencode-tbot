@@ -1,6 +1,7 @@
 import type { Bot } from "grammy";
 import { BOT_COPY } from "../copy.js";
 import { presentError } from "../presenters/error.presenter.js";
+import { buildTelegramPromptReply } from "../../services/telegram/telegram-format.js";
 import type { BotDependencies } from "../types.js";
 
 interface SentMessage {
@@ -13,7 +14,7 @@ interface MessageContext {
     api: {
         deleteMessage(chatId: number, messageId: number): Promise<unknown>;
     };
-    reply(text: string): Promise<SentMessage>;
+    reply(text: string, other?: { parse_mode?: "MarkdownV2" }): Promise<SentMessage>;
 }
 
 export async function handleTextMessage(ctx: MessageContext, dependencies: BotDependencies) {
@@ -32,8 +33,14 @@ export async function handleTextMessage(ctx: MessageContext, dependencies: BotDe
             chatId: ctx.chat.id,
             text,
         });
+        const telegramReply = buildTelegramPromptReply(result.assistantReply);
 
-        await ctx.reply(result.replyText);
+        try {
+            await ctx.reply(telegramReply.preferred.text, telegramReply.preferred.options);
+        } catch (replyError) {
+            dependencies.logger.warn?.({ error: replyError }, "failed to send preferred telegram reply, falling back to plain text");
+            await ctx.reply(telegramReply.fallback.text, telegramReply.fallback.options);
+        }
         sentTerminalReply = true;
     } catch (error) {
         dependencies.logger.error({ error }, "failed to handle text message");

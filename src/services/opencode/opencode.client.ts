@@ -1,5 +1,6 @@
 import {
     type Agent,
+    type AssistantMessage,
     createOpencodeClient,
     type Config,
     type Model,
@@ -10,6 +11,7 @@ import {
     type Project,
     type Session,
 } from "@opencode-ai/sdk/v2/client";
+import { z } from "zod";
 
 export interface OpenCodeClientOptions {
     baseUrl: string;
@@ -20,6 +22,7 @@ export interface PromptSessionInput {
     sessionId: string;
     prompt: string;
     agent?: string | null;
+    structured?: boolean;
     model?: {
         providerID: string;
         modelID: string;
@@ -27,8 +30,18 @@ export interface PromptSessionInput {
     variant?: string | null;
 }
 
+export interface PromptSessionMetrics {
+    durationMs: number | null;
+    totalTokens: number | null;
+}
+
 export interface PromptSessionResult {
-    text: string;
+    bodyMd: string | null;
+    fallbackText: string;
+    info: OpenCodeAssistantMessage | null;
+    metrics: PromptSessionMetrics;
+    parts: Part[];
+    structured: unknown;
 }
 
 export type OpenCodeProject = Project;
@@ -37,6 +50,7 @@ export type OpenCodeModel = Model;
 export type OpenCodeProvider = Provider;
 export type OpenCodeConfig = Config;
 export type OpenCodeAgent = Agent;
+export type OpenCodeAssistantMessage = AssistantMessage;
 export type OpenCodePath = Path;
 export interface OpenCodeHealth {
     healthy: boolean;
@@ -61,12 +75,34 @@ type OpenCodeProviderCatalog = {
 };
 type OpenCodeProviderConfig = NonNullable<OpenCodeConfig["provider"]>[string];
 type OpenCodeModelConfig = NonNullable<OpenCodeProviderConfig["models"]>[string];
+type OpenCodePromptResponse = {
+    info: OpenCodeAssistantMessage;
+    parts: Part[];
+};
 
 const EMPTY_RESPONSE_TEXT = "OpenCode returned empty response.";
+const STRUCTURED_REPLY_SCHEMA = {
+    type: "json_schema" as const,
+    retryCount: 2,
+    schema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["body_md"],
+        properties: {
+            body_md: {
+                type: "string",
+                description: "Markdown body only. Do not include duration, token usage, or any footer. Do not wrap the whole answer in ```md or ```markdown fences. Use Markdown formatting directly unless the user explicitly asks for raw Markdown source.",
+            },
+        },
+    },
+};
 const SDK_OPTIONS = {
     responseStyle: "data" as const,
     throwOnError: true as const,
 };
+const StructuredReplySchema = z.object({
+    body_md: z.string(),
+});
 
 export interface OpenCodeClientLike {
     getHealth(): Promise<OpenCodeHealth>;
@@ -153,9 +189,11 @@ export class OpenCodeClient implements OpenCodeClientLike {
     }
 
     async promptSession(input: PromptSessionInput): Promise<PromptSessionResult> {
+        const startedAt = Date.now();
         const response = await this.client.session.prompt({
             sessionID: input.sessionId,
             ...(input.agent ? { agent: input.agent } : {}),
+            ...(input.structured ? { format: STRUCTURED_REPLY_SCHEMA } : {}),
             ...(input.model ? { model: input.model } : {}),
             ...(input.variant ? { variant: input.variant } : {}),
             parts: [
@@ -164,11 +202,19 @@ export class OpenCodeClient implements OpenCodeClientLike {
                     text: input.prompt,
                 },
             ],
-        }, SDK_OPTIONS) as MaybeWrappedResponse<{ info: unknown; parts: Part[] }>;
+        }, SDK_OPTIONS) as MaybeWrappedResponse<OpenCodePromptResponse>;
         const data = unwrapSdkData(response);
+        const finishedAt = Date.now();
+        const bodyMd = input.structured ? extractStructuredMarkdown(data.info?.structured) : null;
+        const fallbackText = extractTextFromParts(data.parts) || bodyMd || EMPTY_RESPONSE_TEXT;
 
         return {
-            text: extractTextFromParts(data.parts) || EMPTY_RESPONSE_TEXT,
+            bodyMd,
+            fallbackText,
+            info: data.info ?? null,
+            metrics: extractPromptMetrics(data.info, startedAt, finishedAt),
+            parts: data.parts,
+            structured: data.info?.structured ?? null,
         };
     }
 }
@@ -260,6 +306,61 @@ function extractTextFromParts(parts: Part[]): string {
         .map((part) => part.text)
         .join("")
         .trim();
+}
+
+function extractStructuredMarkdown(structured: unknown): string | null {
+    const parsed = StructuredReplySchema.safeParse(structured);
+
+    if (!parsed.success) {
+        return null;
+    }
+
+    const bodyMd = parsed.data.body_md.replace(/\r\n?/g, "\n").trim();
+
+    return bodyMd.length > 0 ? bodyMd : null;
+}
+
+function extractPromptMetrics(
+    info: OpenCodeAssistantMessage | null | undefined,
+    startedAt: number,
+    finishedAt: number,
+): PromptSessionMetrics {
+    const createdAt = typeof info?.time?.created === "number" && Number.isFinite(info.time.created)
+        ? info.time.created
+        : null;
+    const completedAt = typeof info?.time?.completed === "number" && Number.isFinite(info.time.completed)
+        ? info.time.completed
+        : null;
+    const completedDuration = createdAt !== null && completedAt !== null
+        ? completedAt - createdAt
+        : null;
+    const durationMs = completedDuration !== null && completedDuration >= 0
+        ? completedDuration
+        : Math.max(0, finishedAt - startedAt);
+
+    return {
+        durationMs,
+        totalTokens: extractTotalTokens(info),
+    };
+}
+
+function extractTotalTokens(info: OpenCodeAssistantMessage | null | undefined): number | null {
+    if (!info?.tokens) {
+        return null;
+    }
+
+    if (typeof info.tokens.total === "number" && Number.isFinite(info.tokens.total)) {
+        return info.tokens.total;
+    }
+
+    const total =
+        (info.tokens.input ?? 0) +
+        (info.tokens.output ?? 0) +
+        (info.tokens.reasoning ?? 0) +
+        (info.tokens.cache?.read ?? 0) +
+        (info.tokens.cache?.write ?? 0);
+
+    return Number.isFinite(total) ? total : null;
 }
 
 function unwrapSdkData<T>(response: MaybeWrappedResponse<T>): T {

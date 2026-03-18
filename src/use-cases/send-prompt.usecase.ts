@@ -58,6 +58,7 @@ export class SendPromptUseCase {
             sessionId: binding.sessionId,
             prompt: input.text,
             ...(selectedAgent ? { agent: selectedAgent.name } : {}),
+            structured: true,
             ...(model ? { model } : {}),
             ...(binding.modelVariant ? { variant: binding.modelVariant } : {}),
         });
@@ -65,9 +66,9 @@ export class SendPromptUseCase {
         await this.sessionRepo.touch(input.chatId);
 
         return {
+            assistantReply: result,
             sessionId: binding.sessionId,
             projectId: binding.projectId,
-            replyText: result.text,
         };
     }
 }

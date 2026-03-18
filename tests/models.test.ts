@@ -9,6 +9,7 @@ import type {
     OpenCodeClientLike,
     OpenCodeConfiguredModel,
     OpenCodeProject,
+    PromptSessionResult,
     OpenCodeSession,
 } from "../src/services/opencode/opencode.client.js";
 import { ListModelsUseCase } from "../src/use-cases/list-models.usecase.js";
@@ -62,6 +63,22 @@ function createConfiguredModel(
     };
 }
 
+function createPromptReply(text: string): PromptSessionResult {
+    return {
+        bodyMd: text,
+        fallbackText: text,
+        info: null,
+        metrics: {
+            durationMs: 120,
+            totalTokens: 42,
+        },
+        parts: [],
+        structured: {
+            body_md: text,
+        },
+    };
+}
+
 function createDependencies(client: OpenCodeClientLike) {
     const repo = new InMemorySessionRepository();
     const dependencies: BotDependencies = {
@@ -109,7 +126,7 @@ test("/model only shows configured models with numeric inline buttons", async ()
             return [];
         },
         async promptSession() {
-            return { text: "unused" };
+            return createPromptReply("unused");
         },
     });
     const replies: Array<{ text: string; other?: { reply_markup?: unknown } }> = [];
@@ -165,7 +182,7 @@ test("model page callbacks re-render the requested page", async () => {
             return [];
         },
         async promptSession() {
-            return { text: "unused" };
+            return createPromptReply("unused");
         },
     });
     const edits: Array<{ text: string; other?: { reply_markup?: unknown } }> = [];
@@ -229,7 +246,7 @@ test("picking a model with variants opens a second numeric choice list", async (
             return [];
         },
         async promptSession() {
-            return { text: "unused" };
+            return createPromptReply("unused");
         },
     });
     const edits: Array<{ text: string; other?: { reply_markup?: unknown } }> = [];
@@ -287,7 +304,7 @@ test("picking a model without variants switches immediately", async () => {
             return [];
         },
         async promptSession() {
-            return { text: "unused" };
+            return createPromptReply("unused");
         },
     });
     const edits: string[] = [];
@@ -350,7 +367,7 @@ test("variant selection updates the binding and later prompts use the selected m
         },
         async promptSession(input) {
             promptCalls.push(input);
-            return { text: "reply from selected model" };
+            return createPromptReply("reply from selected model");
         },
     });
     const edits: string[] = [];
@@ -393,6 +410,7 @@ test("variant selection updates the binding and later prompts use the selected m
         {
             sessionId: "session-1",
             prompt: "continue",
+            structured: true,
             agent: "build",
             model: {
                 providerID: "openai",
@@ -401,7 +419,7 @@ test("variant selection updates the binding and later prompts use the selected m
             variant: "high",
         },
     ]);
-    assert.equal(promptResult.replyText, "reply from selected model");
+    assert.equal(promptResult.assistantReply.fallbackText, "reply from selected model");
     assert.deepEqual(bindingAfterPrompt, {
         chatId: 12,
         sessionId: "session-1",

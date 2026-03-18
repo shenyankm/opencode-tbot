@@ -8,6 +8,7 @@ import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
 import type {
     OpenCodeClientLike,
     OpenCodeProject,
+    PromptSessionResult,
     OpenCodeSession,
 } from "../src/services/opencode/opencode.client.js";
 import { ListProjectsUseCase } from "../src/use-cases/list-projects.usecase.js";
@@ -41,6 +42,22 @@ function createSession(id: string, projectID: string, directory: string): OpenCo
             updated: 1,
         },
     } as OpenCodeSession;
+}
+
+function createPromptReply(text: string): PromptSessionResult {
+    return {
+        bodyMd: text,
+        fallbackText: text,
+        info: null,
+        metrics: {
+            durationMs: 120,
+            totalTokens: 42,
+        },
+        parts: [],
+        structured: {
+            body_md: text,
+        },
+    };
 }
 
 function createDependencies(client: OpenCodeClientLike) {
@@ -88,7 +105,7 @@ test("/projects shows the first page of projects with an inline keyboard", async
             return projects;
         },
         async promptSession() {
-            return { text: "unused" };
+            return createPromptReply("unused");
         },
     });
     const replies: Array<{ text: string; other?: { reply_markup?: unknown } }> = [];
@@ -144,7 +161,7 @@ test("project page callbacks re-render the requested page", async () => {
             return projects;
         },
         async promptSession() {
-            return { text: "unused" };
+            return createPromptReply("unused");
         },
     });
     const edits: Array<{ text: string; other?: { reply_markup?: unknown } }> = [];
@@ -203,7 +220,7 @@ test("project selection callbacks switch the binding to the selected project", a
             return projects;
         },
         async promptSession() {
-            return { text: "unused" };
+            return createPromptReply("unused");
         },
     });
     const edits: string[] = [];
@@ -254,7 +271,7 @@ test("invalid project selections ask the user to rerun /projects", async () => {
             return [createProject("project-1", "E:/repo-1")];
         },
         async promptSession() {
-            return { text: "unused" };
+            return createPromptReply("unused");
         },
     });
     const edits: string[] = [];
@@ -292,7 +309,7 @@ test("/projects surfaces SDK errors without leaking a stack trace", async () => 
             throw new Error("boom");
         },
         async promptSession() {
-            return { text: "unused" };
+            return createPromptReply("unused");
         },
     });
     const replies: string[] = [];

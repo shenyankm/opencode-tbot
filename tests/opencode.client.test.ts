@@ -304,7 +304,7 @@ test("listSessions forwards to the SDK session list endpoint", async () => {
     ]);
 });
 
-test("promptSession forwards model selection and returns a fallback message when no text parts are returned", async () => {
+test("promptSession forwards model selection and JSON schema format and returns normalized structured output", async () => {
     const calls: Array<{ input: unknown; options: unknown }> = [];
     const client = new OpenCodeClient(
         { baseUrl: "http://127.0.0.1:4096" },
@@ -327,8 +327,26 @@ test("promptSession forwards model selection and returns a fallback message when
 
                     return {
                         data: {
-                            info: {} as never,
-                            parts: [{ type: "tool" }] as never,
+                            info: {
+                                time: {
+                                    created: 100,
+                                    completed: 820,
+                                },
+                                tokens: {
+                                    total: 321,
+                                    input: 100,
+                                    output: 200,
+                                    reasoning: 20,
+                                    cache: {
+                                        read: 0,
+                                        write: 1,
+                                    },
+                                },
+                                structured: {
+                                    body_md: "## Hello\n- world",
+                                },
+                            } as never,
+                            parts: [{ type: "text", text: "fallback text" }] as never,
                         },
                     };
                 },
@@ -344,13 +362,61 @@ test("promptSession forwards model selection and returns a fallback message when
             modelID: "gpt-5",
         },
         variant: "high",
+        agent: "build",
+        structured: true,
     });
 
-    assert.equal(result.text, "OpenCode returned empty response.");
+    assert.deepEqual(result, {
+        bodyMd: "## Hello\n- world",
+        fallbackText: "fallback text",
+        info: {
+            time: {
+                created: 100,
+                completed: 820,
+            },
+            tokens: {
+                total: 321,
+                input: 100,
+                output: 200,
+                reasoning: 20,
+                cache: {
+                    read: 0,
+                    write: 1,
+                },
+            },
+            structured: {
+                body_md: "## Hello\n- world",
+            },
+        },
+        metrics: {
+            durationMs: 720,
+            totalTokens: 321,
+        },
+        parts: [{ type: "text", text: "fallback text" }],
+        structured: {
+            body_md: "## Hello\n- world",
+        },
+    });
     assert.deepEqual(calls, [
         {
             input: {
                 sessionID: "session-1",
+                agent: "build",
+                format: {
+                    type: "json_schema",
+                    retryCount: 2,
+                    schema: {
+                        type: "object",
+                        additionalProperties: false,
+                        required: ["body_md"],
+                        properties: {
+                            body_md: {
+                                type: "string",
+                                description: "Markdown body only. Do not include duration, token usage, or any footer. Do not wrap the whole answer in ```md or ```markdown fences. Use Markdown formatting directly unless the user explicitly asks for raw Markdown source.",
+                            },
+                        },
+                    },
+                },
                 model: {
                     providerID: "openai",
                     modelID: "gpt-5",
@@ -369,6 +435,65 @@ test("promptSession forwards model selection and returns a fallback message when
             },
         },
     ]);
+});
+
+test("promptSession falls back to text parts and summed tokens when structured output is invalid", async () => {
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            config: {
+                get: async () => ({ provider: {} }),
+                providers: async () => ({ providers: [], default: {} }),
+            },
+            path: {
+                get: async () => createPath(),
+            },
+            project: {
+                list: async () => [],
+                current: async () => createProject("project-1", "E:/repo-1"),
+            },
+            session: {
+                create: async () => createSession("session-1", "project-1", "E:/repo-1"),
+                prompt: async () => ({
+                    data: {
+                        info: {
+                            time: {
+                                created: 100,
+                            },
+                            tokens: {
+                                input: 10,
+                                output: 8,
+                                reasoning: 1,
+                                cache: {
+                                    read: 0,
+                                    write: 2,
+                                },
+                            },
+                            structured: {
+                                unexpected: true,
+                            },
+                        } as never,
+                        parts: [{ type: "text", text: "plain fallback" }] as never,
+                    },
+                }),
+            },
+        } as never,
+    );
+
+    const result = await client.promptSession({
+        sessionId: "session-1",
+        prompt: "hello from telegram",
+        structured: true,
+    });
+
+    assert.equal(result.bodyMd, null);
+    assert.equal(result.fallbackText, "plain fallback");
+    assert.equal(result.metrics.totalTokens, 21);
+    assert.ok(result.metrics.durationMs !== null);
+    assert.ok(result.metrics.durationMs >= 0);
+    assert.deepEqual(result.structured, {
+        unexpected: true,
+    });
 });
 
 test("listModels only returns models explicitly configured in OpenCode config", async () => {

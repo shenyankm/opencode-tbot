@@ -28,6 +28,11 @@ export const BOT_COPY = {
     status: {
         processing: "Processing...",
     },
+    replyMetrics: {
+        durationLabel: "Duration",
+        tokensLabel: "Tokens",
+        notAvailable: "n/a",
+    },
     health: {
         title: "Server Health",
         status(healthy: boolean) {
