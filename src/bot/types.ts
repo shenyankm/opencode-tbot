@@ -2,6 +2,7 @@ import type { Logger } from "pino";
 import type { GetConfigUseCase } from "../use-cases/get-config.usecase.js";
 import type { GetHealthUseCase } from "../use-cases/get-health.usecase.js";
 import type { GetPathUseCase } from "../use-cases/get-path.usecase.js";
+import type { AbortPromptUseCase } from "../use-cases/abort-prompt.usecase.js";
 import type { ListAgentsUseCase } from "../use-cases/list-agents.usecase.js";
 import type { ListModelsUseCase } from "../use-cases/list-models.usecase.js";
 import type { ListProjectsUseCase } from "../use-cases/list-projects.usecase.js";
@@ -13,6 +14,7 @@ import type { SwitchProjectUseCase } from "../use-cases/switch-project.usecase.j
 import type { SwitchSessionUseCase } from "../use-cases/switch-session.usecase.js";
 
 export interface BotDependencies {
+    abortPromptUseCase: AbortPromptUseCase;
     getConfigUseCase: GetConfigUseCase;
     getHealthUseCase: GetHealthUseCase;
     getPathUseCase: GetPathUseCase;

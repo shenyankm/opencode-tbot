@@ -304,6 +304,100 @@ test("listSessions forwards to the SDK session list endpoint", async () => {
     ]);
 });
 
+test("getSessionStatuses forwards to the SDK session status endpoint", async () => {
+    const calls: Array<{ input: unknown; options: unknown }> = [];
+    const statuses = {
+        "session-1": { type: "busy" },
+        "session-2": { type: "idle" },
+    };
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            config: {
+                get: async () => ({ provider: {} }),
+                providers: async () => ({ providers: [], default: {} }),
+            },
+            path: {
+                get: async () => createPath(),
+            },
+            project: {
+                list: async () => [],
+                current: async () => createProject("project-1", "E:/repo-1"),
+            },
+            session: {
+                async status(input: unknown, options: unknown) {
+                    calls.push({ input, options });
+                    return { data: statuses };
+                },
+                create: async () => createSession("session-1", "project-1", "E:/repo-1"),
+                prompt: async () => ({
+                    data: {
+                        info: {} as never,
+                        parts: [],
+                    },
+                }),
+            },
+        } as never,
+    );
+
+    assert.deepEqual(await client.getSessionStatuses(), statuses);
+    assert.deepEqual(calls, [
+        {
+            input: undefined,
+            options: {
+                responseStyle: "data",
+                throwOnError: true,
+            },
+        },
+    ]);
+});
+
+test("abortSession forwards the session id to the SDK abort endpoint", async () => {
+    const calls: Array<{ input: unknown; options: unknown }> = [];
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            config: {
+                get: async () => ({ provider: {} }),
+                providers: async () => ({ providers: [], default: {} }),
+            },
+            path: {
+                get: async () => createPath(),
+            },
+            project: {
+                list: async () => [],
+                current: async () => createProject("project-1", "E:/repo-1"),
+            },
+            session: {
+                async abort(input: unknown, options: unknown) {
+                    calls.push({ input, options });
+                    return { data: true };
+                },
+                create: async () => createSession("session-1", "project-1", "E:/repo-1"),
+                prompt: async () => ({
+                    data: {
+                        info: {} as never,
+                        parts: [],
+                    },
+                }),
+            },
+        } as never,
+    );
+
+    assert.equal(await client.abortSession("session-1"), true);
+    assert.deepEqual(calls, [
+        {
+            input: {
+                sessionID: "session-1",
+            },
+            options: {
+                responseStyle: "data",
+                throwOnError: true,
+            },
+        },
+    ]);
+});
+
 test("promptSession forwards model selection and JSON schema format and returns normalized structured output", async () => {
     const calls: Array<{ input: unknown; options: unknown }> = [];
     const client = new OpenCodeClient(
@@ -367,6 +461,7 @@ test("promptSession forwards model selection and JSON schema format and returns 
     });
 
     assert.deepEqual(result, {
+        assistantError: null,
         bodyMd: "## Hello\n- world",
         fallbackText: "fallback text",
         info: {
@@ -390,7 +485,14 @@ test("promptSession forwards model selection and JSON schema format and returns 
         },
         metrics: {
             durationMs: 720,
-            totalTokens: 321,
+            tokens: {
+                total: 321,
+                input: 100,
+                output: 200,
+                reasoning: 20,
+                cacheRead: 0,
+                cacheWrite: 1,
+            },
         },
         parts: [{ type: "text", text: "fallback text" }],
         structured: {
@@ -487,8 +589,10 @@ test("promptSession falls back to text parts and summed tokens when structured o
     });
 
     assert.equal(result.bodyMd, null);
+    assert.equal(result.assistantError, null);
     assert.equal(result.fallbackText, "plain fallback");
-    assert.equal(result.metrics.totalTokens, 21);
+    assert.equal(result.metrics.tokens.total, 20);
+    assert.equal(result.metrics.tokens.reasoning, 1);
     assert.ok(result.metrics.durationMs !== null);
     assert.ok(result.metrics.durationMs >= 0);
     assert.deepEqual(result.structured, {
@@ -496,7 +600,72 @@ test("promptSession falls back to text parts and summed tokens when structured o
     });
 });
 
-test("listModels only returns models explicitly configured in OpenCode config", async () => {
+test("promptSession preserves assistant errors from successful prompt responses", async () => {
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            config: {
+                get: async () => ({ provider: {} }),
+                providers: async () => ({ providers: [], default: {} }),
+            },
+            path: {
+                get: async () => createPath(),
+            },
+            project: {
+                list: async () => [],
+                current: async () => createProject("project-1", "E:/repo-1"),
+            },
+            session: {
+                create: async () => createSession("session-1", "project-1", "E:/repo-1"),
+                prompt: async () => ({
+                    data: {
+                        info: {
+                            error: {
+                                name: "StructuredOutputError",
+                                data: {
+                                    message: "Schema validation failed",
+                                    retries: 2,
+                                },
+                            },
+                            time: {
+                                created: 100,
+                                completed: 400,
+                            },
+                            tokens: {
+                                total: 11,
+                                input: 3,
+                                output: 5,
+                                reasoning: 1,
+                                cache: {
+                                    read: 2,
+                                    write: 0,
+                                },
+                            },
+                        } as never,
+                        parts: [] as never,
+                    },
+                }),
+            },
+        } as never,
+    );
+
+    const result = await client.promptSession({
+        sessionId: "session-1",
+        prompt: "hello from telegram",
+        structured: true,
+    });
+
+    assert.deepEqual(result.assistantError, {
+        name: "StructuredOutputError",
+        data: {
+            message: "Schema validation failed",
+            retries: 2,
+        },
+    });
+    assert.equal(result.fallbackText, "OpenCode returned empty response.");
+    assert.equal(result.metrics.tokens.total, 11);
+});
+test("listModels returns configured models and available custom-provider models", async () => {
     const project = createProject("project-1", "E:/repo-1");
     const configuredModel = createModel("openai", "gpt-5.3-codex", "GPT-5.3 Codex", {
         variants: {
@@ -515,11 +684,32 @@ test("listModels only returns models explicitly configured in OpenCode config", 
             },
         },
     });
+    const customProviderModel = createModel("custom-provider", "custom-text", "Custom Text Model", {
+        variants: {
+            low: {},
+        },
+    });
+    const nonTextCustomModel = createModel("custom-provider", "custom-image", "Custom Image Model", {
+        capabilities: {
+            ...configuredModel.capabilities,
+            output: {
+                ...configuredModel.capabilities.output,
+                text: false,
+            },
+        },
+    });
     const provider = createProvider("openai", "OpenAI", [
         configuredModel,
         hiddenCatalogModel,
         nonTextConfiguredModel,
     ]);
+    const customProvider = {
+        ...createProvider("custom-provider", "Custom Provider", [
+            customProviderModel,
+            nonTextCustomModel,
+        ]),
+        source: "custom",
+    } as OpenCodeProvider;
     const client = new OpenCodeClient(
         { baseUrl: "http://127.0.0.1:4096" },
         {
@@ -543,13 +733,16 @@ test("listModels only returns models explicitly configured in OpenCode config", 
                                         name: "Image Model",
                                     },
                                 },
+                                options: {
+                                    baseURL: "https://aixj.vip/v1",
+                                },
                             },
                         },
                     },
                 }),
                 providers: async () => ({
                     data: {
-                        providers: [provider],
+                        providers: [provider, customProvider],
                         default: {},
                     },
                 }),
@@ -579,13 +772,24 @@ test("listModels only returns models explicitly configured in OpenCode config", 
         {
             id: "gpt-5.3-codex",
             providerID: "openai",
-            providerName: "OpenAI",
+            providerName: "OpenAI (aixj.vip)",
             name: "GPT-5.3 Codex",
             qualifiedId: "openai/gpt-5.3-codex",
             reasoning: true,
             variants: {
                 low: {},
                 high: {},
+            },
+        },
+        {
+            id: "custom-text",
+            providerID: "custom-provider",
+            providerName: "Custom Provider",
+            name: "Custom Text Model",
+            qualifiedId: "custom-provider/custom-text",
+            reasoning: true,
+            variants: {
+                low: {},
             },
         },
     ]);

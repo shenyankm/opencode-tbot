@@ -10,6 +10,7 @@ import {
     type Provider,
     type Project,
     type Session,
+    type SessionStatus,
 } from "@opencode-ai/sdk/v2/client";
 import { z } from "zod";
 
@@ -30,12 +31,22 @@ export interface PromptSessionInput {
     variant?: string | null;
 }
 
+export interface PromptSessionTokenMetrics {
+    total: number | null;
+    input: number | null;
+    output: number | null;
+    reasoning: number | null;
+    cacheRead: number | null;
+    cacheWrite: number | null;
+}
+
 export interface PromptSessionMetrics {
     durationMs: number | null;
-    totalTokens: number | null;
+    tokens: PromptSessionTokenMetrics;
 }
 
 export interface PromptSessionResult {
+    assistantError: OpenCodeAssistantError | null;
     bodyMd: string | null;
     fallbackText: string;
     info: OpenCodeAssistantMessage | null;
@@ -51,7 +62,9 @@ export type OpenCodeProvider = Provider;
 export type OpenCodeConfig = Config;
 export type OpenCodeAgent = Agent;
 export type OpenCodeAssistantMessage = AssistantMessage;
+export type OpenCodeAssistantError = NonNullable<OpenCodeAssistantMessage["error"]>;
 export type OpenCodePath = Path;
+export type OpenCodeSessionStatus = SessionStatus;
 export interface OpenCodeHealth {
     healthy: boolean;
     version: string;
@@ -105,9 +118,11 @@ const StructuredReplySchema = z.object({
 });
 
 export interface OpenCodeClientLike {
+    abortSession(sessionId: string): Promise<boolean>;
     getHealth(): Promise<OpenCodeHealth>;
     getPath(): Promise<OpenCodePath>;
     getConfig(): Promise<OpenCodeConfig>;
+    getSessionStatuses(): Promise<Record<string, OpenCodeSessionStatus>>;
     listProjects(): Promise<OpenCodeProject[]>;
     listSessions(): Promise<OpenCodeSession[]>;
     getCurrentProject(): Promise<OpenCodeProject>;
@@ -132,6 +147,15 @@ export class OpenCodeClient implements OpenCodeClientLike {
         return unwrapSdkData(response);
     }
 
+    async abortSession(sessionId: string): Promise<boolean> {
+        const response = await this.client.session.abort(
+            { sessionID: sessionId },
+            SDK_OPTIONS,
+        ) as MaybeWrappedResponse<boolean>;
+
+        return unwrapSdkData(response);
+    }
+
     async getPath(): Promise<OpenCodePath> {
         const response = await this.client.path.get(undefined, SDK_OPTIONS) as MaybeWrappedResponse<OpenCodePath>;
 
@@ -140,6 +164,15 @@ export class OpenCodeClient implements OpenCodeClientLike {
 
     async getConfig(): Promise<OpenCodeConfig> {
         const response = await this.client.config.get(undefined, SDK_OPTIONS) as MaybeWrappedResponse<OpenCodeConfig>;
+
+        return unwrapSdkData(response);
+    }
+
+    async getSessionStatuses(): Promise<Record<string, OpenCodeSessionStatus>> {
+        const response = await this.client.session.status(
+            undefined,
+            SDK_OPTIONS,
+        ) as MaybeWrappedResponse<Record<string, OpenCodeSessionStatus>>;
 
         return unwrapSdkData(response);
     }
@@ -185,7 +218,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
         const config = unwrapSdkData(configResponse);
         const providerCatalog = unwrapSdkData(providersResponse);
 
-        return buildConfiguredModels(config, providerCatalog.providers);
+        return buildSelectableModels(config, providerCatalog.providers);
     }
 
     async promptSession(input: PromptSessionInput): Promise<PromptSessionResult> {
@@ -209,6 +242,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
         const fallbackText = extractTextFromParts(data.parts) || bodyMd || EMPTY_RESPONSE_TEXT;
 
         return {
+            assistantError: data.info?.error ?? null,
             bodyMd,
             fallbackText,
             info: data.info ?? null,
@@ -219,28 +253,43 @@ export class OpenCodeClient implements OpenCodeClientLike {
     }
 }
 
-function buildConfiguredModels(
+function buildSelectableModels(
     config: OpenCodeConfig,
     providers: OpenCodeProvider[],
 ): OpenCodeConfiguredModel[] {
     const configuredProviders = config.provider ?? {};
     const providersById = new Map(providers.map((provider) => [provider.id, provider]));
+    const models = new Map<string, OpenCodeConfiguredModel>();
 
-    return Object.entries(configuredProviders).flatMap(([providerId, providerConfig]) => {
+    for (const [providerId, providerConfig] of Object.entries(configuredProviders)) {
         const configuredModels = providerConfig.models ?? {};
 
-        return Object.entries(configuredModels)
-            .map(([configuredModelKey, modelConfig]) =>
-                buildConfiguredModel(
-                    providerId,
-                    providerConfig,
-                    configuredModelKey,
-                    modelConfig,
-                    providersById.get(providerId),
-                ),
-            )
-            .filter((model): model is OpenCodeConfiguredModel => model !== null);
-    });
+        for (const [configuredModelKey, modelConfig] of Object.entries(configuredModels)) {
+            const model = buildConfiguredModel(
+                providerId,
+                providerConfig,
+                configuredModelKey,
+                modelConfig,
+                providersById.get(providerId),
+            );
+
+            if (model) {
+                models.set(model.qualifiedId, model);
+            }
+        }
+    }
+
+    for (const provider of providers) {
+        if (configuredProviders[provider.id] || provider.source === "config") {
+            continue;
+        }
+
+        for (const model of buildCatalogProviderModels(provider)) {
+            models.set(model.qualifiedId, model);
+        }
+    }
+
+    return [...models.values()];
 }
 
 function buildConfiguredModel(
@@ -260,12 +309,26 @@ function buildConfiguredModel(
     return {
         id: modelId,
         providerID: providerId,
-        providerName: providerConfig.name ?? providerCatalog?.name ?? providerId,
+        providerName: resolveProviderDisplayName(providerId, providerConfig, providerCatalog),
         name: modelConfig.name ?? catalogModel?.name ?? modelId,
         qualifiedId: `${providerId}/${modelId}`,
         reasoning: modelConfig.reasoning ?? catalogModel?.capabilities.reasoning ?? false,
         variants: normalizeVariants(modelConfig.variants ?? catalogModel?.variants),
     };
+}
+
+function buildCatalogProviderModels(provider: OpenCodeProvider): OpenCodeConfiguredModel[] {
+    return Object.values(provider.models)
+        .filter((model) => isCatalogTextModel(model))
+        .map((model) => ({
+            id: model.id,
+            providerID: provider.id,
+            providerName: provider.name,
+            name: model.name,
+            qualifiedId: `${provider.id}/${model.id}`,
+            reasoning: model.capabilities.reasoning,
+            variants: normalizeVariants(model.variants),
+        }));
 }
 
 function isTextModel(modelConfig: OpenCodeModelConfig, catalogModel: OpenCodeModel | undefined): boolean {
@@ -278,6 +341,53 @@ function isTextModel(modelConfig: OpenCodeModelConfig, catalogModel: OpenCodeMod
     }
 
     return true;
+}
+
+function isCatalogTextModel(catalogModel: OpenCodeModel): boolean {
+    return catalogModel.capabilities.input.text && catalogModel.capabilities.output.text;
+}
+
+function resolveProviderDisplayName(
+    providerId: string,
+    providerConfig: OpenCodeProviderConfig,
+    providerCatalog: OpenCodeProvider | undefined,
+): string {
+    if (providerConfig.name) {
+        return providerConfig.name;
+    }
+
+    const configuredBaseUrl = extractConfiguredBaseUrl(providerConfig);
+
+    if (configuredBaseUrl) {
+        const host = safeParseUrlHost(configuredBaseUrl);
+        const label = providerCatalog?.name ?? providerId;
+
+        return host ? `${label} (${host})` : label;
+    }
+
+    return providerCatalog?.name ?? providerId;
+}
+
+function extractConfiguredBaseUrl(providerConfig: OpenCodeProviderConfig): string | null {
+    const options = providerConfig.options;
+
+    if (!options || typeof options !== "object") {
+        return null;
+    }
+
+    const baseUrl = "baseURL" in options ? options.baseURL : null;
+
+    return typeof baseUrl === "string" && baseUrl.trim().length > 0
+        ? baseUrl.trim()
+        : null;
+}
+
+function safeParseUrlHost(value: string): string | null {
+    try {
+        return new URL(value).host || null;
+    } catch {
+        return null;
+    }
 }
 
 function normalizeVariants(
@@ -340,25 +450,50 @@ function extractPromptMetrics(
 
     return {
         durationMs,
-        totalTokens: extractTotalTokens(info),
+        tokens: extractTokenMetrics(info),
     };
 }
 
-function extractTotalTokens(info: OpenCodeAssistantMessage | null | undefined): number | null {
+function extractTokenMetrics(info: OpenCodeAssistantMessage | null | undefined): PromptSessionTokenMetrics {
     if (!info?.tokens) {
+        return {
+            total: null,
+            input: null,
+            output: null,
+            reasoning: null,
+            cacheRead: null,
+            cacheWrite: null,
+        };
+    }
+
+    const input = coerceFiniteNumber(info.tokens.input);
+    const output = coerceFiniteNumber(info.tokens.output);
+    const reasoning = coerceFiniteNumber(info.tokens.reasoning);
+    const cacheRead = coerceFiniteNumber(info.tokens.cache?.read);
+    const cacheWrite = coerceFiniteNumber(info.tokens.cache?.write);
+    const total = coerceFiniteNumber(info.tokens.total);
+    const fallbackTotal = sumTokenMetrics(input, output, cacheRead, cacheWrite);
+
+    return {
+        total: total ?? fallbackTotal,
+        input,
+        output,
+        reasoning,
+        cacheRead,
+        cacheWrite,
+    };
+}
+
+function coerceFiniteNumber(value: unknown): number | null {
+    return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function sumTokenMetrics(...values: Array<number | null>): number | null {
+    if (values.every((value) => value === null)) {
         return null;
     }
 
-    if (typeof info.tokens.total === "number" && Number.isFinite(info.tokens.total)) {
-        return info.tokens.total;
-    }
-
-    const total =
-        (info.tokens.input ?? 0) +
-        (info.tokens.output ?? 0) +
-        (info.tokens.reasoning ?? 0) +
-        (info.tokens.cache?.read ?? 0) +
-        (info.tokens.cache?.write ?? 0);
+    const total = values.reduce<number>((sum, value) => sum + (value ?? 0), 0);
 
     return Number.isFinite(total) ? total : null;
 }

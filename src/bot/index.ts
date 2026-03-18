@@ -1,4 +1,5 @@
 import type { Bot } from "grammy";
+import { registerAbortCommand } from "./commands/abort.js";
 import { registerAgentsCommand } from "./commands/agents.js";
 import { registerConfigCommand } from "./commands/config.js";
 import { registerHealthCommand } from "./commands/health.js";
@@ -18,6 +19,7 @@ export function registerBot(bot: Bot, container: BotDependencies) {
     bot.use(authMiddleware);
 
     registerStartCommand(bot);
+    registerAbortCommand(bot, container);
     registerHealthCommand(bot, container);
     registerPathCommand(bot, container);
     registerConfigCommand(bot, container);

@@ -5,12 +5,20 @@ import { handleTextMessage } from "../src/bot/handlers/message.handler.js";
 
 function createPromptReply(overrides: Partial<PromptSessionResult> = {}): PromptSessionResult {
     return {
+        assistantError: null,
         bodyMd: "## Hello",
         fallbackText: "Hello",
         info: null,
         metrics: {
             durationMs: 120,
-            totalTokens: 42,
+            tokens: {
+                total: 42,
+                input: 10,
+                output: 12,
+                reasoning: 5,
+                cacheRead: 15,
+                cacheWrite: 0,
+            },
         },
         parts: [],
         structured: {
@@ -79,7 +87,7 @@ test("handleTextMessage sends MarkdownV2 replies with metrics and deletes the pr
     assert.deepEqual(replies, [
         { text: "Processing...", other: undefined },
         {
-            text: "*Hello*\n\n_Duration: 120 ms \\| Tokens: 42_",
+            text: "*Hello*\n\nDuration: 120 ms \\| Tokens: 42",
             other: { parse_mode: "MarkdownV2" },
         },
     ]);
@@ -120,7 +128,7 @@ test("handleTextMessage falls back to plain text when the preferred Telegram mar
     assert.deepEqual(replies, [
         { text: "Processing...", other: undefined },
         {
-            text: "*Hello*\n\n_Duration: 120 ms \\| Tokens: 42_",
+            text: "*Hello*\n\nDuration: 120 ms \\| Tokens: 42",
             other: { parse_mode: "MarkdownV2" },
         },
         {
@@ -160,8 +168,136 @@ test("handleTextMessage also deletes the processing placeholder after sending an
 
     assert.deepEqual(replies, [
         { text: "Processing...", other: undefined },
-        { text: "Error: boom", other: undefined },
+        { text: "Unexpected error.\nCause: boom", other: undefined },
     ]);
     assert.deepEqual(deleted, [{ chatId: 9, messageId: 300 }]);
     assert.equal(errors.length, 1);
+});
+
+test("handleTextMessage rejects a second plain-text prompt while one is already running", async () => {
+    const replies: Array<{ text: string; other?: unknown }> = [];
+    const deleted: Array<{ chatId: number; messageId: number }> = [];
+    let nextMessageId = 500;
+    let releaseFirstRequest: (() => void) | null = null;
+    const firstRequestStarted = new Promise<void>((resolve) => {
+        releaseFirstRequest = resolve;
+    });
+    const { dependencies } = createDependencies(async ({ text }) => {
+        if (text === "first") {
+            await firstRequestStarted;
+            return {
+                assistantReply: createPromptReply(),
+            };
+        }
+
+        return {
+            assistantReply: createPromptReply({
+                fallbackText: "unexpected",
+            }),
+        };
+    });
+
+    const firstCall = handleTextMessage(
+        {
+            chat: { id: 11 },
+            message: { text: "first" },
+            api: {
+                async deleteMessage(chatId, messageId) {
+                    deleted.push({ chatId, messageId });
+                    return true;
+                },
+            },
+            async reply(text, other) {
+                replies.push({ text, other });
+                return { message_id: nextMessageId++ };
+            },
+        },
+        dependencies,
+    );
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    await handleTextMessage(
+        {
+            chat: { id: 11 },
+            message: { text: "second" },
+            api: {
+                async deleteMessage() {
+                    return true;
+                },
+            },
+            async reply(text, other) {
+                replies.push({ text, other });
+                return { message_id: nextMessageId++ };
+            },
+        },
+        dependencies,
+    );
+
+    releaseFirstRequest?.();
+    await firstCall;
+
+    assert.deepEqual(replies, [
+        { text: "Processing...", other: undefined },
+        {
+            text: "Another request is still running. Wait for it to finish before sending a new prompt.",
+            other: undefined,
+        },
+        {
+            text: "*Hello*\n\nDuration: 120 ms \\| Tokens: 42",
+            other: { parse_mode: "MarkdownV2" },
+        },
+    ]);
+    assert.deepEqual(deleted, [{ chatId: 11, messageId: 500 }]);
+});
+
+test("handleTextMessage renders assistant-side prompt errors with metrics and deletes the processing placeholder", async () => {
+    const replies: Array<{ text: string; other?: unknown }> = [];
+    const deleted: Array<{ chatId: number; messageId: number }> = [];
+    let nextMessageId = 700;
+    const { dependencies } = createDependencies(async () => ({
+        assistantReply: createPromptReply({
+            assistantError: {
+                name: "StructuredOutputError",
+                data: {
+                    message: "Schema validation failed",
+                    retries: 2,
+                },
+            } as never,
+            bodyMd: "## Ignored",
+            fallbackText: "ignored",
+        }),
+    }));
+
+    await handleTextMessage(
+        {
+            chat: { id: 15 },
+            message: { text: "hello" },
+            api: {
+                async deleteMessage(chatId, messageId) {
+                    deleted.push({ chatId, messageId });
+                    return true;
+                },
+            },
+            async reply(text, other) {
+                replies.push({ text, other });
+                return { message_id: nextMessageId++ };
+            },
+        },
+        dependencies,
+    );
+
+    assert.deepEqual(replies, [
+        { text: "Processing...", other: undefined },
+        {
+            text: [
+                "Structured output validation failed.",
+                "Cause: Schema validation failed | retries: 2",
+                "",
+                "Duration: 120 ms | Tokens: 42",
+            ].join("\n"),
+            other: undefined,
+        },
+    ]);
+    assert.deepEqual(deleted, [{ chatId: 15, messageId: 700 }]);
 });

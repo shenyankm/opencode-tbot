@@ -52,12 +52,20 @@ function createAgent(name: string): OpenCodeAgent {
 
 function createPromptReply(text: string): PromptSessionResult {
     return {
+        assistantError: null,
         bodyMd: text,
         fallbackText: text,
         info: null,
         metrics: {
             durationMs: 120,
-            totalTokens: 42,
+            tokens: {
+                total: 42,
+                input: 10,
+                output: 12,
+                reasoning: 5,
+                cacheRead: 15,
+                cacheWrite: 0,
+            },
         },
         parts: [],
         structured: {
@@ -78,12 +86,18 @@ test("SendPromptUseCase creates a session in the current project when the chat i
     }> = [];
     const currentProject = createProject("project-1", "E:/repo-1");
     const client: OpenCodeClientLike = {
+        async abortSession() {
+            return true;
+        },
         async createSessionForDirectory(directory) {
             calls.push({ type: "create", directory });
             return createSession("session-1", currentProject.id, directory);
         },
         async getCurrentProject() {
             return currentProject;
+        },
+        async getSessionStatuses() {
+            return {};
         },
         async listModels() {
             return [];
@@ -167,11 +181,17 @@ test("SendPromptUseCase preserves a selected model when it needs to create a ses
     const currentProject = createProject("project-1", "E:/repo-1");
     const promptCalls: unknown[] = [];
     const client: OpenCodeClientLike = {
+        async abortSession() {
+            return true;
+        },
         async createSessionForDirectory(directory) {
             return createSession("session-1", currentProject.id, directory);
         },
         async getCurrentProject() {
             return currentProject;
+        },
+        async getSessionStatuses() {
+            return {};
         },
         async listModels() {
             return [];

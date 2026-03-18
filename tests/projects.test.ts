@@ -46,12 +46,20 @@ function createSession(id: string, projectID: string, directory: string): OpenCo
 
 function createPromptReply(text: string): PromptSessionResult {
     return {
+        assistantError: null,
         bodyMd: text,
         fallbackText: text,
         info: null,
         metrics: {
             durationMs: 120,
-            totalTokens: 42,
+            tokens: {
+                total: 42,
+                input: 10,
+                output: 12,
+                reasoning: 5,
+                cacheRead: 15,
+                cacheWrite: 0,
+            },
         },
         parts: [],
         structured: {
@@ -325,5 +333,5 @@ test("/projects surfaces SDK errors without leaking a stack trace", async () => 
         dependencies,
     );
 
-    assert.equal(replies[0], "Error: boom");
+    assert.equal(replies[0], "Unexpected error.\nCause: boom");
 });

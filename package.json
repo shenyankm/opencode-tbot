@@ -10,6 +10,7 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
+        "@grammyjs/runner": "^2.0.3",
         "@opencode-ai/sdk": "1.2.27",
         "dotenv": "^16.4.5",
         "grammy": "^1.38.0",

@@ -8,6 +8,8 @@ interface SentMessage {
     message_id: number;
 }
 
+const activePromptChats = new Set<number>();
+
 interface MessageContext {
     chat: { id: number };
     message: { text?: string };
@@ -22,18 +24,30 @@ export async function handleTextMessage(ctx: MessageContext, dependencies: BotDe
 
     if (!text) return;
     if (text.startsWith("/")) return;
+    if (activePromptChats.has(ctx.chat.id)) {
+        await ctx.reply(BOT_COPY.status.alreadyProcessing);
+        return;
+    }
 
     let processingMessage: SentMessage | null = null;
     let sentTerminalReply = false;
 
     try {
+        activePromptChats.add(ctx.chat.id);
         processingMessage = await ctx.reply(BOT_COPY.status.processing);
 
         const result = await dependencies.sendPromptUseCase.execute({
             chatId: ctx.chat.id,
             text,
         });
-        const telegramReply = buildTelegramPromptReply(result.assistantReply);
+        const promptReply = result.assistantReply.assistantError
+            ? {
+                ...result.assistantReply,
+                bodyMd: null,
+                fallbackText: presentError(result.assistantReply.assistantError),
+            }
+            : result.assistantReply;
+        const telegramReply = buildTelegramPromptReply(promptReply);
 
         try {
             await ctx.reply(telegramReply.preferred.text, telegramReply.preferred.options);
@@ -47,6 +61,7 @@ export async function handleTextMessage(ctx: MessageContext, dependencies: BotDe
         await ctx.reply(presentError(error));
         sentTerminalReply = true;
     } finally {
+        activePromptChats.delete(ctx.chat.id);
         if (processingMessage && sentTerminalReply) {
             try {
                 await ctx.api.deleteMessage(ctx.chat.id, processingMessage.message_id);

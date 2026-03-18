@@ -65,12 +65,20 @@ function createConfiguredModel(
 
 function createPromptReply(text: string): PromptSessionResult {
     return {
+        assistantError: null,
         bodyMd: text,
         fallbackText: text,
         info: null,
         metrics: {
             durationMs: 120,
-            totalTokens: 42,
+            tokens: {
+                total: 42,
+                input: 10,
+                output: 12,
+                reasoning: 5,
+                cacheRead: 15,
+                cacheWrite: 0,
+            },
         },
         parts: [],
         structured: {
@@ -82,6 +90,11 @@ function createPromptReply(text: string): PromptSessionResult {
 function createDependencies(client: OpenCodeClientLike) {
     const repo = new InMemorySessionRepository();
     const dependencies: BotDependencies = {
+        abortPromptUseCase: {
+            async execute() {
+                return { sessionId: null, sessionStatus: null, status: "no_session" as const };
+            },
+        },
         logger,
         listModelsUseCase: new ListModelsUseCase(repo, client),
         listProjectsUseCase: {
@@ -144,7 +157,7 @@ test("/model only shows configured models with numeric inline buttons", async ()
 
     assert.equal(replies.length, 1);
     assert.match(replies[0].text, /Model List/);
-    assert.match(replies[0].text, /Only models currently configured in OpenCode are shown\./);
+    assert.match(replies[0].text, /Configured models and available custom-provider models in OpenCode are shown\./);
     assert.match(replies[0].text, /Current model: Not selected \(using OpenCode default\)/);
     assert.match(replies[0].text, /Page 1\/2/);
     assert.match(replies[0].text, /1\. OpenAI \/ Model 1/);

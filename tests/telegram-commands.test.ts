@@ -42,6 +42,10 @@ test("TELEGRAM_COMMANDS only advertises implemented commands", () => {
             description: "View and switch sessions",
         },
         {
+            command: "abort",
+            description: "Abort running request",
+        },
+        {
             command: "model",
             description: "View and switch models",
         },

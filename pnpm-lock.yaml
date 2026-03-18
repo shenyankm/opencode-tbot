@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@grammyjs/runner':
+        specifier: ^2.0.3
+        version: 2.0.3(grammy@1.41.1)
       '@opencode-ai/sdk':
         specifier: 1.2.27
         version: 1.2.27
@@ -191,6 +194,12 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@grammyjs/runner@2.0.3':
+    resolution: {integrity: sha512-nckmTs1dPWfVQteK9cxqxzE+0m1VRvluLWB8UgFzsjg62w3qthPJt0TYtJBEdG7OedvfQq4vnFAyE6iaMkR42A==}
+    engines: {node: '>=12.20.0 || >=14.13.1'}
+    peerDependencies:
+      grammy: ^1.13.1
 
   '@grammyjs/types@3.25.0':
     resolution: {integrity: sha512-iN9i5p+8ZOu9OMxWNcguojQfz4K/PDyMPOnL7PPCON+SoA/F8OKMH3uR7CVUkYfdNe0GCz8QOzAWrnqusQYFOg==}
@@ -403,6 +412,11 @@ snapshots:
 
   '@esbuild/win32-x64@0.27.4':
     optional: true
+
+  '@grammyjs/runner@2.0.3(grammy@1.41.1)':
+    dependencies:
+      abort-controller: 3.0.0
+      grammy: 1.41.1
 
   '@grammyjs/types@3.25.0': {}
 

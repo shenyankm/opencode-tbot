@@ -9,12 +9,20 @@ import {
 
 function createPromptReply(overrides: Partial<PromptSessionResult> = {}): PromptSessionResult {
     return {
+        assistantError: null,
         bodyMd: "Hello",
         fallbackText: "Hello",
         info: null,
         metrics: {
             durationMs: 120,
-            totalTokens: 42,
+            tokens: {
+                total: 42,
+                input: 10,
+                output: 12,
+                reasoning: 5,
+                cacheRead: 15,
+                cacheWrite: 0,
+            },
         },
         parts: [],
         structured: {
@@ -91,13 +99,50 @@ test("renderMarkdownToTelegramMarkdownV2 unwraps markdown code fences and render
     );
 });
 
+test("renderMarkdownToTelegramMarkdownV2 renders markdown tables as preformatted tables", () => {
+    const markdown = [
+        "| Language | Runtime |",
+        "| --- | --- |",
+        "| Java | JVM |",
+        "| Python | CPython |",
+    ].join("\n");
+
+    assert.equal(
+        renderMarkdownToTelegramMarkdownV2(markdown),
+        [
+            "```",
+            "Language | Runtime",
+            "---------+--------",
+            "Java     | JVM    ",
+            "Python   | CPython",
+            "```",
+        ].join("\n"),
+    );
+    assert.equal(
+        stripMarkdownToPlainText(markdown),
+        [
+            "Language | Runtime",
+            "---------+--------",
+            "Java     | JVM    ",
+            "Python   | CPython",
+        ].join("\n"),
+    );
+});
+
 test("buildTelegramPromptReply falls back to plain text when markdown is unsupported", () => {
     const result = buildTelegramPromptReply(createPromptReply({
         bodyMd: "<b>bad</b>",
         fallbackText: "plain fallback",
         metrics: {
             durationMs: null,
-            totalTokens: null,
+            tokens: {
+                total: null,
+                input: null,
+                output: null,
+                reasoning: null,
+                cacheRead: null,
+                cacheWrite: null,
+            },
         },
         structured: {
             body_md: "<b>bad</b>",
@@ -112,4 +157,37 @@ test("buildTelegramPromptReply falls back to plain text when markdown is unsuppo
             text: "plain fallback\n\nDuration: n/a | Tokens: n/a",
         },
     });
+});
+
+test("buildTelegramPromptReply appends a compact metrics footer to markdown replies", () => {
+    const result = buildTelegramPromptReply(createPromptReply({
+        bodyMd: "## Hello",
+        fallbackText: "Hello",
+    }));
+
+    assert.deepEqual(result.preferred, {
+        text: "*Hello*\n\nDuration: 120 ms \\| Tokens: 42",
+        options: {
+            parse_mode: "MarkdownV2",
+        },
+    });
+    assert.deepEqual(result.fallback, {
+        text: "Hello\n\nDuration: 120 ms | Tokens: 42",
+    });
+});
+
+test("buildTelegramPromptReply keeps MarkdownV2 enabled for table content", () => {
+    const result = buildTelegramPromptReply(createPromptReply({
+        bodyMd: [
+            "| Language | Runtime |",
+            "| --- | --- |",
+            "| Java | JVM |",
+            "| Python | CPython |",
+        ].join("\n"),
+        fallbackText: "table fallback",
+    }));
+
+    assert.equal(result.preferred.options?.parse_mode, "MarkdownV2");
+    assert.match(result.preferred.text, /^```\nLanguage \| Runtime\n/m);
+    assert.doesNotMatch(result.preferred.text, /^table fallback$/m);
 });

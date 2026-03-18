@@ -1,3 +1,4 @@
+import { run } from "@grammyjs/runner";
 import { bootstrap } from "./app/bootstrap.js";
 import { syncTelegramCommands } from "./bot/commands/sync-commands.js";
 
@@ -6,7 +7,14 @@ async function main() {
 
     container.logger.info("bot starting...");
     await syncTelegramCommands(bot, container.logger);
-    await bot.start();
+    const runner = run(bot);
+
+    const stop = () => {
+        runner.stop();
+    };
+
+    process.once("SIGINT", stop);
+    process.once("SIGTERM", stop);
 }
 
 main().catch((error) => {

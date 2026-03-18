@@ -2,6 +2,7 @@ import pino from "pino";
 import { config } from "./config.js";
 import { InMemorySessionRepository } from "../repositories/session.repo.js";
 import { OpenCodeClient } from "../services/opencode/opencode.client.js";
+import { AbortPromptUseCase } from "../use-cases/abort-prompt.usecase.js";
 import { GetConfigUseCase } from "../use-cases/get-config.usecase.js";
 import { GetHealthUseCase } from "../use-cases/get-health.usecase.js";
 import { GetPathUseCase } from "../use-cases/get-path.usecase.js";
@@ -24,6 +25,7 @@ const opencodeClient = new OpenCodeClient({
     baseUrl: config.opencodeBaseUrl,
     apiKey: config.opencodeApiKey,
 });
+const abortPromptUseCase = new AbortPromptUseCase(sessionRepo, opencodeClient);
 const getHealthUseCase = new GetHealthUseCase(opencodeClient);
 const getPathUseCase = new GetPathUseCase(opencodeClient);
 const getConfigUseCase = new GetConfigUseCase(opencodeClient);
@@ -38,6 +40,7 @@ const switchProjectUseCase = new SwitchProjectUseCase(sessionRepo, opencodeClien
 const switchSessionUseCase = new SwitchSessionUseCase(sessionRepo, opencodeClient, logger);
 
 export const container = {
+    abortPromptUseCase,
     logger,
     sessionRepo,
     opencodeClient,

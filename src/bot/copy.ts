@@ -7,6 +7,7 @@ export const BOT_COPY = {
         agents: "View and switch agents",
         projects: "View and switch projects",
         sessions: "View and switch sessions",
+        abort: "Abort running request",
         model: "View and switch models",
     },
     start: {
@@ -27,11 +28,37 @@ export const BOT_COPY = {
     },
     status: {
         processing: "Processing...",
+        alreadyProcessing: "Another request is still running. Wait for it to finish before sending a new prompt.",
     },
     replyMetrics: {
         durationLabel: "Duration",
         tokensLabel: "Tokens",
+        totalLabel: "total",
+        inputLabel: "input",
+        outputLabel: "output",
+        reasoningLabel: "reasoning",
+        cacheReadLabel: "cache.read",
+        cacheWriteLabel: "cache.write",
         notAvailable: "n/a",
+    },
+    abort: {
+        noSession: "No active session is bound to this chat yet.",
+        notRunning: "No request is currently running for the current session.",
+        aborted: "Abort signal sent to the current session.",
+    },
+    errors: {
+        unexpected: "Unexpected error.",
+        providerAuth: "Provider authentication failed.",
+        requestAborted: "Request was aborted.",
+        structuredOutput: "Structured output validation failed.",
+        outputLength: "Reply hit the model output limit.",
+        contextOverflow: "Conversation exceeded the model context window.",
+        providerRequest: "Provider request failed.",
+        notFound: "Requested resource was not found.",
+        badRequest: "Request was rejected by OpenCode.",
+        causeLabel: "Cause",
+        retryableLabel: "retryable",
+        statusCodeLabel: "status",
     },
     health: {
         title: "Server Health",
@@ -95,9 +122,9 @@ export const BOT_COPY = {
         expired: "The agent is no longer available. Run /agents again.",
     },
     models: {
-        none: "No configured models available.",
+        none: "No models available.",
         title: "Model List",
-        configuredOnly: "Only models currently configured in OpenCode are shown.",
+        configuredOnly: "Configured models and available custom-provider models in OpenCode are shown.",
         current(model: string) {
             return `Current model: ${model}`;
         },
