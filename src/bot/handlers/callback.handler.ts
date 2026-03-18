@@ -1,14 +1,17 @@
 import type { Bot } from "grammy";
-import { BOT_COPY } from "../copy.js";
+import { getChatCopy, getChatLanguage } from "../i18n.js";
+import { presentLanguageSwitchForChat } from "../commands/language.js";
 import type {
     AgentsCallbackData,
     BotDependencies,
+    LanguageCallbackData,
     ModelCallbackData,
     ProjectsCallbackData,
     SessionsCallbackData,
 } from "../types.js";
 import {
     buildAgentsKeyboard,
+    buildLanguageKeyboard,
     buildModelsKeyboard,
     buildModelVariantsKeyboard,
     buildProjectsKeyboard,
@@ -19,6 +22,7 @@ import {
     getModelVariants,
     presentAgentsMessage,
     presentAgentSwitchMessage,
+    presentLanguageMessage,
     presentModelsMessage,
     presentModelSwitchMessage,
     presentModelVariantsMessage,
@@ -37,12 +41,14 @@ const SESSIONS_SELECT_PREFIX = "sessions:select:";
 const MODEL_PAGE_PREFIX = "model:page:";
 const MODEL_PICK_PREFIX = "model:pick:";
 const MODEL_VARIANT_PREFIX = "model:variant:";
+const LANGUAGE_SELECT_PREFIX = "language:select:";
 
 interface CallbackContext {
     chat?: { id: number };
     callbackQuery: { data: string };
     answerCallbackQuery(): Promise<unknown>;
     editMessageText(text: string, other?: { reply_markup?: unknown }): Promise<unknown>;
+    api?: Pick<Bot["api"], "setMyCommands">;
 }
 
 export async function handleAgentsCallback(ctx: CallbackContext, dependencies: BotDependencies) {
@@ -58,6 +64,8 @@ export async function handleAgentsCallback(ctx: CallbackContext, dependencies: B
         return;
     }
 
+    const copy = await getChatCopy(dependencies.sessionRepo, ctx.chat.id);
+
     try {
         if (data.startsWith(AGENTS_PAGE_PREFIX)) {
             const requestedPage = Number(data.slice(AGENTS_PAGE_PREFIX.length));
@@ -66,18 +74,18 @@ export async function handleAgentsCallback(ctx: CallbackContext, dependencies: B
             });
 
             if (result.agents.length === 0) {
-                await ctx.editMessageText(BOT_COPY.agents.none);
+                await ctx.editMessageText(copy.agents.none);
                 return;
             }
 
-            const { keyboard, page } = buildAgentsKeyboard(result.agents, requestedPage);
+            const { keyboard, page } = buildAgentsKeyboard(result.agents, requestedPage, copy);
 
             await ctx.editMessageText(
                 presentAgentsMessage({
                     agents: result.agents,
                     currentAgentName: result.currentAgentName,
                     page: page.page,
-                }),
+                }, copy),
                 {
                     reply_markup: keyboard,
                 },
@@ -94,7 +102,7 @@ export async function handleAgentsCallback(ctx: CallbackContext, dependencies: B
             const agent = result.agents[agentIndex - 1];
 
             if (!agent) {
-                await ctx.editMessageText(BOT_COPY.agents.expired);
+                await ctx.editMessageText(copy.agents.expired);
                 return;
             }
 
@@ -104,15 +112,15 @@ export async function handleAgentsCallback(ctx: CallbackContext, dependencies: B
             });
 
             if (!switchResult.found) {
-                await ctx.editMessageText(BOT_COPY.agents.expired);
+                await ctx.editMessageText(copy.agents.expired);
                 return;
             }
 
-            await ctx.editMessageText(presentAgentSwitchMessage(switchResult.agent));
+            await ctx.editMessageText(presentAgentSwitchMessage(switchResult.agent, copy));
         }
     } catch (error) {
         dependencies.logger.error({ error }, "failed to handle agent callback");
-        await ctx.editMessageText(presentError(error));
+        await ctx.editMessageText(presentError(error, copy));
     }
 }
 
@@ -129,6 +137,8 @@ export async function handleProjectsCallback(ctx: CallbackContext, dependencies:
         return;
     }
 
+    const copy = await getChatCopy(dependencies.sessionRepo, ctx.chat.id);
+
     try {
         if (data.startsWith(PROJECTS_PAGE_PREFIX)) {
             const requestedPage = Number(data.slice(PROJECTS_PAGE_PREFIX.length));
@@ -137,11 +147,11 @@ export async function handleProjectsCallback(ctx: CallbackContext, dependencies:
             });
 
             if (result.projects.length === 0) {
-                await ctx.editMessageText(BOT_COPY.projects.none);
+                await ctx.editMessageText(copy.projects.none);
                 return;
             }
 
-            const { keyboard, page } = buildProjectsKeyboard(result.projects, requestedPage);
+            const { keyboard, page } = buildProjectsKeyboard(result.projects, requestedPage, copy);
 
             await ctx.editMessageText(
                 presentProjectsMessage({
@@ -149,7 +159,7 @@ export async function handleProjectsCallback(ctx: CallbackContext, dependencies:
                     currentProjectId: result.currentProjectId,
                     page: page.page,
                     projects: result.projects,
-                }),
+                }, copy),
                 {
                     reply_markup: keyboard,
                 },
@@ -166,15 +176,15 @@ export async function handleProjectsCallback(ctx: CallbackContext, dependencies:
             });
 
             if (!result.found) {
-                await ctx.editMessageText(BOT_COPY.projects.expired);
+                await ctx.editMessageText(copy.projects.expired);
                 return;
             }
 
-            await ctx.editMessageText(presentProjectSwitchMessage(result.project.worktree));
+            await ctx.editMessageText(presentProjectSwitchMessage(result.project.worktree, copy));
         }
     } catch (error) {
         dependencies.logger.error({ error }, "failed to handle project callback");
-        await ctx.editMessageText(presentError(error));
+        await ctx.editMessageText(presentError(error, copy));
     }
 }
 
@@ -191,6 +201,8 @@ export async function handleModelsCallback(ctx: CallbackContext, dependencies: B
         return;
     }
 
+    const copy = await getChatCopy(dependencies.sessionRepo, ctx.chat.id);
+
     try {
         if (data.startsWith(MODEL_PAGE_PREFIX)) {
             const requestedPage = Number(data.slice(MODEL_PAGE_PREFIX.length));
@@ -199,11 +211,11 @@ export async function handleModelsCallback(ctx: CallbackContext, dependencies: B
             });
 
             if (result.models.length === 0) {
-                await ctx.editMessageText(BOT_COPY.models.none);
+                await ctx.editMessageText(copy.models.none);
                 return;
             }
 
-            const { keyboard, page } = buildModelsKeyboard(result.models, requestedPage);
+            const { keyboard, page } = buildModelsKeyboard(result.models, requestedPage, copy);
 
             await ctx.editMessageText(
                 presentModelsMessage({
@@ -212,7 +224,7 @@ export async function handleModelsCallback(ctx: CallbackContext, dependencies: B
                     currentModelVariant: result.currentModelVariant,
                     models: result.models,
                     page: page.page,
-                }),
+                }, copy),
                 {
                     reply_markup: keyboard,
                 },
@@ -229,7 +241,7 @@ export async function handleModelsCallback(ctx: CallbackContext, dependencies: B
             const model = result.models[modelIndex - 1];
 
             if (!model) {
-                await ctx.editMessageText(BOT_COPY.models.expired);
+                await ctx.editMessageText(copy.models.expired);
                 return;
             }
 
@@ -243,16 +255,16 @@ export async function handleModelsCallback(ctx: CallbackContext, dependencies: B
                 });
 
                 if (!switchResult.found) {
-                    await ctx.editMessageText(BOT_COPY.models.expired);
+                    await ctx.editMessageText(copy.models.expired);
                     return;
                 }
 
-                await ctx.editMessageText(presentModelSwitchMessage(switchResult.model, switchResult.variant));
+                await ctx.editMessageText(presentModelSwitchMessage(switchResult.model, switchResult.variant, copy));
                 return;
             }
 
             await ctx.editMessageText(
-                presentModelVariantsMessage(model, modelIndex),
+                presentModelVariantsMessage(model, modelIndex, copy),
                 {
                     reply_markup: buildModelVariantsKeyboard(variants, modelIndex),
                 },
@@ -272,7 +284,7 @@ export async function handleModelsCallback(ctx: CallbackContext, dependencies: B
             const model = result.models[modelIndex - 1];
 
             if (!model) {
-                await ctx.editMessageText(BOT_COPY.models.expired);
+                await ctx.editMessageText(copy.models.expired);
                 return;
             }
 
@@ -280,7 +292,7 @@ export async function handleModelsCallback(ctx: CallbackContext, dependencies: B
             const variant = variants[variantIndex - 1];
 
             if (!variant) {
-                await ctx.editMessageText(BOT_COPY.models.reasoningLevelExpired);
+                await ctx.editMessageText(copy.models.reasoningLevelExpired);
                 return;
             }
 
@@ -292,15 +304,15 @@ export async function handleModelsCallback(ctx: CallbackContext, dependencies: B
             });
 
             if (!switchResult.found) {
-                await ctx.editMessageText(BOT_COPY.models.expired);
+                await ctx.editMessageText(copy.models.expired);
                 return;
             }
 
-            await ctx.editMessageText(presentModelSwitchMessage(switchResult.model, switchResult.variant));
+            await ctx.editMessageText(presentModelSwitchMessage(switchResult.model, switchResult.variant, copy));
         }
     } catch (error) {
         dependencies.logger.error({ error }, "failed to handle model callback");
-        await ctx.editMessageText(presentError(error));
+        await ctx.editMessageText(presentError(error, copy));
     }
 }
 
@@ -317,6 +329,8 @@ export async function handleSessionsCallback(ctx: CallbackContext, dependencies:
         return;
     }
 
+    const copy = await getChatCopy(dependencies.sessionRepo, ctx.chat.id);
+
     try {
         if (data.startsWith(SESSIONS_PAGE_PREFIX)) {
             const requestedPage = Number(data.slice(SESSIONS_PAGE_PREFIX.length));
@@ -325,11 +339,11 @@ export async function handleSessionsCallback(ctx: CallbackContext, dependencies:
             });
 
             if (result.sessions.length === 0) {
-                await ctx.editMessageText(BOT_COPY.sessions.none);
+                await ctx.editMessageText(copy.sessions.none);
                 return;
             }
 
-            const { keyboard, page } = buildSessionsKeyboard(result.sessions, requestedPage);
+            const { keyboard, page } = buildSessionsKeyboard(result.sessions, requestedPage, copy);
 
             await ctx.editMessageText(
                 presentSessionsMessage({
@@ -337,7 +351,7 @@ export async function handleSessionsCallback(ctx: CallbackContext, dependencies:
                     currentSessionId: result.currentSessionId,
                     page: page.page,
                     sessions: result.sessions,
-                }),
+                }, copy),
                 {
                     reply_markup: keyboard,
                 },
@@ -354,15 +368,56 @@ export async function handleSessionsCallback(ctx: CallbackContext, dependencies:
             });
 
             if (!result.found) {
-                await ctx.editMessageText(BOT_COPY.sessions.expired);
+                await ctx.editMessageText(copy.sessions.expired);
                 return;
             }
 
-            await ctx.editMessageText(presentSessionSwitchMessage(result.session));
+            await ctx.editMessageText(presentSessionSwitchMessage(result.session, copy));
         }
     } catch (error) {
         dependencies.logger.error({ error }, "failed to handle session callback");
-        await ctx.editMessageText(presentError(error));
+        await ctx.editMessageText(presentError(error, copy));
+    }
+}
+
+export async function handleLanguageCallback(ctx: CallbackContext, dependencies: BotDependencies) {
+    const data = ctx.callbackQuery.data as LanguageCallbackData;
+
+    if (!data.startsWith("language:")) {
+        return;
+    }
+
+    await ctx.answerCallbackQuery();
+
+    if (!ctx.chat || !ctx.api) {
+        return;
+    }
+
+    const currentCopy = await getChatCopy(dependencies.sessionRepo, ctx.chat.id);
+
+    try {
+        if (!data.startsWith(LANGUAGE_SELECT_PREFIX)) {
+            await ctx.editMessageText(
+                presentLanguageMessage(await getChatLanguage(dependencies.sessionRepo, ctx.chat.id), currentCopy),
+                {
+                    reply_markup: buildLanguageKeyboard(
+                        await getChatLanguage(dependencies.sessionRepo, ctx.chat.id),
+                        currentCopy,
+                    ),
+                },
+            );
+            return;
+        }
+
+        const selectedLanguage = data.slice(LANGUAGE_SELECT_PREFIX.length);
+        const result = await presentLanguageSwitchForChat(ctx.chat.id, ctx.api, selectedLanguage, dependencies);
+
+        await ctx.editMessageText(result.text, {
+            reply_markup: result.keyboard,
+        });
+    } catch (error) {
+        dependencies.logger.error({ error }, "failed to handle language callback");
+        await ctx.editMessageText(presentError(error, currentCopy));
     }
 }
 
@@ -381,5 +436,9 @@ export function registerCallbackHandler(bot: Bot, dependencies: BotDependencies)
 
     bot.callbackQuery(/^model:/, async (ctx) => {
         await handleModelsCallback(ctx, dependencies);
+    });
+
+    bot.callbackQuery(/^language:/, async (ctx) => {
+        await handleLanguageCallback(ctx, dependencies);
     });
 }

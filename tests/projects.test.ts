@@ -72,6 +72,7 @@ function createDependencies(client: OpenCodeClientLike) {
     const repo = new InMemorySessionRepository();
     const dependencies: BotDependencies = {
         logger,
+        sessionRepo: repo,
         listModelsUseCase: {
             async execute() {
                 return {
@@ -260,6 +261,7 @@ test("project selection callbacks switch the binding to the selected project", a
         modelProviderId: null,
         modelId: null,
         modelVariant: null,
+        language: null,
         updatedAt: binding?.updatedAt,
     });
 });

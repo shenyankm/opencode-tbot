@@ -151,6 +151,7 @@ test("SendPromptUseCase creates a session in the current project when the chat i
         modelProviderId: null,
         modelId: null,
         modelVariant: null,
+        language: null,
         updatedAt: binding?.updatedAt,
     });
     assert.deepEqual(calls, [
@@ -172,9 +173,11 @@ test("SendPromptUseCase preserves a selected model when it needs to create a ses
         sessionId: null,
         projectId: null,
         directory: null,
+        agentName: null,
         modelProviderId: "openai",
         modelId: "gpt-5",
         modelVariant: "high",
+        language: null,
         updatedAt: new Date(0).toISOString(),
     });
 
@@ -251,6 +254,7 @@ test("SendPromptUseCase preserves a selected model when it needs to create a ses
         modelProviderId: "openai",
         modelId: "gpt-5",
         modelVariant: "high",
+        language: null,
         updatedAt: binding?.updatedAt,
     });
 });

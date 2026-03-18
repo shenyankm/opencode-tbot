@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { Logger } from "pino";
-import { TELEGRAM_COMMANDS } from "../src/bot/commands/command-list.js";
+import { getTelegramCommands, TELEGRAM_COMMANDS } from "../src/bot/commands/command-list.js";
 import {
     syncTelegramCommands,
+    syncTelegramCommandsForChat,
     TELEGRAM_COMMAND_SYNC_SCOPES,
 } from "../src/bot/commands/sync-commands.js";
 
@@ -26,10 +27,6 @@ test("TELEGRAM_COMMANDS only advertises implemented commands", () => {
             description: "Show current paths",
         },
         {
-            command: "config",
-            description: "Show configuration",
-        },
-        {
             command: "agents",
             description: "View and switch agents",
         },
@@ -48,6 +45,10 @@ test("TELEGRAM_COMMANDS only advertises implemented commands", () => {
         {
             command: "model",
             description: "View and switch models",
+        },
+        {
+            command: "language",
+            description: "View and switch language",
         },
     ]);
 });
@@ -74,4 +75,31 @@ test("syncTelegramCommands pushes the command list to Telegram", async () => {
             other: { scope },
         })),
     );
+});
+
+test("syncTelegramCommandsForChat applies localized command descriptions to one chat", async () => {
+    const calls: Array<{ commands: unknown; other?: unknown }> = [];
+
+    await syncTelegramCommandsForChat(
+        {
+            async setMyCommands(commands: unknown, other?: unknown) {
+                calls.push({ commands, other });
+                return true;
+            },
+        } as never,
+        7,
+        "zh-CN",
+    );
+
+    assert.deepEqual(calls, [
+        {
+            commands: getTelegramCommands("zh-CN"),
+            other: {
+                scope: {
+                    type: "chat",
+                    chat_id: 7,
+                },
+            },
+        },
+    ]);
 });

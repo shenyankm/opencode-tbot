@@ -1,5 +1,5 @@
 import type { Logger } from "pino";
-import type { GetConfigUseCase } from "../use-cases/get-config.usecase.js";
+import type { SessionRepository } from "../domain/session/session.repository.js";
 import type { GetHealthUseCase } from "../use-cases/get-health.usecase.js";
 import type { GetPathUseCase } from "../use-cases/get-path.usecase.js";
 import type { AbortPromptUseCase } from "../use-cases/abort-prompt.usecase.js";
@@ -15,7 +15,6 @@ import type { SwitchSessionUseCase } from "../use-cases/switch-session.usecase.j
 
 export interface BotDependencies {
     abortPromptUseCase: AbortPromptUseCase;
-    getConfigUseCase: GetConfigUseCase;
     getHealthUseCase: GetHealthUseCase;
     getPathUseCase: GetPathUseCase;
     listAgentsUseCase: ListAgentsUseCase;
@@ -23,6 +22,7 @@ export interface BotDependencies {
     listModelsUseCase: ListModelsUseCase;
     listProjectsUseCase: ListProjectsUseCase;
     listSessionsUseCase: ListSessionsUseCase;
+    sessionRepo: SessionRepository;
     sendPromptUseCase: SendPromptUseCase;
     switchAgentUseCase: SwitchAgentUseCase;
     switchModelUseCase: SwitchModelUseCase;
@@ -31,6 +31,7 @@ export interface BotDependencies {
 }
 
 export type AgentsCallbackData = `agents:page:${number}` | `agents:select:${number}`;
+export type LanguageCallbackData = `language:select:${"en" | "zh-CN"}`;
 export type ProjectsCallbackData = `projects:page:${number}` | `projects:select:${string}`;
 export type SessionsCallbackData = `sessions:page:${number}` | `sessions:select:${string}`;
 export type ModelCallbackData =

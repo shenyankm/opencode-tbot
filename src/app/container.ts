@@ -3,7 +3,6 @@ import { config } from "./config.js";
 import { InMemorySessionRepository } from "../repositories/session.repo.js";
 import { OpenCodeClient } from "../services/opencode/opencode.client.js";
 import { AbortPromptUseCase } from "../use-cases/abort-prompt.usecase.js";
-import { GetConfigUseCase } from "../use-cases/get-config.usecase.js";
 import { GetHealthUseCase } from "../use-cases/get-health.usecase.js";
 import { GetPathUseCase } from "../use-cases/get-path.usecase.js";
 import { ListAgentsUseCase } from "../use-cases/list-agents.usecase.js";
@@ -28,7 +27,6 @@ const opencodeClient = new OpenCodeClient({
 const abortPromptUseCase = new AbortPromptUseCase(sessionRepo, opencodeClient);
 const getHealthUseCase = new GetHealthUseCase(opencodeClient);
 const getPathUseCase = new GetPathUseCase(opencodeClient);
-const getConfigUseCase = new GetConfigUseCase(opencodeClient);
 const listAgentsUseCase = new ListAgentsUseCase(sessionRepo, opencodeClient);
 const listModelsUseCase = new ListModelsUseCase(sessionRepo, opencodeClient);
 const listProjectsUseCase = new ListProjectsUseCase(sessionRepo, opencodeClient);
@@ -46,7 +44,6 @@ export const container = {
     opencodeClient,
     getHealthUseCase,
     getPathUseCase,
-    getConfigUseCase,
     listAgentsUseCase,
     listModelsUseCase,
     listProjectsUseCase,

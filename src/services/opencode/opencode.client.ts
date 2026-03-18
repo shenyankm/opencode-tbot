@@ -121,7 +121,6 @@ export interface OpenCodeClientLike {
     abortSession(sessionId: string): Promise<boolean>;
     getHealth(): Promise<OpenCodeHealth>;
     getPath(): Promise<OpenCodePath>;
-    getConfig(): Promise<OpenCodeConfig>;
     getSessionStatuses(): Promise<Record<string, OpenCodeSessionStatus>>;
     listProjects(): Promise<OpenCodeProject[]>;
     listSessions(): Promise<OpenCodeSession[]>;
@@ -158,12 +157,6 @@ export class OpenCodeClient implements OpenCodeClientLike {
 
     async getPath(): Promise<OpenCodePath> {
         const response = await this.client.path.get(undefined, SDK_OPTIONS) as MaybeWrappedResponse<OpenCodePath>;
-
-        return unwrapSdkData(response);
-    }
-
-    async getConfig(): Promise<OpenCodeConfig> {
-        const response = await this.client.config.get(undefined, SDK_OPTIONS) as MaybeWrappedResponse<OpenCodeConfig>;
 
         return unwrapSdkData(response);
     }
@@ -218,7 +211,10 @@ export class OpenCodeClient implements OpenCodeClientLike {
         const config = unwrapSdkData(configResponse);
         const providerCatalog = unwrapSdkData(providersResponse);
 
-        return buildSelectableModels(config, providerCatalog.providers);
+        return buildSelectableModels(
+            config,
+            providerCatalog.providers,
+        );
     }
 
     async promptSession(input: PromptSessionInput): Promise<PromptSessionResult> {
@@ -280,12 +276,10 @@ function buildSelectableModels(
     }
 
     for (const provider of providers) {
-        if (configuredProviders[provider.id] || provider.source === "config") {
-            continue;
-        }
-
         for (const model of buildCatalogProviderModels(provider)) {
-            models.set(model.qualifiedId, model);
+            if (!models.has(model.qualifiedId)) {
+                models.set(model.qualifiedId, model);
+            }
         }
     }
 

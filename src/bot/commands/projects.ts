@@ -1,5 +1,5 @@
 import type { Bot } from "grammy";
-import { BOT_COPY } from "../copy.js";
+import { getChatCopy } from "../i18n.js";
 import type { BotDependencies } from "../types.js";
 import { buildProjectsKeyboard } from "../presenters/keyboard.presenter.js";
 import { presentError } from "../presenters/error.presenter.js";
@@ -11,17 +11,19 @@ interface ProjectsCommandContext {
 }
 
 export async function handleProjectsCommand(ctx: ProjectsCommandContext, dependencies: BotDependencies) {
+    const copy = await getChatCopy(dependencies.sessionRepo, ctx.chat.id);
+
     try {
         const result = await dependencies.listProjectsUseCase.execute({
             chatId: ctx.chat.id,
         });
 
         if (result.projects.length === 0) {
-            await ctx.reply(BOT_COPY.projects.none);
+            await ctx.reply(copy.projects.none);
             return;
         }
 
-        const { keyboard, page } = buildProjectsKeyboard(result.projects, 0);
+        const { keyboard, page } = buildProjectsKeyboard(result.projects, 0, copy);
 
         await ctx.reply(
             presentProjectsMessage({
@@ -29,14 +31,14 @@ export async function handleProjectsCommand(ctx: ProjectsCommandContext, depende
                 currentProjectId: result.currentProjectId,
                 page: page.page,
                 projects: result.projects,
-            }),
+            }, copy),
             {
                 reply_markup: keyboard,
             },
         );
     } catch (error) {
         dependencies.logger.error({ error }, "failed to list projects");
-        await ctx.reply(presentError(error));
+        await ctx.reply(presentError(error, copy));
     }
 }
 

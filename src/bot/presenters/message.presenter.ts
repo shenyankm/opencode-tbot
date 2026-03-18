@@ -1,13 +1,17 @@
 import type {
     OpenCodeAgent,
-    OpenCodeConfig,
     OpenCodeConfiguredModel,
     OpenCodeHealth,
     OpenCodePath,
     OpenCodeProject,
     OpenCodeSession,
 } from "../../services/opencode/opencode.client.js";
-import { BOT_COPY } from "../copy.js";
+import {
+    BOT_COPY,
+    getLanguageLabel,
+    type BotCopy,
+    type BotLanguage,
+} from "../copy.js";
 import {
     getAgentsPage,
     getModelsPage,
@@ -44,52 +48,37 @@ interface SessionsMessageInput {
 }
 
 const VARIANT_ORDER = ["minimal", "none", "low", "medium", "high", "xhigh", "max"];
-const TELEGRAM_TEXT_SOFT_LIMIT = 3900;
-
-export function presentHealthMessage(health: OpenCodeHealth): string {
+export function presentHealthMessage(health: OpenCodeHealth, copy: BotCopy = BOT_COPY): string {
     return [
-        BOT_COPY.health.title,
-        BOT_COPY.health.status(health.healthy),
-        BOT_COPY.health.version(health.version),
+        copy.health.title,
+        copy.health.status(health.healthy),
+        copy.health.version(health.version),
     ].join("\n");
 }
 
-export function presentPathMessage(path: OpenCodePath): string {
+export function presentPathMessage(path: OpenCodePath, copy: BotCopy = BOT_COPY): string {
     return [
-        BOT_COPY.path.title,
-        BOT_COPY.path.home(path.home),
-        BOT_COPY.path.state(path.state),
-        BOT_COPY.path.config(path.config),
-        BOT_COPY.path.worktree(path.worktree),
-        BOT_COPY.path.directory(path.directory),
+        copy.path.title,
+        copy.path.home(path.home),
+        copy.path.state(path.state),
+        copy.path.config(path.config),
+        copy.path.worktree(path.worktree),
+        copy.path.directory(path.directory),
     ].join("\n");
 }
 
-export function presentConfigMessage(config: OpenCodeConfig): string {
-    const content = safePrettyJson(config);
-    const maxContentLength = TELEGRAM_TEXT_SOFT_LIMIT - BOT_COPY.config.title.length - 1;
-    const body = content.length > maxContentLength
-        ? `${content.slice(0, maxContentLength - BOT_COPY.config.truncated.length - 1)}\n${BOT_COPY.config.truncated}`
-        : content;
-
-    return [
-        BOT_COPY.config.title,
-        body,
-    ].join("\n");
-}
-
-export function presentProjectsMessage(input: ProjectsMessageInput): string {
+export function presentProjectsMessage(input: ProjectsMessageInput, copy: BotCopy = BOT_COPY): string {
     if (input.projects.length === 0) {
-        return BOT_COPY.projects.none;
+        return copy.projects.none;
     }
 
     const page = getProjectsPage(input.projects, input.page);
     const currentProject = input.projects.find((project) => project.id === input.currentProjectId);
-    const currentDirectory = currentProject?.worktree ?? input.currentDirectory ?? BOT_COPY.common.notSelected;
+    const currentDirectory = currentProject?.worktree ?? input.currentDirectory ?? copy.common.notSelected;
     const lines = [
-        BOT_COPY.projects.title,
-        BOT_COPY.projects.current(currentDirectory),
-        BOT_COPY.common.page(page.page + 1, page.totalPages),
+        copy.projects.title,
+        copy.projects.current(currentDirectory),
+        copy.common.page(page.page + 1, page.totalPages),
         "",
         ...page.items.map((project, index) => `${page.startIndex + index + 1}. ${project.worktree}`),
     ];
@@ -97,16 +86,16 @@ export function presentProjectsMessage(input: ProjectsMessageInput): string {
     return lines.join("\n");
 }
 
-export function presentProjectSwitchMessage(worktree: string): string {
+export function presentProjectSwitchMessage(worktree: string, copy: BotCopy = BOT_COPY): string {
     return [
-        BOT_COPY.projects.switched,
-        BOT_COPY.projects.current(worktree),
+        copy.projects.switched,
+        copy.projects.current(worktree),
     ].join("\n");
 }
 
-export function presentSessionsMessage(input: SessionsMessageInput): string {
+export function presentSessionsMessage(input: SessionsMessageInput, copy: BotCopy = BOT_COPY): string {
     if (input.sessions.length === 0) {
-        return BOT_COPY.sessions.none;
+        return copy.sessions.none;
     }
 
     const page = getSessionsPage(input.sessions, input.page);
@@ -114,10 +103,10 @@ export function presentSessionsMessage(input: SessionsMessageInput): string {
         ? input.sessions.find((session) => session.id === input.currentSessionId) ?? null
         : null;
     const lines = [
-        BOT_COPY.sessions.title,
-        BOT_COPY.sessions.currentProject(input.currentDirectory),
-        BOT_COPY.sessions.currentSession(currentSession ? formatSessionLabel(currentSession) : BOT_COPY.common.notSelected),
-        BOT_COPY.common.page(page.page + 1, page.totalPages),
+        copy.sessions.title,
+        copy.sessions.currentProject(input.currentDirectory),
+        copy.sessions.currentSession(currentSession ? formatSessionLabel(currentSession) : copy.common.notSelected),
+        copy.common.page(page.page + 1, page.totalPages),
         "",
         ...page.items.map((session, index) => `${page.startIndex + index + 1}. ${formatSessionLabel(session)}`),
     ];
@@ -125,16 +114,16 @@ export function presentSessionsMessage(input: SessionsMessageInput): string {
     return lines.join("\n");
 }
 
-export function presentSessionSwitchMessage(session: OpenCodeSession): string {
+export function presentSessionSwitchMessage(session: OpenCodeSession, copy: BotCopy = BOT_COPY): string {
     return [
-        BOT_COPY.sessions.switched,
-        BOT_COPY.sessions.currentSession(formatSessionLabel(session)),
+        copy.sessions.switched,
+        copy.sessions.currentSession(formatSessionLabel(session)),
     ].join("\n");
 }
 
-export function presentAgentsMessage(input: AgentsMessageInput): string {
+export function presentAgentsMessage(input: AgentsMessageInput, copy: BotCopy = BOT_COPY): string {
     if (input.agents.length === 0) {
-        return BOT_COPY.agents.none;
+        return copy.agents.none;
     }
 
     const page = getAgentsPage(input.agents, input.page);
@@ -142,9 +131,9 @@ export function presentAgentsMessage(input: AgentsMessageInput): string {
         ? input.agents.find((agent) => agent.name === input.currentAgentName) ?? null
         : null;
     const lines = [
-        BOT_COPY.agents.title,
-        BOT_COPY.agents.current(currentAgent ? formatAgentLabel(currentAgent) : BOT_COPY.common.openCodeDefault),
-        BOT_COPY.common.page(page.page + 1, page.totalPages),
+        copy.agents.title,
+        copy.agents.current(currentAgent ? formatAgentLabel(currentAgent) : copy.common.openCodeDefault),
+        copy.common.page(page.page + 1, page.totalPages),
         "",
         ...page.items.map((agent, index) => `${page.startIndex + index + 1}. ${formatAgentLabel(agent)}`),
     ];
@@ -152,16 +141,16 @@ export function presentAgentsMessage(input: AgentsMessageInput): string {
     return lines.join("\n");
 }
 
-export function presentAgentSwitchMessage(agent: OpenCodeAgent): string {
+export function presentAgentSwitchMessage(agent: OpenCodeAgent, copy: BotCopy = BOT_COPY): string {
     return [
-        BOT_COPY.agents.switched,
-        BOT_COPY.agents.current(formatAgentLabel(agent)),
+        copy.agents.switched,
+        copy.agents.current(formatAgentLabel(agent)),
     ].join("\n");
 }
 
-export function presentModelsMessage(input: ModelsMessageInput): string {
+export function presentModelsMessage(input: ModelsMessageInput, copy: BotCopy = BOT_COPY): string {
     if (input.models.length === 0) {
-        return BOT_COPY.models.none;
+        return copy.models.none;
     }
 
     const page = getModelsPage(input.models, input.page);
@@ -171,13 +160,13 @@ export function presentModelsMessage(input: ModelsMessageInput): string {
         ) ?? null
         : null;
     const currentModelLine = currentModel
-        ? formatModelSelection(currentModel, input.currentModelVariant)
-        : BOT_COPY.common.openCodeDefault;
+        ? formatModelSelection(currentModel, input.currentModelVariant, copy)
+        : copy.common.openCodeDefault;
     const lines = [
-        BOT_COPY.models.title,
-        BOT_COPY.models.configuredOnly,
-        BOT_COPY.models.current(currentModelLine),
-        BOT_COPY.common.page(page.page + 1, page.totalPages),
+        copy.models.title,
+        copy.models.configuredOnly,
+        copy.models.current(currentModelLine),
+        copy.common.page(page.page + 1, page.totalPages),
         "",
         ...page.items.map((model, index) => formatModelListLine(model, page.startIndex + index + 1)),
     ];
@@ -185,20 +174,24 @@ export function presentModelsMessage(input: ModelsMessageInput): string {
     return lines.join("\n");
 }
 
-export function presentModelVariantsMessage(model: OpenCodeConfiguredModel, modelIndex: number): string {
+export function presentModelVariantsMessage(
+    model: OpenCodeConfiguredModel,
+    modelIndex: number,
+    copy: BotCopy = BOT_COPY,
+): string {
     const variants = getModelVariants(model);
 
     if (variants.length === 0) {
         return [
-            BOT_COPY.models.noReasoningLevels,
-            BOT_COPY.models.model(formatModelLabel(model)),
+            copy.models.noReasoningLevels,
+            copy.models.model(formatModelLabel(model)),
         ].join("\n");
     }
 
     const lines = [
-        BOT_COPY.models.reasoningLevelsTitle,
-        BOT_COPY.models.model(formatModelLabel(model)),
-        BOT_COPY.models.modelNumber(modelIndex),
+        copy.models.reasoningLevelsTitle,
+        copy.models.model(formatModelLabel(model)),
+        copy.models.modelNumber(modelIndex),
         "",
         ...variants.map((variant, index) => `${index + 1}. ${variant}`),
     ];
@@ -206,11 +199,31 @@ export function presentModelVariantsMessage(model: OpenCodeConfiguredModel, mode
     return lines.join("\n");
 }
 
-export function presentModelSwitchMessage(model: OpenCodeConfiguredModel, variant: string | null): string {
+export function presentModelSwitchMessage(
+    model: OpenCodeConfiguredModel,
+    variant: string | null,
+    copy: BotCopy = BOT_COPY,
+): string {
     return [
-        BOT_COPY.models.switched,
-        BOT_COPY.models.current(formatModelLabel(model)),
-        BOT_COPY.models.currentReasoningLevel(variant ?? BOT_COPY.models.defaultReasoningLevel),
+        copy.models.switched,
+        copy.models.current(formatModelLabel(model)),
+        copy.models.currentReasoningLevel(variant ?? copy.models.defaultReasoningLevel),
+    ].join("\n");
+}
+
+export function presentLanguageMessage(currentLanguage: BotLanguage, copy: BotCopy = BOT_COPY): string {
+    return [
+        copy.language.title,
+        copy.language.current(getLanguageLabel(currentLanguage, copy)),
+        "",
+        copy.language.choose,
+    ].join("\n");
+}
+
+export function presentLanguageSwitchMessage(currentLanguage: BotLanguage, copy: BotCopy = BOT_COPY): string {
+    return [
+        copy.language.switched,
+        copy.language.current(getLanguageLabel(currentLanguage, copy)),
     ].join("\n");
 }
 
@@ -246,8 +259,12 @@ function formatModelListLine(model: OpenCodeConfiguredModel, displayIndex: numbe
     return `${displayIndex}. ${formatModelLabel(model)}`;
 }
 
-function formatModelSelection(model: OpenCodeConfiguredModel, variant: string | null): string {
-    return `${formatModelLabel(model)} | ${BOT_COPY.models.reasoningLevel(variant ?? BOT_COPY.models.defaultReasoningLevel)}`;
+function formatModelSelection(
+    model: OpenCodeConfiguredModel,
+    variant: string | null,
+    copy: BotCopy,
+): string {
+    return `${formatModelLabel(model)} | ${copy.models.reasoningLevel(variant ?? copy.models.defaultReasoningLevel)}`;
 }
 
 function formatModelLabel(model: OpenCodeConfiguredModel): string {
@@ -260,12 +277,4 @@ function formatSessionLabel(session: OpenCodeSession): string {
     return title === session.slug
         ? title
         : `${title} [${session.slug}]`;
-}
-
-function safePrettyJson(value: unknown): string {
-    try {
-        return JSON.stringify(value, null, 2) ?? "null";
-    } catch {
-        return String(value);
-    }
 }

@@ -46,6 +46,7 @@ test("ListAgentsUseCase keeps the explicitly selected agent when present", async
         modelProviderId: null,
         modelId: null,
         modelVariant: null,
+        language: null,
         updatedAt: new Date(0).toISOString(),
     });
     const useCase = new ListAgentsUseCase(

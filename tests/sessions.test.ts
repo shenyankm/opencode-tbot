@@ -46,6 +46,7 @@ function createDependencies(client: OpenCodeClientLike) {
     const repo = new InMemorySessionRepository();
     const dependencies: BotDependencies = {
         logger,
+        sessionRepo: repo,
         getConfigUseCase: {} as never,
         getHealthUseCase: {} as never,
         getPathUseCase: {} as never,
@@ -191,6 +192,7 @@ test("session selection callbacks switch the binding within the current project"
         modelProviderId: null,
         modelId: null,
         modelVariant: null,
+        language: null,
         updatedAt: binding?.updatedAt,
     });
 });

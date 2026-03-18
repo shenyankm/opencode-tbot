@@ -1,5 +1,5 @@
 import type { Bot } from "grammy";
-import { BOT_COPY } from "../copy.js";
+import { getChatCopy } from "../i18n.js";
 import type { BotDependencies } from "../types.js";
 import { buildAgentsKeyboard } from "../presenters/keyboard.presenter.js";
 import { presentError } from "../presenters/error.presenter.js";
@@ -11,31 +11,33 @@ interface AgentsCommandContext {
 }
 
 export async function handleAgentsCommand(ctx: AgentsCommandContext, dependencies: BotDependencies) {
+    const copy = await getChatCopy(dependencies.sessionRepo, ctx.chat.id);
+
     try {
         const result = await dependencies.listAgentsUseCase.execute({
             chatId: ctx.chat.id,
         });
 
         if (result.agents.length === 0) {
-            await ctx.reply(BOT_COPY.agents.none);
+            await ctx.reply(copy.agents.none);
             return;
         }
 
-        const { keyboard, page } = buildAgentsKeyboard(result.agents, 0);
+        const { keyboard, page } = buildAgentsKeyboard(result.agents, 0, copy);
 
         await ctx.reply(
             presentAgentsMessage({
                 agents: result.agents,
                 currentAgentName: result.currentAgentName,
                 page: page.page,
-            }),
+            }, copy),
             {
                 reply_markup: keyboard,
             },
         );
     } catch (error) {
         dependencies.logger.error({ error }, "failed to list agents");
-        await ctx.reply(presentError(error));
+        await ctx.reply(presentError(error, copy));
     }
 }
 

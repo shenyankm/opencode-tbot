@@ -41,6 +41,7 @@ export class SwitchAgentUseCase {
             modelProviderId: binding?.modelProviderId ?? null,
             modelId: binding?.modelId ?? null,
             modelVariant: binding?.modelVariant ?? null,
+            language: binding?.language ?? null,
             updatedAt: new Date().toISOString(),
         });
 

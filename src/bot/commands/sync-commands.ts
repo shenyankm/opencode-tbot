@@ -1,7 +1,8 @@
 import type { Bot } from "grammy";
 import type { BotCommandScope } from "grammy/types";
 import type { Logger } from "pino";
-import { TELEGRAM_COMMANDS } from "./command-list.js";
+import { type BotLanguage } from "../copy.js";
+import { getTelegramCommands, TELEGRAM_COMMANDS } from "./command-list.js";
 
 export const TELEGRAM_COMMAND_SYNC_SCOPES: ReadonlyArray<BotCommandScope> = [
     { type: "default" },
@@ -21,5 +22,21 @@ export async function syncTelegramCommands(bot: Bot, logger: Logger): Promise<vo
             scopes: TELEGRAM_COMMAND_SYNC_SCOPES.map((scope) => scope.type),
         },
         "telegram commands synced",
+    );
+}
+
+export async function syncTelegramCommandsForChat(
+    api: Pick<Bot["api"], "setMyCommands">,
+    chatId: number,
+    language: BotLanguage,
+): Promise<void> {
+    await api.setMyCommands(
+        getTelegramCommands(language),
+        {
+            scope: {
+                type: "chat",
+                chat_id: chatId,
+            },
+        },
     );
 }

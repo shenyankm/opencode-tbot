@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { PromptSessionResult } from "../src/services/opencode/opencode.client.js";
 import { handleTextMessage } from "../src/bot/handlers/message.handler.js";
+import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
 
 function createPromptReply(overrides: Partial<PromptSessionResult> = {}): PromptSessionResult {
     return {
@@ -33,6 +34,7 @@ function createDependencies(
 ) {
     const errors: unknown[] = [];
     const warnings: unknown[] = [];
+    const sessionRepo = new InMemorySessionRepository();
 
     return {
         dependencies: {
@@ -44,11 +46,13 @@ function createDependencies(
                     warnings.push(warning);
                 },
             },
+            sessionRepo,
             sendPromptUseCase: {
                 execute: sendPrompt,
             },
         } as never,
         errors,
+        sessionRepo,
         warnings,
     };
 }
@@ -300,4 +304,53 @@ test("handleTextMessage renders assistant-side prompt errors with metrics and de
         },
     ]);
     assert.deepEqual(deleted, [{ chatId: 15, messageId: 700 }]);
+});
+
+test("handleTextMessage localizes bot-generated status text and metrics footer for Chinese chats", async () => {
+    const replies: Array<{ text: string; other?: unknown }> = [];
+    const deleted: Array<{ chatId: number; messageId: number }> = [];
+    let nextMessageId = 900;
+    const { dependencies, sessionRepo } = createDependencies(async () => ({
+        assistantReply: createPromptReply(),
+    }));
+
+    await sessionRepo.setCurrent({
+        chatId: 21,
+        sessionId: null,
+        projectId: null,
+        directory: null,
+        agentName: null,
+        modelProviderId: null,
+        modelId: null,
+        modelVariant: null,
+        language: "zh-CN",
+        updatedAt: new Date(0).toISOString(),
+    });
+
+    await handleTextMessage(
+        {
+            chat: { id: 21 },
+            message: { text: "hello" },
+            api: {
+                async deleteMessage(chatId, messageId) {
+                    deleted.push({ chatId, messageId });
+                    return true;
+                },
+            },
+            async reply(text, other) {
+                replies.push({ text, other });
+                return { message_id: nextMessageId++ };
+            },
+        },
+        dependencies,
+    );
+
+    assert.deepEqual(replies, [
+        { text: "处理中...", other: undefined },
+        {
+            text: "*Hello*\n\n耗时: 120 ms \\| 令牌数: 42",
+            other: { parse_mode: "MarkdownV2" },
+        },
+    ]);
+    assert.deepEqual(deleted, [{ chatId: 21, messageId: 900 }]);
 });

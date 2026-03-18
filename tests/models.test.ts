@@ -106,6 +106,7 @@ function createDependencies(client: OpenCodeClientLike) {
                 };
             },
         } as never,
+        sessionRepo: repo,
         sendPromptUseCase: new SendPromptUseCase(repo, client, logger),
         switchModelUseCase: new SwitchModelUseCase(repo, client, logger),
         switchProjectUseCase: {
@@ -157,7 +158,7 @@ test("/model only shows configured models with numeric inline buttons", async ()
 
     assert.equal(replies.length, 1);
     assert.match(replies[0].text, /Model List/);
-    assert.match(replies[0].text, /Configured models and available custom-provider models in OpenCode are shown\./);
+    assert.match(replies[0].text, /Configured models, connected-provider models, and available custom-provider models in OpenCode are shown\./);
     assert.match(replies[0].text, /Current model: Not selected \(using OpenCode default\)/);
     assert.match(replies[0].text, /Page 1\/2/);
     assert.match(replies[0].text, /1\. OpenAI \/ Model 1/);
@@ -349,6 +350,7 @@ test("picking a model without variants switches immediately", async () => {
         modelProviderId: "openai",
         modelId: "gpt-5",
         modelVariant: null,
+        language: null,
         updatedAt: binding?.updatedAt,
     });
 });
@@ -417,6 +419,7 @@ test("variant selection updates the binding and later prompts use the selected m
         modelProviderId: "openai",
         modelId: "gpt-5-thinking",
         modelVariant: "high",
+        language: null,
         updatedAt: bindingAfterSwitch?.updatedAt,
     });
     assert.deepEqual(promptCalls, [
@@ -442,6 +445,7 @@ test("variant selection updates the binding and later prompts use the selected m
         modelProviderId: "openai",
         modelId: "gpt-5-thinking",
         modelVariant: "high",
+        language: null,
         updatedAt: bindingAfterPrompt?.updatedAt,
     });
 });

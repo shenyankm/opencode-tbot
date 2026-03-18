@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
     OpenCodeClient,
-    type OpenCodeConfig,
     type OpenCodeModel,
     type OpenCodePath,
     type OpenCodeProject,
@@ -113,13 +112,6 @@ function createPath(overrides: Partial<OpenCodePath> = {}): OpenCodePath {
     };
 }
 
-function createConfig(overrides: Partial<OpenCodeConfig> = {}): OpenCodeConfig {
-    return {
-        "$schema": "https://opencode.ai/config.json",
-        ...overrides,
-    } as OpenCodeConfig;
-}
-
 test("createSessionForDirectory forwards directory and title to the SDK", async () => {
     const calls: Array<{ input: unknown; options: unknown }> = [];
     const client = new OpenCodeClient(
@@ -199,52 +191,6 @@ test("getPath forwards to the SDK path endpoint", async () => {
     );
 
     assert.deepEqual(await client.getPath(), pathInfo);
-    assert.deepEqual(calls, [
-        {
-            input: undefined,
-            options: {
-                responseStyle: "data",
-                throwOnError: true,
-            },
-        },
-    ]);
-});
-
-test("getConfig forwards to the SDK config endpoint", async () => {
-    const calls: Array<{ input: unknown; options: unknown }> = [];
-    const config = createConfig({
-        model: "openai/gpt-5",
-    });
-    const client = new OpenCodeClient(
-        { baseUrl: "http://127.0.0.1:4096" },
-        {
-            config: {
-                async get(input: unknown, options: unknown) {
-                    calls.push({ input, options });
-                    return { data: config };
-                },
-                providers: async () => ({ providers: [], default: {} }),
-            },
-            path: {
-                get: async () => createPath(),
-            },
-            project: {
-                list: async () => [],
-                current: async () => createProject("project-1", "E:/repo-1"),
-            },
-            session: {
-                create: async () => createSession("session-1", "project-1", "E:/repo-1"),
-                prompt: async () => ({
-                    data: {
-                        info: {} as never,
-                        parts: [],
-                    },
-                }),
-            },
-        } as never,
-    );
-
-    assert.deepEqual(await client.getConfig(), config);
     assert.deepEqual(calls, [
         {
             input: undefined,
@@ -665,7 +611,7 @@ test("promptSession preserves assistant errors from successful prompt responses"
     assert.equal(result.fallbackText, "OpenCode returned empty response.");
     assert.equal(result.metrics.tokens.total, 11);
 });
-test("listModels returns configured models and available custom-provider models", async () => {
+test("listModels returns configured models, connected-provider models, and available custom-provider models", async () => {
     const project = createProject("project-1", "E:/repo-1");
     const configuredModel = createModel("openai", "gpt-5.3-codex", "GPT-5.3 Codex", {
         variants: {
@@ -747,6 +693,15 @@ test("listModels returns configured models and available custom-provider models"
                     },
                 }),
             },
+            provider: {
+                list: async () => ({
+                    data: {
+                        all: [provider, customProvider],
+                        connected: ["openai", "custom-provider"],
+                        default: {},
+                    },
+                }),
+            },
             path: {
                 get: async () => ({ data: createPath({ worktree: project.worktree, directory: project.worktree }) }),
             },
@@ -780,6 +735,15 @@ test("listModels returns configured models and available custom-provider models"
                 low: {},
                 high: {},
             },
+        },
+        {
+            id: "gpt-4o",
+            providerID: "openai",
+            providerName: "OpenAI",
+            name: "GPT-4o",
+            qualifiedId: "openai/gpt-4o",
+            reasoning: true,
+            variants: {},
         },
         {
             id: "custom-text",

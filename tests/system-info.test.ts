@@ -1,10 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { Logger } from "pino";
-import { handleConfigCommand } from "../src/bot/commands/config.js";
 import { handlePathCommand } from "../src/bot/commands/path.js";
-import { presentConfigMessage } from "../src/bot/presenters/message.presenter.js";
 import type { BotDependencies } from "../src/bot/types.js";
+import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
 
 const logger = {
     error() { },
@@ -12,15 +11,12 @@ const logger = {
 } as unknown as Logger;
 
 function createDependencies() {
+    const sessionRepo = new InMemorySessionRepository();
+
     return {
         logger,
+        sessionRepo,
         getConfigUseCase: {
-            async execute() {
-                return {
-                    "$schema": "https://opencode.ai/config.json",
-                    model: "openai/gpt-5",
-                };
-            },
         },
         getHealthUseCase: {
             async execute() {
@@ -57,6 +53,7 @@ test("/path returns the current path information", async () => {
 
     await handlePathCommand(
         {
+            chat: { id: 1 },
             async reply(text) {
                 replies.push(text);
                 return {};
@@ -78,12 +75,25 @@ test("/path returns the current path information", async () => {
     );
 });
 
-test("/config returns the current configuration", async () => {
+test("/path uses the selected chat language for bot-generated output", async () => {
     const dependencies = createDependencies();
+    await dependencies.sessionRepo.setCurrent({
+        chatId: 2,
+        sessionId: null,
+        projectId: null,
+        directory: null,
+        agentName: null,
+        modelProviderId: null,
+        modelId: null,
+        modelVariant: null,
+        language: "zh-CN",
+        updatedAt: new Date(0).toISOString(),
+    });
     const replies: string[] = [];
 
-    await handleConfigCommand(
+    await handlePathCommand(
         {
+            chat: { id: 2 },
             async reply(text) {
                 replies.push(text);
                 return {};
@@ -95,21 +105,12 @@ test("/config returns the current configuration", async () => {
     assert.equal(
         replies[0],
         [
-            "Config",
-            "{",
-            "  \"$schema\": \"https://opencode.ai/config.json\",",
-            "  \"model\": \"openai/gpt-5\"",
-            "}",
+            "当前路径",
+            "主目录: E:/Users/demo",
+            "状态目录: E:/Users/demo/.opencode",
+            "配置文件: E:/repo/opencode.json",
+            "工作树: E:/repo",
+            "当前目录: E:/repo/src",
         ].join("\n"),
     );
-});
-
-test("presentConfigMessage truncates oversized config payloads", () => {
-    const message = presentConfigMessage({
-        notes: "x".repeat(5000),
-    } as never);
-
-    assert.match(message, /^Config\n/);
-    assert.match(message, /\.\.\. \(truncated\)$/);
-    assert.ok(message.length < 4000);
 });

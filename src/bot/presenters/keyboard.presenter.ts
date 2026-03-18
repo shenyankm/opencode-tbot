@@ -1,5 +1,11 @@
 import { InlineKeyboard } from "grammy";
-import { BOT_COPY } from "../copy.js";
+import {
+    BOT_COPY,
+    getLanguageLabel,
+    SUPPORTED_BOT_LANGUAGES,
+    type BotCopy,
+    type BotLanguage,
+} from "../copy.js";
 import type {
     OpenCodeAgent,
     OpenCodeConfiguredModel,
@@ -41,7 +47,11 @@ export interface SessionsPage {
     totalPages: number;
 }
 
-export function buildProjectsKeyboard(projects: OpenCodeProject[], requestedPage: number) {
+export function buildProjectsKeyboard(
+    projects: OpenCodeProject[],
+    requestedPage: number,
+    copy: BotCopy = BOT_COPY,
+) {
     const page = getProjectsPage(projects, requestedPage);
     const keyboard = buildNumberedKeyboard(
         page.items,
@@ -49,12 +59,16 @@ export function buildProjectsKeyboard(projects: OpenCodeProject[], requestedPage
         (project) => `projects:select:${project.id}`,
     );
 
-    appendPaginationButtons(keyboard, page.page, page.totalPages, "projects:page");
+    appendPaginationButtons(keyboard, page.page, page.totalPages, "projects:page", copy);
 
     return { keyboard, page };
 }
 
-export function buildModelsKeyboard(models: OpenCodeConfiguredModel[], requestedPage: number) {
+export function buildModelsKeyboard(
+    models: OpenCodeConfiguredModel[],
+    requestedPage: number,
+    copy: BotCopy = BOT_COPY,
+) {
     const page = getModelsPage(models, requestedPage);
     const keyboard = buildNumberedKeyboard(
         page.items,
@@ -62,12 +76,16 @@ export function buildModelsKeyboard(models: OpenCodeConfiguredModel[], requested
         (_, index) => `model:pick:${page.startIndex + index + 1}`,
     );
 
-    appendPaginationButtons(keyboard, page.page, page.totalPages, "model:page");
+    appendPaginationButtons(keyboard, page.page, page.totalPages, "model:page", copy);
 
     return { keyboard, page };
 }
 
-export function buildAgentsKeyboard(agents: OpenCodeAgent[], requestedPage: number) {
+export function buildAgentsKeyboard(
+    agents: OpenCodeAgent[],
+    requestedPage: number,
+    copy: BotCopy = BOT_COPY,
+) {
     const page = getAgentsPage(agents, requestedPage);
     const keyboard = buildNumberedKeyboard(
         page.items,
@@ -75,12 +93,16 @@ export function buildAgentsKeyboard(agents: OpenCodeAgent[], requestedPage: numb
         (_, index) => `agents:select:${page.startIndex + index + 1}`,
     );
 
-    appendPaginationButtons(keyboard, page.page, page.totalPages, "agents:page");
+    appendPaginationButtons(keyboard, page.page, page.totalPages, "agents:page", copy);
 
     return { keyboard, page };
 }
 
-export function buildSessionsKeyboard(sessions: OpenCodeSession[], requestedPage: number) {
+export function buildSessionsKeyboard(
+    sessions: OpenCodeSession[],
+    requestedPage: number,
+    copy: BotCopy = BOT_COPY,
+) {
     const page = getSessionsPage(sessions, requestedPage);
     const keyboard = buildNumberedKeyboard(
         page.items,
@@ -88,7 +110,7 @@ export function buildSessionsKeyboard(sessions: OpenCodeSession[], requestedPage
         (session) => `sessions:select:${session.id}`,
     );
 
-    appendPaginationButtons(keyboard, page.page, page.totalPages, "sessions:page");
+    appendPaginationButtons(keyboard, page.page, page.totalPages, "sessions:page", copy);
 
     return { keyboard, page };
 }
@@ -99,6 +121,24 @@ export function buildModelVariantsKeyboard(variants: string[], modelIndex: numbe
         0,
         (_, index) => `model:variant:${modelIndex}:${index + 1}`,
     );
+}
+
+export function buildLanguageKeyboard(currentLanguage: BotLanguage, copy: BotCopy = BOT_COPY) {
+    const keyboard = new InlineKeyboard();
+
+    SUPPORTED_BOT_LANGUAGES.forEach((language, index) => {
+        const label = currentLanguage === language
+            ? `[${getLanguageLabel(language, copy)}]`
+            : getLanguageLabel(language, copy);
+
+        keyboard.text(label, `language:select:${language}`);
+
+        if (index !== SUPPORTED_BOT_LANGUAGES.length - 1) {
+            keyboard.row();
+        }
+    });
+
+    return keyboard;
 }
 
 export function getProjectsPage(projects: OpenCodeProject[], requestedPage: number): ProjectsPage {
@@ -142,17 +182,18 @@ function appendPaginationButtons(
     page: number,
     totalPages: number,
     prefix: "agents:page" | "projects:page" | "sessions:page" | "model:page",
+    copy: BotCopy,
 ) {
     if (totalPages <= 1) {
         return;
     }
 
     if (page > 0) {
-        keyboard.text(BOT_COPY.common.previousPage, `${prefix}:${page - 1}`);
+        keyboard.text(copy.common.previousPage, `${prefix}:${page - 1}`);
     }
 
     if (page < totalPages - 1) {
-        keyboard.text(BOT_COPY.common.nextPage, `${prefix}:${page + 1}`);
+        keyboard.text(copy.common.nextPage, `${prefix}:${page + 1}`);
     }
 }
 

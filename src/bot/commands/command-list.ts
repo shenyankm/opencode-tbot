@@ -1,41 +1,47 @@
 import type { BotCommand } from "grammy/types";
-import { BOT_COPY } from "../copy.js";
+import { getBotCopy, type BotLanguage } from "../copy.js";
 
-export const TELEGRAM_COMMANDS: BotCommand[] = [
-    {
-        command: "start",
-        description: BOT_COPY.commands.start,
-    },
-    {
-        command: "health",
-        description: BOT_COPY.commands.health,
-    },
-    {
-        command: "path",
-        description: BOT_COPY.commands.path,
-    },
-    {
-        command: "config",
-        description: BOT_COPY.commands.config,
-    },
-    {
-        command: "agents",
-        description: BOT_COPY.commands.agents,
-    },
-    {
-        command: "projects",
-        description: BOT_COPY.commands.projects,
-    },
-    {
-        command: "sessions",
-        description: BOT_COPY.commands.sessions,
-    },
-    {
-        command: "abort",
-        description: BOT_COPY.commands.abort,
-    },
-    {
-        command: "model",
-        description: BOT_COPY.commands.model,
-    },
-];
+export function getTelegramCommands(language: BotLanguage = "en"): BotCommand[] {
+    const copy = getBotCopy(language);
+
+    return [
+        {
+            command: "start",
+            description: copy.commands.start,
+        },
+        {
+            command: "health",
+            description: copy.commands.health,
+        },
+        {
+            command: "path",
+            description: copy.commands.path,
+        },
+        {
+            command: "agents",
+            description: copy.commands.agents,
+        },
+        {
+            command: "projects",
+            description: copy.commands.projects,
+        },
+        {
+            command: "sessions",
+            description: copy.commands.sessions,
+        },
+        {
+            command: "abort",
+            description: copy.commands.abort,
+        },
+        {
+            command: "model",
+            description: copy.commands.model,
+        },
+        {
+            command: "language",
+            description: copy.commands.language,
+        },
+    ];
+}
+
+export const TELEGRAM_COMMANDS: BotCommand[] = getTelegramCommands();

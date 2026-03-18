@@ -1,8 +1,8 @@
 import type { Bot } from "grammy";
 import { registerAbortCommand } from "./commands/abort.js";
 import { registerAgentsCommand } from "./commands/agents.js";
-import { registerConfigCommand } from "./commands/config.js";
 import { registerHealthCommand } from "./commands/health.js";
+import { registerLanguageCommand } from "./commands/language.js";
 import { registerModelsCommand } from "./commands/models.js";
 import { registerPathCommand } from "./commands/path.js";
 import type { BotDependencies } from "./types.js";
@@ -18,12 +18,12 @@ export function registerBot(bot: Bot, container: BotDependencies) {
     bot.use(loggingMiddleware);
     bot.use(authMiddleware);
 
-    registerStartCommand(bot);
+    registerStartCommand(bot, container);
     registerAbortCommand(bot, container);
     registerHealthCommand(bot, container);
     registerPathCommand(bot, container);
-    registerConfigCommand(bot, container);
     registerAgentsCommand(bot, container);
+    registerLanguageCommand(bot, container);
     registerModelsCommand(bot, container);
     registerProjectsCommand(bot, container);
     registerSessionsCommand(bot, container);

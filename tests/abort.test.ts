@@ -41,6 +41,7 @@ test("AbortPromptUseCase reports not_running when the current session is idle", 
         modelProviderId: null,
         modelId: null,
         modelVariant: null,
+        language: null,
         updatedAt: new Date(0).toISOString(),
     });
     const useCase = new AbortPromptUseCase(
@@ -75,6 +76,7 @@ test("AbortPromptUseCase aborts busy sessions", async () => {
         modelProviderId: null,
         modelId: null,
         modelVariant: null,
+        language: null,
         updatedAt: new Date(0).toISOString(),
     });
     const abortedSessionIds: string[] = [];
@@ -104,6 +106,7 @@ test("AbortPromptUseCase aborts busy sessions", async () => {
 test("handleAbortCommand maps use case statuses and presents normalized errors", async () => {
     const replies: string[] = [];
     const errors: unknown[] = [];
+    const repo = new InMemorySessionRepository();
     const dependencies = {
         abortPromptUseCase: {
             async execute({ chatId }: { chatId: number }) {
@@ -127,6 +130,7 @@ test("handleAbortCommand maps use case statuses and presents normalized errors",
                 errors.push(error);
             },
         },
+        sessionRepo: repo,
     } as never;
 
     for (const chatId of [10, 11, 12, 13]) {

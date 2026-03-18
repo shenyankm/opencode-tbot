@@ -1,5 +1,5 @@
 import type { Bot } from "grammy";
-import { BOT_COPY } from "../copy.js";
+import { getChatCopy } from "../i18n.js";
 import { presentError } from "../presenters/error.presenter.js";
 import { buildTelegramPromptReply } from "../../services/telegram/telegram-format.js";
 import type { BotDependencies } from "../types.js";
@@ -24,8 +24,9 @@ export async function handleTextMessage(ctx: MessageContext, dependencies: BotDe
 
     if (!text) return;
     if (text.startsWith("/")) return;
+    const copy = await getChatCopy(dependencies.sessionRepo, ctx.chat.id);
     if (activePromptChats.has(ctx.chat.id)) {
-        await ctx.reply(BOT_COPY.status.alreadyProcessing);
+        await ctx.reply(copy.status.alreadyProcessing);
         return;
     }
 
@@ -34,7 +35,7 @@ export async function handleTextMessage(ctx: MessageContext, dependencies: BotDe
 
     try {
         activePromptChats.add(ctx.chat.id);
-        processingMessage = await ctx.reply(BOT_COPY.status.processing);
+        processingMessage = await ctx.reply(copy.status.processing);
 
         const result = await dependencies.sendPromptUseCase.execute({
             chatId: ctx.chat.id,
@@ -44,10 +45,10 @@ export async function handleTextMessage(ctx: MessageContext, dependencies: BotDe
             ? {
                 ...result.assistantReply,
                 bodyMd: null,
-                fallbackText: presentError(result.assistantReply.assistantError),
+                fallbackText: presentError(result.assistantReply.assistantError, copy),
             }
             : result.assistantReply;
-        const telegramReply = buildTelegramPromptReply(promptReply);
+        const telegramReply = buildTelegramPromptReply(promptReply, copy);
 
         try {
             await ctx.reply(telegramReply.preferred.text, telegramReply.preferred.options);
@@ -58,7 +59,7 @@ export async function handleTextMessage(ctx: MessageContext, dependencies: BotDe
         sentTerminalReply = true;
     } catch (error) {
         dependencies.logger.error({ error }, "failed to handle text message");
-        await ctx.reply(presentError(error));
+        await ctx.reply(presentError(error, copy));
         sentTerminalReply = true;
     } finally {
         activePromptChats.delete(ctx.chat.id);

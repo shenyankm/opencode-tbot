@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { PromptSessionResult } from "../src/services/opencode/opencode.client.js";
+import { getBotCopy } from "../src/bot/copy.js";
 import {
     buildTelegramPromptReply,
     renderMarkdownToTelegramMarkdownV2,
@@ -190,4 +191,24 @@ test("buildTelegramPromptReply keeps MarkdownV2 enabled for table content", () =
     assert.equal(result.preferred.options?.parse_mode, "MarkdownV2");
     assert.match(result.preferred.text, /^```\nLanguage \| Runtime\n/m);
     assert.doesNotMatch(result.preferred.text, /^table fallback$/m);
+});
+
+test("buildTelegramPromptReply localizes the metrics footer", () => {
+    const result = buildTelegramPromptReply(
+        createPromptReply({
+            bodyMd: "## Hello",
+            fallbackText: "Hello",
+        }),
+        getBotCopy("zh-CN"),
+    );
+
+    assert.deepEqual(result.preferred, {
+        text: "*Hello*\n\n耗时: 120 ms \\| 令牌数: 42",
+        options: {
+            parse_mode: "MarkdownV2",
+        },
+    });
+    assert.deepEqual(result.fallback, {
+        text: "Hello\n\n耗时: 120 ms | 令牌数: 42",
+    });
 });

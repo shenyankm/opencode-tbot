@@ -39,6 +39,7 @@ export class SwitchProjectUseCase {
             modelProviderId: existingBinding?.modelProviderId ?? null,
             modelId: existingBinding?.modelId ?? null,
             modelVariant: existingBinding?.modelVariant ?? null,
+            language: existingBinding?.language ?? null,
             updatedAt: new Date().toISOString(),
         });
 

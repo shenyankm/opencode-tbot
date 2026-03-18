@@ -1,4 +1,4 @@
-import { BOT_COPY } from "../../bot/copy.js";
+import { BOT_COPY, type BotCopy } from "../../bot/copy.js";
 import type {
     PromptSessionMetrics,
     PromptSessionResult,
@@ -20,10 +20,13 @@ export interface TelegramPromptReply {
     preferred: TelegramReplyPayload;
 }
 
-export function buildTelegramPromptReply(result: PromptSessionResult): TelegramPromptReply {
+export function buildTelegramPromptReply(
+    result: PromptSessionResult,
+    copy: BotCopy = BOT_COPY,
+): TelegramPromptReply {
     const renderedMarkdown = result.bodyMd ? renderMarkdownToTelegramMarkdownV2(result.bodyMd) : null;
-    const footerPlain = formatPlainMetricsFooter(result.metrics);
-    const plainBody = normalizePlainBody(result, renderedMarkdown !== null);
+    const footerPlain = formatPlainMetricsFooter(result.metrics, copy);
+    const plainBody = normalizePlainBody(result, renderedMarkdown !== null, copy);
     const fallback = {
         text: joinBodyAndFooter(
             truncatePlainBody(plainBody, footerPlain),
@@ -38,7 +41,7 @@ export function buildTelegramPromptReply(result: PromptSessionResult): TelegramP
         };
     }
 
-    const footerMarkdown = formatMarkdownMetricsFooter(result.metrics);
+    const footerMarkdown = formatMarkdownMetricsFooter(result.metrics, copy);
     const markdownText = joinBodyAndFooter(renderedMarkdown, footerMarkdown);
 
     if (markdownText.length > MAX_TELEGRAM_MESSAGE_LENGTH) {
@@ -209,14 +212,18 @@ export function stripMarkdownToPlainText(markdown: string): string {
         .trim();
 }
 
-function normalizePlainBody(result: PromptSessionResult, preferStructured: boolean): string {
+function normalizePlainBody(
+    result: PromptSessionResult,
+    preferStructured: boolean,
+    copy: BotCopy,
+): string {
     const fromStructured = result.bodyMd ? stripMarkdownToPlainText(result.bodyMd) : "";
     const fromFallback = result.fallbackText.trim();
     const body = preferStructured
         ? fromStructured || fromFallback
         : fromFallback || fromStructured;
 
-    return body.trim() || result.fallbackText || "OpenCode returned empty response.";
+    return body.trim() || result.fallbackText || copy.prompt.emptyResponse;
 }
 
 function truncatePlainBody(body: string, footer: string): string {
@@ -273,17 +280,17 @@ function preprocessMarkdownForTelegram(markdown: string): string {
     return processed.join("\n");
 }
 
-function formatPlainMetricsFooter(metrics: PromptSessionMetrics): string {
-    return `${BOT_COPY.replyMetrics.durationLabel}: ${formatDuration(metrics.durationMs)} | ${BOT_COPY.replyMetrics.tokensLabel}: ${formatMetricValue(metrics.tokens.total)}`;
+function formatPlainMetricsFooter(metrics: PromptSessionMetrics, copy: BotCopy): string {
+    return `${copy.replyMetrics.durationLabel}: ${formatDuration(metrics.durationMs, copy)} | ${copy.replyMetrics.tokensLabel}: ${formatMetricValue(metrics.tokens.total, copy)}`;
 }
 
-function formatMarkdownMetricsFooter(metrics: PromptSessionMetrics): string {
-    return escapeMarkdownText(formatPlainMetricsFooter(metrics));
+function formatMarkdownMetricsFooter(metrics: PromptSessionMetrics, copy: BotCopy): string {
+    return escapeMarkdownText(formatPlainMetricsFooter(metrics, copy));
 }
 
-function formatDuration(durationMs: number | null): string {
+function formatDuration(durationMs: number | null, copy: BotCopy): string {
     if (durationMs === null || !Number.isFinite(durationMs)) {
-        return BOT_COPY.replyMetrics.notAvailable;
+        return copy.replyMetrics.notAvailable;
     }
 
     if (durationMs < 1000) {
@@ -293,9 +300,9 @@ function formatDuration(durationMs: number | null): string {
     return `${(durationMs / 1000).toFixed(1)} s`;
 }
 
-function formatMetricValue(value: number | null): string {
+function formatMetricValue(value: number | null, copy: BotCopy): string {
     if (value === null || !Number.isFinite(value)) {
-        return BOT_COPY.replyMetrics.notAvailable;
+        return copy.replyMetrics.notAvailable;
     }
 
     return `${Math.round(value)}`;

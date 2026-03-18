@@ -7,5 +7,6 @@ export interface ChatSessionBinding {
     modelProviderId: string | null;
     modelId: string | null;
     modelVariant: string | null;
+    language: string | null;
     updatedAt: string;
 }

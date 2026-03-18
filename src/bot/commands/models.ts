@@ -1,5 +1,5 @@
 import type { Bot } from "grammy";
-import { BOT_COPY } from "../copy.js";
+import { getChatCopy } from "../i18n.js";
 import type { BotDependencies } from "../types.js";
 import { buildModelsKeyboard } from "../presenters/keyboard.presenter.js";
 import { presentError } from "../presenters/error.presenter.js";
@@ -11,17 +11,19 @@ interface ModelsCommandContext {
 }
 
 export async function handleModelsCommand(ctx: ModelsCommandContext, dependencies: BotDependencies) {
+    const copy = await getChatCopy(dependencies.sessionRepo, ctx.chat.id);
+
     try {
         const result = await dependencies.listModelsUseCase.execute({
             chatId: ctx.chat.id,
         });
 
         if (result.models.length === 0) {
-            await ctx.reply(BOT_COPY.models.none);
+            await ctx.reply(copy.models.none);
             return;
         }
 
-        const { keyboard, page } = buildModelsKeyboard(result.models, 0);
+        const { keyboard, page } = buildModelsKeyboard(result.models, 0, copy);
 
         await ctx.reply(
             presentModelsMessage({
@@ -30,14 +32,14 @@ export async function handleModelsCommand(ctx: ModelsCommandContext, dependencie
                 currentModelVariant: result.currentModelVariant,
                 models: result.models,
                 page: page.page,
-            }),
+            }, copy),
             {
                 reply_markup: keyboard,
             },
         );
     } catch (error) {
-        dependencies.logger.error({ error }, "failed to list configured models");
-        await ctx.reply(presentError(error));
+        dependencies.logger.error({ error }, "failed to list models");
+        await ctx.reply(presentError(error, copy));
     }
 }
 

@@ -55,6 +55,7 @@ export class SwitchModelUseCase {
             modelProviderId: model.providerID,
             modelId: model.id,
             modelVariant: variant,
+            language: binding?.language ?? null,
             updatedAt: new Date().toISOString(),
         });
 
