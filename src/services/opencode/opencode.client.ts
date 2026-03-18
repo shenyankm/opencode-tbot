@@ -86,7 +86,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
     }
 
     async getHealth(): Promise<OpenCodeHealth> {
-        const response = await this.client.global.health(undefined, SDK_OPTIONS) as MaybeWrappedResponse<OpenCodeHealth>;
+        const response = await this.client.global.health(SDK_OPTIONS) as MaybeWrappedResponse<OpenCodeHealth>;
 
         return unwrapSdkData(response);
     }
@@ -132,9 +132,9 @@ export class OpenCodeClient implements OpenCodeClientLike {
     async promptSession(input: PromptSessionInput): Promise<PromptSessionResult> {
         const response = await this.client.session.prompt({
             sessionID: input.sessionId,
-            agent: input.agent ?? undefined,
-            model: input.model,
-            variant: input.variant ?? undefined,
+            ...(input.agent ? { agent: input.agent } : {}),
+            ...(input.model ? { model: input.model } : {}),
+            ...(input.variant ? { variant: input.variant } : {}),
             parts: [
                 {
                     type: "text",

@@ -1,4 +1,5 @@
 import type { Bot } from "grammy";
+import { BOT_COPY } from "../copy.js";
 import type { BotDependencies } from "../types.js";
 import { buildProjectsKeyboard } from "../presenters/keyboard.presenter.js";
 import { presentError } from "../presenters/error.presenter.js";
@@ -16,7 +17,7 @@ export async function handleProjectsCommand(ctx: ProjectsCommandContext, depende
         });
 
         if (result.projects.length === 0) {
-            await ctx.reply("暂无可用项目。");
+            await ctx.reply(BOT_COPY.projects.none);
             return;
         }
 

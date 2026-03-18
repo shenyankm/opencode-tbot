@@ -1,4 +1,5 @@
 import type { Bot } from "grammy";
+import { BOT_COPY } from "../copy.js";
 import type { BotDependencies } from "../types.js";
 import { buildModelsKeyboard } from "../presenters/keyboard.presenter.js";
 import { presentError } from "../presenters/error.presenter.js";
@@ -16,7 +17,7 @@ export async function handleModelsCommand(ctx: ModelsCommandContext, dependencie
         });
 
         if (result.models.length === 0) {
-            await ctx.reply("暂无已配置模型。");
+            await ctx.reply(BOT_COPY.models.none);
             return;
         }
 

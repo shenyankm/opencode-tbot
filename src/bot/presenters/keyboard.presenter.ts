@@ -1,4 +1,5 @@
 import { InlineKeyboard } from "grammy";
+import { BOT_COPY } from "../copy.js";
 import type {
     OpenCodeAgent,
     OpenCodeConfiguredModel,
@@ -121,11 +122,11 @@ function appendPaginationButtons(
     }
 
     if (page > 0) {
-        keyboard.text("上一页", `${prefix}:${page - 1}`);
+        keyboard.text(BOT_COPY.common.previousPage, `${prefix}:${page - 1}`);
     }
 
     if (page < totalPages - 1) {
-        keyboard.text("下一页", `${prefix}:${page + 1}`);
+        keyboard.text(BOT_COPY.common.nextPage, `${prefix}:${page + 1}`);
     }
 }
 

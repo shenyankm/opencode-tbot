@@ -1,6 +1,7 @@
 import type { Logger } from "pino";
 import type { SessionRepository } from "../domain/session/session.repository.js";
 import type { OpenCodeClientLike } from "../services/opencode/opencode.client.js";
+import { resolveSelectedAgent } from "./agent-selection.js";
 
 export class SendPromptUseCase {
     constructor(
@@ -44,17 +45,21 @@ export class SendPromptUseCase {
             throw new Error("Failed to initialize chat session.");
         }
 
+        const model = binding.modelProviderId && binding.modelId
+            ? {
+                providerID: binding.modelProviderId,
+                modelID: binding.modelId,
+            }
+            : null;
+        const selectedAgent = binding.agentName
+            ? { name: binding.agentName }
+            : resolveSelectedAgent(await this.opencodeClient.listAgents(), null);
         const result = await this.opencodeClient.promptSession({
             sessionId: binding.sessionId,
             prompt: input.text,
-            agent: binding.agentName,
-            model: binding.modelProviderId && binding.modelId
-                ? {
-                    providerID: binding.modelProviderId,
-                    modelID: binding.modelId,
-                }
-                : undefined,
-            variant: binding.modelVariant,
+            ...(selectedAgent ? { agent: selectedAgent.name } : {}),
+            ...(model ? { model } : {}),
+            ...(binding.modelVariant ? { variant: binding.modelVariant } : {}),
         });
 
         await this.sessionRepo.touch(input.chatId);

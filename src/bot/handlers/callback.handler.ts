@@ -1,4 +1,5 @@
 import type { Bot } from "grammy";
+import { BOT_COPY } from "../copy.js";
 import type {
     AgentsCallbackData,
     BotDependencies,
@@ -59,7 +60,7 @@ export async function handleAgentsCallback(ctx: CallbackContext, dependencies: B
             });
 
             if (result.agents.length === 0) {
-                await ctx.editMessageText("暂无可用代理。");
+                await ctx.editMessageText(BOT_COPY.agents.none);
                 return;
             }
 
@@ -87,7 +88,7 @@ export async function handleAgentsCallback(ctx: CallbackContext, dependencies: B
             const agent = result.agents[agentIndex - 1];
 
             if (!agent) {
-                await ctx.editMessageText("代理已失效，请重新执行 /agents。");
+                await ctx.editMessageText(BOT_COPY.agents.expired);
                 return;
             }
 
@@ -97,7 +98,7 @@ export async function handleAgentsCallback(ctx: CallbackContext, dependencies: B
             });
 
             if (!switchResult.found) {
-                await ctx.editMessageText("代理已失效，请重新执行 /agents。");
+                await ctx.editMessageText(BOT_COPY.agents.expired);
                 return;
             }
 
@@ -130,7 +131,7 @@ export async function handleProjectsCallback(ctx: CallbackContext, dependencies:
             });
 
             if (result.projects.length === 0) {
-                await ctx.editMessageText("暂无可用项目。");
+                await ctx.editMessageText(BOT_COPY.projects.none);
                 return;
             }
 
@@ -159,7 +160,7 @@ export async function handleProjectsCallback(ctx: CallbackContext, dependencies:
             });
 
             if (!result.found) {
-                await ctx.editMessageText("项目已失效，请重新执行 /projects。");
+                await ctx.editMessageText(BOT_COPY.projects.expired);
                 return;
             }
 
@@ -192,7 +193,7 @@ export async function handleModelsCallback(ctx: CallbackContext, dependencies: B
             });
 
             if (result.models.length === 0) {
-                await ctx.editMessageText("暂无已配置模型。");
+                await ctx.editMessageText(BOT_COPY.models.none);
                 return;
             }
 
@@ -222,7 +223,7 @@ export async function handleModelsCallback(ctx: CallbackContext, dependencies: B
             const model = result.models[modelIndex - 1];
 
             if (!model) {
-                await ctx.editMessageText("模型已失效，请重新执行 /model。");
+                await ctx.editMessageText(BOT_COPY.models.expired);
                 return;
             }
 
@@ -236,7 +237,7 @@ export async function handleModelsCallback(ctx: CallbackContext, dependencies: B
                 });
 
                 if (!switchResult.found) {
-                    await ctx.editMessageText("模型已失效，请重新执行 /model。");
+                    await ctx.editMessageText(BOT_COPY.models.expired);
                     return;
                 }
 
@@ -265,7 +266,7 @@ export async function handleModelsCallback(ctx: CallbackContext, dependencies: B
             const model = result.models[modelIndex - 1];
 
             if (!model) {
-                await ctx.editMessageText("模型已失效，请重新执行 /model。");
+                await ctx.editMessageText(BOT_COPY.models.expired);
                 return;
             }
 
@@ -273,7 +274,7 @@ export async function handleModelsCallback(ctx: CallbackContext, dependencies: B
             const variant = variants[variantIndex - 1];
 
             if (!variant) {
-                await ctx.editMessageText("推理强度已失效，请重新执行 /model。");
+                await ctx.editMessageText(BOT_COPY.models.reasoningLevelExpired);
                 return;
             }
 
@@ -285,7 +286,7 @@ export async function handleModelsCallback(ctx: CallbackContext, dependencies: B
             });
 
             if (!switchResult.found) {
-                await ctx.editMessageText("模型已失效，请重新执行 /model。");
+                await ctx.editMessageText(BOT_COPY.models.expired);
                 return;
             }
 

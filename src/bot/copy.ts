@@ -1,0 +1,81 @@
+export const BOT_COPY = {
+    commands: {
+        start: "Show bot overview",
+        health: "Check server health",
+        agents: "View and switch agents",
+        projects: "View and switch projects",
+        model: "View and switch models",
+    },
+    start: {
+        lines: [
+            "opencode-tbot is running.",
+            "",
+            "Send a text message and I will forward it to OpenCode and reply with the result.",
+        ],
+    },
+    common: {
+        notSelected: "Not selected",
+        openCodeDefault: "Not selected (using OpenCode default)",
+        previousPage: "Previous",
+        nextPage: "Next",
+        page(currentPage: number, totalPages: number) {
+            return `Page ${currentPage}/${totalPages}`;
+        },
+    },
+    status: {
+        processing: "Processing...",
+    },
+    health: {
+        title: "Server Health",
+        status(healthy: boolean) {
+            return `Status: ${healthy ? "healthy" : "unhealthy"}`;
+        },
+        version(version: string) {
+            return `Version: ${version}`;
+        },
+    },
+    projects: {
+        none: "No projects available.",
+        title: "Project List",
+        current(worktree: string) {
+            return `Current project: ${worktree}`;
+        },
+        switched: "Project switched.",
+        expired: "The project is no longer available. Run /projects again.",
+    },
+    agents: {
+        none: "No agents available.",
+        title: "Agent List",
+        current(agent: string) {
+            return `Current agent: ${agent}`;
+        },
+        switched: "Agent switched.",
+        expired: "The agent is no longer available. Run /agents again.",
+    },
+    models: {
+        none: "No configured models available.",
+        title: "Model List",
+        configuredOnly: "Only models currently configured in OpenCode are shown.",
+        current(model: string) {
+            return `Current model: ${model}`;
+        },
+        switched: "Model switched.",
+        currentReasoningLevel(variant: string) {
+            return `Current reasoning level: ${variant}`;
+        },
+        reasoningLevel(variant: string) {
+            return `Reasoning level: ${variant}`;
+        },
+        noReasoningLevels: "This model has no selectable reasoning levels.",
+        reasoningLevelsTitle: "Reasoning Levels",
+        model(model: string) {
+            return `Model: ${model}`;
+        },
+        modelNumber(modelIndex: number) {
+            return `Model number: ${modelIndex}`;
+        },
+        expired: "The model is no longer available. Run /model again.",
+        reasoningLevelExpired: "The reasoning level is no longer available. Run /model again.",
+        defaultReasoningLevel: "default",
+    },
+} as const;

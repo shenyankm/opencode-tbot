@@ -4,6 +4,7 @@ import type {
     OpenCodeHealth,
     OpenCodeProject,
 } from "../../services/opencode/opencode.client.js";
+import { BOT_COPY } from "../copy.js";
 import {
     getAgentsPage,
     getModelsPage,
@@ -35,24 +36,24 @@ const VARIANT_ORDER = ["minimal", "none", "low", "medium", "high", "xhigh", "max
 
 export function presentHealthMessage(health: OpenCodeHealth): string {
     return [
-        "服务器健康状态",
-        `状态：${health.healthy ? "healthy" : "unhealthy"}`,
-        `版本：${health.version}`,
+        BOT_COPY.health.title,
+        BOT_COPY.health.status(health.healthy),
+        BOT_COPY.health.version(health.version),
     ].join("\n");
 }
 
 export function presentProjectsMessage(input: ProjectsMessageInput): string {
     if (input.projects.length === 0) {
-        return "暂无可用项目。";
+        return BOT_COPY.projects.none;
     }
 
     const page = getProjectsPage(input.projects, input.page);
     const currentProject = input.projects.find((project) => project.id === input.currentProjectId);
-    const currentDirectory = currentProject?.worktree ?? input.currentDirectory ?? "未选择";
+    const currentDirectory = currentProject?.worktree ?? input.currentDirectory ?? BOT_COPY.common.notSelected;
     const lines = [
-        "项目列表",
-        `当前项目：${currentDirectory}`,
-        `第 ${page.page + 1}/${page.totalPages} 页`,
+        BOT_COPY.projects.title,
+        BOT_COPY.projects.current(currentDirectory),
+        BOT_COPY.common.page(page.page + 1, page.totalPages),
         "",
         ...page.items.map((project, index) => `${page.startIndex + index + 1}. ${project.worktree}`),
     ];
@@ -62,14 +63,14 @@ export function presentProjectsMessage(input: ProjectsMessageInput): string {
 
 export function presentProjectSwitchMessage(worktree: string): string {
     return [
-        "已切换项目。",
-        `当前项目：${worktree}`,
+        BOT_COPY.projects.switched,
+        BOT_COPY.projects.current(worktree),
     ].join("\n");
 }
 
 export function presentAgentsMessage(input: AgentsMessageInput): string {
     if (input.agents.length === 0) {
-        return "暂无可用代理。";
+        return BOT_COPY.agents.none;
     }
 
     const page = getAgentsPage(input.agents, input.page);
@@ -77,9 +78,9 @@ export function presentAgentsMessage(input: AgentsMessageInput): string {
         ? input.agents.find((agent) => agent.name === input.currentAgentName) ?? null
         : null;
     const lines = [
-        "代理列表",
-        `当前代理：${currentAgent ? formatAgentLabel(currentAgent) : "未选择（使用 OpenCode 默认）"}`,
-        `第 ${page.page + 1}/${page.totalPages} 页`,
+        BOT_COPY.agents.title,
+        BOT_COPY.agents.current(currentAgent ? formatAgentLabel(currentAgent) : BOT_COPY.common.openCodeDefault),
+        BOT_COPY.common.page(page.page + 1, page.totalPages),
         "",
         ...page.items.map((agent, index) => `${page.startIndex + index + 1}. ${formatAgentLabel(agent)}`),
     ];
@@ -89,14 +90,14 @@ export function presentAgentsMessage(input: AgentsMessageInput): string {
 
 export function presentAgentSwitchMessage(agent: OpenCodeAgent): string {
     return [
-        "已切换代理。",
-        `当前代理：${formatAgentLabel(agent)}`,
+        BOT_COPY.agents.switched,
+        BOT_COPY.agents.current(formatAgentLabel(agent)),
     ].join("\n");
 }
 
 export function presentModelsMessage(input: ModelsMessageInput): string {
     if (input.models.length === 0) {
-        return "暂无已配置模型。";
+        return BOT_COPY.models.none;
     }
 
     const page = getModelsPage(input.models, input.page);
@@ -107,12 +108,12 @@ export function presentModelsMessage(input: ModelsMessageInput): string {
         : null;
     const currentModelLine = currentModel
         ? formatModelSelection(currentModel, input.currentModelVariant)
-        : "未选择（使用 OpenCode 默认）";
+        : BOT_COPY.common.openCodeDefault;
     const lines = [
-        "模型列表",
-        "仅显示 OpenCode 当前已配置的模型。",
-        `当前模型：${currentModelLine}`,
-        `第 ${page.page + 1}/${page.totalPages} 页`,
+        BOT_COPY.models.title,
+        BOT_COPY.models.configuredOnly,
+        BOT_COPY.models.current(currentModelLine),
+        BOT_COPY.common.page(page.page + 1, page.totalPages),
         "",
         ...page.items.map((model, index) => formatModelListLine(model, page.startIndex + index + 1)),
     ];
@@ -125,15 +126,15 @@ export function presentModelVariantsMessage(model: OpenCodeConfiguredModel, mode
 
     if (variants.length === 0) {
         return [
-            "该模型没有可选推理强度。",
-            `模型：${formatModelLabel(model)}`,
+            BOT_COPY.models.noReasoningLevels,
+            BOT_COPY.models.model(formatModelLabel(model)),
         ].join("\n");
     }
 
     const lines = [
-        "推理强度列表",
-        `模型：${formatModelLabel(model)}`,
-        `模型编号：${modelIndex}`,
+        BOT_COPY.models.reasoningLevelsTitle,
+        BOT_COPY.models.model(formatModelLabel(model)),
+        BOT_COPY.models.modelNumber(modelIndex),
         "",
         ...variants.map((variant, index) => `${index + 1}. ${variant}`),
     ];
@@ -143,9 +144,9 @@ export function presentModelVariantsMessage(model: OpenCodeConfiguredModel, mode
 
 export function presentModelSwitchMessage(model: OpenCodeConfiguredModel, variant: string | null): string {
     return [
-        "已切换模型。",
-        `当前模型：${formatModelLabel(model)}`,
-        `当前强度：${variant ?? "默认"}`,
+        BOT_COPY.models.switched,
+        BOT_COPY.models.current(formatModelLabel(model)),
+        BOT_COPY.models.currentReasoningLevel(variant ?? BOT_COPY.models.defaultReasoningLevel),
     ].join("\n");
 }
 
@@ -182,7 +183,7 @@ function formatModelListLine(model: OpenCodeConfiguredModel, displayIndex: numbe
 }
 
 function formatModelSelection(model: OpenCodeConfiguredModel, variant: string | null): string {
-    return `${formatModelLabel(model)} | 强度：${variant ?? "默认"}`;
+    return `${formatModelLabel(model)} | ${BOT_COPY.models.reasoningLevel(variant ?? BOT_COPY.models.defaultReasoningLevel)}`;
 }
 
 function formatModelLabel(model: OpenCodeConfiguredModel): string {

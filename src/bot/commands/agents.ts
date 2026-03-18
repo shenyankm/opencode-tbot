@@ -1,4 +1,5 @@
 import type { Bot } from "grammy";
+import { BOT_COPY } from "../copy.js";
 import type { BotDependencies } from "../types.js";
 import { buildAgentsKeyboard } from "../presenters/keyboard.presenter.js";
 import { presentError } from "../presenters/error.presenter.js";
@@ -16,7 +17,7 @@ export async function handleAgentsCommand(ctx: AgentsCommandContext, dependencie
         });
 
         if (result.agents.length === 0) {
-            await ctx.reply("暂无可用代理。");
+            await ctx.reply(BOT_COPY.agents.none);
             return;
         }
 

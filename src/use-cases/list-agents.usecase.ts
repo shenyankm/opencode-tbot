@@ -3,6 +3,7 @@ import type {
     OpenCodeAgent,
     OpenCodeClientLike,
 } from "../services/opencode/opencode.client.js";
+import { resolveSelectedAgent } from "./agent-selection.js";
 
 export interface ListAgentsResult {
     agents: OpenCodeAgent[];
@@ -20,10 +21,12 @@ export class ListAgentsUseCase {
             this.sessionRepo.getByChatId(input.chatId),
             this.opencodeClient.listAgents(),
         ]);
+        const visibleAgents = agents.filter((agent) => !agent.hidden);
+        const currentAgent = resolveSelectedAgent(visibleAgents, binding?.agentName);
 
         return {
-            agents: agents.filter((agent) => !agent.hidden),
-            currentAgentName: binding?.agentName ?? null,
+            agents: visibleAgents,
+            currentAgentName: currentAgent?.name ?? null,
         };
     }
 }

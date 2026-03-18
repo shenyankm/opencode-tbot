@@ -105,9 +105,9 @@ test("/projects shows the first page of projects with an inline keyboard", async
     );
 
     assert.equal(replies.length, 1);
-    assert.match(replies[0].text, /项目列表/);
-    assert.match(replies[0].text, /当前项目：E:\/repo-2/);
-    assert.match(replies[0].text, /第 1\/2 页/);
+    assert.match(replies[0].text, /Project List/);
+    assert.match(replies[0].text, /Current project: E:\/repo-2/);
+    assert.match(replies[0].text, /Page 1\/2/);
     assert.match(replies[0].text, /1\. E:\/repo-1/);
     assert.doesNotMatch(replies[0].text, /11\. E:\/repo-11/);
 
@@ -168,7 +168,7 @@ test("project page callbacks re-render the requested page", async () => {
 
     assert.equal(answered, 1);
     assert.equal(edits.length, 1);
-    assert.match(edits[0].text, /第 2\/2 页/);
+    assert.match(edits[0].text, /Page 2\/2/);
     assert.match(edits[0].text, /11\. E:\/repo-11/);
     assert.doesNotMatch(edits[0].text, /^1\. E:\/repo-1$/m);
 
@@ -225,12 +225,13 @@ test("project selection callbacks switch the binding to the selected project", a
 
     const binding = await repo.getByChatId(7);
 
-    assert.equal(edits[0], "已切换项目。\n当前项目：E:/repo-2");
+    assert.equal(edits[0], "Project switched.\nCurrent project: E:/repo-2");
     assert.deepEqual(binding, {
         chatId: 7,
         sessionId: "session-2",
         projectId: "project-2",
         directory: "E:/repo-2",
+        agentName: null,
         modelProviderId: null,
         modelId: null,
         modelVariant: null,
@@ -273,7 +274,7 @@ test("invalid project selections ask the user to rerun /projects", async () => {
         dependencies,
     );
 
-    assert.equal(edits[0], "项目已失效，请重新执行 /projects。");
+    assert.equal(edits[0], "The project is no longer available. Run /projects again.");
 });
 
 test("/projects surfaces SDK errors without leaking a stack trace", async () => {

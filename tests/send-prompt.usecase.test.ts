@@ -3,6 +3,7 @@ import test from "node:test";
 import type { Logger } from "pino";
 import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
 import type {
+    OpenCodeAgent,
     OpenCodeClientLike,
     OpenCodeProject,
     OpenCodeSession,
@@ -38,6 +39,16 @@ function createSession(id: string, projectID: string, directory: string): OpenCo
     } as OpenCodeSession;
 }
 
+function createAgent(name: string): OpenCodeAgent {
+    return {
+        name,
+        mode: "primary",
+        prompt: "",
+        tools: [],
+        model: undefined,
+    } as OpenCodeAgent;
+}
+
 test("SendPromptUseCase creates a session in the current project when the chat is unbound", async () => {
     const repo = new InMemorySessionRepository();
     const calls: Array<{ type: string; directory?: string; prompt?: string; sessionId?: string }> = [];
@@ -52,6 +63,9 @@ test("SendPromptUseCase creates a session in the current project when the chat i
         },
         async listModels() {
             return [];
+        },
+        async listAgents() {
+            return [createAgent("build")];
         },
         async listProjects() {
             return [currentProject];
@@ -80,6 +94,7 @@ test("SendPromptUseCase creates a session in the current project when the chat i
         sessionId: "session-1",
         projectId: "project-1",
         directory: "E:/repo-1",
+        agentName: null,
         modelProviderId: null,
         modelId: null,
         modelVariant: null,
@@ -116,6 +131,9 @@ test("SendPromptUseCase preserves a selected model when it needs to create a ses
         async listModels() {
             return [];
         },
+        async listAgents() {
+            return [createAgent("build")];
+        },
         async listProjects() {
             return [currentProject];
         },
@@ -141,6 +159,7 @@ test("SendPromptUseCase preserves a selected model when it needs to create a ses
         {
             sessionId: "session-1",
             prompt: "continue",
+            agent: "build",
             model: {
                 providerID: "openai",
                 modelID: "gpt-5",
@@ -153,6 +172,7 @@ test("SendPromptUseCase preserves a selected model when it needs to create a ses
         sessionId: "session-1",
         projectId: "project-1",
         directory: "E:/repo-1",
+        agentName: null,
         modelProviderId: "openai",
         modelId: "gpt-5",
         modelVariant: "high",

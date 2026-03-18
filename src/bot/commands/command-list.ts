@@ -1,24 +1,25 @@
 import type { BotCommand } from "grammy/types";
+import { BOT_COPY } from "../copy.js";
 
 export const TELEGRAM_COMMANDS: BotCommand[] = [
     {
         command: "start",
-        description: "查看机器人说明",
+        description: BOT_COPY.commands.start,
     },
     {
         command: "health",
-        description: "检查服务器健康状态",
+        description: BOT_COPY.commands.health,
     },
     {
         command: "agents",
-        description: "查看并切换代理",
+        description: BOT_COPY.commands.agents,
     },
     {
         command: "projects",
-        description: "查看并切换项目",
+        description: BOT_COPY.commands.projects,
     },
     {
         command: "model",
-        description: "查看并切换模型",
+        description: BOT_COPY.commands.model,
     },
 ];

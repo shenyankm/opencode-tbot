@@ -102,6 +102,9 @@ test("/model only shows configured models with numeric inline buttons", async ()
         async listModels() {
             return models;
         },
+        async listAgents() {
+            return [{ name: "build", mode: "primary" }] as never;
+        },
         async listProjects() {
             return [];
         },
@@ -123,10 +126,10 @@ test("/model only shows configured models with numeric inline buttons", async ()
     );
 
     assert.equal(replies.length, 1);
-    assert.match(replies[0].text, /模型列表/);
-    assert.match(replies[0].text, /仅显示 OpenCode 当前已配置的模型。/);
-    assert.match(replies[0].text, /当前模型：未选择（使用 OpenCode 默认）/);
-    assert.match(replies[0].text, /第 1\/2 页/);
+    assert.match(replies[0].text, /Model List/);
+    assert.match(replies[0].text, /Only models currently configured in OpenCode are shown\./);
+    assert.match(replies[0].text, /Current model: Not selected \(using OpenCode default\)/);
+    assert.match(replies[0].text, /Page 1\/2/);
     assert.match(replies[0].text, /1\. OpenAI \/ Model 1/);
     assert.doesNotMatch(replies[0].text, /13\. /);
 
@@ -154,6 +157,9 @@ test("model page callbacks re-render the requested page", async () => {
         },
         async listModels() {
             return models;
+        },
+        async listAgents() {
+            return [{ name: "build", mode: "primary" }] as never;
         },
         async listProjects() {
             return [];
@@ -183,7 +189,7 @@ test("model page callbacks re-render the requested page", async () => {
 
     assert.equal(answered, 1);
     assert.equal(edits.length, 1);
-    assert.match(edits[0].text, /第 2\/2 页/);
+    assert.match(edits[0].text, /Page 2\/2/);
     assert.match(edits[0].text, /11\. OpenAI \/ Model 11/);
     assert.doesNotMatch(edits[0].text, /^1\. OpenAI \/ Model 1$/m);
 
@@ -216,6 +222,9 @@ test("picking a model with variants opens a second numeric choice list", async (
         async listModels() {
             return models;
         },
+        async listAgents() {
+            return [{ name: "build", mode: "primary" }] as never;
+        },
         async listProjects() {
             return [];
         },
@@ -241,8 +250,8 @@ test("picking a model with variants opens a second numeric choice list", async (
     );
 
     assert.equal(edits.length, 1);
-    assert.match(edits[0].text, /推理强度列表/);
-    assert.match(edits[0].text, /模型编号：2/);
+    assert.match(edits[0].text, /Reasoning Levels/);
+    assert.match(edits[0].text, /Model number: 2/);
     assert.match(edits[0].text, /1\. low/);
     assert.match(edits[0].text, /2\. medium/);
     assert.match(edits[0].text, /3\. high/);
@@ -271,6 +280,9 @@ test("picking a model without variants switches immediately", async () => {
         async listModels() {
             return models;
         },
+        async listAgents() {
+            return [{ name: "build", mode: "primary" }] as never;
+        },
         async listProjects() {
             return [];
         },
@@ -297,12 +309,13 @@ test("picking a model without variants switches immediately", async () => {
 
     const binding = await repo.getByChatId(9);
 
-    assert.equal(edits[0], "已切换模型。\n当前模型：OpenAI / GPT-5\n当前强度：默认");
+    assert.equal(edits[0], "Model switched.\nCurrent model: OpenAI / GPT-5\nCurrent reasoning level: default");
     assert.deepEqual(binding, {
         chatId: 9,
         sessionId: null,
         projectId: null,
         directory: null,
+        agentName: null,
         modelProviderId: "openai",
         modelId: "gpt-5",
         modelVariant: null,
@@ -328,6 +341,9 @@ test("variant selection updates the binding and later prompts use the selected m
         },
         async listModels() {
             return models;
+        },
+        async listAgents() {
+            return [{ name: "build", mode: "primary" }] as never;
         },
         async listProjects() {
             return [];
@@ -361,12 +377,13 @@ test("variant selection updates the binding and later prompts use the selected m
     });
     const bindingAfterPrompt = await repo.getByChatId(12);
 
-    assert.equal(edits[0], "已切换模型。\n当前模型：OpenAI / GPT-5 Thinking\n当前强度：high");
+    assert.equal(edits[0], "Model switched.\nCurrent model: OpenAI / GPT-5 Thinking\nCurrent reasoning level: high");
     assert.deepEqual(bindingAfterSwitch, {
         chatId: 12,
         sessionId: null,
         projectId: null,
         directory: null,
+        agentName: null,
         modelProviderId: "openai",
         modelId: "gpt-5-thinking",
         modelVariant: "high",
@@ -376,6 +393,7 @@ test("variant selection updates the binding and later prompts use the selected m
         {
             sessionId: "session-1",
             prompt: "continue",
+            agent: "build",
             model: {
                 providerID: "openai",
                 modelID: "gpt-5-thinking",
@@ -389,6 +407,7 @@ test("variant selection updates the binding and later prompts use the selected m
         sessionId: "session-1",
         projectId: "project-1",
         directory: "E:/repo-1",
+        agentName: null,
         modelProviderId: "openai",
         modelId: "gpt-5-thinking",
         modelVariant: "high",
