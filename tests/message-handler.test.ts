@@ -268,8 +268,9 @@ test("handleTextMessage renders assistant-side prompt errors with metrics and de
                     retries: 2,
                 },
             } as never,
-            bodyMd: "## Ignored",
-            fallbackText: "ignored",
+            bodyMd: null,
+            fallbackText: "OpenCode returned empty response.",
+            parts: [],
         }),
     }));
 
@@ -304,6 +305,54 @@ test("handleTextMessage renders assistant-side prompt errors with metrics and de
         },
     ]);
     assert.deepEqual(deleted, [{ chatId: 15, messageId: 700 }]);
+});
+
+test("handleTextMessage falls back to assistant text when structured output validation fails but text was produced", async () => {
+    const replies: Array<{ text: string; other?: unknown }> = [];
+    const deleted: Array<{ chatId: number; messageId: number }> = [];
+    let nextMessageId = 800;
+    const { dependencies, warnings } = createDependencies(async () => ({
+        assistantReply: createPromptReply({
+            assistantError: {
+                name: "StructuredOutputError",
+                data: {
+                    message: "Model did not produce structured output",
+                    retries: 0,
+                },
+            } as never,
+            bodyMd: null,
+            fallbackText: "这是项目简介",
+            parts: [{ type: "text", text: "这是项目简介" }] as never,
+        }),
+    }));
+
+    await handleTextMessage(
+        {
+            chat: { id: 18 },
+            message: { text: "介绍这个项目" },
+            api: {
+                async deleteMessage(chatId, messageId) {
+                    deleted.push({ chatId, messageId });
+                    return true;
+                },
+            },
+            async reply(text, other) {
+                replies.push({ text, other });
+                return { message_id: nextMessageId++ };
+            },
+        },
+        dependencies,
+    );
+
+    assert.deepEqual(replies, [
+        { text: "Processing...", other: undefined },
+        {
+            text: "这是项目简介\n\nDuration: 120 ms | Tokens: 42",
+            other: undefined,
+        },
+    ]);
+    assert.equal(warnings.length, 1);
+    assert.deepEqual(deleted, [{ chatId: 18, messageId: 800 }]);
 });
 
 test("handleTextMessage localizes bot-generated status text and metrics footer for Chinese chats", async () => {

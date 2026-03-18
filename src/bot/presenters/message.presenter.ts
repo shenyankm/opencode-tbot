@@ -2,6 +2,7 @@ import type {
     OpenCodeAgent,
     OpenCodeConfiguredModel,
     OpenCodeHealth,
+    OpenCodeMcpStatus,
     OpenCodePath,
     OpenCodeSession,
 } from "../../services/opencode/opencode.client.js";
@@ -38,6 +39,14 @@ interface SessionsMessageInput {
     sessions: OpenCodeSession[];
 }
 
+interface McpMessageInput {
+    currentDirectory: string;
+    statuses: Array<{
+        name: string;
+        status: OpenCodeMcpStatus;
+    }>;
+}
+
 const VARIANT_ORDER = ["minimal", "none", "low", "medium", "high", "xhigh", "max"];
 export function presentHealthMessage(health: OpenCodeHealth, copy: BotCopy = BOT_COPY): string {
     return [
@@ -49,6 +58,23 @@ export function presentHealthMessage(health: OpenCodeHealth, copy: BotCopy = BOT
 
 export function presentPathMessage(path: OpenCodePath, copy: BotCopy = BOT_COPY): string {
     return copy.path.directory(path.directory);
+}
+
+export function presentMcpMessage(input: McpMessageInput, copy: BotCopy = BOT_COPY): string {
+    const lines = [
+        copy.mcp.title,
+        copy.mcp.currentProject(input.currentDirectory),
+        "",
+    ];
+
+    if (input.statuses.length === 0) {
+        lines.push(copy.mcp.none);
+        return lines.join("\n");
+    }
+
+    lines.push(...input.statuses.map(({ name, status }) => `${name}: ${formatMcpStatus(status, copy)}`));
+
+    return lines.join("\n");
 }
 
 export function presentSessionsMessage(input: SessionsMessageInput, copy: BotCopy = BOT_COPY): string {
@@ -75,6 +101,13 @@ export function presentSessionsMessage(input: SessionsMessageInput, copy: BotCop
 export function presentSessionSwitchMessage(session: OpenCodeSession, copy: BotCopy = BOT_COPY): string {
     return [
         copy.sessions.switched,
+        copy.sessions.currentSession(formatSessionLabel(session)),
+    ].join("\n");
+}
+
+export function presentSessionCreatedMessage(session: OpenCodeSession, copy: BotCopy = BOT_COPY): string {
+    return [
+        copy.sessions.created,
         copy.sessions.currentSession(formatSessionLabel(session)),
     ].join("\n");
 }
@@ -235,4 +268,23 @@ function formatSessionLabel(session: OpenCodeSession): string {
     return title === session.slug
         ? title
         : `${title} [${session.slug}]`;
+}
+
+function formatMcpStatus(status: OpenCodeMcpStatus, copy: BotCopy): string {
+    switch (status.status) {
+        case "connected":
+            return copy.mcp.connected;
+        case "disabled":
+            return copy.mcp.disabled;
+        case "needs_auth":
+            return copy.mcp.needsAuth;
+        case "failed":
+            return copy.mcp.failed(status.error);
+        case "needs_client_registration":
+            return copy.mcp.needsClientRegistration(status.error);
+    }
+
+    const exhaustiveStatus: never = status;
+
+    return exhaustiveStatus;
 }

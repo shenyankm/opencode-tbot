@@ -435,3 +435,61 @@ test("variant selection updates the binding and later prompts use the selected m
         updatedAt: bindingAfterPrompt?.updatedAt,
     });
 });
+
+test("ListModelsUseCase clears stale model selections during listing", async () => {
+    const { dependencies, repo } = createDependencies({
+        async createSessionForDirectory(directory) {
+            return createSession("session-1", "project-1", directory);
+        },
+        async getCurrentProject() {
+            return createProject("project-1", "E:/repo-1");
+        },
+        async listModels() {
+            return [
+                createConfiguredModel("openai", "gpt-5", "GPT-5", "OpenAI", {
+                    low: {},
+                }),
+            ];
+        },
+        async listAgents() {
+            return [{ name: "build", mode: "primary" }] as never;
+        },
+        async listProjects() {
+            return [];
+        },
+        async promptSession() {
+            return createPromptReply("unused");
+        },
+    });
+    await repo.setCurrent({
+        chatId: 44,
+        sessionId: "session-44",
+        projectId: "project-1",
+        directory: "E:/repo-1",
+        agentName: null,
+        modelProviderId: "openai",
+        modelId: "missing-model",
+        modelVariant: "high",
+        language: null,
+        updatedAt: new Date(0).toISOString(),
+    });
+
+    const result = await dependencies.listModelsUseCase.execute({ chatId: 44 });
+    const binding = await repo.getByChatId(44);
+
+    assert.equal(result.currentModelProviderId, null);
+    assert.equal(result.currentModelId, null);
+    assert.equal(result.currentModelVariant, null);
+    assert.deepEqual(binding, {
+        chatId: 44,
+        sessionId: "session-44",
+        projectId: "project-1",
+        directory: "E:/repo-1",
+        agentName: null,
+        modelProviderId: null,
+        modelId: null,
+        modelVariant: null,
+        language: null,
+        updatedAt: binding?.updatedAt,
+    });
+});

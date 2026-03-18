@@ -6,6 +6,7 @@ node_modules/
 __pycache__/
 dist/
 build/
+data/
 *.log
 .env
 .env.*

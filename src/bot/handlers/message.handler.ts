@@ -41,13 +41,7 @@ export async function handleTextMessage(ctx: MessageContext, dependencies: BotDe
             chatId: ctx.chat.id,
             text,
         });
-        const promptReply = result.assistantReply.assistantError
-            ? {
-                ...result.assistantReply,
-                bodyMd: null,
-                fallbackText: presentError(result.assistantReply.assistantError, copy),
-            }
-            : result.assistantReply;
+        const promptReply = normalizePromptReplyForDisplay(result.assistantReply, copy, dependencies);
         const telegramReply = buildTelegramPromptReply(promptReply, copy);
 
         try {
@@ -77,4 +71,50 @@ export function registerMessageHandler(bot: Bot, dependencies: BotDependencies) 
     bot.on("message:text", async (ctx) => {
         await handleTextMessage(ctx, dependencies);
     });
+}
+
+function normalizePromptReplyForDisplay(
+    promptReply: Awaited<ReturnType<BotDependencies["sendPromptUseCase"]["execute"]>>["assistantReply"],
+    copy: Awaited<ReturnType<typeof getChatCopy>>,
+    dependencies: BotDependencies,
+) {
+    if (!promptReply.assistantError) {
+        return promptReply;
+    }
+
+    if (isRecoverableStructuredOutputError(promptReply)) {
+        dependencies.logger.warn?.(
+            {
+                error: promptReply.assistantError,
+            },
+            "structured output validation failed, falling back to assistant text reply",
+        );
+
+        return {
+            ...promptReply,
+            assistantError: null,
+        };
+    }
+
+    return {
+        ...promptReply,
+        bodyMd: null,
+        fallbackText: presentError(promptReply.assistantError, copy),
+    };
+}
+
+function isRecoverableStructuredOutputError(
+    promptReply: Awaited<ReturnType<BotDependencies["sendPromptUseCase"]["execute"]>>["assistantReply"],
+): boolean {
+    if (promptReply.assistantError?.name !== "StructuredOutputError") {
+        return false;
+    }
+
+    if (promptReply.bodyMd?.trim()) {
+        return true;
+    }
+
+    return promptReply.parts.some((part) =>
+        part.type === "text" && typeof part.text === "string" && part.text.trim().length > 0
+    );
 }

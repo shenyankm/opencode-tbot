@@ -1,7 +1,21 @@
+import type { ChatSessionBinding } from "../domain/session/session.entity.js";
 import type { Logger } from "pino";
 import type { SessionRepository } from "../domain/session/session.repository.js";
 import type { OpenCodeClientLike } from "../services/opencode/opencode.client.js";
 import { resolveSelectedAgent } from "./agent-selection.js";
+import {
+    clearStoredAgentSelection,
+    clearStoredModelSelection,
+    clearStoredModelVariant,
+    clearStoredSessionContext,
+} from "./binding-update.js";
+import { createAndBindCurrentProjectSession } from "./session-creation.js";
+
+type ActiveChatBinding = ChatSessionBinding & {
+    directory: string;
+    projectId: string;
+    sessionId: string;
+};
 
 export class SendPromptUseCase {
     constructor(
@@ -13,30 +27,52 @@ export class SendPromptUseCase {
     async execute(input: { chatId: number; text: string }) {
         let binding = await this.sessionRepo.getByChatId(input.chatId);
 
+        if (binding?.projectId && binding.directory) {
+            const projects = await this.opencodeClient.listProjects();
+            const selectedProject = projects.find((project) =>
+                project.id === binding?.projectId && project.worktree === binding.directory,
+            );
+
+            if (!selectedProject) {
+                binding = await this.clearInvalidSessionContext(
+                    input.chatId,
+                    binding,
+                    "saved project is no longer available",
+                );
+            }
+        }
+
+        if (binding?.sessionId && binding.projectId) {
+            const sessions = await this.opencodeClient.listSessions();
+            const selectedSession = sessions.find((session) =>
+                session.id === binding?.sessionId && session.projectID === binding.projectId,
+            );
+
+            if (!selectedSession) {
+                binding = await this.clearInvalidSessionContext(
+                    input.chatId,
+                    binding,
+                    "saved session is no longer available",
+                );
+            }
+        }
+
         if (!binding || !binding.sessionId || !binding.projectId || !binding.directory) {
-            const project = await this.opencodeClient.getCurrentProject();
-            const session = await this.opencodeClient.createSessionForDirectory(project.worktree);
-
-            binding = {
-                chatId: input.chatId,
-                sessionId: session.id,
-                projectId: project.id,
-                directory: project.worktree,
-                agentName: binding?.agentName ?? null,
-                modelProviderId: binding?.modelProviderId ?? null,
-                modelId: binding?.modelId ?? null,
-                modelVariant: binding?.modelVariant ?? null,
-                language: binding?.language ?? null,
-                updatedAt: new Date().toISOString(),
-            };
-
-            await this.sessionRepo.setCurrent(binding);
+            const createdSession = await createAndBindCurrentProjectSession(
+                this.sessionRepo,
+                this.opencodeClient,
+                {
+                    chatId: input.chatId,
+                    binding,
+                },
+            );
+            binding = createdSession.binding;
             this.logger.info(
                 {
                     chatId: input.chatId,
-                    sessionId: binding.sessionId,
-                    projectId: binding.projectId,
-                    directory: binding.directory,
+                    sessionId: createdSession.session.id,
+                    projectId: createdSession.session.projectID,
+                    directory: createdSession.session.directory,
                 },
                 "session created",
             );
@@ -49,14 +85,7 @@ export class SendPromptUseCase {
             );
 
             if (!selectedModel) {
-                binding = {
-                    ...binding,
-                    modelProviderId: null,
-                    modelId: null,
-                    modelVariant: null,
-                    updatedAt: new Date().toISOString(),
-                };
-                await this.sessionRepo.setCurrent(binding);
+                binding = await clearStoredModelSelection(this.sessionRepo, binding);
                 this.logger.warn?.(
                     {
                         chatId: input.chatId,
@@ -64,12 +93,7 @@ export class SendPromptUseCase {
                     "selected model is no longer available, falling back to OpenCode default",
                 );
             } else if (binding.modelVariant && !(binding.modelVariant in selectedModel.variants)) {
-                binding = {
-                    ...binding,
-                    modelVariant: null,
-                    updatedAt: new Date().toISOString(),
-                };
-                await this.sessionRepo.setCurrent(binding);
+                binding = await clearStoredModelVariant(this.sessionRepo, binding);
                 this.logger.warn?.(
                     {
                         chatId: input.chatId,
@@ -85,30 +109,57 @@ export class SendPromptUseCase {
             throw new Error("Failed to initialize chat session.");
         }
 
-        const model = binding.modelProviderId && binding.modelId
+        let activeBinding = binding as ActiveChatBinding;
+        const model = activeBinding.modelProviderId && activeBinding.modelId
             ? {
-                providerID: binding.modelProviderId,
-                modelID: binding.modelId,
+                providerID: activeBinding.modelProviderId,
+                modelID: activeBinding.modelId,
             }
             : null;
-        const selectedAgent = binding.agentName
-            ? { name: binding.agentName }
-            : resolveSelectedAgent(await this.opencodeClient.listAgents(), null);
+        const availableAgents = await this.opencodeClient.listAgents();
+        const selectedAgent = resolveSelectedAgent(availableAgents, activeBinding.agentName);
+
+        if (activeBinding.agentName && selectedAgent?.name !== activeBinding.agentName) {
+            activeBinding = await clearStoredAgentSelection(this.sessionRepo, activeBinding) as ActiveChatBinding;
+            this.logger.warn?.(
+                {
+                    chatId: input.chatId,
+                },
+                "selected agent is no longer available, falling back to OpenCode default",
+            );
+        }
+
         const result = await this.opencodeClient.promptSession({
-            sessionId: binding.sessionId,
+            sessionId: activeBinding.sessionId,
             prompt: input.text,
             ...(selectedAgent ? { agent: selectedAgent.name } : {}),
             structured: true,
             ...(model ? { model } : {}),
-            ...(binding.modelVariant ? { variant: binding.modelVariant } : {}),
+            ...(activeBinding.modelVariant ? { variant: activeBinding.modelVariant } : {}),
         });
 
         await this.sessionRepo.touch(input.chatId);
 
         return {
             assistantReply: result,
-            sessionId: binding.sessionId,
-            projectId: binding.projectId,
+            sessionId: activeBinding.sessionId,
+            projectId: activeBinding.projectId,
         };
+    }
+
+    private async clearInvalidSessionContext(
+        chatId: number,
+        binding: ChatSessionBinding,
+        reason: string,
+    ) {
+        const nextBinding = await clearStoredSessionContext(this.sessionRepo, binding);
+        this.logger.warn?.(
+            {
+                chatId,
+            },
+            `${reason}, falling back to the current OpenCode project`,
+        );
+
+        return nextBinding;
     }
 }

@@ -224,3 +224,55 @@ test("invalid session selections ask the user to rerun /sessions", async () => {
 
     assert.equal(edits[0], "The session is no longer available. Run /sessions again.");
 });
+
+test("ListSessionsUseCase clears stale saved session context and falls back to the current project", async () => {
+    const repo = new InMemorySessionRepository();
+    await repo.setCurrent({
+        chatId: 8,
+        sessionId: "missing-session",
+        projectId: "project-stale",
+        directory: "E:/repo-stale",
+        agentName: null,
+        modelProviderId: null,
+        modelId: null,
+        modelVariant: null,
+        language: "en",
+        updatedAt: new Date(0).toISOString(),
+    });
+    const currentProject = createProject("project-2", "E:/repo-2");
+    const useCase = new ListSessionsUseCase(
+        repo,
+        {
+            async getCurrentProject() {
+                return currentProject;
+            },
+            async listProjects() {
+                return [currentProject];
+            },
+            async listSessions() {
+                return [
+                    createSession("session-1", currentProject.id, currentProject.worktree, "Session 1"),
+                ];
+            },
+        } as never,
+    );
+
+    const result = await useCase.execute({ chatId: 8 });
+    const binding = await repo.getByChatId(8);
+
+    assert.equal(result.currentProjectId, "project-2");
+    assert.equal(result.currentDirectory, "E:/repo-2");
+    assert.equal(result.currentSessionId, null);
+    assert.deepEqual(binding, {
+        chatId: 8,
+        sessionId: null,
+        projectId: null,
+        directory: null,
+        agentName: null,
+        modelProviderId: null,
+        modelId: null,
+        modelVariant: null,
+        language: "en",
+        updatedAt: binding?.updatedAt,
+    });
+});

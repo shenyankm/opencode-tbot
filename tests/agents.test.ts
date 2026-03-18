@@ -62,3 +62,34 @@ test("ListAgentsUseCase keeps the explicitly selected agent when present", async
 
     assert.equal(result.currentAgentName, "review");
 });
+
+test("ListAgentsUseCase clears stale selected agents and falls back to the default", async () => {
+    const repo = new InMemorySessionRepository();
+    await repo.setCurrent({
+        chatId: 3,
+        sessionId: "session-3",
+        projectId: "project-3",
+        directory: "E:/repo-3",
+        agentName: "review",
+        modelProviderId: null,
+        modelId: null,
+        modelVariant: null,
+        language: "en",
+        updatedAt: new Date(0).toISOString(),
+    });
+    const useCase = new ListAgentsUseCase(
+        repo,
+        {
+            async listAgents() {
+                return [createAgent("build"), createAgent("chat")];
+            },
+        } as never,
+    );
+
+    const result = await useCase.execute({ chatId: 3 });
+    const binding = await repo.getByChatId(3);
+
+    assert.equal(result.currentAgentName, "build");
+    assert.equal(binding?.agentName, null);
+    assert.equal(binding?.sessionId, "session-3");
+});

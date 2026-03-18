@@ -374,3 +374,151 @@ test("SendPromptUseCase clears a stale model selection before prompting", async 
         updatedAt: binding?.updatedAt,
     });
 });
+
+test("SendPromptUseCase recreates the session when the saved session context is stale", async () => {
+    const repo = new InMemorySessionRepository();
+    await repo.setCurrent({
+        chatId: 77,
+        sessionId: "session-stale",
+        projectId: "project-stale",
+        directory: "E:/repo-stale",
+        agentName: null,
+        modelProviderId: null,
+        modelId: null,
+        modelVariant: null,
+        language: null,
+        updatedAt: new Date(0).toISOString(),
+    });
+
+    const promptCalls: unknown[] = [];
+    const client: OpenCodeClientLike = {
+        async abortSession() {
+            return true;
+        },
+        async createSessionForDirectory(directory) {
+            return createSession("session-new", "project-1", directory);
+        },
+        async getCurrentProject() {
+            return createProject("project-1", "E:/repo-1");
+        },
+        async getSessionStatuses() {
+            return {};
+        },
+        async listModels() {
+            return [];
+        },
+        async listAgents() {
+            return [createAgent("build")];
+        },
+        async listProjects() {
+            return [createProject("project-1", "E:/repo-1")];
+        },
+        async listSessions() {
+            return [createSession("session-live", "project-1", "E:/repo-1")];
+        },
+        async getPath() {
+            throw new Error("unused");
+        },
+        async promptSession(input) {
+            promptCalls.push(input);
+            return createPromptReply("reply after recreating the session");
+        },
+    };
+
+    const useCase = new SendPromptUseCase(repo, client, logger);
+    const result = await useCase.execute({
+        chatId: 77,
+        text: "continue",
+    });
+    const binding = await repo.getByChatId(77);
+
+    assert.deepEqual(promptCalls, [
+        {
+            sessionId: "session-new",
+            prompt: "continue",
+            structured: true,
+            agent: "build",
+        },
+    ]);
+    assert.equal(result.sessionId, "session-new");
+    assert.deepEqual(binding, {
+        chatId: 77,
+        sessionId: "session-new",
+        projectId: "project-1",
+        directory: "E:/repo-1",
+        agentName: null,
+        modelProviderId: null,
+        modelId: null,
+        modelVariant: null,
+        language: null,
+        updatedAt: binding?.updatedAt,
+    });
+});
+
+test("SendPromptUseCase clears stale selected agents before prompting", async () => {
+    const repo = new InMemorySessionRepository();
+    await repo.setCurrent({
+        chatId: 88,
+        sessionId: "session-1",
+        projectId: "project-1",
+        directory: "E:/repo-1",
+        agentName: "review",
+        modelProviderId: null,
+        modelId: null,
+        modelVariant: null,
+        language: null,
+        updatedAt: new Date(0).toISOString(),
+    });
+
+    const promptCalls: unknown[] = [];
+    const client: OpenCodeClientLike = {
+        async abortSession() {
+            return true;
+        },
+        async createSessionForDirectory(directory) {
+            return createSession("session-1", "project-1", directory);
+        },
+        async getCurrentProject() {
+            return createProject("project-1", "E:/repo-1");
+        },
+        async getSessionStatuses() {
+            return {};
+        },
+        async listModels() {
+            return [];
+        },
+        async listAgents() {
+            return [createAgent("build")];
+        },
+        async listProjects() {
+            return [createProject("project-1", "E:/repo-1")];
+        },
+        async listSessions() {
+            return [createSession("session-1", "project-1", "E:/repo-1")];
+        },
+        async getPath() {
+            throw new Error("unused");
+        },
+        async promptSession(input) {
+            promptCalls.push(input);
+            return createPromptReply("reply from default agent");
+        },
+    };
+
+    const useCase = new SendPromptUseCase(repo, client, logger);
+    await useCase.execute({
+        chatId: 88,
+        text: "continue",
+    });
+    const binding = await repo.getByChatId(88);
+
+    assert.deepEqual(promptCalls, [
+        {
+            sessionId: "session-1",
+            prompt: "continue",
+            structured: true,
+            agent: "build",
+        },
+    ]);
+    assert.equal(binding?.agentName, null);
+});

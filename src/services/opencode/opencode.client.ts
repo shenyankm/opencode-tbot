@@ -3,6 +3,7 @@ import {
     type AssistantMessage,
     createOpencodeClient,
     type Config,
+    type McpStatus,
     type Model,
     type OpencodeClient,
     type Part,
@@ -64,6 +65,7 @@ export type OpenCodeAgent = Agent;
 export type OpenCodeAssistantMessage = AssistantMessage;
 export type OpenCodeAssistantError = NonNullable<OpenCodeAssistantMessage["error"]>;
 export type OpenCodePath = Path;
+export type OpenCodeMcpStatus = McpStatus;
 export type OpenCodeSessionStatus = SessionStatus;
 export interface OpenCodeHealth {
     healthy: boolean;
@@ -80,7 +82,7 @@ export interface OpenCodeConfiguredModel {
     variants: Record<string, Record<string, unknown>>;
 }
 
-type OpenCodeSdkClient = Pick<OpencodeClient, "app" | "config" | "global" | "path" | "project" | "session">;
+type OpenCodeSdkClient = Pick<OpencodeClient, "app" | "config" | "global" | "mcp" | "path" | "project" | "session">;
 type MaybeWrappedResponse<T> = T | { data: T };
 type OpenCodeProviderCatalog = {
     providers: OpenCodeProvider[];
@@ -122,6 +124,7 @@ export interface OpenCodeClientLike {
     abortSession(sessionId: string): Promise<boolean>;
     getHealth(): Promise<OpenCodeHealth>;
     getPath(): Promise<OpenCodePath>;
+    listMcpStatuses(directory?: string): Promise<Record<string, OpenCodeMcpStatus>>;
     getSessionStatuses(): Promise<Record<string, OpenCodeSessionStatus>>;
     listProjects(): Promise<OpenCodeProject[]>;
     listSessions(): Promise<OpenCodeSession[]>;
@@ -160,6 +163,17 @@ export class OpenCodeClient implements OpenCodeClientLike {
 
     async getPath(): Promise<OpenCodePath> {
         const response = await this.client.path.get(undefined, SDK_OPTIONS) as MaybeWrappedResponse<OpenCodePath>;
+
+        return unwrapSdkData(response);
+    }
+
+    async listMcpStatuses(directory?: string): Promise<Record<string, OpenCodeMcpStatus>> {
+        const response = await this.client.mcp.status(
+            directory
+                ? { directory }
+                : undefined,
+            SDK_OPTIONS,
+        ) as MaybeWrappedResponse<Record<string, OpenCodeMcpStatus>>;
 
         return unwrapSdkData(response);
     }

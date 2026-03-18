@@ -1,9 +1,11 @@
 import type { Logger } from "pino";
 import type { SessionRepository } from "../domain/session/session.repository.js";
+import type { CreateSessionUseCase } from "../use-cases/create-session.usecase.js";
 import type { GetHealthUseCase } from "../use-cases/get-health.usecase.js";
 import type { GetPathUseCase } from "../use-cases/get-path.usecase.js";
 import type { AbortPromptUseCase } from "../use-cases/abort-prompt.usecase.js";
 import type { ListAgentsUseCase } from "../use-cases/list-agents.usecase.js";
+import type { ListMcpUseCase } from "../use-cases/list-mcp.usecase.js";
 import type { ListModelsUseCase } from "../use-cases/list-models.usecase.js";
 import type { ListSessionsUseCase } from "../use-cases/list-sessions.usecase.js";
 import type { SendPromptUseCase } from "../use-cases/send-prompt.usecase.js";
@@ -13,9 +15,11 @@ import type { SwitchSessionUseCase } from "../use-cases/switch-session.usecase.j
 
 export interface BotDependencies {
     abortPromptUseCase: AbortPromptUseCase;
+    createSessionUseCase: CreateSessionUseCase;
     getHealthUseCase: GetHealthUseCase;
     getPathUseCase: GetPathUseCase;
     listAgentsUseCase: ListAgentsUseCase;
+    listMcpUseCase: ListMcpUseCase;
     logger: Logger;
     listModelsUseCase: ListModelsUseCase;
     listSessionsUseCase: ListSessionsUseCase;

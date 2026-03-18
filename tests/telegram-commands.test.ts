@@ -27,6 +27,14 @@ test("TELEGRAM_COMMANDS only advertises implemented commands", () => {
             description: "Show current paths",
         },
         {
+            command: "mcp",
+            description: "Show MCP servers",
+        },
+        {
+            command: "new",
+            description: "Create a new session",
+        },
+        {
             command: "agents",
             description: "View and switch agents",
         },

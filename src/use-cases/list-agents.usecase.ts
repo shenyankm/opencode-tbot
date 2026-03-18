@@ -4,6 +4,7 @@ import type {
     OpenCodeClientLike,
 } from "../services/opencode/opencode.client.js";
 import { resolveSelectedAgent } from "./agent-selection.js";
+import { clearStoredAgentSelection } from "./binding-update.js";
 
 export interface ListAgentsResult {
     agents: OpenCodeAgent[];
@@ -17,12 +18,16 @@ export class ListAgentsUseCase {
     ) { }
 
     async execute(input: { chatId: number }): Promise<ListAgentsResult> {
-        const [binding, agents] = await Promise.all([
+        let [binding, agents] = await Promise.all([
             this.sessionRepo.getByChatId(input.chatId),
             this.opencodeClient.listAgents(),
         ]);
         const visibleAgents = agents.filter((agent) => !agent.hidden);
         const currentAgent = resolveSelectedAgent(visibleAgents, binding?.agentName);
+
+        if (binding?.agentName && currentAgent?.name !== binding.agentName) {
+            binding = await clearStoredAgentSelection(this.sessionRepo, binding);
+        }
 
         return {
             agents: visibleAgents,

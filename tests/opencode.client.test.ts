@@ -298,6 +298,57 @@ test("getSessionStatuses forwards to the SDK session status endpoint", async () 
     ]);
 });
 
+test("listMcpStatuses forwards the current directory to the SDK MCP endpoint", async () => {
+    const calls: Array<{ input: unknown; options: unknown }> = [];
+    const statuses = {
+        filesystem: { status: "connected" },
+    };
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            config: {
+                get: async () => ({ provider: {} }),
+                providers: async () => ({ providers: [], default: {} }),
+            },
+            mcp: {
+                async status(input: unknown, options: unknown) {
+                    calls.push({ input, options });
+                    return { data: statuses };
+                },
+            },
+            path: {
+                get: async () => createPath(),
+            },
+            project: {
+                list: async () => [],
+                current: async () => createProject("project-1", "E:/repo-1"),
+            },
+            session: {
+                create: async () => createSession("session-1", "project-1", "E:/repo-1"),
+                prompt: async () => ({
+                    data: {
+                        info: {} as never,
+                        parts: [],
+                    },
+                }),
+            },
+        } as never,
+    );
+
+    assert.deepEqual(await client.listMcpStatuses("E:/repo-1"), statuses as never);
+    assert.deepEqual(calls, [
+        {
+            input: {
+                directory: "E:/repo-1",
+            },
+            options: {
+                responseStyle: "data",
+                throwOnError: true,
+            },
+        },
+    ]);
+});
+
 test("abortSession forwards the session id to the SDK abort endpoint", async () => {
     const calls: Array<{ input: unknown; options: unknown }> = [];
     const client = new OpenCodeClient(

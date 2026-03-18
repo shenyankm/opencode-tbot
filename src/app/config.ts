@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { resolve } from "node:path";
 import { z } from "zod";
 
 const ConfigSchema = z.object({
@@ -7,6 +8,7 @@ const ConfigSchema = z.object({
     OPENCODE_BASE_URL: z.string().url(),
     OPENCODE_API_KEY: z.string().default(""),
     LOG_LEVEL: z.string().default("info"),
+    BOT_STATE_DB_PATH: z.string().default("./data/opencode-tbot.sqlite"),
 });
 
 const parsed = ConfigSchema.safeParse(process.env);
@@ -29,4 +31,5 @@ export const config = {
     opencodeBaseUrl: parsed.data.OPENCODE_BASE_URL,
     opencodeApiKey: parsed.data.OPENCODE_API_KEY,
     logLevel: parsed.data.LOG_LEVEL,
+    botStateDbPath: resolve(parsed.data.BOT_STATE_DB_PATH),
 };

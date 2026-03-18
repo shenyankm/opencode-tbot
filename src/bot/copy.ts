@@ -5,6 +5,8 @@ export interface BotCopy {
         start: string;
         health: string;
         path: string;
+        mcp: string;
+        new: string;
         agents: string;
         sessions: string;
         abort: string;
@@ -77,7 +79,18 @@ export interface BotCopy {
         currentProject(worktree: string): string;
         currentSession(session: string): string;
         switched: string;
+        created: string;
         expired: string;
+    };
+    mcp: {
+        none: string;
+        title: string;
+        currentProject(worktree: string): string;
+        connected: string;
+        disabled: string;
+        needsAuth: string;
+        failed(error: string): string;
+        needsClientRegistration(error: string): string;
     };
     agents: {
         none: string;
@@ -115,11 +128,13 @@ export interface BotCopy {
 export const DEFAULT_BOT_LANGUAGE: BotLanguage = "en";
 export const SUPPORTED_BOT_LANGUAGES: readonly BotLanguage[] = ["en", "zh-CN"];
 
-const EN_BOT_COPY = {
+const EN_BOT_COPY: BotCopy = {
     commands: {
         start: "Show bot overview",
         health: "Check server health",
         path: "Show current paths",
+        mcp: "Show MCP servers",
+        new: "Create a new session",
         agents: "View and switch agents",
         sessions: "View and switch sessions",
         abort: "Abort running request",
@@ -216,7 +231,24 @@ const EN_BOT_COPY = {
             return `Current session: ${session}`;
         },
         switched: "Session switched.",
+        created: "Session created.",
         expired: "The session is no longer available. Run /sessions again.",
+    },
+    mcp: {
+        none: "No MCP servers configured for the current project.",
+        title: "MCP Servers",
+        currentProject(worktree: string) {
+            return `Current project: ${worktree}`;
+        },
+        connected: "connected",
+        disabled: "disabled",
+        needsAuth: "needs auth",
+        failed(error: string) {
+            return `failed: ${error}`;
+        },
+        needsClientRegistration(error: string) {
+            return `needs client registration: ${error}`;
+        },
     },
     agents: {
         none: "No agents available.",
@@ -268,13 +300,14 @@ const EN_BOT_COPY = {
     },
 };
 
-const ZH_CN_BOT_COPY = {
+const ZH_CN_BOT_COPY: BotCopy = {
     commands: {
         start: "查看机器人说明",
         health: "检查服务健康状态",
         path: "查看当前路径",
+        mcp: "查看 MCP 服务",
+        new: "新建会话",
         agents: "查看并切换代理",
-        projects: "查看并切换项目",
         sessions: "查看并切换会话",
         abort: "中止正在运行的请求",
         model: "查看并切换模型",
@@ -360,15 +393,6 @@ const ZH_CN_BOT_COPY = {
             return `当前工作目录: ${path}`;
         },
     },
-    projects: {
-        none: "没有可用项目。",
-        title: "项目列表",
-        current(worktree: string) {
-            return `当前项目: ${worktree}`;
-        },
-        switched: "项目已切换。",
-        expired: "该项目已不可用。请重新运行 /projects。",
-    },
     sessions: {
         none: "当前项目下没有可用会话。",
         title: "会话列表",
@@ -379,7 +403,24 @@ const ZH_CN_BOT_COPY = {
             return `当前会话: ${session}`;
         },
         switched: "会话已切换。",
+        created: "会话已创建。",
         expired: "该会话已不可用。请重新运行 /sessions。",
+    },
+    mcp: {
+        none: "当前项目未配置 MCP。",
+        title: "MCP 服务",
+        currentProject(worktree: string) {
+            return `当前项目: ${worktree}`;
+        },
+        connected: "已连接",
+        disabled: "已禁用",
+        needsAuth: "需要认证",
+        failed(error: string) {
+            return `失败: ${error}`;
+        },
+        needsClientRegistration(error: string) {
+            return `需要客户端注册: ${error}`;
+        },
     },
     agents: {
         none: "没有可用代理。",
@@ -418,7 +459,7 @@ const ZH_CN_BOT_COPY = {
     },
     language: {
         title: "语言",
-        choose: "选择电报机器人菜单和返回信息的显示语言。",
+        choose: "选择机器人菜单和回复信息的显示语言。",
         current(label: string) {
             return `当前语言: ${label}`;
         },

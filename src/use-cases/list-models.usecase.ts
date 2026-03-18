@@ -3,6 +3,10 @@ import type {
     OpenCodeClientLike,
     OpenCodeConfiguredModel,
 } from "../services/opencode/opencode.client.js";
+import {
+    clearStoredModelSelection,
+    clearStoredModelVariant,
+} from "./binding-update.js";
 
 export interface ListModelsResult {
     models: OpenCodeConfiguredModel[];
@@ -18,10 +22,22 @@ export class ListModelsUseCase {
     ) { }
 
     async execute(input: { chatId: number }): Promise<ListModelsResult> {
-        const [binding, models] = await Promise.all([
+        let [binding, models] = await Promise.all([
             this.sessionRepo.getByChatId(input.chatId),
             this.opencodeClient.listModels(),
         ]);
+
+        if (binding?.modelProviderId && binding?.modelId) {
+            const selectedModel = models.find((model) =>
+                model.providerID === binding?.modelProviderId && model.id === binding?.modelId,
+            );
+
+            if (!selectedModel) {
+                binding = await clearStoredModelSelection(this.sessionRepo, binding);
+            } else if (binding.modelVariant && !(binding.modelVariant in selectedModel.variants)) {
+                binding = await clearStoredModelVariant(this.sessionRepo, binding);
+            }
+        }
 
         return {
             models,
