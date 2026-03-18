@@ -5,6 +5,7 @@ import {
     type Model,
     type OpencodeClient,
     type Part,
+    type Path,
     type Provider,
     type Project,
     type Session,
@@ -36,6 +37,7 @@ export type OpenCodeModel = Model;
 export type OpenCodeProvider = Provider;
 export type OpenCodeConfig = Config;
 export type OpenCodeAgent = Agent;
+export type OpenCodePath = Path;
 export interface OpenCodeHealth {
     healthy: boolean;
     version: string;
@@ -51,7 +53,7 @@ export interface OpenCodeConfiguredModel {
     variants: Record<string, Record<string, unknown>>;
 }
 
-type OpenCodeSdkClient = Pick<OpencodeClient, "app" | "config" | "global" | "project" | "session">;
+type OpenCodeSdkClient = Pick<OpencodeClient, "app" | "config" | "global" | "path" | "project" | "session">;
 type MaybeWrappedResponse<T> = T | { data: T };
 type OpenCodeProviderCatalog = {
     providers: OpenCodeProvider[];
@@ -68,6 +70,8 @@ const SDK_OPTIONS = {
 
 export interface OpenCodeClientLike {
     getHealth(): Promise<OpenCodeHealth>;
+    getPath(): Promise<OpenCodePath>;
+    getConfig(): Promise<OpenCodeConfig>;
     listProjects(): Promise<OpenCodeProject[]>;
     getCurrentProject(): Promise<OpenCodeProject>;
     createSessionForDirectory(directory: string, title?: string): Promise<OpenCodeSession>;
@@ -87,6 +91,18 @@ export class OpenCodeClient implements OpenCodeClientLike {
 
     async getHealth(): Promise<OpenCodeHealth> {
         const response = await this.client.global.health(SDK_OPTIONS) as MaybeWrappedResponse<OpenCodeHealth>;
+
+        return unwrapSdkData(response);
+    }
+
+    async getPath(): Promise<OpenCodePath> {
+        const response = await this.client.path.get(undefined, SDK_OPTIONS) as MaybeWrappedResponse<OpenCodePath>;
+
+        return unwrapSdkData(response);
+    }
+
+    async getConfig(): Promise<OpenCodeConfig> {
+        const response = await this.client.config.get(undefined, SDK_OPTIONS) as MaybeWrappedResponse<OpenCodeConfig>;
 
         return unwrapSdkData(response);
     }

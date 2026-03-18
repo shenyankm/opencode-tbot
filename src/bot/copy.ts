@@ -2,6 +2,8 @@ export const BOT_COPY = {
     commands: {
         start: "Show bot overview",
         health: "Check server health",
+        path: "Show current paths",
+        config: "Show configuration",
         agents: "View and switch agents",
         projects: "View and switch projects",
         model: "View and switch models",
@@ -33,6 +35,28 @@ export const BOT_COPY = {
         version(version: string) {
             return `Version: ${version}`;
         },
+    },
+    path: {
+        title: "Current Paths",
+        home(path: string) {
+            return `Home: ${path}`;
+        },
+        state(path: string) {
+            return `State: ${path}`;
+        },
+        config(path: string) {
+            return `Config: ${path}`;
+        },
+        worktree(path: string) {
+            return `Worktree: ${path}`;
+        },
+        directory(path: string) {
+            return `Directory: ${path}`;
+        },
+    },
+    config: {
+        title: "Config",
+        truncated: "... (truncated)",
     },
     projects: {
         none: "No projects available.",

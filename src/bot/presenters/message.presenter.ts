@@ -1,7 +1,9 @@
 import type {
     OpenCodeAgent,
+    OpenCodeConfig,
     OpenCodeConfiguredModel,
     OpenCodeHealth,
+    OpenCodePath,
     OpenCodeProject,
 } from "../../services/opencode/opencode.client.js";
 import { BOT_COPY } from "../copy.js";
@@ -33,12 +35,37 @@ interface AgentsMessageInput {
 }
 
 const VARIANT_ORDER = ["minimal", "none", "low", "medium", "high", "xhigh", "max"];
+const TELEGRAM_TEXT_SOFT_LIMIT = 3900;
 
 export function presentHealthMessage(health: OpenCodeHealth): string {
     return [
         BOT_COPY.health.title,
         BOT_COPY.health.status(health.healthy),
         BOT_COPY.health.version(health.version),
+    ].join("\n");
+}
+
+export function presentPathMessage(path: OpenCodePath): string {
+    return [
+        BOT_COPY.path.title,
+        BOT_COPY.path.home(path.home),
+        BOT_COPY.path.state(path.state),
+        BOT_COPY.path.config(path.config),
+        BOT_COPY.path.worktree(path.worktree),
+        BOT_COPY.path.directory(path.directory),
+    ].join("\n");
+}
+
+export function presentConfigMessage(config: OpenCodeConfig): string {
+    const content = safePrettyJson(config);
+    const maxContentLength = TELEGRAM_TEXT_SOFT_LIMIT - BOT_COPY.config.title.length - 1;
+    const body = content.length > maxContentLength
+        ? `${content.slice(0, maxContentLength - BOT_COPY.config.truncated.length - 1)}\n${BOT_COPY.config.truncated}`
+        : content;
+
+    return [
+        BOT_COPY.config.title,
+        body,
     ].join("\n");
 }
 
@@ -188,4 +215,12 @@ function formatModelSelection(model: OpenCodeConfiguredModel, variant: string | 
 
 function formatModelLabel(model: OpenCodeConfiguredModel): string {
     return `${model.providerName} / ${model.name}`;
+}
+
+function safePrettyJson(value: unknown): string {
+    try {
+        return JSON.stringify(value, null, 2) ?? "null";
+    } catch {
+        return String(value);
+    }
 }

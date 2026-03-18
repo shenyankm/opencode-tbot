@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
     OpenCodeClient,
+    type OpenCodeConfig,
     type OpenCodeModel,
+    type OpenCodePath,
     type OpenCodeProject,
     type OpenCodeProvider,
     type OpenCodeSession,
@@ -100,6 +102,24 @@ function createProvider(id: string, name: string, models: OpenCodeModel[]): Open
     } as OpenCodeProvider;
 }
 
+function createPath(overrides: Partial<OpenCodePath> = {}): OpenCodePath {
+    return {
+        home: "E:/Users/demo",
+        state: "E:/Users/demo/.opencode",
+        config: "E:/repo/opencode.json",
+        worktree: "E:/repo",
+        directory: "E:/repo/src",
+        ...overrides,
+    };
+}
+
+function createConfig(overrides: Partial<OpenCodeConfig> = {}): OpenCodeConfig {
+    return {
+        "$schema": "https://opencode.ai/config.json",
+        ...overrides,
+    } as OpenCodeConfig;
+}
+
 test("createSessionForDirectory forwards directory and title to the SDK", async () => {
     const calls: Array<{ input: unknown; options: unknown }> = [];
     const client = new OpenCodeClient(
@@ -108,6 +128,9 @@ test("createSessionForDirectory forwards directory and title to the SDK", async 
             config: {
                 get: async () => ({ provider: {} }),
                 providers: async () => ({ providers: [], default: {} }),
+            },
+            path: {
+                get: async () => createPath(),
             },
             project: {
                 list: async () => [],
@@ -143,6 +166,96 @@ test("createSessionForDirectory forwards directory and title to the SDK", async 
     ]);
 });
 
+test("getPath forwards to the SDK path endpoint", async () => {
+    const calls: Array<{ input: unknown; options: unknown }> = [];
+    const pathInfo = createPath();
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            config: {
+                get: async () => ({ provider: {} }),
+                providers: async () => ({ providers: [], default: {} }),
+            },
+            path: {
+                async get(input: unknown, options: unknown) {
+                    calls.push({ input, options });
+                    return { data: pathInfo };
+                },
+            },
+            project: {
+                list: async () => [],
+                current: async () => createProject("project-1", "E:/repo-1"),
+            },
+            session: {
+                create: async () => createSession("session-1", "project-1", "E:/repo-1"),
+                prompt: async () => ({
+                    data: {
+                        info: {} as never,
+                        parts: [],
+                    },
+                }),
+            },
+        } as never,
+    );
+
+    assert.deepEqual(await client.getPath(), pathInfo);
+    assert.deepEqual(calls, [
+        {
+            input: undefined,
+            options: {
+                responseStyle: "data",
+                throwOnError: true,
+            },
+        },
+    ]);
+});
+
+test("getConfig forwards to the SDK config endpoint", async () => {
+    const calls: Array<{ input: unknown; options: unknown }> = [];
+    const config = createConfig({
+        model: "openai/gpt-5",
+    });
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            config: {
+                async get(input: unknown, options: unknown) {
+                    calls.push({ input, options });
+                    return { data: config };
+                },
+                providers: async () => ({ providers: [], default: {} }),
+            },
+            path: {
+                get: async () => createPath(),
+            },
+            project: {
+                list: async () => [],
+                current: async () => createProject("project-1", "E:/repo-1"),
+            },
+            session: {
+                create: async () => createSession("session-1", "project-1", "E:/repo-1"),
+                prompt: async () => ({
+                    data: {
+                        info: {} as never,
+                        parts: [],
+                    },
+                }),
+            },
+        } as never,
+    );
+
+    assert.deepEqual(await client.getConfig(), config);
+    assert.deepEqual(calls, [
+        {
+            input: undefined,
+            options: {
+                responseStyle: "data",
+                throwOnError: true,
+            },
+        },
+    ]);
+});
+
 test("promptSession forwards model selection and returns a fallback message when no text parts are returned", async () => {
     const calls: Array<{ input: unknown; options: unknown }> = [];
     const client = new OpenCodeClient(
@@ -151,6 +264,9 @@ test("promptSession forwards model selection and returns a fallback message when
             config: {
                 get: async () => ({ provider: {} }),
                 providers: async () => ({ providers: [], default: {} }),
+            },
+            path: {
+                get: async () => createPath(),
             },
             project: {
                 list: async () => [],
@@ -264,6 +380,9 @@ test("listModels only returns models explicitly configured in OpenCode config", 
                         default: {},
                     },
                 }),
+            },
+            path: {
+                get: async () => ({ data: createPath({ worktree: project.worktree, directory: project.worktree }) }),
             },
             project: {
                 list: async () => ({ data: [project] }),

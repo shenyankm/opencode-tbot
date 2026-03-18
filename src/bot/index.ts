@@ -1,7 +1,9 @@
 import type { Bot } from "grammy";
 import { registerAgentsCommand } from "./commands/agents.js";
+import { registerConfigCommand } from "./commands/config.js";
 import { registerHealthCommand } from "./commands/health.js";
 import { registerModelsCommand } from "./commands/models.js";
+import { registerPathCommand } from "./commands/path.js";
 import type { BotDependencies } from "./types.js";
 import { registerProjectsCommand } from "./commands/projects.js";
 import { registerStartCommand } from "./commands/start.js";
@@ -16,6 +18,8 @@ export function registerBot(bot: Bot, container: BotDependencies) {
 
     registerStartCommand(bot);
     registerHealthCommand(bot, container);
+    registerPathCommand(bot, container);
+    registerConfigCommand(bot, container);
     registerAgentsCommand(bot, container);
     registerModelsCommand(bot, container);
     registerProjectsCommand(bot, container);

@@ -22,6 +22,14 @@ test("TELEGRAM_COMMANDS only advertises implemented commands", () => {
             description: "Check server health",
         },
         {
+            command: "path",
+            description: "Show current paths",
+        },
+        {
+            command: "config",
+            description: "Show configuration",
+        },
+        {
             command: "agents",
             description: "View and switch agents",
         },

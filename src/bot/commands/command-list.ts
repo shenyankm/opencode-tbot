@@ -11,6 +11,14 @@ export const TELEGRAM_COMMANDS: BotCommand[] = [
         description: BOT_COPY.commands.health,
     },
     {
+        command: "path",
+        description: BOT_COPY.commands.path,
+    },
+    {
+        command: "config",
+        description: BOT_COPY.commands.config,
+    },
+    {
         command: "agents",
         description: BOT_COPY.commands.agents,
     },
