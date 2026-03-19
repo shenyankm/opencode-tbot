@@ -4,7 +4,6 @@ import { dirname, join } from "node:path";
 import type { PluginConfigSource } from "./config.js";
 
 export const PLUGIN_CONFIG_FILE_NAME = "tbot.config.json";
-export const LEGACY_PLUGIN_CONFIG_FILE_NAME = "opencode-tbot.config.json";
 export const GLOBAL_PLUGIN_DIRECTORY_NAME = "opencode-tbot";
 export const GLOBAL_PLUGIN_CONFIG_FILE_NAME = "config.json";
 export const OPENCODE_CONFIG_FILE_NAME = "opencode.json";
@@ -81,10 +80,9 @@ export function mergePluginConfigSources(
             continue;
         }
 
-        const normalized = normalizePluginConfigSource(source);
+        const normalized = source;
         const previousTelegram = merged.telegram;
         const previousState = merged.state;
-        const previousDatabase = merged.database;
         const previousOpenRouter = merged.openrouter;
 
         Object.assign(merged, normalized);
@@ -100,13 +98,6 @@ export function mergePluginConfigSources(
             merged.state = {
                 ...(previousState ?? {}),
                 ...normalized.state,
-            };
-        }
-
-        if (normalized.database) {
-            merged.database = {
-                ...(previousDatabase ?? {}),
-                ...normalized.database,
             };
         }
 
@@ -165,7 +156,6 @@ function orderPluginConfig(config: PluginConfigSource): PluginConfigSource {
     const prioritizedKeys = new Set([
         "telegram",
         "state",
-        "database",
         "openrouter",
         "logLevel",
     ]);
@@ -177,10 +167,6 @@ function orderPluginConfig(config: PluginConfigSource): PluginConfigSource {
 
     if (config.state) {
         ordered.state = config.state;
-    }
-
-    if (config.database) {
-        ordered.database = config.database;
     }
 
     if (config.openrouter) {
@@ -211,16 +197,6 @@ function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
 async function resolveProjectPluginConfigFilePath(cwd: string): Promise<string> {
     const preferredPath = join(cwd, PLUGIN_CONFIG_FILE_NAME);
 
-    if (await pathExists(preferredPath)) {
-        return preferredPath;
-    }
-
-    const legacyPath = join(cwd, LEGACY_PLUGIN_CONFIG_FILE_NAME);
-
-    if (await pathExists(legacyPath)) {
-        return legacyPath;
-    }
-
     return preferredPath;
 }
 
@@ -235,18 +211,4 @@ async function pathExists(filePath: string): Promise<boolean> {
 
         throw error;
     }
-}
-
-function normalizePluginConfigSource(source: PluginConfigSource): PluginConfigSource {
-    if (source.state?.path || !source.database?.path) {
-        return source;
-    }
-
-    return {
-        ...source,
-        state: {
-            ...(source.state ?? {}),
-            path: source.database.path,
-        },
-    };
 }

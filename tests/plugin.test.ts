@@ -163,27 +163,6 @@ test("preparePluginConfiguration loads telegram.botToken from cwd config file", 
     assert.equal(prepared.config.logLevel, "debug");
 });
 
-test("preparePluginConfiguration loads the legacy config filename when the new filename is absent", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-plugin-legacy-file-"));
-    const legacyConfigFilePath = join(cwd, "opencode-tbot.config.json");
-    writeFileSync(
-        legacyConfigFilePath,
-        serializePluginConfig({
-            telegram: {
-                botToken: "legacy-file-token",
-            },
-        }),
-        "utf8",
-    );
-
-    const prepared = await preparePluginConfiguration({
-        cwd,
-    });
-
-    assert.equal(prepared.config.telegram?.botToken, "legacy-file-token");
-    assert.equal(prepared.configFilePath, legacyConfigFilePath);
-});
-
 test("preparePluginConfiguration merges global defaults with project overrides", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-plugin-merge-"));
     const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-home-"));
@@ -230,8 +209,10 @@ test("preparePluginConfiguration merges global defaults with project overrides",
 
 test("preparePluginConfiguration keeps missing tokens unresolved for the installer flow", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-plugin-no-tty-"));
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-home-empty-"));
     const prepared = await preparePluginConfiguration({
         cwd,
+        homeDir,
         config: {
             logLevel: "info",
         },

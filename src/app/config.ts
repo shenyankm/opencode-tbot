@@ -26,13 +26,6 @@ const StateConfigSchema = z.preprocess(
     }),
 );
 
-const LegacyDatabaseConfigSchema = z.preprocess(
-    (value) => value ?? {},
-    z.object({
-        path: z.string().trim().min(1).optional(),
-    }),
-);
-
 const OpenRouterConfigSchema = z.preprocess(
     (value) => value ?? {},
     z.object({
@@ -43,16 +36,12 @@ const OpenRouterConfigSchema = z.preprocess(
     }),
 );
 
-const AppConfigSchema = z.preprocess(
-    normalizeLegacyConfigSource,
-    z.object({
-        telegram: TelegramConfigSchema,
-        state: StateConfigSchema,
-        database: LegacyDatabaseConfigSchema.optional(),
-        openrouter: OpenRouterConfigSchema,
-        logLevel: z.string().default("info"),
-    }),
-);
+const AppConfigSchema = z.object({
+    telegram: TelegramConfigSchema,
+    state: StateConfigSchema,
+    openrouter: OpenRouterConfigSchema,
+    logLevel: z.string().default("info"),
+});
 
 export interface PluginConfigSource {
     telegram?: {
@@ -62,10 +51,6 @@ export interface PluginConfigSource {
         [key: string]: unknown;
     };
     state?: {
-        path?: string;
-        [key: string]: unknown;
-    };
-    database?: {
         path?: string;
         [key: string]: unknown;
     };
@@ -146,7 +131,7 @@ function resolveStatePath(
     data: z.infer<typeof AppConfigSchema>,
     cwd: string,
 ): string {
-    return resolve(cwd, data.state.path || data.database?.path || DEFAULT_STATE_FILE_PATH);
+    return resolve(cwd, data.state.path || DEFAULT_STATE_FILE_PATH);
 }
 
 function normalizeApiRoot(value: string): string {
@@ -155,26 +140,6 @@ function normalizeApiRoot(value: string): string {
     return normalized.endsWith("/")
         ? normalized.slice(0, -1)
         : normalized;
-}
-
-function normalizeLegacyConfigSource(value: unknown): unknown {
-    if (!isPlainObject(value)) {
-        return value ?? {};
-    }
-
-    const source = value as PluginConfigSource;
-
-    if (source.state?.path || !source.database?.path) {
-        return source;
-    }
-
-    return {
-        ...source,
-        state: {
-            ...(source.state ?? {}),
-            path: source.database.path,
-        },
-    };
 }
 
 function parseConfig<TSchema extends z.ZodTypeAny>(
@@ -190,8 +155,4 @@ function parseConfig<TSchema extends z.ZodTypeAny>(
     throw new Error(
         `Invalid plugin configuration: ${JSON.stringify(parsed.error.flatten())}`,
     );
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-    return value !== null && typeof value === "object" && !Array.isArray(value);
 }

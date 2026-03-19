@@ -38,7 +38,6 @@ test("package.json exposes publishable plugin entrypoints", () => {
         "dist",
         "README.md",
         "README.zh-CN.md",
-        "INSTALL.md",
         "tbot.config.example.json",
         "LICENSE",
     ]);
