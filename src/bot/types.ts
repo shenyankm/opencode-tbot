@@ -8,6 +8,7 @@ import type { CreateSessionUseCase } from "../use-cases/create-session.usecase.j
 import type { GetHealthUseCase } from "../use-cases/get-health.usecase.js";
 import type { GetPathUseCase } from "../use-cases/get-path.usecase.js";
 import type { AbortPromptUseCase } from "../use-cases/abort-prompt.usecase.js";
+import type { GetStatusUseCase } from "../use-cases/get-status.usecase.js";
 import type { ListAgentsUseCase } from "../use-cases/list-agents.usecase.js";
 import type { ListLspUseCase } from "../use-cases/list-lsp.usecase.js";
 import type { ListMcpUseCase } from "../use-cases/list-mcp.usecase.js";
@@ -24,6 +25,7 @@ export interface BotDependencies {
     createSessionUseCase: CreateSessionUseCase;
     getHealthUseCase: GetHealthUseCase;
     getPathUseCase: GetPathUseCase;
+    getStatusUseCase: GetStatusUseCase;
     listAgentsUseCase: ListAgentsUseCase;
     listLspUseCase: ListLspUseCase;
     listMcpUseCase: ListMcpUseCase;

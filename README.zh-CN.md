@@ -104,14 +104,11 @@ pnpm start
 ## 命令
 
 - `/start` 查看机器人简介
-- `/health` 检查 OpenCode 服务健康状态
-- `/path` 查看 OpenCode 路径和当前工作目录
-- `/lsp` 查看当前项目的 LSP 服务状态
-- `/mcp` 查看当前项目的 MCP 服务状态
+- `/status` 查看聚合后的 OpenCode 健康、路径、LSP 和 MCP 状态
 - `/new [title]` 创建新的 OpenCode 会话
 - `/agents` 或 `/agent` 查看可用 agent 并切换当前项
 - `/sessions` 查看可用会话并切换当前项
-- `/abort` 中止当前会话正在执行的请求
+- `/cancel` 取消会话重命名或中止当前会话正在执行的请求
 - `/model` 或 `/models` 查看可用模型并切换当前项
 - `/language` 切换机器人显示语言
 

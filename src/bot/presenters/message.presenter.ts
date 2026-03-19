@@ -7,12 +7,14 @@ import type {
     OpenCodePath,
     OpenCodeSession,
 } from "../../services/opencode/opencode.client.js";
+import type { GetStatusResult } from "../../use-cases/get-status.usecase.js";
 import {
     BOT_COPY,
     getLanguageLabel,
     type BotCopy,
     type BotLanguage,
 } from "../copy.js";
+import { presentError } from "./error.presenter.js";
 import {
     getAgentsPage,
     getModelsPage,
@@ -66,6 +68,29 @@ export function presentPathMessage(path: OpenCodePath, copy: BotCopy = BOT_COPY)
     return copy.path.directory(path.directory);
 }
 
+export function presentStatusMessage(input: GetStatusResult, copy: BotCopy = BOT_COPY): string {
+    const sections = [
+        input.health.status === "ok"
+            ? presentHealthMessage(input.health.data, copy)
+            : presentStatusErrorSection(copy.health.title, input.health.error, copy),
+        input.path.status === "ok"
+            ? [copy.path.title, presentPathMessage(input.path.data, copy)].join("\n")
+            : presentStatusErrorSection(copy.path.title, input.path.error, copy),
+        input.lsp.status === "ok"
+            ? presentLspMessage(input.lsp.data, copy)
+            : presentStatusErrorSection(copy.lsp.title, input.lsp.error, copy),
+        input.mcp.status === "ok"
+            ? presentMcpMessage(input.mcp.data, copy)
+            : presentStatusErrorSection(copy.mcp.title, input.mcp.error, copy),
+    ];
+
+    return [
+        copy.systemStatus.title,
+        "",
+        ...sections.flatMap((section, index) => index === 0 ? [section] : ["", section]),
+    ].join("\n");
+}
+
 export function presentMcpMessage(input: McpMessageInput, copy: BotCopy = BOT_COPY): string {
     const lines = [
         copy.mcp.title,
@@ -98,6 +123,13 @@ export function presentLspMessage(input: LspMessageInput, copy: BotCopy = BOT_CO
     lines.push(...input.statuses.map((status) => `${status.name}: ${formatLspStatus(status, copy)}`));
 
     return lines.join("\n");
+}
+
+function presentStatusErrorSection(title: string, error: unknown, copy: BotCopy): string {
+    return [
+        title,
+        presentError(error, copy),
+    ].join("\n");
 }
 
 export function presentSessionsMessage(input: SessionsMessageInput, copy: BotCopy = BOT_COPY): string {

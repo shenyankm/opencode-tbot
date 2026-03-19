@@ -14,6 +14,7 @@ import { AbortPromptUseCase } from "../use-cases/abort-prompt.usecase.js";
 import { CreateSessionUseCase } from "../use-cases/create-session.usecase.js";
 import { GetHealthUseCase } from "../use-cases/get-health.usecase.js";
 import { GetPathUseCase } from "../use-cases/get-path.usecase.js";
+import { GetStatusUseCase } from "../use-cases/get-status.usecase.js";
 import { ListAgentsUseCase } from "../use-cases/list-agents.usecase.js";
 import { ListLspUseCase } from "../use-cases/list-lsp.usecase.js";
 import { ListMcpUseCase } from "../use-cases/list-mcp.usecase.js";
@@ -59,6 +60,12 @@ const getPathUseCase = new GetPathUseCase(opencodeClient);
 const listAgentsUseCase = new ListAgentsUseCase(sessionRepo, opencodeClient);
 const listLspUseCase = new ListLspUseCase(sessionRepo, opencodeClient);
 const listMcpUseCase = new ListMcpUseCase(sessionRepo, opencodeClient);
+const getStatusUseCase = new GetStatusUseCase(
+    getHealthUseCase,
+    getPathUseCase,
+    listLspUseCase,
+    listMcpUseCase,
+);
 const listModelsUseCase = new ListModelsUseCase(sessionRepo, opencodeClient);
 const listSessionsUseCase = new ListSessionsUseCase(sessionRepo, opencodeClient);
 const renameSessionUseCase = new RenameSessionUseCase(sessionRepo, opencodeClient, logger);
@@ -76,6 +83,7 @@ export const container = {
     opencodeClient,
     getHealthUseCase,
     getPathUseCase,
+    getStatusUseCase,
     listAgentsUseCase,
     listLspUseCase,
     listMcpUseCase,

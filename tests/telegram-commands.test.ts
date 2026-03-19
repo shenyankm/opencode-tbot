@@ -19,20 +19,8 @@ test("TELEGRAM_COMMANDS only advertises implemented commands", () => {
             description: "Show bot overview",
         },
         {
-            command: "health",
-            description: "Check server health",
-        },
-        {
-            command: "path",
-            description: "Show current paths",
-        },
-        {
-            command: "lsp",
-            description: "Show LSP servers",
-        },
-        {
-            command: "mcp",
-            description: "Show MCP servers",
+            command: "status",
+            description: "Show system status",
         },
         {
             command: "new",

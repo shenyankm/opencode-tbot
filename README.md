@@ -96,7 +96,7 @@ pnpm start
 - Create and switch OpenCode sessions in chat
 - View and switch agents
 - View and switch models and reasoning levels
-- Inspect health, path, LSP status, and MCP status
+- Inspect health, path, LSP status, and MCP status through `/status`
 - Use English or Simplified Chinese UI
 - Restrict access with an optional Telegram chat allowlist
 - Persist chat bindings locally in SQLite
@@ -104,14 +104,11 @@ pnpm start
 ## Commands
 
 - `/start` show a short bot overview
-- `/health` check OpenCode server health
-- `/path` show OpenCode paths and current working directory
-- `/lsp` show LSP server status for the current project
-- `/mcp` show MCP server status for the current project
+- `/status` show aggregated OpenCode health, path, LSP, and MCP status
 - `/new [title]` create a new OpenCode session
 - `/agents` or `/agent` list available agents and switch the active one
 - `/sessions` list available sessions and switch the active one
-- `/abort` abort the running request for the current session
+- `/cancel` cancel session rename or abort the running request for the current session
 - `/model` or `/models` list available models and switch the active one
 - `/language` switch the bot display language
 

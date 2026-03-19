@@ -1,13 +1,10 @@
 import type { Bot } from "grammy";
 import { registerAgentsCommand } from "./commands/agents.js";
 import { registerCancelCommand } from "./commands/cancel.js";
-import { registerHealthCommand } from "./commands/health.js";
 import { registerLanguageCommand } from "./commands/language.js";
-import { registerLspCommand } from "./commands/lsp.js";
-import { registerMcpCommand } from "./commands/mcp.js";
 import { registerModelsCommand } from "./commands/models.js";
 import { registerNewCommand } from "./commands/new.js";
-import { registerPathCommand } from "./commands/path.js";
+import { registerStatusCommand } from "./commands/status.js";
 import type { BotDependencies } from "./types.js";
 import { registerSessionsCommand } from "./commands/sessions.js";
 import { registerStartCommand } from "./commands/start.js";
@@ -24,10 +21,7 @@ export function registerBot(bot: Bot, container: BotDependencies) {
 
     registerStartCommand(bot, container);
     registerCancelCommand(bot, container);
-    registerHealthCommand(bot, container);
-    registerPathCommand(bot, container);
-    registerLspCommand(bot, container);
-    registerMcpCommand(bot, container);
+    registerStatusCommand(bot, container);
     registerNewCommand(bot, container);
     registerAgentsCommand(bot, container);
     registerLanguageCommand(bot, container);

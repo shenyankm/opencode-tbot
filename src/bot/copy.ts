@@ -3,10 +3,7 @@ export type BotLanguage = "en" | "zh-CN";
 export interface BotCopy {
     commands: {
         start: string;
-        health: string;
-        path: string;
-        lsp: string;
-        mcp: string;
+        status: string;
         new: string;
         agents: string;
         sessions: string;
@@ -16,6 +13,9 @@ export interface BotCopy {
     };
     start: {
         lines: string[];
+    };
+    systemStatus: {
+        title: string;
     };
     common: {
         notSelected: string;
@@ -158,10 +158,7 @@ export const SUPPORTED_BOT_LANGUAGES: readonly BotLanguage[] = ["en", "zh-CN"];
 const EN_BOT_COPY: BotCopy = {
     commands: {
         start: "Show bot overview",
-        health: "Check server health",
-        path: "Show current paths",
-        lsp: "Show LSP servers",
-        mcp: "Show MCP servers",
+        status: "Show system status",
         new: "Create a new session",
         agents: "View and switch agents",
         sessions: "View and switch sessions",
@@ -175,6 +172,9 @@ const EN_BOT_COPY: BotCopy = {
             "",
             "Send a text message and I will forward it to OpenCode and reply with the result.",
         ],
+    },
+    systemStatus: {
+        title: "System Status",
     },
     common: {
         notSelected: "Not selected",
@@ -367,10 +367,7 @@ const EN_BOT_COPY: BotCopy = {
 const ZH_CN_BOT_COPY: BotCopy = {
     commands: {
         start: "查看机器人说明",
-        health: "检查服务健康状态",
-        path: "查看当前路径",
-        lsp: "查看 LSP 服务",
-        mcp: "查看 MCP 服务",
+        status: "查看系统状态",
         new: "新建会话",
         agents: "查看并切换代理",
         sessions: "查看并切换会话",
@@ -384,6 +381,9 @@ const ZH_CN_BOT_COPY: BotCopy = {
             "",
             "发送一条文本消息，我会转发给 OpenCode 并返回结果。",
         ],
+    },
+    systemStatus: {
+        title: "系统状态",
     },
     common: {
         notSelected: "未选择",
