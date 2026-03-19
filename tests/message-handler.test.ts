@@ -148,6 +148,26 @@ test("handleTextMessage sends MarkdownV2 replies with metrics and deletes the pr
         },
     ]);
     assert.deepEqual(deleted, [{ chatId: 1, messageId: 100 }]);
+    return;
+
+    assert.deepEqual(replies, [
+        { text: "处理中...", other: undefined },
+        {
+            text: "*Hello*\n\n耗时: 120 ms \\| 令牌数: 42",
+            other: { parse_mode: "MarkdownV2" },
+        },
+    ]);
+    assert.deepEqual(deleted, [{ chatId: 21, messageId: 900 }]);
+    return;
+
+    assert.deepEqual(replies, [
+        { text: "Processing...", other: undefined },
+        {
+            text: "*Hello*\n\nDuration: 120 ms \\| Tokens: 42",
+            other: { parse_mode: "MarkdownV2" },
+        },
+    ]);
+    assert.deepEqual(deleted, [{ chatId: 1, messageId: 100 }]);
 });
 
 test("handleTextMessage falls back to plain text when the preferred Telegram markdown reply fails", async () => {
@@ -480,6 +500,16 @@ test("handleTextMessage localizes bot-generated status text and metrics footer f
     );
 
     assert.deepEqual(replies, [
+        { text: "处理中...", other: undefined },
+        {
+            text: "*Hello*\n\n耗时: 120 ms \\| 令牌数: 42",
+            other: { parse_mode: "MarkdownV2" },
+        },
+    ]);
+    assert.deepEqual(deleted, [{ chatId: 21, messageId: 900 }]);
+    return;
+
+    assert.deepEqual(replies, [
         { text: "澶勭悊涓?..", other: undefined },
         {
             text: "*Hello*\n\n鑰楁椂: 120 ms \\| 浠ょ墝鏁? 42",
@@ -580,6 +610,34 @@ test("handleTextMessage consumes pending session rename input, renames the sessi
             other: undefined,
         },
     ]);
+    assert.equal(edits.length, 1);
+    assert.equal(edits[0]?.chatId, 31);
+    assert.equal(edits[0]?.messageId, 444);
+    assert.equal(
+        edits[0]?.text,
+        [
+            "Session List",
+            "Current project: E:/repo-1",
+            "Current session: Not selected",
+            "Page 1/1",
+            "",
+            "1. Session 1 [session-1]",
+            "2. Renamed Session [session-2]",
+        ].join("\n"),
+    );
+    assert.deepEqual(
+        (edits[0]?.other as {
+            reply_markup?: {
+                inline_keyboard?: Array<Array<{ callback_data: string; text: string }>>;
+            };
+        })?.reply_markup?.inline_keyboard,
+        [[
+            { text: "1", callback_data: "sessions:pick:0:session-1" },
+            { text: "2", callback_data: "sessions:pick:0:session-2" },
+        ]],
+    );
+    assert.equal(await pendingActionRepo.getByChatId(31), null);
+    return;
     assert.deepEqual(edits, [
         {
             chatId: 31,

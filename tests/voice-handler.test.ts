@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { handleTextMessage } from "../src/bot/handlers/message.handler.js";
 import { handleVoiceMessage } from "../src/bot/handlers/voice.handler.js";
+import { InMemoryPendingActionRepository } from "../src/repositories/pending-action.repo.js";
 import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
 import type { PromptSessionResult } from "../src/services/opencode/opencode.client.js";
 import {
@@ -45,6 +46,7 @@ function createDependencies(options: {
     }) => Promise<{ text: string }>;
 } = {}) {
     const errors: unknown[] = [];
+    const pendingActionRepo = new InMemoryPendingActionRepository();
     const warnings: unknown[] = [];
     const sessionRepo = new InMemorySessionRepository();
 
@@ -58,6 +60,7 @@ function createDependencies(options: {
                     warnings.push(warning);
                 },
             },
+            pendingActionRepo,
             sessionRepo,
             sendPromptUseCase: {
                 execute: options.sendPrompt ?? (async () => ({
@@ -77,6 +80,7 @@ function createDependencies(options: {
             },
         } as never,
         errors,
+        pendingActionRepo,
         sessionRepo,
         warnings,
     };
@@ -307,6 +311,27 @@ test("handleVoiceMessage surfaces Telegram download failures and still deletes t
     ]);
     assert.deepEqual(deleted, [{ chatId: 12, messageId: 1200 }]);
     assert.equal(errors.length, 1);
+    return;
+
+    assert.deepEqual(replies, [
+        { text: "处理中...", other: undefined },
+        {
+            text: "未配置语音转写服务。\n原因: Set STT_BASE_URL and STT_MODEL to enable Telegram voice transcription.",
+            other: undefined,
+        },
+    ]);
+    assert.deepEqual(deleted, [{ chatId: 13, messageId: 1300 }]);
+    return;
+
+    assert.deepEqual(replies, [
+        { text: "Processing...", other: undefined },
+        {
+            text: "Failed to download the Telegram voice file.\nCause: network failed",
+            other: undefined,
+        },
+    ]);
+    assert.deepEqual(deleted, [{ chatId: 12, messageId: 1200 }]);
+    assert.equal(errors.length, 1);
 });
 
 test("handleVoiceMessage reports STT configuration errors with Chinese copy", async () => {
@@ -372,6 +397,16 @@ test("handleVoiceMessage reports STT configuration errors with Chinese copy", as
         },
     ]);
     assert.deepEqual(deleted, [{ chatId: 13, messageId: 1300 }]);
+    return;
+
+    assert.deepEqual(replies, [
+        { text: "处理中...", other: undefined },
+        {
+            text: "未配置语音转写服务。\n原因: Set STT_BASE_URL and STT_MODEL to enable Telegram voice transcription.",
+            other: undefined,
+        },
+    ]);
+    assert.deepEqual(deleted, [{ chatId: 13, messageId: 1300 }]);
 });
 
 test("handleVoiceMessage surfaces empty transcriptions", async () => {
@@ -422,4 +457,58 @@ test("handleVoiceMessage surfaces empty transcriptions", async () => {
         },
     ]);
     assert.deepEqual(deleted, [{ chatId: 14, messageId: 1400 }]);
+});
+
+test("handleVoiceMessage blocks voice prompts while waiting for a session rename", async () => {
+    const replies: Array<{ text: string; other?: unknown }> = [];
+    const { dependencies, pendingActionRepo } = createDependencies({
+        sendPrompt: async () => {
+            throw new Error("should not run");
+        },
+    });
+
+    await pendingActionRepo.set({
+        chatId: 15,
+        kind: "session_rename",
+        sessionId: "session-1",
+        menuMessageId: 222,
+        returnPage: 0,
+        updatedAt: new Date(0).toISOString(),
+    });
+
+    await handleVoiceMessage(
+        {
+            chat: { id: 15 },
+            message: {
+                voice: {
+                    duration: 3,
+                    file_id: "voice-file-id",
+                    file_size: 3,
+                    mime_type: "audio/ogg",
+                },
+            },
+            async getFile() {
+                return {
+                    file_path: "voice/file_123.ogg",
+                };
+            },
+            api: {
+                async deleteMessage() {
+                    return true;
+                },
+            },
+            async reply(text, other) {
+                replies.push({ text, other });
+                return { message_id: 1500 };
+            },
+        },
+        dependencies,
+    );
+
+    assert.deepEqual(replies, [
+        {
+            text: "Waiting for the new session name. Send plain text or /cancel.",
+            other: undefined,
+        },
+    ]);
 });

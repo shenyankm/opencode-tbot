@@ -355,7 +355,7 @@ export async function handleSessionsCallback(ctx: CallbackContext, dependencies:
 
             const menuMessageId = ctx.callbackQuery.message?.message_id;
 
-            if (!Number.isInteger(menuMessageId)) {
+            if (typeof menuMessageId !== "number" || !Number.isInteger(menuMessageId)) {
                 await ctx.editMessageText(copy.sessions.renameExpired);
                 return;
             }

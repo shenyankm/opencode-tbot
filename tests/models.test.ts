@@ -215,9 +215,9 @@ test("model page callbacks re-render the requested page", async () => {
     };
     assert.deepEqual(
         keyboard.inline_keyboard[0].map((button) => button.text),
-        ["11", "12"],
+        ["11", "12", "Previous"],
     );
-    assert.equal(keyboard.inline_keyboard.at(-1)?.[0]?.callback_data, "model:page:0");
+    assert.equal(keyboard.inline_keyboard[0].at(-1)?.callback_data, "model:page:0");
 });
 
 test("picking a model with variants opens a second numeric choice list", async () => {

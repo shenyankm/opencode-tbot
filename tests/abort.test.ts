@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { Logger } from "pino";
-import { handleAbortCommand } from "../src/bot/commands/abort.js";
+import { handleCancelCommand } from "../src/bot/commands/cancel.js";
+import { InMemoryPendingActionRepository } from "../src/repositories/pending-action.repo.js";
 import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
 import { AbortPromptUseCase } from "../src/use-cases/abort-prompt.usecase.js";
 
 const logger = {
     error() { },
+    warn() { },
 } as unknown as Logger;
 
 test("AbortPromptUseCase reports no_session when the chat has no bound session", async () => {
@@ -103,7 +105,7 @@ test("AbortPromptUseCase aborts busy sessions", async () => {
     assert.deepEqual(abortedSessionIds, ["session-9"]);
 });
 
-test("handleAbortCommand maps use case statuses and presents normalized errors", async () => {
+test("handleCancelCommand maps abort statuses and presents normalized errors", async () => {
     const replies: string[] = [];
     const errors: unknown[] = [];
     const repo = new InMemorySessionRepository();
@@ -119,7 +121,11 @@ test("handleAbortCommand maps use case statuses and presents normalized errors",
                 }
 
                 if (chatId === 12) {
-                    return { sessionId: "session-1", sessionStatus: { type: "retry", attempt: 1, message: "retrying", next: 123 }, status: "aborted" as const };
+                    return {
+                        sessionId: "session-1",
+                        sessionStatus: { type: "retry", attempt: 1, message: "retrying", next: 123 },
+                        status: "aborted" as const,
+                    };
                 }
 
                 throw new Error("boom");
@@ -130,12 +136,18 @@ test("handleAbortCommand maps use case statuses and presents normalized errors",
                 errors.push(error);
             },
         },
+        pendingActionRepo: new InMemoryPendingActionRepository(),
         sessionRepo: repo,
     } as never;
 
     for (const chatId of [10, 11, 12, 13]) {
-        await handleAbortCommand(
+        await handleCancelCommand(
             {
+                api: {
+                    async editMessageText() {
+                        return true;
+                    },
+                },
                 chat: { id: chatId },
                 async reply(text) {
                     replies.push(text);
@@ -153,4 +165,99 @@ test("handleAbortCommand maps use case statuses and presents normalized errors",
         "Unexpected error.\nCause: boom",
     ]);
     assert.equal(errors.length, 1);
+});
+
+test("handleCancelCommand cancels pending session rename before aborting", async () => {
+    const replies: string[] = [];
+    const edits: Array<{ chatId: number; messageId: number; text: string; other?: unknown }> = [];
+    const pendingActionRepo = new InMemoryPendingActionRepository();
+    const repo = new InMemorySessionRepository();
+    let abortCalls = 0;
+
+    await pendingActionRepo.set({
+        chatId: 20,
+        kind: "session_rename",
+        sessionId: "session-1",
+        menuMessageId: 777,
+        returnPage: 0,
+        updatedAt: new Date(0).toISOString(),
+    });
+
+    const dependencies = {
+        abortPromptUseCase: {
+            async execute() {
+                abortCalls += 1;
+                return { sessionId: null, sessionStatus: null, status: "no_session" as const };
+            },
+        },
+        listSessionsUseCase: {
+            async execute() {
+                return {
+                    currentDirectory: "E:/repo-1",
+                    currentProjectId: "project-1",
+                    currentSessionId: null,
+                    sessions: [
+                        {
+                            id: "session-1",
+                            slug: "session-1",
+                            projectID: "project-1",
+                            directory: "E:/repo-1",
+                            title: "Session 1",
+                            version: "1",
+                            time: {
+                                created: 1,
+                                updated: 1,
+                            },
+                        },
+                    ],
+                };
+            },
+        },
+        logger,
+        pendingActionRepo,
+        sessionRepo: repo,
+    } as never;
+
+    await handleCancelCommand(
+        {
+            api: {
+                async editMessageText(chatId, messageId, text, other) {
+                    edits.push({ chatId, messageId, text, other });
+                    return true;
+                },
+            },
+            chat: { id: 20 },
+            async reply(text) {
+                replies.push(text);
+                return {};
+            },
+        },
+        dependencies,
+    );
+
+    assert.equal(abortCalls, 0);
+    assert.equal(await pendingActionRepo.getByChatId(20), null);
+    assert.deepEqual(replies, ["Session rename cancelled."]);
+    assert.equal(edits.length, 1);
+    assert.equal(edits[0]?.chatId, 20);
+    assert.equal(edits[0]?.messageId, 777);
+    assert.equal(
+        edits[0]?.text,
+        [
+            "Session List",
+            "Current project: E:/repo-1",
+            "Current session: Not selected",
+            "Page 1/1",
+            "",
+            "1. Session 1 [session-1]",
+        ].join("\n"),
+    );
+    assert.deepEqual(
+        (edits[0]?.other as {
+            reply_markup?: {
+                inline_keyboard?: Array<Array<{ callback_data: string; text: string }>>;
+            };
+        })?.reply_markup?.inline_keyboard,
+        [[{ text: "1", callback_data: "sessions:pick:0:session-1" }]],
+    );
 });

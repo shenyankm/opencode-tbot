@@ -276,7 +276,7 @@ test("session rename callbacks enter pending rename mode", async () => {
         {
             chat: { id: 8 },
             callbackQuery: {
-                data: "sessions:rename:1:session-2",
+                data: "sessions:rename:0:session-2",
                 message: {
                     message_id: 987,
                 },
@@ -305,7 +305,7 @@ test("session rename callbacks enter pending rename mode", async () => {
         kind: "session_rename",
         sessionId: "session-2",
         menuMessageId: 987,
-        returnPage: 1,
+        returnPage: 0,
         updatedAt: (await pendingActionRepo.getByChatId(8))?.updatedAt,
     });
 });

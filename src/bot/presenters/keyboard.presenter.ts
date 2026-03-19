@@ -151,7 +151,10 @@ function buildNumberedKeyboard<T>(
 
         keyboard.text(`${displayIndex}`, buildCallbackData(item, index));
 
-        if ((index + 1) % NUMBERED_BUTTONS_PER_ROW === 0 || index === items.length - 1) {
+        if (
+            index !== items.length - 1
+            && (index + 1) % NUMBERED_BUTTONS_PER_ROW === 0
+        ) {
             keyboard.row();
         }
     });
