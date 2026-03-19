@@ -1,5 +1,6 @@
-import { builtinModules } from "node:module";
 import { readFileSync } from "node:fs";
+import { builtinModules } from "node:module";
+import { resolve } from "node:path";
 import { defineConfig } from "vite";
 
 interface PackageJson {
@@ -22,12 +23,16 @@ export default defineConfig({
         minify: false,
         outDir: "dist",
         sourcemap: true,
-        ssr: "src/index.ts",
+        ssr: true,
         target: "node22",
         rollupOptions: {
             external,
+            input: {
+                index: resolve("src/index.ts"),
+                plugin: resolve("src/plugin.ts"),
+            },
             output: {
-                entryFileNames: "index.js",
+                entryFileNames: "[name].js",
                 format: "es",
             },
         },

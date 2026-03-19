@@ -1,15 +1,42 @@
 {
     "name": "opencode-tbot",
     "version": "0.1.0",
-    "private": true,
     "type": "module",
+    "description": "Telegram bot plugin for OpenCode",
+    "license": "MIT",
+    "main": "./dist/index.js",
+    "files": [
+        "dist",
+        "README.md",
+        "README.zh-CN.md",
+        "INSTALL.md",
+        "tbot.config.example.json",
+        "LICENSE"
+    ],
+    "exports": {
+        ".": "./dist/index.js",
+        "./plugin": "./dist/plugin.js"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/Shenean/opencode-tbot.git"
+    },
+    "homepage": "https://github.com/Shenean/opencode-tbot#readme",
+    "bugs": {
+        "url": "https://github.com/Shenean/opencode-tbot/issues"
+    },
+    "keywords": [
+        "opencode",
+        "plugin",
+        "telegram",
+        "bot"
+    ],
     "engines": {
         "node": ">=22.12.0"
     },
     "scripts": {
-        "dev": "tsx watch src/index.ts",
         "build": "vite build",
-        "start": "node dist/index.js",
+        "prepublishOnly": "pnpm build && pnpm typecheck && pnpm test",
         "test": "tsx --test tests/**/*.test.ts",
         "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
         "audit": "pnpm audit"
@@ -17,7 +44,7 @@
     "dependencies": {
         "@grammyjs/runner": "^2.0.3",
         "@opencode-ai/sdk": "1.2.27",
-        "dotenv": "^16.4.5",
+        "@openrouter/sdk": "0.9.11",
         "grammy": "^1.38.0",
         "pino": "^9.3.2",
         "zod": "^3.23.8"

@@ -1,8 +1,8 @@
 import type { Logger } from "pino";
 import type { PendingActionRepository } from "../domain/pending-action/pending-action.repository.js";
 import type { SessionRepository } from "../domain/session/session.repository.js";
-import type { SttServiceLike } from "../services/stt/stt.service.js";
 import type { TelegramFileClientLike } from "../services/telegram/telegram.client.js";
+import type { VoiceTranscriptionServiceLike } from "../services/voice-transcription/voice-transcription.service.js";
 import type { UploadFileUseCase } from "../use-cases/upload-file.usecase.js";
 import type { CreateSessionUseCase } from "../use-cases/create-session.usecase.js";
 import type { GetHealthUseCase } from "../use-cases/get-health.usecase.js";
@@ -36,7 +36,7 @@ export interface BotDependencies {
     renameSessionUseCase: RenameSessionUseCase;
     sessionRepo: SessionRepository;
     sendPromptUseCase: SendPromptUseCase;
-    sttService: SttServiceLike;
+    voiceTranscriptionService: VoiceTranscriptionServiceLike;
     switchAgentUseCase: SwitchAgentUseCase;
     switchModelUseCase: SwitchModelUseCase;
     switchSessionUseCase: SwitchSessionUseCase;

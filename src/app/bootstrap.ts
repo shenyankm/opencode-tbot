@@ -1,10 +1,24 @@
-import { Bot } from "grammy";
-import { config } from "./config.js";
-import { container } from "./container.js";
-import { registerBot } from "../bot/index.js";
+import {
+    loadAppConfig,
+    type LoadAppConfigOptions,
+    type AppConfig,
+    type PluginConfigSource,
+} from "./config.js";
+import {
+    createAppContainer,
+    type AppContainer,
+} from "./container.js";
+import type { OpenCodeSdkClientLike } from "../services/opencode/opencode.client.js";
 
-export function bootstrap() {
-    const bot = new Bot(config.telegramBotToken);
-    registerBot(bot, container);
-    return { bot, container };
+export function bootstrapPluginApp(
+    client: OpenCodeSdkClientLike,
+    configSource: PluginConfigSource | undefined = {},
+    options: LoadAppConfigOptions = {},
+): { config: AppConfig; container: AppContainer } {
+    const config = loadAppConfig(configSource, options);
+
+    return {
+        config,
+        container: createAppContainer(config, client),
+    };
 }

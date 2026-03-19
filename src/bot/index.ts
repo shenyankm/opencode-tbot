@@ -1,6 +1,7 @@
 import type { Bot } from "grammy";
 import { registerAgentsCommand } from "./commands/agents.js";
 import { registerCancelCommand } from "./commands/cancel.js";
+import { registerHelpCommand } from "./commands/help.js";
 import { registerLanguageCommand } from "./commands/language.js";
 import { registerModelsCommand } from "./commands/models.js";
 import { registerNewCommand } from "./commands/new.js";
@@ -12,21 +13,26 @@ import { registerCallbackHandler } from "./handlers/callback.handler.js";
 import { registerFileHandler } from "./handlers/file.handler.js";
 import { registerMessageHandler } from "./handlers/message.handler.js";
 import { registerVoiceHandler } from "./handlers/voice.handler.js";
-import { authMiddleware } from "./middlewares/auth.js";
-import { loggingMiddleware } from "./middlewares/logging.js";
+import { createAuthMiddleware } from "./middlewares/auth.js";
+import { createLoggingMiddleware } from "./middlewares/logging.js";
 
-export function registerBot(bot: Bot, container: BotDependencies) {
-    bot.use(loggingMiddleware);
-    bot.use(authMiddleware);
+export interface RegisterBotOptions {
+    telegramAllowedChatIds: number[];
+}
+
+export function registerBot(bot: Bot, container: BotDependencies, options: RegisterBotOptions) {
+    bot.use(createLoggingMiddleware(container.logger));
+    bot.use(createAuthMiddleware(options.telegramAllowedChatIds));
 
     registerStartCommand(bot, container);
-    registerCancelCommand(bot, container);
+    registerHelpCommand(bot, container);
     registerStatusCommand(bot, container);
     registerNewCommand(bot, container);
     registerAgentsCommand(bot, container);
-    registerLanguageCommand(bot, container);
-    registerModelsCommand(bot, container);
     registerSessionsCommand(bot, container);
+    registerCancelCommand(bot, container);
+    registerModelsCommand(bot, container);
+    registerLanguageCommand(bot, container);
     registerCallbackHandler(bot, container);
     registerFileHandler(bot, container);
     registerMessageHandler(bot, container);

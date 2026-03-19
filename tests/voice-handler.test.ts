@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import test from "node:test";
 import { handleTextMessage } from "../src/bot/handlers/message.handler.js";
 import { handleVoiceMessage } from "../src/bot/handlers/voice.handler.js";
@@ -8,7 +8,7 @@ import type { PromptSessionResult } from "../src/services/opencode/opencode.clie
 import {
     VoiceTranscriptionNotConfiguredError,
     VoiceTranscriptEmptyError,
-} from "../src/services/stt/stt.client.js";
+} from "../src/services/voice-transcription/openrouter-voice.client.js";
 import { TelegramFileDownloadError } from "../src/services/telegram/telegram.client.js";
 
 function createPromptReply(overrides: Partial<PromptSessionResult> = {}): PromptSessionResult {
@@ -67,7 +67,7 @@ function createDependencies(options: {
                     assistantReply: createPromptReply(),
                 })),
             },
-            sttService: {
+            voiceTranscriptionService: {
                 transcribeVoice: options.transcribeVoice ?? (async () => ({
                     text: "voice prompt",
                 })),
@@ -316,7 +316,7 @@ test("handleVoiceMessage surfaces Telegram download failures and still deletes t
     assert.deepEqual(replies, [
         { text: "处理中...", other: undefined },
         {
-            text: "未配置语音转写服务。\n原因: Set STT_BASE_URL and STT_MODEL to enable Telegram voice transcription.",
+            text: "未配置语音转写服务。\n原因: Set openrouter.apiKey in tbot.config.json to enable Telegram voice transcription.",
             other: undefined,
         },
     ]);
@@ -334,14 +334,14 @@ test("handleVoiceMessage surfaces Telegram download failures and still deletes t
     assert.equal(errors.length, 1);
 });
 
-test("handleVoiceMessage reports STT configuration errors with Chinese copy", async () => {
+test("handleVoiceMessage reports OpenRouter configuration errors with Chinese copy", async () => {
     const replies: Array<{ text: string; other?: unknown }> = [];
     const deleted: Array<{ chatId: number; messageId: number }> = [];
     let nextMessageId = 1300;
     const { dependencies, sessionRepo } = createDependencies({
         transcribeVoice: async () => {
             throw new VoiceTranscriptionNotConfiguredError(
-                "Set STT_BASE_URL and STT_MODEL to enable Telegram voice transcription.",
+                "Set openrouter.apiKey in tbot.config.json to enable Telegram voice transcription.",
             );
         },
     });
@@ -392,7 +392,7 @@ test("handleVoiceMessage reports STT configuration errors with Chinese copy", as
     assert.deepEqual(replies, [
         { text: "处理中...", other: undefined },
         {
-            text: "未配置语音转写服务。\n原因: Set STT_BASE_URL and STT_MODEL to enable Telegram voice transcription.",
+            text: "未配置语音转写服务。\n原因: Set openrouter.apiKey in tbot.config.json to enable Telegram voice transcription.",
             other: undefined,
         },
     ]);
@@ -402,7 +402,7 @@ test("handleVoiceMessage reports STT configuration errors with Chinese copy", as
     assert.deepEqual(replies, [
         { text: "处理中...", other: undefined },
         {
-            text: "未配置语音转写服务。\n原因: Set STT_BASE_URL and STT_MODEL to enable Telegram voice transcription.",
+            text: "未配置语音转写服务。\n原因: Set openrouter.apiKey in tbot.config.json to enable Telegram voice transcription.",
             other: undefined,
         },
     ]);
@@ -512,3 +512,4 @@ test("handleVoiceMessage blocks voice prompts while waiting for a session rename
         },
     ]);
 });
+

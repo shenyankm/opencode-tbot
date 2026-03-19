@@ -3,6 +3,7 @@ import test from "node:test";
 import type { PromptSessionResult } from "../src/services/opencode/opencode.client.js";
 import { getBotCopy } from "../src/bot/copy.js";
 import {
+    buildTelegramStaticReply,
     buildTelegramPromptReply,
     renderMarkdownToTelegramMarkdownV2,
     stripMarkdownToPlainText,
@@ -210,5 +211,47 @@ test("buildTelegramPromptReply localizes the metrics footer", () => {
     });
     assert.deepEqual(result.fallback, {
         text: "Hello\n\n耗时: 120 ms | 令牌数: 42",
+    });
+});
+
+test("buildTelegramStaticReply prefers MarkdownV2 when the markdown is supported", () => {
+    const result = buildTelegramStaticReply([
+        "# Welcome",
+        "",
+        "- Text",
+        "- Image",
+    ].join("\n"));
+
+    assert.deepEqual(result.preferred, {
+        text: [
+            "*Welcome*",
+            "",
+            "\\- Text",
+            "\\- Image",
+        ].join("\n"),
+        options: {
+            parse_mode: "MarkdownV2",
+        },
+    });
+    assert.deepEqual(result.fallback, {
+        text: [
+            "Welcome",
+            "",
+            "- Text",
+            "- Image",
+        ].join("\n"),
+    });
+});
+
+test("buildTelegramStaticReply falls back to plain text when markdown is unsupported", () => {
+    const result = buildTelegramStaticReply("<b>bad</b>");
+
+    assert.deepEqual(result, {
+        preferred: {
+            text: "<b>bad</b>",
+        },
+        fallback: {
+            text: "<b>bad</b>",
+        },
     });
 });

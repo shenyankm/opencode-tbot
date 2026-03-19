@@ -54,7 +54,7 @@ export async function handleVoiceMessage(ctx: VoiceContext, dependencies: BotDep
         });
         const mimeType = voice.mime_type?.trim() || download.mimeType || DEFAULT_VOICE_MIME_TYPE;
         const filename = resolveVoiceFilename(filePath);
-        const transcription = await dependencies.sttService.transcribeVoice({
+        const transcription = await dependencies.voiceTranscriptionService.transcribeVoice({
             data: download.data,
             filename,
             mimeType,

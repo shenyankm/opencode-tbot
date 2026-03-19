@@ -20,6 +20,11 @@ export interface TelegramPromptReply {
     preferred: TelegramReplyPayload;
 }
 
+export interface TelegramStaticReply {
+    fallback: TelegramReplyPayload;
+    preferred: TelegramReplyPayload;
+}
+
 export function buildTelegramPromptReply(
     result: PromptSessionResult,
     copy: BotCopy = BOT_COPY,
@@ -54,6 +59,31 @@ export function buildTelegramPromptReply(
     return {
         preferred: {
             text: markdownText,
+            options: {
+                parse_mode: "MarkdownV2",
+            },
+        },
+        fallback,
+    };
+}
+
+export function buildTelegramStaticReply(markdown: string): TelegramStaticReply {
+    const renderedMarkdown = renderMarkdownToTelegramMarkdownV2(markdown);
+    const plainText = truncateStaticText(stripMarkdownToPlainText(markdown) || markdown.trim());
+    const fallback = {
+        text: plainText,
+    };
+
+    if (!renderedMarkdown || renderedMarkdown.length > MAX_TELEGRAM_MESSAGE_LENGTH) {
+        return {
+            preferred: fallback,
+            fallback,
+        };
+    }
+
+    return {
+        preferred: {
+            text: renderedMarkdown,
             options: {
                 parse_mode: "MarkdownV2",
             },
@@ -235,6 +265,14 @@ function truncatePlainBody(body: string, footer: string): string {
     }
 
     return `${body.slice(0, Math.max(0, maxBodyLength - TRUNCATED_SUFFIX.length))}${TRUNCATED_SUFFIX}`;
+}
+
+function truncateStaticText(text: string): string {
+    if (text.length <= MAX_TELEGRAM_MESSAGE_LENGTH) {
+        return text;
+    }
+
+    return `${text.slice(0, Math.max(0, MAX_TELEGRAM_MESSAGE_LENGTH - TRUNCATED_SUFFIX.length))}${TRUNCATED_SUFFIX}`;
 }
 
 function joinBodyAndFooter(body: string, footer: string): string {

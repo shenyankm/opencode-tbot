@@ -16,7 +16,11 @@ test("TELEGRAM_COMMANDS only advertises implemented commands", () => {
     assert.deepEqual(TELEGRAM_COMMANDS, [
         {
             command: "start",
-            description: "Show bot overview",
+            description: "Welcome and quick start",
+        },
+        {
+            command: "help",
+            description: "Show commands and examples",
         },
         {
             command: "status",

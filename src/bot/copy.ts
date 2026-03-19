@@ -3,6 +3,7 @@ export type BotLanguage = "en" | "zh-CN";
 export interface BotCopy {
     commands: {
         start: string;
+        help: string;
         status: string;
         new: string;
         agents: string;
@@ -12,6 +13,9 @@ export interface BotCopy {
         language: string;
     };
     start: {
+        lines: string[];
+    };
+    help: {
         lines: string[];
     };
     systemStatus: {
@@ -157,7 +161,8 @@ export const SUPPORTED_BOT_LANGUAGES: readonly BotLanguage[] = ["en", "zh-CN"];
 
 const EN_BOT_COPY: BotCopy = {
     commands: {
-        start: "Show bot overview",
+        start: "Welcome and quick start",
+        help: "Show commands and examples",
         status: "Show system status",
         new: "Create a new session",
         agents: "View and switch agents",
@@ -168,9 +173,43 @@ const EN_BOT_COPY: BotCopy = {
     },
     start: {
         lines: [
-            "opencode-tbot is running.",
+            "# Welcome to opencode-tbot",
             "",
-            "Send a text message and I will forward it to OpenCode and reply with the result.",
+            "Talk to your OpenCode server from Telegram.",
+            "",
+            "## What you can send",
+            "- Text prompts",
+            "- Images with an optional caption",
+            "- Voice messages (requires OpenRouter voice transcription)",
+            "",
+            "## Quick start",
+            "1. Run `/status` to confirm the server is ready.",
+            "2. Run `/new [title]` to create a fresh session.",
+            "3. Send a text, image, or voice message.",
+            "",
+            "Use `/help` to see the full command list and examples.",
+        ],
+    },
+    help: {
+        lines: [
+            "# Help",
+            "",
+            "Use this bot to chat with OpenCode from Telegram.",
+            "",
+            "## Commands",
+            "- `/status` Check server, workspace, MCP, and LSP status",
+            "- `/new [title]` Create a new session",
+            "- `/sessions` View, switch, or rename sessions",
+            "- `/agents` View and switch agents",
+            "- `/model` View and switch models and reasoning levels",
+            "- `/language` Switch the bot display language",
+            "- `/cancel` Cancel session rename or abort the running request",
+            "",
+            "## Examples",
+            "- `/new bug triage`",
+            "- Send a plain text message directly",
+            "- Send an image with a caption",
+            "- Send a voice message if OpenRouter voice transcription is configured",
         ],
     },
     systemStatus: {
@@ -366,7 +405,8 @@ const EN_BOT_COPY: BotCopy = {
 
 const ZH_CN_BOT_COPY: BotCopy = {
     commands: {
-        start: "查看机器人说明",
+        start: "查看欢迎与快速开始",
+        help: "查看命令说明与示例",
         status: "查看系统状态",
         new: "新建会话",
         agents: "查看并切换代理",
@@ -377,9 +417,43 @@ const ZH_CN_BOT_COPY: BotCopy = {
     },
     start: {
         lines: [
-            "opencode-tbot 已运行。",
+            "# 欢迎使用 opencode-tbot",
             "",
-            "发送一条文本消息，我会转发给 OpenCode 并返回结果。",
+            "通过 Telegram 直接和 OpenCode 服务对话。",
+            "",
+            "## 支持的输入",
+            "- 文本消息",
+            "- 图片 (可附带 caption)",
+            "- 语音消息 (需先配置 OpenRouter 语音转写)",
+            "",
+            "## 快速开始",
+            "1. 先运行 `/status` 确认服务状态正常。",
+            "2. 运行 `/new [title]` 创建一个新会话。",
+            "3. 直接发送文本、图片或语音消息。",
+            "",
+            "更多命令和示例请查看 `/help`。",
+        ],
+    },
+    help: {
+        lines: [
+            "# 帮助",
+            "",
+            "使用这个机器人可以通过 Telegram 与 OpenCode 对话。",
+            "",
+            "## 命令",
+            "- `/status` 查看服务、工作区、MCP 和 LSP 状态",
+            "- `/new [title]` 创建一个新会话",
+            "- `/sessions` 查看、切换或重命名会话",
+            "- `/agents` 查看并切换代理",
+            "- `/model` 查看并切换模型与推理级别",
+            "- `/language` 切换机器人的显示语言",
+            "- `/cancel` 取消会话重命名或中止当前请求",
+            "",
+            "## 示例",
+            "- `/new bug triage`",
+            "- 直接发送一条文本消息",
+            "- 发送一张带 caption 的图片",
+            "- 如果已配置 OpenRouter 语音转写，直接发送语音消息",
         ],
     },
     systemStatus: {

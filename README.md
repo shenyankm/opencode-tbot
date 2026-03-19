@@ -1,98 +1,150 @@
 # opencode-tbot
 
-A Telegram client for driving an [OpenCode](https://opencode.ai) server from chat.
+A Telegram bot plugin for driving [OpenCode](https://opencode.ai) from chat.
 
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
 > This project is not built by the OpenCode team and is not affiliated with them.
 
----
-
 ## What It Is
 
-`opencode-tbot` lets you talk to OpenCode through Telegram. Send a normal text message to the bot, and it forwards that prompt to the current OpenCode session and returns the result back to the same chat.
+`opencode-tbot` lets you talk to OpenCode through Telegram.
 
-If you configure an OpenAI-compatible speech-to-text endpoint, the bot can also accept Telegram voice messages, transcribe them, and forward the transcript into the same OpenCode flow.
+- Text messages are forwarded to the active OpenCode session.
+- Telegram images are uploaded as OpenCode file parts, with the caption used as prompt text when present.
+- Telegram voice messages can be transcribed through OpenRouter voice transcription before entering the normal prompt flow.
+- Per-chat state is stored in SQLite, including the bound session, selected agent, selected model, reasoning variant, and preferred UI language.
 
-The bot can also accept Telegram images. It downloads the image from Telegram, converts it into an OpenCode file part, and forwards it together with the optional caption text.
-
-The bot stores per-chat state in SQLite, including the active session, project binding, selected agent, selected model, selected reasoning variant, and preferred UI language.
+This repository now runs only as an OpenCode plugin. There is no standalone bot process anymore.
 
 ## Installation
 
-```bash
-pnpm install
+There are two configuration surfaces:
+
+- global plugin registration in `~/.config/opencode/opencode.json`
+- per-project Telegram runtime configuration in the current worktree `tbot.config.json`
+
+### Option A: Let OpenCode or an agent install it
+
+The quickest path is to give an LLM agent the install contract from [INSTALL.md](./INSTALL.md).
+
+Copy this prompt into OpenCode, Claude Code, Cursor, or another coding agent:
+
+```text
+Install the opencode-tbot plugin for OpenCode.
+
+Do all of the following without removing existing unrelated configuration:
+1. Open or create ~/.config/opencode/opencode.json
+2. Ensure the config uses the singular "plugin" key
+3. Append "opencode-tbot@latest" to the "plugin" array if it is not already present
+4. In the current project, open or create tbot.config.json
+5. Ask me for the Telegram bot token and write it to telegram.botToken if I provide it
+6. If I do not provide the token, leave tbot.config.json ready for manual completion and do not block plugin registration
+7. Preserve any existing plugins and any unrelated configuration keys
+8. After editing, show me the exact changes and tell me to restart OpenCode
 ```
 
-Create a local environment file:
+Windows note: `~` resolves to your user home directory.
 
-```bash
-cp .env.example .env
+### Option B: Manual setup
+
+1. Register the plugin globally in `~/.config/opencode/opencode.json`:
+
+```json
+{
+  "plugin": ["opencode-tbot@latest"]
+}
 ```
 
-Windows PowerShell:
+If `opencode.json` already exists, keep the singular `plugin` key, preserve existing entries, and append `opencode-tbot@latest` only if it is missing.
 
-```powershell
-Copy-Item .env.example .env
+2. Create or update `tbot.config.json` in the project where OpenCode runs:
+
+```json
+{
+  "telegram": {
+    "botToken": "your_telegram_bot_token",
+    "allowedChatIds": []
+  },
+  "database": {
+    "path": "./data/opencode-tbot.sqlite"
+  },
+  "openrouter": {
+    "apiKey": "",
+    "model": "openai/gpt-audio-mini",
+    "timeoutMs": 30000,
+    "transcriptionPrompt": ""
+  },
+  "logLevel": "info",
+  "opencodeApiKey": ""
+}
 ```
+
+3. Restart OpenCode from the same worktree that contains `tbot.config.json`.
+
+4. Verify the plugin:
+
+- If `telegram.botToken` is already configured, send `/start` or `/status` to the bot.
+- If you skipped the token during install, add it to `tbot.config.json` first and then restart OpenCode.
+
+### For LLM agents
+
+Merge rules for automated installers:
+
+- create `~/.config/opencode/opencode.json` if it does not exist
+- use `plugin`, not `plugins`
+- append `opencode-tbot@latest` without duplicating it
+- preserve unrelated JSON keys and existing plugin entries
+- create or update only the current worktree `tbot.config.json`
+- preserve unrelated config keys when writing `telegram.botToken`
+
+## Package Entry
+
+The package root entry and [src/plugin.ts](./src/plugin.ts) both resolve to the plugin runtime. `dist/index.js` is the npm/OpenCode package entry, and `dist/plugin.js` remains the explicit subpath export.
+
+For local development inside this repository, [.opencode/plugins/opencode-tbot.ts](./.opencode/plugins/opencode-tbot.ts) still acts as a source bridge.
 
 ## Configuration
 
-Set at least the following values in `.env`:
+Required in `tbot.config.json`:
 
-- `TELEGRAM_BOT_TOKEN`
-- `OPENCODE_BASE_URL`
+- `telegram.botToken`
 
-Environment variables:
+The legacy filename `opencode-tbot.config.json` is still accepted for backward compatibility.
 
-| Variable | Required | Description |
+Configuration fields:
+
+| Field | Required | Description |
 | --- | --- | --- |
-| `TELEGRAM_BOT_TOKEN` | Yes | Telegram bot token. |
-| `TELEGRAM_ALLOWED_CHAT_IDS` | No | Comma-separated list of allowed Telegram chat IDs. If empty, the bot accepts messages from any chat. |
-| `OPENCODE_BASE_URL` | Yes | OpenCode server URL, for example `http://127.0.0.1:4096`. |
-| `OPENCODE_API_KEY` | No | Optional API key passed to the OpenCode client layer. |
-| `STT_BASE_URL` | No | Base URL for an OpenAI-compatible speech-to-text API. Required only if you want Telegram voice transcription. |
-| `STT_API_KEY` | No | Optional API key for the speech-to-text service. |
-| `STT_MODEL` | No | Speech-to-text model name. Required only if you want Telegram voice transcription. |
-| `STT_TIMEOUT_MS` | No | Timeout for speech-to-text requests in milliseconds. Default: `30000`. |
-| `STT_LANGUAGE` | No | Optional default language hint passed to the speech-to-text API. |
-| `STT_PROMPT` | No | Optional prompt passed to the speech-to-text API to bias transcription behavior. |
-| `LOG_LEVEL` | No | Logger level. Default: `info`. |
-| `BOT_STATE_DB_PATH` | No | SQLite file path for chat state. Default: `./data/opencode-tbot.sqlite`. |
+| `telegram.botToken` | Yes | Telegram bot token. If missing during interactive plugin startup, the plugin prompts and saves it to `tbot.config.json`. |
+| `telegram.allowedChatIds` | No | Array of allowed Telegram chat IDs. If empty, the bot accepts messages from any chat. |
+| `opencodeApiKey` | No | Optional compatibility setting retained in plugin config. The plugin runtime itself uses the injected OpenCode SDK client. |
+| `openrouter.apiKey` | No | OpenRouter API key. Required only for Telegram voice transcription. |
+| `openrouter.model` | No | OpenRouter model used for audio transcription. Default: `openai/gpt-audio-mini`. |
+| `openrouter.timeoutMs` | No | Timeout for voice transcription requests in milliseconds. Default: `30000`. |
+| `openrouter.transcriptionPrompt` | No | Optional extra instructions appended to the built-in transcription prompt. |
+| `logLevel` | No | Logger level. Default: `info`. |
+| `database.path` | No | SQLite file path for chat state. Default: `./data/opencode-tbot.sqlite`. Resolved relative to the current OpenCode worktree. |
+
+Global installation does not imply global Telegram credentials. The plugin is registered once through `~/.config/opencode/opencode.json`, but `telegram.botToken` is still read from each worktree's `tbot.config.json` unless you manually reuse the same token across projects.
 
 Voice transcription notes:
 
-- Voice input is optional. If STT is not configured, text prompts still work normally.
+- Voice input is optional. If OpenRouter voice transcription is not configured, text and image prompts still work normally.
 - v1 only handles Telegram `voice` messages, not `audio`, `document`, or `video_note`.
-- The bot downloads the Telegram voice file in memory, sends it to the configured STT endpoint, and does not persist the audio locally.
+- Voice files are downloaded in memory and are not persisted locally.
 
 Image upload notes:
 
 - Telegram `photo` messages are supported.
-- Telegram `document` messages are also supported if the document is an image.
-- Images are downloaded in memory and forwarded to OpenCode as file parts. The Telegram bot token is not forwarded to OpenCode.
-- If a caption is present, it is sent as the prompt text alongside the image.
-
-## Running
-
-Make sure your OpenCode server is already running, then start the bot:
-
-```bash
-pnpm dev
-```
-
-For a compiled run:
-
-```bash
-pnpm build
-pnpm start
-```
+- Telegram `document` messages are supported when the document is an image.
+- Images are downloaded in memory and forwarded to OpenCode as file parts.
 
 ## Features
 
 - Send plain text prompts to OpenCode from Telegram
 - Send Telegram images to OpenCode, with optional caption text
-- Send Telegram voice messages through an OpenAI-compatible STT service and continue with the normal OpenCode prompt flow
+- Send Telegram voice messages through OpenRouter voice transcription
 - Create and switch OpenCode sessions in chat
 - View and switch agents
 - View and switch models and reasoning levels
@@ -103,7 +155,8 @@ pnpm start
 
 ## Commands
 
-- `/start` show a short bot overview
+- `/start` show the welcome message and quick-start steps
+- `/help` show the full command reference and examples
 - `/status` show aggregated OpenCode health, path, LSP, and MCP status
 - `/new [title]` create a new OpenCode session
 - `/agents` or `/agent` list available agents and switch the active one
@@ -112,9 +165,15 @@ pnpm start
 - `/model` or `/models` list available models and switch the active one
 - `/language` switch the bot display language
 
-Any non-command text message is treated as a prompt and sent to OpenCode. If STT is configured, Telegram `voice` messages are transcribed and then sent through the same prompt path. Telegram image uploads are forwarded as OpenCode file parts, and their captions are used as prompt text when present.
+Any non-command text message is treated as a prompt and sent to OpenCode. If OpenRouter voice transcription is configured, Telegram `voice` messages are transcribed and sent through the same prompt path. Telegram image uploads are forwarded as OpenCode file parts.
 
 ## Development
+
+Build the plugin bundle:
+
+```bash
+pnpm build
+```
 
 Type-check:
 
@@ -134,11 +193,15 @@ Run a dependency audit:
 pnpm audit
 ```
 
+## Deployment
+
+Deployment details are in [docs/deployment.md](./docs/deployment.md).
+
 ## FAQ
 
-### Do I need a running OpenCode server?
+### Do I need a running OpenCode instance?
 
-Yes. This repository is a Telegram client layer, not a replacement for the OpenCode server itself.
+Yes. This repository provides a Telegram integration layer and depends on the OpenCode host process that loads the plugin.
 
 ### Is this an official OpenCode project?
 

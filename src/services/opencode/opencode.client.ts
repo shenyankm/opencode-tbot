@@ -100,7 +100,7 @@ export interface OpenCodeConfiguredModel {
     variants: Record<string, Record<string, unknown>>;
 }
 
-type OpenCodeSdkClient = Pick<OpencodeClient, "app" | "config" | "global" | "lsp" | "mcp" | "path" | "project" | "session">;
+export type OpenCodeSdkClientLike = Pick<OpencodeClient, "app" | "config" | "global" | "lsp" | "mcp" | "path" | "project" | "session">;
 type MaybeWrappedResponse<T> = T | { data: T };
 type OpenCodeProviderCatalog = {
     providers: OpenCodeProvider[];
@@ -156,11 +156,19 @@ export interface OpenCodeClientLike {
 }
 
 export class OpenCodeClient implements OpenCodeClientLike {
-    private readonly client: OpenCodeSdkClient;
+    private readonly client: OpenCodeSdkClientLike;
     private readonly fetchFn: typeof fetch;
 
-    constructor(options: OpenCodeClientOptions, client?: OpenCodeSdkClient, fetchFn: typeof fetch = fetch) {
-        this.client = client ?? createOpencodeClient(buildOpenCodeSdkConfig(options));
+    constructor(
+        options?: OpenCodeClientOptions,
+        client?: OpenCodeSdkClientLike,
+        fetchFn: typeof fetch = fetch,
+    ) {
+        if (!options && !client) {
+            throw new Error("OpenCodeClient requires either base URL options or an injected SDK client.");
+        }
+
+        this.client = client ?? createOpencodeClient(buildOpenCodeSdkConfig(options as OpenCodeClientOptions));
         this.fetchFn = fetchFn;
     }
 
@@ -319,6 +327,13 @@ export class OpenCodeClient implements OpenCodeClientLike {
             structured: data.info?.structured ?? null,
         };
     }
+}
+
+export function createOpenCodeClientFromSdkClient(
+    client: OpenCodeSdkClientLike,
+    fetchFn: typeof fetch = fetch,
+): OpenCodeClientLike {
+    return new OpenCodeClient(undefined, client, fetchFn);
 }
 
 function buildSelectableModels(

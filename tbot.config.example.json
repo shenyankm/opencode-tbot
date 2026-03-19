@@ -1,0 +1,17 @@
+{
+  "telegram": {
+    "botToken": "your_telegram_bot_token",
+    "allowedChatIds": []
+  },
+  "database": {
+    "path": "./data/opencode-tbot.sqlite"
+  },
+  "openrouter": {
+    "apiKey": "",
+    "model": "openai/gpt-audio-mini",
+    "timeoutMs": 30000,
+    "transcriptionPrompt": ""
+  },
+  "logLevel": "info",
+  "opencodeApiKey": ""
+}

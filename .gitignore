@@ -10,5 +10,6 @@ data/
 *.log
 .env
 .env.*
-!.env.example
+tbot.config.json
+opencode-tbot.config.json
 
