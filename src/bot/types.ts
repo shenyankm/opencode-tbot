@@ -1,6 +1,6 @@
-import type { Logger } from "pino";
 import type { PendingActionRepository } from "../domain/pending-action/pending-action.repository.js";
 import type { SessionRepository } from "../domain/session/session.repository.js";
+import type { AppLogger } from "../infra/logger/index.js";
 import type { TelegramFileClientLike } from "../services/telegram/telegram.client.js";
 import type { VoiceTranscriptionServiceLike } from "../services/voice-transcription/voice-transcription.service.js";
 import type { UploadFileUseCase } from "../use-cases/upload-file.usecase.js";
@@ -29,7 +29,7 @@ export interface BotDependencies {
     listAgentsUseCase: ListAgentsUseCase;
     listLspUseCase: ListLspUseCase;
     listMcpUseCase: ListMcpUseCase;
-    logger: Logger;
+    logger: AppLogger;
     listModelsUseCase: ListModelsUseCase;
     listSessionsUseCase: ListSessionsUseCase;
     pendingActionRepo: PendingActionRepository;
@@ -56,3 +56,7 @@ export type ModelCallbackData =
     | `model:page:${number}`
     | `model:pick:${number}`
     | `model:variant:${number}:${number}`;
+export type PermissionApprovalCallbackData =
+    | `permission:once:${string}`
+    | `permission:always:${string}`
+    | `permission:reject:${string}`;

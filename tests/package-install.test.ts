@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 interface PackageJson {
@@ -30,9 +30,11 @@ test("package.json exposes publishable plugin entrypoints", () => {
     assert.equal(packageJson.main, "./dist/index.js");
     assert.deepEqual(packageJson.exports, {
         ".": "./dist/index.js",
+        "./cli": "./dist/cli.js",
         "./plugin": "./dist/plugin.js",
     });
     assert.deepEqual(packageJson.files, [
+        "bin",
         "dist",
         "README.md",
         "README.zh-CN.md",
@@ -92,13 +94,17 @@ test("vite build keeps both npm and explicit plugin entrypoints", async () => {
 
     assert.deepEqual(
         Object.keys(viteConfig.build?.rollupOptions?.input ?? {}).sort(),
-        ["index", "plugin"],
+        ["cli", "index", "plugin"],
     );
     assert.equal(viteConfig.build?.outDir, "dist");
     assert.equal(viteConfig.build?.rollupOptions?.output?.entryFileNames, "[name].js");
 });
 
 function collectSourceFiles(directory: URL): URL[] {
+    if (!existsSync(directory)) {
+        return [];
+    }
+
     const files: URL[] = [];
 
     for (const entry of readdirSync(directory, { withFileTypes: true })) {

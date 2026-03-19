@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { Logger } from "pino";
 import { handleSessionsCommand } from "../src/bot/commands/sessions.js";
 import { handleSessionsCallback } from "../src/bot/handlers/callback.handler.js";
 import type { BotDependencies } from "../src/bot/types.js";
+import type { AppLogger } from "../src/infra/logger/index.js";
 import { InMemoryPendingActionRepository } from "../src/repositories/pending-action.repo.js";
 import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
 import type {
@@ -18,7 +18,7 @@ import { SwitchSessionUseCase } from "../src/use-cases/switch-session.usecase.js
 const logger = {
     error() { },
     info() { },
-} as unknown as Logger;
+} as unknown as AppLogger;
 
 function createProject(id: string, worktree: string): OpenCodeProject {
     return {

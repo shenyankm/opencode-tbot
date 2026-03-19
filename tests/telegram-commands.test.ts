@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { Logger } from "pino";
 import { getTelegramCommands, TELEGRAM_COMMANDS } from "../src/bot/commands/command-list.js";
+import type { AppLogger } from "../src/infra/logger/index.js";
 import {
     syncTelegramCommands,
     syncTelegramCommandsForChat,
@@ -10,7 +10,7 @@ import {
 
 const logger = {
     info() { },
-} as unknown as Logger;
+} as unknown as AppLogger;
 
 test("TELEGRAM_COMMANDS only advertises implemented commands", () => {
     assert.deepEqual(TELEGRAM_COMMANDS, [

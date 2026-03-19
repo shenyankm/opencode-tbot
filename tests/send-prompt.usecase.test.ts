@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { Logger } from "pino";
+import type { AppLogger } from "../src/infra/logger/index.js";
 import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
 import type {
     OpenCodeAgent,
@@ -15,7 +15,7 @@ import { SendPromptUseCase } from "../src/use-cases/send-prompt.usecase.js";
 const logger = {
     error() { },
     info() { },
-} as unknown as Logger;
+} as unknown as AppLogger;
 
 function createProject(id: string, worktree: string): OpenCodeProject {
     return {

@@ -1,16 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { Logger } from "pino";
 import { handleLanguageCommand } from "../src/bot/commands/language.js";
 import { handleLanguageCallback } from "../src/bot/handlers/callback.handler.js";
 import type { BotDependencies } from "../src/bot/types.js";
+import type { AppLogger } from "../src/infra/logger/index.js";
 import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
 import { getTelegramCommands } from "../src/bot/commands/command-list.js";
 
 const logger = {
     error() { },
     info() { },
-} as unknown as Logger;
+} as unknown as AppLogger;
 
 function createDependencies() {
     const sessionRepo = new InMemorySessionRepository();

@@ -15,16 +15,30 @@ export interface TelegramBotRuntime {
     bot: Bot;
     container: AppContainer;
     stop(): void;
-    dispose(): void;
+    dispose(): Promise<void>;
 }
 
 export async function startTelegramBotRuntime(
     input: StartTelegramBotRuntimeInput,
 ): Promise<TelegramBotRuntime> {
-    const bot = new Bot(input.config.telegramBotToken);
+    const bot = new Bot(input.config.telegramBotToken, {
+        client: {
+            apiRoot: input.config.telegramApiRoot,
+        },
+    });
 
     registerBot(bot, input.container, {
         telegramAllowedChatIds: input.config.telegramAllowedChatIds,
+    });
+
+    bot.catch((error) => {
+        input.container.logger.error(
+            {
+                error: error.error,
+                update: error.ctx.update,
+            },
+            "telegram bot update failed",
+        );
     });
 
     input.container.logger.info("bot starting...");
@@ -44,14 +58,14 @@ export async function startTelegramBotRuntime(
         stopped = true;
         runner.stop();
     };
-    const dispose = () => {
+    const dispose = async () => {
         if (disposed) {
             return;
         }
 
         disposed = true;
         stop();
-        input.container.dispose();
+        await input.container.dispose();
     };
 
     return {

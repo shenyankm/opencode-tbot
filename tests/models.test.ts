@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { Logger } from "pino";
 import { handleModelsCommand } from "../src/bot/commands/models.js";
 import { handleModelsCallback } from "../src/bot/handlers/callback.handler.js";
 import type { BotDependencies } from "../src/bot/types.js";
+import type { AppLogger } from "../src/infra/logger/index.js";
 import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
 import type {
     OpenCodeClientLike,
@@ -19,7 +19,7 @@ import { SwitchModelUseCase } from "../src/use-cases/switch-model.usecase.js";
 const logger = {
     error() { },
     info() { },
-} as unknown as Logger;
+} as unknown as AppLogger;
 
 function createProject(id: string, worktree: string): OpenCodeProject {
     return {

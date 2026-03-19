@@ -3,23 +3,30 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { SQLitePendingActionRepository } from "../src/repositories/pending-action.repo.js";
-import { SQLiteSessionRepository } from "../src/repositories/session.repo.js";
-import { openSQLiteDatabase } from "../src/services/storage/sqlite.js";
+import { FilePendingActionRepository } from "../src/repositories/pending-action.repo.js";
+import { FilePermissionApprovalRepository } from "../src/repositories/permission-approval.repo.js";
+import { FileSessionRepository } from "../src/repositories/session.repo.js";
+import { createDefaultOpencodeTbotState } from "../src/services/storage/bot-state.js";
+import { JsonStateStore } from "../src/services/storage/json-state-store.js";
 
-function createTempDatabasePath() {
+function createTempStateStore() {
     const directory = mkdtempSync(join(tmpdir(), "opencode-tbot-"));
+    const filePath = join(directory, "state.json");
 
     return {
         cleanup() {
             rmSync(directory, { recursive: true, force: true });
         },
-        filePath: join(directory, "state.sqlite"),
+        filePath,
+        store: new JsonStateStore({
+            filePath,
+            createDefaultState: createDefaultOpencodeTbotState,
+        }),
     };
 }
 
-test("SQLiteSessionRepository persists bindings across repository instances", async () => {
-    const tempDatabase = createTempDatabasePath();
+test("FileSessionRepository persists bindings across repository instances", async () => {
+    const tempState = createTempStateStore();
     const initialBinding = {
         chatId: 7,
         sessionId: "session-1",
@@ -33,16 +40,17 @@ test("SQLiteSessionRepository persists bindings across repository instances", as
         updatedAt: new Date(0).toISOString(),
     };
 
-    const databaseOne = openSQLiteDatabase(tempDatabase.filePath);
-    const repositoryOne = new SQLiteSessionRepository(databaseOne);
+    const repositoryOne = new FileSessionRepository(tempState.store);
     await repositoryOne.setCurrent(initialBinding);
-    databaseOne.close();
 
-    const databaseTwo = openSQLiteDatabase(tempDatabase.filePath);
-    const repositoryTwo = new SQLiteSessionRepository(databaseTwo);
+    const repositoryTwo = new FileSessionRepository(new JsonStateStore({
+        filePath: tempState.filePath,
+        createDefaultState: createDefaultOpencodeTbotState,
+    }));
     const loadedBinding = await repositoryTwo.getByChatId(7);
 
     assert.deepEqual(loadedBinding, initialBinding);
+    assert.deepEqual(await repositoryTwo.listBySessionId("session-1"), [initialBinding]);
 
     await repositoryTwo.setCurrent({
         ...initialBinding,
@@ -58,14 +66,12 @@ test("SQLiteSessionRepository persists bindings across repository instances", as
         updatedAt: new Date(1_000).toISOString(),
     });
 
-    databaseTwo.close();
-    tempDatabase.cleanup();
+    tempState.cleanup();
 });
 
-test("SQLiteSessionRepository touch only updates the timestamp", async () => {
-    const tempDatabase = createTempDatabasePath();
-    const database = openSQLiteDatabase(tempDatabase.filePath);
-    const repository = new SQLiteSessionRepository(database);
+test("FileSessionRepository touch only updates the timestamp", async () => {
+    const tempState = createTempStateStore();
+    const repository = new FileSessionRepository(tempState.store);
     const binding = {
         chatId: 9,
         sessionId: "session-9",
@@ -92,12 +98,11 @@ test("SQLiteSessionRepository touch only updates the timestamp", async () => {
     );
     assert.notEqual(touchedBinding?.updatedAt, binding.updatedAt);
 
-    database.close();
-    tempDatabase.cleanup();
+    tempState.cleanup();
 });
 
-test("SQLitePendingActionRepository persists and clears pending rename actions", async () => {
-    const tempDatabase = createTempDatabasePath();
+test("FilePendingActionRepository persists and clears pending rename actions", async () => {
+    const tempState = createTempStateStore();
     const initialAction = {
         chatId: 12,
         kind: "session_rename" as const,
@@ -107,13 +112,13 @@ test("SQLitePendingActionRepository persists and clears pending rename actions",
         updatedAt: new Date(0).toISOString(),
     };
 
-    const databaseOne = openSQLiteDatabase(tempDatabase.filePath);
-    const repositoryOne = new SQLitePendingActionRepository(databaseOne);
+    const repositoryOne = new FilePendingActionRepository(tempState.store);
     await repositoryOne.set(initialAction);
-    databaseOne.close();
 
-    const databaseTwo = openSQLiteDatabase(tempDatabase.filePath);
-    const repositoryTwo = new SQLitePendingActionRepository(databaseTwo);
+    const repositoryTwo = new FilePendingActionRepository(new JsonStateStore({
+        filePath: tempState.filePath,
+        createDefaultState: createDefaultOpencodeTbotState,
+    }));
 
     assert.deepEqual(await repositoryTwo.getByChatId(12), initialAction);
 
@@ -134,6 +139,35 @@ test("SQLitePendingActionRepository persists and clears pending rename actions",
     await repositoryTwo.clear(12);
     assert.equal(await repositoryTwo.getByChatId(12), null);
 
-    databaseTwo.close();
-    tempDatabase.cleanup();
+    tempState.cleanup();
+});
+
+test("FilePermissionApprovalRepository persists approval prompts", async () => {
+    const tempState = createTempStateStore();
+    const repository = new FilePermissionApprovalRepository(tempState.store);
+
+    await repository.set({
+        requestId: "request-1",
+        sessionId: "session-1",
+        chatId: 42,
+        messageId: 99,
+        status: "pending",
+        updatedAt: new Date(0).toISOString(),
+    });
+
+    const repositoryTwo = new FilePermissionApprovalRepository(new JsonStateStore({
+        filePath: tempState.filePath,
+        createDefaultState: createDefaultOpencodeTbotState,
+    }));
+
+    assert.deepEqual(await repositoryTwo.listByRequestId("request-1"), [{
+        requestId: "request-1",
+        sessionId: "session-1",
+        chatId: 42,
+        messageId: 99,
+        status: "pending",
+        updatedAt: new Date(0).toISOString(),
+    }]);
+
+    tempState.cleanup();
 });

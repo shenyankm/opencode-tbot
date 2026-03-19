@@ -1,4 +1,6 @@
+import type { Hooks, Plugin, PluginInput } from "@opencode-ai/plugin";
 import { bootstrapPluginApp } from "./app/bootstrap.js";
+import { handleTelegramBotPluginEvent } from "./app/plugin-events.js";
 import {
     preparePluginConfiguration,
     type PreparedPluginConfiguration,
@@ -74,11 +76,13 @@ export async function ensureTelegramBotPluginRuntime(
     return runtimeState.runtimePromise;
 }
 
-export async function TelegramBotPlugin(context: OpenCodePluginContextLike): Promise<Record<string, never>> {
-    await ensureTelegramBotPluginRuntime({ context });
+export const TelegramBotPlugin: Plugin = async (context) => {
+    const runtime = await ensureTelegramBotPluginRuntime({
+        context: context as unknown as OpenCodePluginContextLike,
+    });
 
-    return {};
-}
+    return createHooks(runtime);
+};
 
 export async function resetTelegramBotPluginRuntimeForTests() {
     if (!runtimeState) {
@@ -115,6 +119,8 @@ async function startPluginRuntime(
         container.logger.info(
             {
                 cwd: preparedConfiguration.cwd,
+                globalConfigFilePath: preparedConfiguration.globalConfigFilePath,
+                projectConfigFilePath: preparedConfiguration.projectConfigFilePath,
                 configFilePath: preparedConfiguration.configFilePath,
                 mode: "plugin",
             },
@@ -123,7 +129,7 @@ async function startPluginRuntime(
 
         return runtime;
     } catch (error) {
-        container.dispose();
+        await container.dispose();
         throw error;
     }
 }
@@ -137,5 +143,20 @@ async function disposeTelegramBotPluginRuntimeState(
 ): Promise<void> {
     const runtime = state.runtime ?? await state.runtimePromise.catch(() => null);
 
-    runtime?.dispose();
+    await runtime?.dispose();
+}
+
+function createHooks(runtime: TelegramBotRuntime): Hooks {
+    return {
+        async event({ event }) {
+            await handleTelegramBotPluginEvent(runtime, event as never);
+        },
+        async "permission.ask"(input, output) {
+            const bindings = await runtime.container.sessionRepo.listBySessionId(input.sessionID);
+
+            if (bindings.length > 0) {
+                output.status = "ask";
+            }
+        },
+    };
 }

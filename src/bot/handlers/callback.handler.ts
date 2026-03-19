@@ -1,4 +1,5 @@
 import type { Bot } from "grammy";
+import type { PermissionApprovalRepository } from "../../domain/permission/approval.repository.js";
 import { getChatCopy, getChatLanguage } from "../i18n.js";
 import { presentLanguageSwitchForChat } from "../commands/language.js";
 import type {
@@ -6,6 +7,7 @@ import type {
     BotDependencies,
     LanguageCallbackData,
     ModelCallbackData,
+    PermissionApprovalCallbackData,
     SessionsCallbackData,
 } from "../types.js";
 import {
@@ -30,6 +32,11 @@ import {
     buildSessionActionView,
     buildSessionsListView,
 } from "../sessions-menu.js";
+import type { OpenCodeClientLike } from "../../services/opencode/opencode.client.js";
+import {
+    buildPermissionApprovalResolvedMessage,
+    parsePermissionApprovalCallbackData,
+} from "../../services/permission/telegram-approval.js";
 
 const AGENTS_PAGE_PREFIX = "agents:page:";
 const AGENTS_SELECT_PREFIX = "agents:select:";
@@ -42,6 +49,12 @@ const MODEL_PAGE_PREFIX = "model:page:";
 const MODEL_PICK_PREFIX = "model:pick:";
 const MODEL_VARIANT_PREFIX = "model:variant:";
 const LANGUAGE_SELECT_PREFIX = "language:select:";
+const PERMISSION_PREFIX = "permission:";
+
+type PermissionApprovalDependencies = BotDependencies & {
+    opencodeClient: OpenCodeClientLike;
+    permissionApprovalRepo: PermissionApprovalRepository;
+};
 
 interface CallbackContext {
     chat?: { id: number };
@@ -418,7 +431,50 @@ export async function handleLanguageCallback(ctx: CallbackContext, dependencies:
     }
 }
 
-export function registerCallbackHandler(bot: Bot, dependencies: BotDependencies) {
+export async function handlePermissionApprovalCallback(
+    ctx: CallbackContext,
+    dependencies: PermissionApprovalDependencies,
+) {
+    const data = ctx.callbackQuery.data as PermissionApprovalCallbackData;
+
+    if (!data.startsWith(PERMISSION_PREFIX)) {
+        return;
+    }
+
+    await ctx.answerCallbackQuery();
+
+    if (!ctx.chat) {
+        return;
+    }
+
+    const parsed = parsePermissionApprovalCallbackData(data);
+
+    if (!parsed) {
+        return;
+    }
+
+    try {
+        await dependencies.opencodeClient.replyToPermission(parsed.requestId, parsed.reply);
+
+        const approvals = await dependencies.permissionApprovalRepo.listByRequestId(parsed.requestId);
+        const approval = approvals.find((item) => item.chatId === ctx.chat?.id);
+
+        if (approval) {
+            await dependencies.permissionApprovalRepo.set({
+                ...approval,
+                status: parsed.reply,
+                updatedAt: new Date().toISOString(),
+            });
+        }
+
+        await ctx.editMessageText(buildPermissionApprovalResolvedMessage(parsed.requestId, parsed.reply));
+    } catch (error) {
+        dependencies.logger.error({ error, requestId: parsed.requestId }, "failed to reply to permission request");
+        await ctx.editMessageText("Failed to reply to the permission request.");
+    }
+}
+
+export function registerCallbackHandler(bot: Bot, dependencies: PermissionApprovalDependencies) {
     bot.callbackQuery(/^agents:/, async (ctx) => {
         await handleAgentsCallback(ctx, dependencies);
     });
@@ -433,6 +489,10 @@ export function registerCallbackHandler(bot: Bot, dependencies: BotDependencies)
 
     bot.callbackQuery(/^language:/, async (ctx) => {
         await handleLanguageCallback(ctx, dependencies);
+    });
+
+    bot.callbackQuery(/^permission:/, async (ctx) => {
+        await handlePermissionApprovalCallback(ctx, dependencies);
     });
 }
 

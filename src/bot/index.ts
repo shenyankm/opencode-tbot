@@ -1,4 +1,6 @@
 import type { Bot } from "grammy";
+import type { PermissionApprovalRepository } from "../domain/permission/approval.repository.js";
+import type { OpenCodeClientLike } from "../services/opencode/opencode.client.js";
 import { registerAgentsCommand } from "./commands/agents.js";
 import { registerCancelCommand } from "./commands/cancel.js";
 import { registerHelpCommand } from "./commands/help.js";
@@ -20,7 +22,14 @@ export interface RegisterBotOptions {
     telegramAllowedChatIds: number[];
 }
 
-export function registerBot(bot: Bot, container: BotDependencies, options: RegisterBotOptions) {
+export function registerBot(
+    bot: Bot,
+    container: BotDependencies & {
+        opencodeClient: OpenCodeClientLike;
+        permissionApprovalRepo: PermissionApprovalRepository;
+    },
+    options: RegisterBotOptions,
+) {
     bot.use(createLoggingMiddleware(container.logger));
     bot.use(createAuthMiddleware(options.telegramAllowedChatIds));
 

@@ -1,10 +1,14 @@
 import type { ChatSessionBinding } from "../domain/session/session.entity.js";
-import type { Logger } from "pino";
 import type { SessionRepository } from "../domain/session/session.repository.js";
+import type { AppLogger } from "../infra/logger/index.js";
 import type {
     OpenCodeClientLike,
     PromptSessionFilePartInput,
 } from "../services/opencode/opencode.client.js";
+import {
+    NOOP_FOREGROUND_SESSION_TRACKER,
+    type ForegroundSessionTrackerLike,
+} from "../services/session-activity/foreground-session-tracker.js";
 import { resolveSelectedAgent } from "./agent-selection.js";
 import {
     clearStoredAgentSelection,
@@ -24,7 +28,8 @@ export class SendPromptUseCase {
     constructor(
         private readonly sessionRepo: SessionRepository,
         private readonly opencodeClient: OpenCodeClientLike,
-        private readonly logger: Logger,
+        private readonly logger: AppLogger,
+        private readonly foregroundSessionTracker: ForegroundSessionTrackerLike = NOOP_FOREGROUND_SESSION_TRACKER,
     ) { }
 
     async execute(input: { chatId: number; text?: string | null; files?: PromptSessionFilePartInput[] }) {
@@ -139,15 +144,22 @@ export class SendPromptUseCase {
             );
         }
 
-        const result = await this.opencodeClient.promptSession({
-            sessionId: activeBinding.sessionId,
-            prompt: promptText,
-            ...(files.length > 0 ? { files } : {}),
-            ...(selectedAgent ? { agent: selectedAgent.name } : {}),
-            structured: true,
-            ...(model ? { model } : {}),
-            ...(activeBinding.modelVariant ? { variant: activeBinding.modelVariant } : {}),
-        });
+        const endForegroundSession = this.foregroundSessionTracker.begin(activeBinding.sessionId);
+        let result;
+
+        try {
+            result = await this.opencodeClient.promptSession({
+                sessionId: activeBinding.sessionId,
+                prompt: promptText,
+                ...(files.length > 0 ? { files } : {}),
+                ...(selectedAgent ? { agent: selectedAgent.name } : {}),
+                structured: true,
+                ...(model ? { model } : {}),
+                ...(activeBinding.modelVariant ? { variant: activeBinding.modelVariant } : {}),
+            });
+        } finally {
+            endForegroundSession();
+        }
 
         await this.sessionRepo.touch(input.chatId);
 

@@ -5,7 +5,11 @@
     "description": "Telegram bot plugin for OpenCode",
     "license": "MIT",
     "main": "./dist/index.js",
+    "bin": {
+        "opencode-tbot": "./bin/opencode-tbot.js"
+    },
     "files": [
+        "bin",
         "dist",
         "README.md",
         "README.zh-CN.md",
@@ -15,6 +19,7 @@
     ],
     "exports": {
         ".": "./dist/index.js",
+        "./cli": "./dist/cli.js",
         "./plugin": "./dist/plugin.js"
     },
     "repository": {
@@ -43,10 +48,11 @@
     },
     "dependencies": {
         "@grammyjs/runner": "^2.0.3",
+        "@opencode-ai/plugin": "1.2.27",
         "@opencode-ai/sdk": "1.2.27",
         "@openrouter/sdk": "0.9.11",
         "grammy": "^1.38.0",
-        "pino": "^9.3.2",
+        "jsonc-parser": "3.3.1",
         "zod": "^3.23.8"
     },
     "devDependencies": {

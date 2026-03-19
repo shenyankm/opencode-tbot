@@ -2,6 +2,9 @@ import { resolve } from "node:path";
 import { z } from "zod";
 
 export const DEFAULT_OPENROUTER_MODEL = "openai/gpt-audio-mini";
+export const DEFAULT_STATE_FILE_PATH = "./data/opencode-tbot.state.json";
+export const DEFAULT_TELEGRAM_API_ROOT = "https://api.telegram.org";
+
 const AllowedChatIdSchema = z.union([
     z.number().int(),
     z.string().regex(/^-?\d+$/u).transform((value) => Number(value)),
@@ -12,13 +15,21 @@ const TelegramConfigSchema = z.preprocess(
     z.object({
         botToken: z.string().trim().min(1),
         allowedChatIds: z.array(AllowedChatIdSchema).default([]),
+        apiRoot: z.string().trim().url().default(DEFAULT_TELEGRAM_API_ROOT),
     }),
 );
 
-const DatabaseConfigSchema = z.preprocess(
+const StateConfigSchema = z.preprocess(
     (value) => value ?? {},
     z.object({
-        path: z.string().default("./data/opencode-tbot.sqlite"),
+        path: z.string().trim().min(1).default(DEFAULT_STATE_FILE_PATH),
+    }),
+);
+
+const LegacyDatabaseConfigSchema = z.preprocess(
+    (value) => value ?? {},
+    z.object({
+        path: z.string().trim().min(1).optional(),
     }),
 );
 
@@ -33,13 +44,13 @@ const OpenRouterConfigSchema = z.preprocess(
 );
 
 const AppConfigSchema = z.preprocess(
-    (value) => value ?? {},
+    normalizeLegacyConfigSource,
     z.object({
         telegram: TelegramConfigSchema,
-        database: DatabaseConfigSchema,
+        state: StateConfigSchema,
+        database: LegacyDatabaseConfigSchema.optional(),
         openrouter: OpenRouterConfigSchema,
         logLevel: z.string().default("info"),
-        opencodeApiKey: z.string().default(""),
     }),
 );
 
@@ -47,6 +58,11 @@ export interface PluginConfigSource {
     telegram?: {
         botToken?: string;
         allowedChatIds?: Array<number | string>;
+        apiRoot?: string;
+        [key: string]: unknown;
+    };
+    state?: {
+        path?: string;
         [key: string]: unknown;
     };
     database?: {
@@ -61,7 +77,6 @@ export interface PluginConfigSource {
         [key: string]: unknown;
     };
     logLevel?: string;
-    opencodeApiKey?: string;
     [key: string]: unknown;
 }
 
@@ -76,9 +91,9 @@ export interface AppOpenRouterConfig {
 export interface AppConfig {
     telegramBotToken: string;
     telegramAllowedChatIds: number[];
+    telegramApiRoot: string;
     logLevel: string;
-    botStateDbPath: string;
-    opencodeApiKey: string;
+    stateFilePath: string;
     openrouter: AppOpenRouterConfig;
 }
 
@@ -108,9 +123,9 @@ function buildAppConfig(
     return {
         telegramBotToken: data.telegram.botToken,
         telegramAllowedChatIds: data.telegram.allowedChatIds,
+        telegramApiRoot: normalizeApiRoot(data.telegram.apiRoot),
         logLevel: data.logLevel,
-        botStateDbPath: resolve(options.cwd ?? process.cwd(), data.database.path),
-        opencodeApiKey: data.opencodeApiKey,
+        stateFilePath: resolveStatePath(data, options.cwd ?? process.cwd()),
         openrouter: {
             configured: !!openRouterApiKey,
             apiKey: openRouterApiKey,
@@ -127,6 +142,41 @@ function normalizeOptionalString(value: string): string | null {
     return normalized.length > 0 ? normalized : null;
 }
 
+function resolveStatePath(
+    data: z.infer<typeof AppConfigSchema>,
+    cwd: string,
+): string {
+    return resolve(cwd, data.state.path || data.database?.path || DEFAULT_STATE_FILE_PATH);
+}
+
+function normalizeApiRoot(value: string): string {
+    const normalized = value.trim();
+
+    return normalized.endsWith("/")
+        ? normalized.slice(0, -1)
+        : normalized;
+}
+
+function normalizeLegacyConfigSource(value: unknown): unknown {
+    if (!isPlainObject(value)) {
+        return value ?? {};
+    }
+
+    const source = value as PluginConfigSource;
+
+    if (source.state?.path || !source.database?.path) {
+        return source;
+    }
+
+    return {
+        ...source,
+        state: {
+            ...(source.state ?? {}),
+            path: source.database.path,
+        },
+    };
+}
+
 function parseConfig<TSchema extends z.ZodTypeAny>(
     schema: TSchema,
     configSource: PluginConfigSource | undefined,
@@ -140,4 +190,8 @@ function parseConfig<TSchema extends z.ZodTypeAny>(
     throw new Error(
         `Invalid plugin configuration: ${JSON.stringify(parsed.error.flatten())}`,
     );
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
 }

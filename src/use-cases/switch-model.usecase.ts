@@ -1,5 +1,5 @@
-import type { Logger } from "pino";
 import type { SessionRepository } from "../domain/session/session.repository.js";
+import type { AppLogger } from "../infra/logger/index.js";
 import type {
     OpenCodeClientLike,
     OpenCodeConfiguredModel,
@@ -19,7 +19,7 @@ export class SwitchModelUseCase {
     constructor(
         private readonly sessionRepo: SessionRepository,
         private readonly opencodeClient: OpenCodeClientLike,
-        private readonly logger: Logger,
+        private readonly logger: AppLogger,
     ) { }
 
     async execute(input: {

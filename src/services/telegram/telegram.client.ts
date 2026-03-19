@@ -13,6 +13,7 @@ export interface TelegramFileClientLike {
 
 export interface TelegramFileClientOptions {
     baseUrl?: string;
+    apiRoot?: string;
     botToken: string;
 }
 
@@ -41,7 +42,7 @@ export class TelegramFileClient implements TelegramFileClientLike {
     private readonly fetchFn: typeof fetch;
 
     constructor(options: TelegramFileClientOptions, fetchFn: typeof fetch = fetch) {
-        this.baseUrl = options.baseUrl ?? `https://api.telegram.org/file/bot${options.botToken}/`;
+        this.baseUrl = options.baseUrl ?? buildTelegramFileApiRoot(options.apiRoot, options.botToken);
         this.fetchFn = fetchFn;
     }
 
@@ -75,6 +76,12 @@ export class TelegramFileClient implements TelegramFileClientLike {
             mimeType: response.headers.get("content-type"),
         };
     }
+}
+
+export function buildTelegramFileApiRoot(apiRoot: string | undefined, botToken: string): string {
+    const normalizedApiRoot = (apiRoot ?? "https://api.telegram.org").trim().replace(/\/+$/u, "");
+
+    return `${normalizedApiRoot}/file/bot${botToken}/`;
 }
 
 async function buildDownloadFailureMessage(response: Response): Promise<string> {

@@ -28,6 +28,7 @@ export default defineConfig({
         rollupOptions: {
             external,
             input: {
+                cli: resolve("src/cli.ts"),
                 index: resolve("src/index.ts"),
                 plugin: resolve("src/plugin.ts"),
             },

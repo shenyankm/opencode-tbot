@@ -1126,3 +1126,160 @@ test("listModels filters configured providers against the upstream /models endpo
     assert.equal(fetchCalls.length, 1);
     assert.equal(fetchCalls[0].input, "https://gateway.example/v1/models");
 });
+
+test("listModels caches results for 60 seconds and refreshes after expiry", async () => {
+    const provider = createProvider("openai", "OpenAI", [
+        createModel("openai", "gpt-5", "GPT-5"),
+    ]);
+    let configCalls = 0;
+    let providerCalls = 0;
+    let fetchCalls = 0;
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            config: {
+                get: async () => {
+                    configCalls += 1;
+                    return {
+                        data: {
+                            provider: {
+                                openai: {
+                                    models: {
+                                        "gpt-5": {
+                                            name: "GPT-5",
+                                        },
+                                    },
+                                    options: {
+                                        apiKey: "test-key",
+                                        baseURL: "https://gateway.example/v1",
+                                    },
+                                },
+                            },
+                        },
+                    };
+                },
+                providers: async () => {
+                    providerCalls += 1;
+                    return {
+                        data: {
+                            providers: [provider],
+                            default: {},
+                        },
+                    };
+                },
+            },
+            path: {
+                get: async () => ({ data: createPath() }),
+            },
+            permission: {
+                list: async () => ({ data: [] }),
+                reply: async () => ({ data: true }),
+            },
+            project: {
+                list: async () => ({ data: [] }),
+                current: async () => ({ data: createProject("project-1", "E:/repo-1") }),
+            },
+            session: {
+                create: async () => ({ data: createSession("session-1", "project-1", "E:/repo-1") }),
+                prompt: async () => ({
+                    data: {
+                        info: {} as never,
+                        parts: [],
+                    },
+                }),
+            },
+        } as never,
+        async () => {
+            fetchCalls += 1;
+
+            return new Response(JSON.stringify({
+                data: [{ id: "gpt-5" }],
+            }), {
+                status: 200,
+                headers: {
+                    "content-type": "application/json",
+                },
+            });
+        },
+    );
+
+    await client.listModels();
+    await client.listModels();
+    (client as unknown as { modelCache: { expiresAt: number } }).modelCache.expiresAt = Date.now() - 1;
+    await client.listModels();
+
+    assert.equal(configCalls, 2);
+    assert.equal(providerCalls, 2);
+    assert.equal(fetchCalls, 2);
+});
+
+test("permission helpers forward list and reply calls to the SDK", async () => {
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            config: {
+                get: async () => ({ provider: {} }),
+                providers: async () => ({ providers: [], default: {} }),
+            },
+            path: {
+                get: async () => createPath(),
+            },
+            permission: {
+                list: async (input: unknown, options: unknown) => {
+                    assert.deepEqual(input, { directory: "E:/repo" });
+                    assert.deepEqual(options, {
+                        responseStyle: "data",
+                        throwOnError: true,
+                    });
+
+                    return {
+                        data: [{
+                            id: "request-1",
+                            sessionID: "session-1",
+                            permission: "read",
+                            patterns: ["src/**"],
+                            metadata: {},
+                            always: [],
+                        }],
+                    };
+                },
+                reply: async (input: unknown, options: unknown) => {
+                    assert.deepEqual(input, {
+                        requestID: "request-1",
+                        reply: "once",
+                        message: "approved",
+                    });
+                    assert.deepEqual(options, {
+                        responseStyle: "data",
+                        throwOnError: true,
+                    });
+
+                    return {
+                        data: true,
+                    };
+                },
+            },
+            project: {
+                list: async () => [],
+                current: async () => createProject("project-1", "E:/repo-1"),
+            },
+            session: {
+                create: async () => createSession("session-1", "project-1", "E:/repo-1"),
+                prompt: async () => ({
+                    info: {} as never,
+                    parts: [],
+                }),
+            },
+        } as never,
+    );
+
+    assert.deepEqual(await client.listPendingPermissions("E:/repo"), [{
+        id: "request-1",
+        sessionID: "session-1",
+        permission: "read",
+        patterns: ["src/**"],
+        metadata: {},
+        always: [],
+    }]);
+    assert.equal(await client.replyToPermission("request-1", "once", "approved"), true);
+});

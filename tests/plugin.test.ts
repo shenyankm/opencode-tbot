@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
@@ -27,8 +27,8 @@ function createConfig(overrides: PluginConfigSource = {}): PluginConfigSource {
         telegram: {
             botToken: "telegram-token",
         },
-        database: {
-            path: "./data/opencode-tbot.sqlite",
+        state: {
+            path: "./data/opencode-tbot.state.json",
         },
         logLevel: "info",
     }, overrides);
@@ -124,7 +124,8 @@ test("loadAppConfig resolves plugin configuration from the config file shape", (
     const config = loadAppConfig(createConfig(), { cwd });
 
     assert.equal(config.telegramBotToken, "telegram-token");
-    assert.equal(config.botStateDbPath, join(cwd, "data/opencode-tbot.sqlite"));
+    assert.equal(config.telegramApiRoot, "https://api.telegram.org");
+    assert.equal(config.stateFilePath, join(cwd, "data/opencode-tbot.state.json"));
     assert.equal(config.openrouter.configured, false);
     assert.equal(config.openrouter.model, DEFAULT_OPENROUTER_MODEL);
 });
@@ -183,13 +184,31 @@ test("preparePluginConfiguration loads the legacy config filename when the new f
     assert.equal(prepared.configFilePath, legacyConfigFilePath);
 });
 
-test("preparePluginConfiguration prompts for a missing token and preserves unrelated config", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-plugin-prompt-"));
-    const configFilePath = join(cwd, PLUGIN_CONFIG_FILE_NAME);
+test("preparePluginConfiguration merges global defaults with project overrides", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-plugin-merge-"));
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-home-"));
+    const globalConfigFilePath = join(homeDir, ".config", "opencode", "opencode-tbot", "config.json");
+
+    mkdirSync(join(homeDir, ".config", "opencode", "opencode-tbot"), { recursive: true });
     writeFileSync(
-        configFilePath,
+        globalConfigFilePath,
         serializePluginConfig({
+            telegram: {
+                botToken: "global-token",
+            },
+            state: {
+                path: "./global-state.json",
+            },
             logLevel: "debug",
+        }),
+        "utf8",
+    );
+    writeFileSync(
+        join(cwd, PLUGIN_CONFIG_FILE_NAME),
+        serializePluginConfig({
+            state: {
+                path: "./project-state.json",
+            },
             openrouter: {
                 model: "openai/gpt-audio-mini",
             },
@@ -199,38 +218,27 @@ test("preparePluginConfiguration prompts for a missing token and preserves unrel
 
     const prepared = await preparePluginConfiguration({
         cwd,
-        isInteractive: () => true,
-        promptForTelegramBotToken: async () => "prompted-token",
+        homeDir,
     });
 
-    assert.equal(prepared.config.telegram?.botToken, "prompted-token");
-    assert.equal(
-        readFileSync(configFilePath, "utf8"),
-        serializePluginConfig({
-            telegram: {
-                botToken: "prompted-token",
-            },
-            openrouter: {
-                model: "openai/gpt-audio-mini",
-            },
-            logLevel: "debug",
-        }),
-    );
+    assert.equal(prepared.config.telegram?.botToken, "global-token");
+    assert.equal(prepared.config.logLevel, "debug");
+    assert.equal(prepared.config.state?.path, "./project-state.json");
+    assert.equal(prepared.config.openrouter?.model, "openai/gpt-audio-mini");
+    assert.equal(prepared.globalConfigFilePath, globalConfigFilePath);
 });
 
-test("preparePluginConfiguration fails fast when telegram.botToken is missing without a TTY", async () => {
+test("preparePluginConfiguration keeps missing tokens unresolved for the installer flow", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-plugin-no-tty-"));
+    const prepared = await preparePluginConfiguration({
+        cwd,
+        config: {
+            logLevel: "info",
+        },
+    });
 
-    await assert.rejects(
-        preparePluginConfiguration({
-            cwd,
-            config: {
-                logLevel: "info",
-            },
-            isInteractive: () => false,
-        }),
-        /Missing telegram\.botToken/,
-    );
+    assert.equal(prepared.config.telegram?.botToken, undefined);
+    assert.equal(prepared.config.logLevel, "info");
 });
 
 test("ensureTelegramBotPluginRuntime starts the Telegram runtime only once per worktree", async () => {

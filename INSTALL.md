@@ -1,79 +1,92 @@
 # Install `opencode-tbot`
 
-## Option A: Let OpenCode Or Another LLM Agent Install It
+## Recommended
 
-Paste this into OpenCode, Claude Code, Cursor, or another coding agent:
+Run:
 
-```text
-Install the opencode-tbot plugin for OpenCode.
-
-Do all of the following without removing existing unrelated configuration:
-1. Open or create ~/.config/opencode/opencode.json
-2. Ensure the config uses the singular "plugin" key
-3. Append "opencode-tbot@latest" to the "plugin" array if it is not already present
-4. In the current project, open or create tbot.config.json
-5. Ask me for the Telegram bot token and write it to telegram.botToken if I provide it
-6. If I do not provide the token, leave tbot.config.json ready for manual completion and do not block plugin registration
-7. Preserve any existing plugins and any unrelated configuration keys
-8. After editing, show me the exact changes and tell me to restart OpenCode
+```bash
+npx opencode-tbot@latest install
 ```
 
-Windows note: in OpenCode config paths, `~` means your home directory.
+The installer will:
 
-## Option B: Manual Setup
+1. update `~/.config/opencode/opencode.json`
+2. ensure the `plugin` array contains `opencode-tbot@latest`
+3. prompt for the Telegram bot token
+4. ask whether voice transcription should be enabled
+5. prompt for the OpenRouter API key when voice transcription is enabled
+6. write plugin defaults to `~/.config/opencode/opencode-tbot/config.json`
 
-### 1. Register the plugin globally
+Restart OpenCode after installation.
 
-Edit `~/.config/opencode/opencode.json`:
+## Non-Interactive
 
-```json
-{
-  "plugin": ["opencode-tbot@latest"]
-}
+Example:
+
+```bash
+npx opencode-tbot@latest install \
+  --bot-token <telegram-token> \
+  --disable-voice
 ```
 
-If the file already exists, merge this into the existing JSON and keep other plugins.
+If voice transcription is enabled:
 
-### 2. Configure the current worktree
+```bash
+npx opencode-tbot@latest install \
+  --bot-token <telegram-token> \
+  --enable-voice \
+  --openrouter-api-key <openrouter-key>
+```
 
-Create or update `tbot.config.json` in the project where OpenCode will run:
+Useful flags:
+
+- `--telegram-api-root <url>`
+- `--skip-register`
+- `--home-dir <path>`
+
+`--skip-register` only skips the OpenCode global registration step. The plugin config file is still written.
+
+## Project Overrides
+
+The installer writes global defaults to:
+
+- `~/.config/opencode/opencode-tbot/config.json`
+
+You can override them per worktree with:
+
+- `<worktree>/tbot.config.json`
+- legacy fallback: `<worktree>/opencode-tbot.config.json`
+
+The runtime loads global defaults first, then deep-merges the project config on top.
+
+Example project override:
 
 ```json
 {
   "telegram": {
-    "botToken": "your_telegram_bot_token",
-    "allowedChatIds": []
+    "allowedChatIds": [123456789]
   },
-  "database": {
-    "path": "./data/opencode-tbot.sqlite"
+  "state": {
+    "path": "./data/opencode-tbot.state.json"
   },
-  "openrouter": {
-    "apiKey": "",
-    "model": "openai/gpt-audio-mini",
-    "timeoutMs": 30000,
-    "transcriptionPrompt": ""
-  },
-  "logLevel": "info",
-  "opencodeApiKey": ""
+  "logLevel": "info"
 }
 ```
 
-`telegram.botToken` is required for the bot to start.
+## Agent Prompt
 
-### 3. Restart OpenCode
+If you want another coding agent to perform the install, give it this:
 
-Restart OpenCode after updating `opencode.json` or `tbot.config.json`.
+```text
+Install opencode-tbot for OpenCode by running:
+npx opencode-tbot@latest install
 
-### 4. Verify The Plugin
+If the environment is non-interactive, use:
+- --bot-token for the Telegram bot token
+- --enable-voice or --disable-voice
+- --openrouter-api-key when voice transcription is enabled
 
-OpenCode must be running from the same worktree that contains the `tbot.config.json` you configured.
-
-- If you already set `telegram.botToken`, message the bot with `/start` or `/status`.
-- If you skipped the token during installation, add it to `tbot.config.json` first and then restart OpenCode.
-
-## Notes
-
-- Plugin registration is global through `~/.config/opencode/opencode.json`.
-- Telegram bot credentials stay local to each project through that worktree's `tbot.config.json`.
-- If `telegram.botToken` is still missing at runtime and startup is interactive, the plugin can prompt for it on first run and write the value back to `tbot.config.json`.
-- The legacy filename `opencode-tbot.config.json` is still accepted for backward compatibility.
+Do not remove unrelated existing configuration.
+Preserve existing plugins in ~/.config/opencode/opencode.json.
+Show me the final changes and tell me to restart OpenCode.
+```

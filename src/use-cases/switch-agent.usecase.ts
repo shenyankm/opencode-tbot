@@ -1,5 +1,5 @@
-import type { Logger } from "pino";
 import type { SessionRepository } from "../domain/session/session.repository.js";
+import type { AppLogger } from "../infra/logger/index.js";
 import type {
     OpenCodeAgent,
     OpenCodeClientLike,
@@ -18,7 +18,7 @@ export class SwitchAgentUseCase {
     constructor(
         private readonly sessionRepo: SessionRepository,
         private readonly opencodeClient: OpenCodeClientLike,
-        private readonly logger: Logger,
+        private readonly logger: AppLogger,
     ) { }
 
     async execute(input: { chatId: number; agentName: string }): Promise<SwitchAgentResult> {

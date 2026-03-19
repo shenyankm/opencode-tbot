@@ -1,89 +1,66 @@
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { stdin, stdout } from "node:process";
-import { createInterface } from "node:readline/promises";
 import type { PluginConfigSource } from "./config.js";
 
 export const PLUGIN_CONFIG_FILE_NAME = "tbot.config.json";
-const LEGACY_PLUGIN_CONFIG_FILE_NAMES = ["opencode-tbot.config.json"];
+export const LEGACY_PLUGIN_CONFIG_FILE_NAME = "opencode-tbot.config.json";
+export const GLOBAL_PLUGIN_DIRECTORY_NAME = "opencode-tbot";
+export const GLOBAL_PLUGIN_CONFIG_FILE_NAME = "config.json";
+export const OPENCODE_CONFIG_FILE_NAME = "opencode.json";
 
 export interface PreparedPluginConfiguration {
     cwd: string;
     config: PluginConfigSource;
-    configFilePath: string;
-}
-
-export interface PromptTelegramBotTokenContext {
-    cwd: string;
+    globalConfigFilePath: string;
+    projectConfigFilePath: string;
     configFilePath: string;
 }
 
 export interface PreparePluginConfigurationOptions {
     cwd: string;
     config?: PluginConfigSource;
-    isInteractive?: () => boolean;
-    promptForTelegramBotToken?: (
-        context: PromptTelegramBotTokenContext,
-    ) => Promise<string>;
+    homeDir?: string;
 }
 
 export async function preparePluginConfiguration(
     options: PreparePluginConfigurationOptions,
 ): Promise<PreparedPluginConfiguration> {
-    const configFilePath = await resolvePluginConfigFilePath(options.cwd);
-    const fileConfig = await loadPluginConfigFile(configFilePath);
-    let config = mergePluginConfigSources(fileConfig, options.config);
-    const token = normalizeConfigString(config.telegram?.botToken);
-
-    if (!token) {
-        const isInteractive = options.isInteractive ?? isInteractiveTerminal;
-
-        if (!isInteractive()) {
-            throw new Error(
-                [
-                    "Missing telegram.botToken for the Telegram bot plugin.",
-                    `Add it to ${configFilePath} before starting OpenCode.`,
-                ].join(" "),
-            );
-        }
-
-        console.info("[opencode-tbot] telegram.botToken is missing.");
-        console.info(`[opencode-tbot] The value will be saved to ${configFilePath}.`);
-
-        const promptForTelegramBotToken = options.promptForTelegramBotToken ?? promptForTelegramBotTokenFromTerminal;
-        const promptedToken = normalizeRequiredConfigString(
-            await promptForTelegramBotToken({ cwd: options.cwd, configFilePath }),
-            "telegram.botToken cannot be empty.",
-        );
-
-        config = withTelegramBotToken(config, promptedToken);
-        await writePluginConfigFile(configFilePath, config);
-
-        console.info(`[opencode-tbot] Saved telegram.botToken to ${configFilePath}.`);
-    }
+    const homeDir = options.homeDir ?? homedir();
+    const globalConfigFilePath = getGlobalPluginConfigFilePath(homeDir);
+    const projectConfigFilePath = await resolveProjectPluginConfigFilePath(options.cwd);
+    const [globalConfig, projectConfig] = await Promise.all([
+        loadPluginConfigFile(globalConfigFilePath),
+        loadPluginConfigFile(projectConfigFilePath),
+    ]);
+    const config = mergePluginConfigSources(globalConfig, projectConfig, options.config);
+    const configFilePath = await pathExists(projectConfigFilePath)
+        ? projectConfigFilePath
+        : globalConfigFilePath;
 
     return {
         cwd: options.cwd,
         config,
+        globalConfigFilePath,
+        projectConfigFilePath,
         configFilePath,
     };
 }
 
-export async function promptForTelegramBotTokenFromTerminal(
-    context: PromptTelegramBotTokenContext,
-): Promise<string> {
-    const readline = createInterface({
-        input: stdin,
-        output: stdout,
-    });
+export function getOpenCodeConfigDirectory(homeDir: string = homedir()): string {
+    return join(homeDir, ".config", "opencode");
+}
 
-    try {
-        return await readline.question(
-            `Enter telegram.botToken for opencode-tbot (${context.configFilePath}): `,
-        );
-    } finally {
-        readline.close();
-    }
+export function getOpenCodeConfigFilePath(homeDir: string = homedir()): string {
+    return join(getOpenCodeConfigDirectory(homeDir), OPENCODE_CONFIG_FILE_NAME);
+}
+
+export function getGlobalPluginConfigFilePath(homeDir: string = homedir()): string {
+    return join(
+        getOpenCodeConfigDirectory(homeDir),
+        GLOBAL_PLUGIN_DIRECTORY_NAME,
+        GLOBAL_PLUGIN_CONFIG_FILE_NAME,
+    );
 }
 
 export async function writePluginConfigFile(
@@ -104,30 +81,39 @@ export function mergePluginConfigSources(
             continue;
         }
 
+        const normalized = normalizePluginConfigSource(source);
         const previousTelegram = merged.telegram;
+        const previousState = merged.state;
         const previousDatabase = merged.database;
         const previousOpenRouter = merged.openrouter;
 
-        Object.assign(merged, source);
+        Object.assign(merged, normalized);
 
-        if (source.telegram) {
+        if (normalized.telegram) {
             merged.telegram = {
                 ...(previousTelegram ?? {}),
-                ...source.telegram,
+                ...normalized.telegram,
             };
         }
 
-        if (source.database) {
+        if (normalized.state) {
+            merged.state = {
+                ...(previousState ?? {}),
+                ...normalized.state,
+            };
+        }
+
+        if (normalized.database) {
             merged.database = {
                 ...(previousDatabase ?? {}),
-                ...source.database,
+                ...normalized.database,
             };
         }
 
-        if (source.openrouter) {
+        if (normalized.openrouter) {
             merged.openrouter = {
                 ...(previousOpenRouter ?? {}),
-                ...source.openrouter,
+                ...normalized.openrouter,
             };
         }
     }
@@ -175,29 +161,22 @@ function parsePluginConfigText(
     }
 }
 
-function withTelegramBotToken(
-    config: PluginConfigSource,
-    botToken: string,
-): PluginConfigSource {
-    return mergePluginConfigSources(config, {
-        telegram: {
-            botToken,
-        },
-    });
-}
-
 function orderPluginConfig(config: PluginConfigSource): PluginConfigSource {
     const prioritizedKeys = new Set([
         "telegram",
+        "state",
         "database",
         "openrouter",
         "logLevel",
-        "opencodeApiKey",
     ]);
     const ordered: PluginConfigSource = {};
 
     if (config.telegram) {
         ordered.telegram = config.telegram;
+    }
+
+    if (config.state) {
+        ordered.state = config.state;
     }
 
     if (config.database) {
@@ -212,10 +191,6 @@ function orderPluginConfig(config: PluginConfigSource): PluginConfigSource {
         ordered.logLevel = config.logLevel;
     }
 
-    if (config.opencodeApiKey !== undefined) {
-        ordered.opencodeApiKey = config.opencodeApiKey;
-    }
-
     for (const [key, value] of Object.entries(config)) {
         if (!prioritizedKeys.has(key)) {
             ordered[key] = value;
@@ -223,30 +198,6 @@ function orderPluginConfig(config: PluginConfigSource): PluginConfigSource {
     }
 
     return ordered;
-}
-
-function isInteractiveTerminal(): boolean {
-    return Boolean(stdin.isTTY && stdout.isTTY);
-}
-
-function normalizeConfigString(value: string | undefined): string | null {
-    if (value === undefined) {
-        return null;
-    }
-
-    const normalized = value.trim();
-
-    return normalized.length > 0 ? normalized : null;
-}
-
-function normalizeRequiredConfigString(value: string, errorMessage: string): string {
-    const normalized = value.trim();
-
-    if (normalized.length === 0) {
-        throw new Error(errorMessage);
-    }
-
-    return normalized;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -257,19 +208,17 @@ function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
     return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
-async function resolvePluginConfigFilePath(cwd: string): Promise<string> {
+async function resolveProjectPluginConfigFilePath(cwd: string): Promise<string> {
     const preferredPath = join(cwd, PLUGIN_CONFIG_FILE_NAME);
 
     if (await pathExists(preferredPath)) {
         return preferredPath;
     }
 
-    for (const legacyFileName of LEGACY_PLUGIN_CONFIG_FILE_NAMES) {
-        const legacyPath = join(cwd, legacyFileName);
+    const legacyPath = join(cwd, LEGACY_PLUGIN_CONFIG_FILE_NAME);
 
-        if (await pathExists(legacyPath)) {
-            return legacyPath;
-        }
+    if (await pathExists(legacyPath)) {
+        return legacyPath;
     }
 
     return preferredPath;
@@ -286,4 +235,18 @@ async function pathExists(filePath: string): Promise<boolean> {
 
         throw error;
     }
+}
+
+function normalizePluginConfigSource(source: PluginConfigSource): PluginConfigSource {
+    if (source.state?.path || !source.database?.path) {
+        return source;
+    }
+
+    return {
+        ...source,
+        state: {
+            ...(source.state ?? {}),
+            path: source.database.path,
+        },
+    };
 }

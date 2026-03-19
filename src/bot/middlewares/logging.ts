@@ -1,5 +1,5 @@
 import type { MiddlewareFn } from "grammy";
-import type { Logger } from "pino";
+import type { AppLogger } from "../../infra/logger/index.js";
 import { createRedactedPreview } from "../../infra/utils/redact.js";
 
 interface LoggingContextLike {
@@ -26,7 +26,7 @@ export function buildIncomingUpdateLogFields(ctx: LoggingContextLike) {
     };
 }
 
-export function createLoggingMiddleware(logger: Pick<Logger, "info">): MiddlewareFn {
+export function createLoggingMiddleware(logger: Pick<AppLogger, "info">): MiddlewareFn {
     return async (ctx, next) => {
         logger.info(
             buildIncomingUpdateLogFields(ctx),

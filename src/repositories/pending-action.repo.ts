@@ -1,15 +1,7 @@
-import type { DatabaseSync, StatementSync } from "node:sqlite";
-import type { PendingChatAction, SessionRenamePendingAction } from "../domain/pending-action/pending-action.entity.js";
+import type { PendingChatAction } from "../domain/pending-action/pending-action.entity.js";
 import type { PendingActionRepository } from "../domain/pending-action/pending-action.repository.js";
-
-interface PendingChatActionRow {
-    chat_id: number;
-    kind: "session_rename";
-    menu_message_id: number;
-    return_page: number;
-    session_id: string;
-    updated_at: string;
-}
+import type { OpencodeTbotState } from "../services/storage/bot-state.js";
+import type { JsonStateStore } from "../services/storage/json-state-store.js";
 
 export class InMemoryPendingActionRepository implements PendingActionRepository {
     private readonly actionsByChatId = new Map<number, PendingChatAction>();
@@ -27,81 +19,24 @@ export class InMemoryPendingActionRepository implements PendingActionRepository 
     }
 }
 
-export class SQLitePendingActionRepository implements PendingActionRepository {
-    private readonly clearStatement: StatementSync;
-    private readonly getByChatIdStatement: StatementSync;
-    private readonly setStatement: StatementSync;
-
-    constructor(private readonly database: DatabaseSync) {
-        this.getByChatIdStatement = this.database.prepare(`
-            SELECT
-                chat_id,
-                kind,
-                session_id,
-                menu_message_id,
-                return_page,
-                updated_at
-            FROM chat_pending_actions
-            WHERE chat_id = $chatId
-        `);
-        this.setStatement = this.database.prepare(`
-            INSERT INTO chat_pending_actions (
-                chat_id,
-                kind,
-                session_id,
-                menu_message_id,
-                return_page,
-                updated_at
-            ) VALUES (
-                $chatId,
-                $kind,
-                $sessionId,
-                $menuMessageId,
-                $returnPage,
-                $updatedAt
-            )
-            ON CONFLICT(chat_id) DO UPDATE SET
-                kind = excluded.kind,
-                session_id = excluded.session_id,
-                menu_message_id = excluded.menu_message_id,
-                return_page = excluded.return_page,
-                updated_at = excluded.updated_at
-        `);
-        this.clearStatement = this.database.prepare(`
-            DELETE FROM chat_pending_actions
-            WHERE chat_id = $chatId
-        `);
-    }
+export class FilePendingActionRepository implements PendingActionRepository {
+    constructor(private readonly store: JsonStateStore<OpencodeTbotState>) { }
 
     async getByChatId(chatId: number): Promise<PendingChatAction | null> {
-        const row = this.getByChatIdStatement.get({ chatId }) as PendingChatActionRow | undefined;
+        const state = await this.store.read();
 
-        return row ? mapRowToPendingAction(row) : null;
+        return state.pendingActions[String(chatId)] ?? null;
     }
 
     async set(action: PendingChatAction): Promise<void> {
-        this.setStatement.run({
-            chatId: action.chatId,
-            kind: action.kind,
-            sessionId: action.sessionId,
-            menuMessageId: action.menuMessageId,
-            returnPage: action.returnPage,
-            updatedAt: action.updatedAt,
+        await this.store.update((state) => {
+            state.pendingActions[String(action.chatId)] = action;
         });
     }
 
     async clear(chatId: number): Promise<void> {
-        this.clearStatement.run({ chatId });
+        await this.store.update((state) => {
+            delete state.pendingActions[String(chatId)];
+        });
     }
-}
-
-function mapRowToPendingAction(row: PendingChatActionRow): SessionRenamePendingAction {
-    return {
-        chatId: row.chat_id,
-        kind: row.kind,
-        sessionId: row.session_id,
-        menuMessageId: row.menu_message_id,
-        returnPage: row.return_page,
-        updatedAt: row.updated_at,
-    };
 }

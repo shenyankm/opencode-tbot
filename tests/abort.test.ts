@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { Logger } from "pino";
 import { handleCancelCommand } from "../src/bot/commands/cancel.js";
+import type { AppLogger } from "../src/infra/logger/index.js";
 import { InMemoryPendingActionRepository } from "../src/repositories/pending-action.repo.js";
 import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
 import { AbortPromptUseCase } from "../src/use-cases/abort-prompt.usecase.js";
@@ -9,7 +9,7 @@ import { AbortPromptUseCase } from "../src/use-cases/abort-prompt.usecase.js";
 const logger = {
     error() { },
     warn() { },
-} as unknown as Logger;
+} as unknown as AppLogger;
 
 test("AbortPromptUseCase reports no_session when the chat has no bound session", async () => {
     const repo = new InMemorySessionRepository();

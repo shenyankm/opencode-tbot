@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { Logger } from "pino";
 import { getChatCopy } from "../src/bot/i18n.js";
 import { handleHelpCommand } from "../src/bot/commands/help.js";
 import { handleStartCommand } from "../src/bot/commands/start.js";
+import type { AppLogger } from "../src/infra/logger/index.js";
 import {
     presentHelpMarkdownMessage,
     presentStartMarkdownMessage,
@@ -15,7 +15,7 @@ import type { BotDependencies } from "../src/bot/types.js";
 const logger = {
     error() { },
     info() { },
-} as unknown as Logger;
+} as unknown as AppLogger;
 
 function createDependencies() {
     const sessionRepo = new InMemorySessionRepository();

@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { Logger } from "pino";
 import { getChatCopy } from "../src/bot/i18n.js";
 import { handleStatusCommand } from "../src/bot/commands/status.js";
 import { presentStatusMarkdownMessage } from "../src/bot/presenters/message.presenter.js";
+import type { AppLogger } from "../src/infra/logger/index.js";
 import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
 import type {
     OpenCodeClientLike,
@@ -19,7 +19,7 @@ import { ListMcpUseCase } from "../src/use-cases/list-mcp.usecase.js";
 const logger = {
     error() { },
     info() { },
-} as unknown as Logger;
+} as unknown as AppLogger;
 
 interface StatusReply {
     options?: {

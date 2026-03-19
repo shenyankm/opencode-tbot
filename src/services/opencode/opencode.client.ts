@@ -8,6 +8,7 @@ import {
     type Model,
     type OpencodeClient,
     type Part,
+    type PermissionRequest,
     type Path,
     type Provider,
     type Project,
@@ -85,6 +86,7 @@ export type OpenCodeLspStatus = LspStatus;
 export type OpenCodePath = Path;
 export type OpenCodeMcpStatus = McpStatus;
 export type OpenCodeSessionStatus = SessionStatus;
+export type OpenCodePermissionRequest = PermissionRequest;
 export interface OpenCodeHealth {
     healthy: boolean;
     version: string;
@@ -100,7 +102,7 @@ export interface OpenCodeConfiguredModel {
     variants: Record<string, Record<string, unknown>>;
 }
 
-export type OpenCodeSdkClientLike = Pick<OpencodeClient, "app" | "config" | "global" | "lsp" | "mcp" | "path" | "project" | "session">;
+export type OpenCodeSdkClientLike = Pick<OpencodeClient, "app" | "config" | "global" | "lsp" | "mcp" | "path" | "permission" | "project" | "session">;
 type MaybeWrappedResponse<T> = T | { data: T };
 type OpenCodeProviderCatalog = {
     providers: OpenCodeProvider[];
@@ -139,6 +141,7 @@ const StructuredReplySchema = z.object({
 });
 
 export interface OpenCodeClientLike {
+    readonly client?: OpenCodeSdkClientLike;
     abortSession(sessionId: string): Promise<boolean>;
     getHealth(): Promise<OpenCodeHealth>;
     getPath(): Promise<OpenCodePath>;
@@ -151,13 +154,24 @@ export interface OpenCodeClientLike {
     createSessionForDirectory(directory: string, title?: string): Promise<OpenCodeSession>;
     renameSession(sessionId: string, title: string): Promise<OpenCodeSession>;
     listAgents(): Promise<OpenCodeAgent[]>;
+    listPendingPermissions(directory?: string): Promise<OpenCodePermissionRequest[]>;
+    replyToPermission(requestId: string, reply: "once" | "always" | "reject", message?: string): Promise<boolean>;
     listModels(): Promise<OpenCodeConfiguredModel[]>;
     promptSession(input: PromptSessionInput): Promise<PromptSessionResult>;
 }
 
 export class OpenCodeClient implements OpenCodeClientLike {
-    private readonly client: OpenCodeSdkClientLike;
+    readonly client: OpenCodeSdkClientLike;
     private readonly fetchFn: typeof fetch;
+    private modelCache: {
+        expiresAt: number;
+        promise: Promise<OpenCodeConfiguredModel[]> | null;
+        value: OpenCodeConfiguredModel[] | null;
+    } = {
+        expiresAt: 0,
+        promise: null,
+        value: null,
+    };
 
     constructor(
         options?: OpenCodeClientOptions,
@@ -266,20 +280,56 @@ export class OpenCodeClient implements OpenCodeClientLike {
         return unwrapSdkData(response);
     }
 
-    async listModels(): Promise<OpenCodeConfiguredModel[]> {
-        const [configResponse, providersResponse] = await Promise.all([
-            this.client.config.get(undefined, SDK_OPTIONS) as Promise<MaybeWrappedResponse<OpenCodeConfig>>,
-            this.client.config.providers(undefined, SDK_OPTIONS) as Promise<MaybeWrappedResponse<OpenCodeProviderCatalog>>,
-        ]);
-        const config = unwrapSdkData(configResponse);
-        const providerCatalog = unwrapSdkData(providersResponse);
-        const providerAvailability = await resolveProviderAvailability(config, this.fetchFn);
+    async listPendingPermissions(directory?: string): Promise<OpenCodePermissionRequest[]> {
+        const response = await this.client.permission.list(
+            directory
+                ? { directory }
+                : undefined,
+            SDK_OPTIONS,
+        ) as MaybeWrappedResponse<OpenCodePermissionRequest[]>;
 
-        return buildSelectableModels(
-            config,
-            providerCatalog.providers,
-            providerAvailability,
-        );
+        return unwrapSdkData(response);
+    }
+
+    async replyToPermission(
+        requestId: string,
+        reply: "once" | "always" | "reject",
+        message?: string,
+    ): Promise<boolean> {
+        const response = await this.client.permission.reply(
+            {
+                requestID: requestId,
+                reply,
+                ...(message?.trim()
+                    ? { message: message.trim() }
+                    : {}),
+            },
+            SDK_OPTIONS,
+        ) as MaybeWrappedResponse<boolean>;
+
+        return unwrapSdkData(response);
+    }
+
+    async listModels(): Promise<OpenCodeConfiguredModel[]> {
+        const now = Date.now();
+
+        if (this.modelCache.value && this.modelCache.expiresAt > now) {
+            return this.modelCache.value;
+        }
+
+        if (this.modelCache.promise) {
+            return this.modelCache.promise;
+        }
+
+        const refreshPromise = this.loadModels().finally(() => {
+            if (this.modelCache.promise === refreshPromise) {
+                this.modelCache.promise = null;
+            }
+        });
+
+        this.modelCache.promise = refreshPromise;
+
+        return refreshPromise;
     }
 
     async promptSession(input: PromptSessionInput): Promise<PromptSessionResult> {
@@ -326,6 +376,29 @@ export class OpenCodeClient implements OpenCodeClientLike {
             parts: data.parts,
             structured: data.info?.structured ?? null,
         };
+    }
+
+    private async loadModels(): Promise<OpenCodeConfiguredModel[]> {
+        const [configResponse, providersResponse] = await Promise.all([
+            this.client.config.get(undefined, SDK_OPTIONS) as Promise<MaybeWrappedResponse<OpenCodeConfig>>,
+            this.client.config.providers(undefined, SDK_OPTIONS) as Promise<MaybeWrappedResponse<OpenCodeProviderCatalog>>,
+        ]);
+        const config = unwrapSdkData(configResponse);
+        const providerCatalog = unwrapSdkData(providersResponse);
+        const providerAvailability = await resolveProviderAvailability(config, this.fetchFn);
+        const models = buildSelectableModels(
+            config,
+            providerCatalog.providers,
+            providerAvailability,
+        );
+
+        this.modelCache = {
+            expiresAt: Date.now() + 60_000,
+            promise: null,
+            value: models,
+        };
+
+        return models;
     }
 }
 

@@ -1,5 +1,5 @@
-import type { Logger } from "pino";
 import type { SessionRepository } from "../domain/session/session.repository.js";
+import type { AppLogger } from "../infra/logger/index.js";
 import type {
     OpenCodeClientLike,
     OpenCodeSession,
@@ -14,7 +14,7 @@ export class CreateSessionUseCase {
     constructor(
         private readonly sessionRepo: SessionRepository,
         private readonly opencodeClient: OpenCodeClientLike,
-        private readonly logger: Logger,
+        private readonly logger: AppLogger,
     ) { }
 
     async execute(input: { chatId: number; title?: string | null }): Promise<CreateSessionResult> {

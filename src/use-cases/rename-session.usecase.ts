@@ -1,5 +1,5 @@
-import type { Logger } from "pino";
 import type { SessionRepository } from "../domain/session/session.repository.js";
+import type { AppLogger } from "../infra/logger/index.js";
 import type { OpenCodeClientLike, OpenCodeSession } from "../services/opencode/opencode.client.js";
 
 export type RenameSessionResult =
@@ -15,7 +15,7 @@ export class RenameSessionUseCase {
     constructor(
         private readonly sessionRepo: SessionRepository,
         private readonly opencodeClient: OpenCodeClientLike,
-        private readonly logger: Logger,
+        private readonly logger: AppLogger,
     ) { }
 
     async execute(input: { chatId: number; sessionId: string; title: string }): Promise<RenameSessionResult> {
