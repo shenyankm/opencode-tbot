@@ -8,8 +8,6 @@ dist/
 build/
 data/
 *.log
-.env
-.env.*
 tbot.config.json
 opencode-tbot.config.json
 

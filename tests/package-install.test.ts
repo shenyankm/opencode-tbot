@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 interface PackageJson {
@@ -12,6 +12,13 @@ interface PackageJson {
     keywords?: string[];
     dependencies?: Record<string, string>;
 }
+
+const ENV_RUNTIME_PATTERNS = [
+    /dotenv/u,
+    /process\.env/u,
+    /import\.meta\.env/u,
+    /(?:^|[^A-Za-z0-9])\.env(?:$|[^A-Za-z0-9])/u,
+];
 
 test("package.json exposes publishable plugin entrypoints", () => {
     const packageJson = JSON.parse(
@@ -43,6 +50,26 @@ test("package.json exposes publishable plugin entrypoints", () => {
     assert.equal(packageJson.dependencies?.dotenv, undefined);
 });
 
+test("runtime source does not depend on .env-based configuration", () => {
+    const sourceRoots = [
+        new URL("../src/", import.meta.url),
+        new URL("../scripts/", import.meta.url),
+    ];
+    const sourceFiles = sourceRoots.flatMap((root) => collectSourceFiles(root));
+
+    for (const file of sourceFiles) {
+        const content = readFileSync(file, "utf8");
+
+        for (const pattern of ENV_RUNTIME_PATTERNS) {
+            assert.equal(
+                pattern.test(content),
+                false,
+                `${file.pathname} unexpectedly matches ${pattern}`,
+            );
+        }
+    }
+});
+
 test("package root entry re-exports the plugin module", async () => {
     const rootModule = await import("../src/index.js");
     const pluginModule = await import("../src/plugin.js");
@@ -70,3 +97,22 @@ test("vite build keeps both npm and explicit plugin entrypoints", async () => {
     assert.equal(viteConfig.build?.outDir, "dist");
     assert.equal(viteConfig.build?.rollupOptions?.output?.entryFileNames, "[name].js");
 });
+
+function collectSourceFiles(directory: URL): URL[] {
+    const files: URL[] = [];
+
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+        const entryUrl = new URL(entry.name, directory);
+
+        if (entry.isDirectory()) {
+            files.push(...collectSourceFiles(new URL(`${entry.name}/`, directory)));
+            continue;
+        }
+
+        if (entry.isFile() && /\.(?:ts|js|mts|cts)$/u.test(entry.name)) {
+            files.push(entryUrl);
+        }
+    }
+
+    return files;
+}
