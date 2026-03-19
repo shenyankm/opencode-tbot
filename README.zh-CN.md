@@ -61,7 +61,7 @@ pnpm dev
 如果你希望先编译再运行：
 
 ```bash
-pnpm exec tsc -p tsconfig.json
+pnpm build
 pnpm start
 ```
 
@@ -104,6 +104,12 @@ pnpm typecheck
 
 ```bash
 pnpm test
+```
+
+运行依赖安全审计：
+
+```bash
+pnpm audit
 ```
 
 ## 常见问题

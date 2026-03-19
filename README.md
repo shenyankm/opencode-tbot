@@ -61,7 +61,7 @@ pnpm dev
 For a compiled run:
 
 ```bash
-pnpm exec tsc -p tsconfig.json
+pnpm build
 pnpm start
 ```
 
@@ -104,6 +104,12 @@ Run tests:
 
 ```bash
 pnpm test
+```
+
+Run a dependency audit:
+
+```bash
+pnpm audit
 ```
 
 ## FAQ

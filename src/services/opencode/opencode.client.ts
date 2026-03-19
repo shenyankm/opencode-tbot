@@ -21,6 +21,15 @@ export interface OpenCodeClientOptions {
     apiKey?: string;
 }
 
+export function buildOpenCodeSdkConfig(options: OpenCodeClientOptions) {
+    const apiKey = options.apiKey?.trim();
+
+    return {
+        baseUrl: options.baseUrl,
+        ...(apiKey ? { auth: apiKey } : {}),
+    };
+}
+
 export interface PromptSessionInput {
     sessionId: string;
     prompt: string;
@@ -143,9 +152,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
     private readonly fetchFn: typeof fetch;
 
     constructor(options: OpenCodeClientOptions, client?: OpenCodeSdkClient, fetchFn: typeof fetch = fetch) {
-        this.client = client ?? createOpencodeClient({
-            baseUrl: options.baseUrl,
-        });
+        this.client = client ?? createOpencodeClient(buildOpenCodeSdkConfig(options));
         this.fetchFn = fetchFn;
     }
 

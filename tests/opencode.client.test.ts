@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+    buildOpenCodeSdkConfig,
     OpenCodeClient,
     type OpenCodeModel,
     type OpenCodePath,
@@ -111,6 +112,31 @@ function createPath(overrides: Partial<OpenCodePath> = {}): OpenCodePath {
         ...overrides,
     };
 }
+
+test("buildOpenCodeSdkConfig forwards trimmed auth tokens when an API key is configured", () => {
+    assert.deepEqual(
+        buildOpenCodeSdkConfig({
+            baseUrl: "http://127.0.0.1:4096",
+            apiKey: "  secret-token  ",
+        }),
+        {
+            baseUrl: "http://127.0.0.1:4096",
+            auth: "secret-token",
+        },
+    );
+});
+
+test("buildOpenCodeSdkConfig omits auth when the API key is blank", () => {
+    assert.deepEqual(
+        buildOpenCodeSdkConfig({
+            baseUrl: "http://127.0.0.1:4096",
+            apiKey: "   ",
+        }),
+        {
+            baseUrl: "http://127.0.0.1:4096",
+        },
+    );
+});
 
 test("createSessionForDirectory forwards directory and title to the SDK", async () => {
     const calls: Array<{ input: unknown; options: unknown }> = [];
