@@ -55,7 +55,32 @@ interface LspMessageInput {
     statuses: OpenCodeLspStatus[];
 }
 
+interface StatusLayoutCopy {
+    currentDirectoryLabel: string;
+    detailsLabel: string;
+    divider: string;
+    errorStatus: string;
+    healthyStatus: string;
+    languageLabel: string;
+    lastUpdatedLabel: string;
+    lspTitle: string;
+    mcpNotesLabel: string;
+    mcpRegistrationRequiredStatus: string;
+    mcpTitle: string;
+    mcpFailedStatus: string;
+    noneStatus: string;
+    okLabel: string;
+    pageTitle: string;
+    rootLabel: string;
+    serverTitle: string;
+    serviceLabel: string;
+    statusLabel: string;
+    versionLabel: string;
+    workspaceTitle: string;
+}
+
 const VARIANT_ORDER = ["minimal", "none", "low", "medium", "high", "xhigh", "max"];
+
 export function presentHealthMessage(health: OpenCodeHealth, copy: BotCopy = BOT_COPY): string {
     return [
         copy.health.title,
@@ -69,26 +94,31 @@ export function presentPathMessage(path: OpenCodePath, copy: BotCopy = BOT_COPY)
 }
 
 export function presentStatusMessage(input: GetStatusResult, copy: BotCopy = BOT_COPY): string {
+    const layout = getStatusLayoutCopy(copy);
     const sections = [
-        input.health.status === "ok"
-            ? presentHealthMessage(input.health.data, copy)
-            : presentStatusErrorSection(copy.health.title, input.health.error, copy),
-        input.path.status === "ok"
-            ? [copy.path.title, presentPathMessage(input.path.data, copy)].join("\n")
-            : presentStatusErrorSection(copy.path.title, input.path.error, copy),
-        input.lsp.status === "ok"
-            ? presentLspMessage(input.lsp.data, copy)
-            : presentStatusErrorSection(copy.lsp.title, input.lsp.error, copy),
-        input.mcp.status === "ok"
-            ? presentMcpMessage(input.mcp.data, copy)
-            : presentStatusErrorSection(copy.mcp.title, input.mcp.error, copy),
+        presentStatusPlainSection(layout.serverTitle, presentStatusPlainServerLines(input, copy, layout)),
+        presentStatusPlainSection(layout.workspaceTitle, presentStatusPlainWorkspaceLines(input, copy, layout)),
+        presentStatusPlainSection(layout.mcpTitle, presentStatusPlainMcpLines(input, copy, layout)),
+        presentStatusPlainSection(layout.lspTitle, presentStatusPlainLspLines(input, copy, layout)),
+        layout.divider,
+        `${layout.lastUpdatedLabel}: ${formatStatusDate(new Date())}`,
     ];
 
-    return [
-        copy.systemStatus.title,
-        "",
-        ...sections.flatMap((section, index) => index === 0 ? [section] : ["", section]),
-    ].join("\n");
+    return presentStatusSections(layout.pageTitle, sections);
+}
+
+export function presentStatusMarkdownMessage(input: GetStatusResult, copy: BotCopy = BOT_COPY): string {
+    const layout = getStatusLayoutCopy(copy);
+    const sections = [
+        presentStatusMarkdownSection(layout.serverTitle, presentStatusMarkdownServerLines(input, copy, layout)),
+        presentStatusMarkdownSection(layout.workspaceTitle, presentStatusMarkdownWorkspaceLines(input, copy, layout)),
+        presentStatusMarkdownSection(layout.mcpTitle, presentStatusMarkdownMcpLines(input, copy, layout)),
+        presentStatusMarkdownSection(layout.lspTitle, presentStatusMarkdownLspLines(input, copy, layout)),
+        layout.divider,
+        `_${layout.lastUpdatedLabel}: ${formatStatusDate(new Date())}_`,
+    ];
+
+    return presentStatusSections(`# ${layout.pageTitle}`, sections);
 }
 
 export function presentMcpMessage(input: McpMessageInput, copy: BotCopy = BOT_COPY): string {
@@ -125,11 +155,329 @@ export function presentLspMessage(input: LspMessageInput, copy: BotCopy = BOT_CO
     return lines.join("\n");
 }
 
-function presentStatusErrorSection(title: string, error: unknown, copy: BotCopy): string {
+function presentStatusSections(title: string, sections: string[]): string {
     return [
         title,
-        presentError(error, copy),
+        "",
+        ...sections.flatMap((section, index) => index === 0 ? [section] : ["", section]),
     ].join("\n");
+}
+
+function presentStatusPlainSection(title: string, lines: string[]): string {
+    return [
+        title,
+        ...lines,
+    ].join("\n");
+}
+
+function presentStatusMarkdownSection(title: string, lines: string[]): string {
+    return [
+        `## ${title}`,
+        ...lines,
+    ].join("\n");
+}
+
+function presentStatusPlainServerLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
+    if (input.health.status === "error") {
+        return presentStatusPlainErrorLines(input.health.error, copy, layout);
+    }
+
+    return [
+        presentPlainStatusBullet(layout.statusLabel, formatHealthBadge(input.health.data.healthy, layout)),
+        presentPlainStatusBullet(layout.versionLabel, input.health.data.version),
+    ];
+}
+
+function presentStatusMarkdownServerLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
+    if (input.health.status === "error") {
+        return presentStatusMarkdownErrorLines(input.health.error, copy, layout);
+    }
+
+    return [
+        presentMarkdownStatusBullet(layout.statusLabel, formatHealthBadge(input.health.data.healthy, layout)),
+        presentMarkdownStatusBullet(layout.versionLabel, input.health.data.version),
+    ];
+}
+
+function presentStatusPlainWorkspaceLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
+    if (input.path.status === "error") {
+        return presentStatusPlainErrorLines(input.path.error, copy, layout);
+    }
+
+    return [
+        presentPlainStatusBullet(layout.currentDirectoryLabel, input.path.data.directory),
+    ];
+}
+
+function presentStatusMarkdownWorkspaceLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
+    if (input.path.status === "error") {
+        return presentStatusMarkdownErrorLines(input.path.error, copy, layout);
+    }
+
+    return [
+        presentMarkdownStatusBullet(layout.currentDirectoryLabel, input.path.data.directory, {
+            codeValue: true,
+        }),
+    ];
+}
+
+function presentStatusPlainLspLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
+    return buildPlainStatusTable(
+        [layout.languageLabel, layout.statusLabel, layout.rootLabel],
+        buildLspStatusRows(input, copy, layout),
+    );
+}
+
+function presentStatusMarkdownLspLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
+    return buildMarkdownStatusTable(
+        [layout.languageLabel, layout.statusLabel, layout.rootLabel],
+        buildLspStatusRows(input, copy, layout),
+    );
+}
+
+function presentStatusPlainMcpLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
+    return buildPlainStatusTable(
+        [layout.serviceLabel, layout.statusLabel, layout.mcpNotesLabel],
+        buildMcpStatusRows(input, copy, layout),
+    );
+}
+
+function presentStatusMarkdownMcpLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
+    return buildMarkdownStatusTable(
+        [layout.serviceLabel, layout.statusLabel, layout.mcpNotesLabel],
+        buildMcpStatusRows(input, copy, layout),
+    );
+}
+
+function buildLspStatusRows(
+    input: GetStatusResult,
+    copy: BotCopy,
+    layout: StatusLayoutCopy,
+): string[][] {
+    if (input.lsp.status === "error") {
+        return [["-", layout.errorStatus, flattenStatusError(input.lsp.error, copy)]];
+    }
+
+    if (input.lsp.data.statuses.length === 0) {
+        return [["-", layout.noneStatus, copy.lsp.none]];
+    }
+
+    return input.lsp.data.statuses.map((status) => [
+        status.name,
+        formatLspStatusBadge(status, copy),
+        status.root || "-",
+    ]);
+}
+
+function buildMcpStatusRows(
+    input: GetStatusResult,
+    copy: BotCopy,
+    layout: StatusLayoutCopy,
+): string[][] {
+    if (input.mcp.status === "error") {
+        return [["-", layout.errorStatus, flattenStatusError(input.mcp.error, copy)]];
+    }
+
+    if (input.mcp.data.statuses.length === 0) {
+        return [["-", layout.noneStatus, copy.mcp.none]];
+    }
+
+    return input.mcp.data.statuses.map(({ name, status }) => [
+        name,
+        formatMcpStatusBadge(status, copy, layout),
+        formatMcpStatusNotes(status, layout),
+    ]);
+}
+
+function buildPlainStatusTable(headers: string[], rows: string[][]): string[] {
+    return [
+        formatPlainTableRow(headers),
+        formatPlainTableSeparator(headers.length),
+        ...rows.map((row) => formatPlainTableRow(row)),
+    ];
+}
+
+function buildMarkdownStatusTable(headers: string[], rows: string[][]): string[] {
+    return [
+        `| ${headers.map(sanitizeTableCell).join(" | ")} |`,
+        `| ${headers.map(() => "---").join(" | ")} |`,
+        ...rows.map((row) => `| ${row.map(sanitizeTableCell).join(" | ")} |`),
+    ];
+}
+
+function formatPlainTableRow(columns: string[]): string {
+    return `| ${columns.map(sanitizeTableCell).join(" | ")} |`;
+}
+
+function formatPlainTableSeparator(columnCount: number): string {
+    return `| ${Array.from({ length: columnCount }, () => "---").join(" | ")} |`;
+}
+
+function sanitizeTableCell(value: string): string {
+    return value
+        .replace(/\r\n?/g, " / ")
+        .replace(/\|/g, "/")
+        .trim();
+}
+
+function presentStatusPlainErrorLines(error: unknown, copy: BotCopy, layout: StatusLayoutCopy): string[] {
+    const detailLines = splitStatusLines(presentError(error, copy));
+
+    return [
+        presentPlainStatusBullet(layout.statusLabel, layout.errorStatus),
+        ...detailLines.map((line) => presentPlainStatusBullet(layout.detailsLabel, line)),
+    ];
+}
+
+function presentStatusMarkdownErrorLines(error: unknown, copy: BotCopy, layout: StatusLayoutCopy): string[] {
+    const detailLines = splitStatusLines(presentError(error, copy));
+
+    return [
+        presentMarkdownStatusBullet(layout.statusLabel, layout.errorStatus),
+        ...detailLines.map((line) => presentMarkdownStatusBullet(layout.detailsLabel, line)),
+    ];
+}
+
+function flattenStatusError(error: unknown, copy: BotCopy): string {
+    const lines = splitStatusLines(presentError(error, copy));
+
+    return lines.join(" / ");
+}
+
+function presentPlainStatusBullet(label: string, value: string): string {
+    return `- ${label}: ${value}`;
+}
+
+function presentMarkdownStatusBullet(
+    label: string,
+    value: string,
+    options: {
+        codeValue?: boolean;
+    } = {},
+): string {
+    return options.codeValue
+        ? `- **${label}:** \`${value}\``
+        : `- **${label}:** ${value}`;
+}
+
+function splitStatusLines(text: string): string[] {
+    return text
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+}
+
+function formatHealthBadge(healthy: boolean, layout: StatusLayoutCopy): string {
+    return healthy ? layout.healthyStatus : layout.errorStatus;
+}
+
+function formatLspStatusBadge(status: OpenCodeLspStatus, copy: BotCopy): string {
+    switch (status.status) {
+        case "connected":
+            return `🟢 ${copy.lsp.connected}`;
+        case "error":
+            return `🔴 ${copy.lsp.error}`;
+    }
+
+    const exhaustiveStatus: never = status.status;
+
+    return exhaustiveStatus;
+}
+
+function formatMcpStatusBadge(status: OpenCodeMcpStatus, copy: BotCopy, layout: StatusLayoutCopy): string {
+    switch (status.status) {
+        case "connected":
+            return `🟢 ${copy.mcp.connected}`;
+        case "disabled":
+            return `⚪ ${copy.mcp.disabled}`;
+        case "needs_auth":
+            return `🟡 ${copy.mcp.needsAuth}`;
+        case "failed":
+            return layout.mcpFailedStatus;
+        case "needs_client_registration":
+            return layout.mcpRegistrationRequiredStatus;
+    }
+
+    const exhaustiveStatus: never = status;
+
+    return exhaustiveStatus;
+}
+
+function formatMcpStatusNotes(status: OpenCodeMcpStatus, layout: StatusLayoutCopy): string {
+    switch (status.status) {
+        case "connected":
+            return layout.okLabel;
+        case "disabled":
+            return "-";
+        case "needs_auth":
+            return "-";
+        case "failed":
+            return status.error;
+        case "needs_client_registration":
+            return status.error;
+    }
+
+    const exhaustiveStatus: never = status;
+
+    return exhaustiveStatus;
+}
+
+function formatStatusDate(value: Date): string {
+    return value.toISOString().slice(0, 10);
+}
+
+function getStatusLayoutCopy(copy: BotCopy): StatusLayoutCopy {
+    const isEnglish = copy.systemStatus.title === BOT_COPY.systemStatus.title;
+
+    if (isEnglish) {
+        return {
+            currentDirectoryLabel: "Current Directory",
+            detailsLabel: "Details",
+            divider: "────────────────",
+            errorStatus: "🔴 Unhealthy",
+            healthyStatus: "🟢 Healthy",
+            languageLabel: "Language",
+            lastUpdatedLabel: "Last updated",
+            lspTitle: "🧠 LSP (Language Server)",
+            mcpNotesLabel: "Notes",
+            mcpRegistrationRequiredStatus: "🟡 Registration Required",
+            mcpTitle: "🔌 MCP (Model Context Protocol)",
+            mcpFailedStatus: "🔴 Failed",
+            noneStatus: "⚪ None",
+            okLabel: "OK",
+            pageTitle: "📊 Service Status",
+            rootLabel: "Root",
+            serverTitle: "🖥️ Server",
+            serviceLabel: "Service",
+            statusLabel: "Status",
+            versionLabel: "Version",
+            workspaceTitle: "📁 Workspace",
+        };
+    }
+
+    return {
+        currentDirectoryLabel: "当前目录",
+        detailsLabel: "详情",
+        divider: "────────────────",
+        errorStatus: "🔴 异常",
+        healthyStatus: "🟢 健康",
+        languageLabel: "语言",
+        lastUpdatedLabel: "最后更新",
+        lspTitle: "🧠 LSP (Language Server)",
+        mcpNotesLabel: "说明",
+        mcpRegistrationRequiredStatus: "🟡 需要注册",
+        mcpTitle: "🔌 MCP (Model Context Protocol)",
+        mcpFailedStatus: "🔴 失败",
+        noneStatus: "⚪ 无",
+        okLabel: "正常",
+        pageTitle: "📊 服务状态",
+        rootLabel: "根目录",
+        serverTitle: "🖥️ 服务端",
+        serviceLabel: "服务",
+        statusLabel: "状态",
+        versionLabel: "版本",
+        workspaceTitle: "📁 工作区",
+    };
 }
 
 export function presentSessionsMessage(input: SessionsMessageInput, copy: BotCopy = BOT_COPY): string {

@@ -1,12 +1,21 @@
 import type { Bot } from "grammy";
 import { getChatCopy } from "../i18n.js";
 import { presentError } from "../presenters/error.presenter.js";
-import { presentStatusMessage } from "../presenters/message.presenter.js";
+import {
+    presentStatusMarkdownMessage,
+    presentStatusMessage,
+} from "../presenters/message.presenter.js";
+import { renderMarkdownToTelegramMarkdownV2 } from "../../services/telegram/telegram-format.js";
 import type { BotDependencies } from "../types.js";
 
 interface StatusCommandContext {
     chat?: { id: number };
-    reply(text: string): Promise<unknown>;
+    reply(
+        text: string,
+        options?: {
+            parse_mode: "MarkdownV2";
+        },
+    ): Promise<unknown>;
 }
 
 export async function handleStatusCommand(ctx: StatusCommandContext, dependencies: BotDependencies) {
@@ -16,6 +25,13 @@ export async function handleStatusCommand(ctx: StatusCommandContext, dependencie
         const result = await dependencies.getStatusUseCase.execute({
             chatId: ctx.chat?.id ?? 0,
         });
+
+        const renderedMarkdown = renderMarkdownToTelegramMarkdownV2(presentStatusMarkdownMessage(result, copy));
+
+        if (renderedMarkdown) {
+            await ctx.reply(renderedMarkdown, { parse_mode: "MarkdownV2" });
+            return;
+        }
 
         await ctx.reply(presentStatusMessage(result, copy));
     } catch (error) {

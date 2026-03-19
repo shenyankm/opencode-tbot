@@ -3,12 +3,13 @@ import test from "node:test";
 import type { Logger } from "pino";
 import { getChatCopy } from "../src/bot/i18n.js";
 import { handleStatusCommand } from "../src/bot/commands/status.js";
-import { presentStatusMessage } from "../src/bot/presenters/message.presenter.js";
+import { presentStatusMarkdownMessage } from "../src/bot/presenters/message.presenter.js";
 import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
 import type {
     OpenCodeClientLike,
     OpenCodeProject,
 } from "../src/services/opencode/opencode.client.js";
+import { renderMarkdownToTelegramMarkdownV2 } from "../src/services/telegram/telegram-format.js";
 import { GetHealthUseCase } from "../src/use-cases/get-health.usecase.js";
 import { GetPathUseCase } from "../src/use-cases/get-path.usecase.js";
 import { GetStatusUseCase } from "../src/use-cases/get-status.usecase.js";
@@ -19,6 +20,13 @@ const logger = {
     error() { },
     info() { },
 } as unknown as Logger;
+
+interface StatusReply {
+    options?: {
+        parse_mode: "MarkdownV2";
+    };
+    text: string;
+}
 
 function createProject(id: string, worktree: string): OpenCodeProject {
     return {
@@ -53,9 +61,24 @@ function createDependencies(client: OpenCodeClientLike) {
     };
 }
 
+function renderExpectedStatusMarkdown(
+    result: Awaited<ReturnType<GetStatusUseCase["execute"]>>,
+    copy: Awaited<ReturnType<typeof getChatCopy>>,
+): string {
+    const rendered = renderMarkdownToTelegramMarkdownV2(presentStatusMarkdownMessage(result, copy));
+
+    assert.ok(rendered);
+
+    return rendered;
+}
+
+function countOccurrences(text: string, value: string): number {
+    return text.split(value).length - 1;
+}
+
 test("/status aggregates health, path, LSP, and MCP into one reply", async () => {
     const project = createProject("project-1", "E:/repo-1");
-    const replies: string[] = [];
+    const replies: StatusReply[] = [];
     const { dependencies, getStatusUseCase, sessionRepo } = createDependencies({
         async getCurrentProject() {
             return project;
@@ -72,7 +95,7 @@ test("/status aggregates health, path, LSP, and MCP into one reply", async () =>
                 state: "E:/Users/demo/.opencode",
                 config: "E:/repo/opencode.json",
                 worktree: "E:/repo",
-                directory: "E:/repo/src",
+                directory: "E:/repo-1",
             };
         },
         async listProjects() {
@@ -116,8 +139,8 @@ test("/status aggregates health, path, LSP, and MCP into one reply", async () =>
     await handleStatusCommand(
         {
             chat: { id: 1 },
-            async reply(text) {
-                replies.push(text);
+            async reply(text, options) {
+                replies.push({ text, options });
                 return {};
             },
         },
@@ -126,18 +149,25 @@ test("/status aggregates health, path, LSP, and MCP into one reply", async () =>
 
     const copy = await getChatCopy(sessionRepo, 1);
     const result = await getStatusUseCase.execute({ chatId: 1 });
+    const expected = renderExpectedStatusMarkdown(result, copy);
 
-    assert.equal(replies[0], presentStatusMessage(result, copy));
-    assert.match(replies[0], /^System Status/m);
-    assert.match(replies[0], /Server Health/);
-    assert.match(replies[0], /Current Paths/);
-    assert.match(replies[0], /LSP Servers/);
-    assert.match(replies[0], /MCP Servers/);
+    assert.equal(replies[0]?.text, expected);
+    assert.deepEqual(replies[0]?.options, { parse_mode: "MarkdownV2" });
+    assert.match(replies[0]?.text ?? "", /\*📊 Service Status\*/);
+    assert.match(replies[0]?.text ?? "", /\*🖥️ Server\*/);
+    assert.match(replies[0]?.text ?? "", /\*📁 Workspace\*/);
+    assert.match(replies[0]?.text ?? "", /\*🔌 MCP \\\(Model Context Protocol\\\)\*/);
+    assert.match(replies[0]?.text ?? "", /\*🧠 LSP \\\(Language Server\\\)\*/);
+    assert.match(replies[0]?.text ?? "", /Service\s+\|\s+Status\s+\|\s+Notes/);
+    assert.match(replies[0]?.text ?? "", /Language\s+\|\s+Status\s+\|\s+Root/);
+    assert.match(replies[0]?.text ?? "", /_Last updated: \d{4}\\-\d{2}\\-\d{2}_/);
+    assert.equal(countOccurrences(replies[0]?.text ?? "", "Current Directory"), 1);
+    assert.doesNotMatch(replies[0]?.text ?? "", /Current project/);
 });
 
 test("/status keeps successful sections when one section fails", async () => {
     const project = createProject("project-1", "E:/repo-1");
-    const replies: string[] = [];
+    const replies: StatusReply[] = [];
     const { dependencies, sessionRepo } = createDependencies({
         async getCurrentProject() {
             return project;
@@ -165,25 +195,28 @@ test("/status keeps successful sections when one section fails", async () => {
     await handleStatusCommand(
         {
             chat: { id: 2 },
-            async reply(text) {
-                replies.push(text);
+            async reply(text, options) {
+                replies.push({ text, options });
                 return {};
             },
         },
         dependencies,
     );
 
-    assert.match(replies[0], /System Status/);
-    assert.match(replies[0], /Server Health\nUnexpected error\.\nCause: health boom/);
-    assert.match(replies[0], /Current Paths\nCurrent working directory: E:\/repo\/src/);
-    assert.match(replies[0], /LSP Servers\nCurrent project: E:\/repo-1\n\nNo LSP servers detected for the current project\./);
-    assert.match(replies[0], /MCP Servers\nUnexpected error\.\nCause: mcp boom/);
+    assert.deepEqual(replies[0]?.options, { parse_mode: "MarkdownV2" });
+    assert.match(replies[0]?.text ?? "", /\*📊 Service Status\*/);
+    assert.match(replies[0]?.text ?? "", /Unexpected error\./);
+    assert.match(replies[0]?.text ?? "", /health boom/);
+    assert.match(replies[0]?.text ?? "", /E:\/repo\/src/);
+    assert.match(replies[0]?.text ?? "", /No LSP servers detected for the current project\./);
+    assert.match(replies[0]?.text ?? "", /mcp boom/);
+    assert.doesNotMatch(replies[0]?.text ?? "", /Current project/);
     assert.equal(await sessionRepo.getByChatId(2), null);
 });
 
 test("/status uses the selected chat language", async () => {
     const project = createProject("project-1", "E:/repo-1");
-    const replies: string[] = [];
+    const replies: StatusReply[] = [];
     const { dependencies, getStatusUseCase, sessionRepo } = createDependencies({
         async getCurrentProject() {
             return project;
@@ -227,8 +260,8 @@ test("/status uses the selected chat language", async () => {
     await handleStatusCommand(
         {
             chat: { id: 3 },
-            async reply(text) {
-                replies.push(text);
+            async reply(text, options) {
+                replies.push({ text, options });
                 return {};
             },
         },
@@ -237,7 +270,11 @@ test("/status uses the selected chat language", async () => {
 
     const copy = await getChatCopy(sessionRepo, 3);
     const result = await getStatusUseCase.execute({ chatId: 3 });
+    const expected = renderExpectedStatusMarkdown(result, copy);
 
-    assert.equal(replies[0], presentStatusMessage(result, copy));
-    assert.match(replies[0], /^系统状态/m);
+    assert.equal(replies[0]?.text, expected);
+    assert.deepEqual(replies[0]?.options, { parse_mode: "MarkdownV2" });
+    assert.match(replies[0]?.text ?? "", /^\*📊 服务状态\*/m);
+    assert.match(replies[0]?.text ?? "", /\*🖥️ 服务端\*/);
+    assert.match(replies[0]?.text ?? "", /\*📁 工作区\*/);
 });
