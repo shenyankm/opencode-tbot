@@ -99,21 +99,6 @@ Use this mode when developing from source inside this repository.
 4. Start OpenCode in this worktree.
 5. OpenCode loads [.opencode/plugins/opencode-tbot.ts](./.opencode/plugins/opencode-tbot.ts), which re-exports [src/plugin.ts](./src/plugin.ts).
 
-## Unpublished External Project Bridge
-
-Use this only when another OpenCode project must load this repository directly instead of the published npm package.
-
-1. Build the plugin bundle with `pnpm build`.
-2. In the target OpenCode plugin directory, create a bridge file that re-exports `dist/plugin.js`.
-3. Register that bridge with OpenCode.
-4. Provide global defaults or project overrides as needed.
-
-Example bridge:
-
-```ts
-export { default } from "../path/to/opencode-tbot/dist/plugin.js";
-```
-
 ## Runtime Expectations
 
 Required:

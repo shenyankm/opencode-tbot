@@ -99,21 +99,6 @@ npx opencode-tbot@latest install
 4. 启动 OpenCode
 5. OpenCode 会加载 [.opencode/plugins/opencode-tbot.ts](./.opencode/plugins/opencode-tbot.ts)，它会转发到 [src/plugin.ts](./src/plugin.ts)
 
-## 外部项目桥接
-
-如果另一个 OpenCode 项目需要直接加载本仓库的构建产物：
-
-1. 执行 `pnpm build`
-2. 在目标 OpenCode 插件目录里创建一个 re-export `dist/plugin.js` 的桥接文件
-3. 将该桥接文件注册到 OpenCode
-4. 按需提供全局默认值或项目覆盖配置
-
-示例桥接文件：
-
-```ts
-export { default } from "../path/to/opencode-tbot/dist/plugin.js";
-```
-
 ## 运行时约定
 
 必填：
