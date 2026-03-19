@@ -86,14 +86,16 @@ function createContainer(
     const listAgentsUseCase = new ListAgentsUseCase(sessionRepo, opencodeClient);
     const listLspUseCase = new ListLspUseCase(sessionRepo, opencodeClient);
     const listMcpUseCase = new ListMcpUseCase(sessionRepo, opencodeClient);
+    const listSessionsUseCase = new ListSessionsUseCase(sessionRepo, opencodeClient);
     const getStatusUseCase = new GetStatusUseCase(
         getHealthUseCase,
         getPathUseCase,
         listLspUseCase,
         listMcpUseCase,
+        listSessionsUseCase,
+        sessionRepo,
     );
     const listModelsUseCase = new ListModelsUseCase(sessionRepo, opencodeClient);
-    const listSessionsUseCase = new ListSessionsUseCase(sessionRepo, opencodeClient);
     const renameSessionUseCase = new RenameSessionUseCase(sessionRepo, opencodeClient, logger);
     const sendPromptUseCase = new SendPromptUseCase(
         sessionRepo,

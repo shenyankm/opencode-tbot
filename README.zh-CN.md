@@ -72,33 +72,6 @@ npx opencode-tbot@latest install
 | `openrouter.transcriptionPrompt` | 否 | `""` | 追加到内置转写提示词后的可选说明。 |
 | `logLevel` | 否 | `info` | 插件日志级别。日志统一通过 `client.app.log()` 上报。 |
 
-## 部署
-
-有两层配置：
-
-- `~/.config/opencode/opencode.json` 中的全局插件注册
-- `~/.config/opencode/opencode-tbot/config.json` 中的插件运行时默认值
-
-可选的项目覆盖配置放在：
-
-- `<worktree>/tbot.config.json`
-
-优先推荐使用安装器：
-
-```bash
-npx opencode-tbot@latest install
-```
-
-## 本地开发桥接
-
-如果要从源码在本仓库内调试：
-
-1. 执行 `pnpm install`
-2. 需要 bundle 时执行 `pnpm build`
-3. 如需工作区覆盖配置，创建 `tbot.config.json`
-4. 启动 OpenCode
-5. OpenCode 会加载 [.opencode/plugins/opencode-tbot.ts](./.opencode/plugins/opencode-tbot.ts)，它会转发到 [src/plugin.ts](./src/plugin.ts)
-
 ## 运行时约定
 
 必填：

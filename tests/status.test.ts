@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import { getChatCopy } from "../src/bot/i18n.js";
 import { handleStatusCommand } from "../src/bot/commands/status.js";
@@ -76,8 +79,23 @@ function countOccurrences(text: string, value: string): number {
     return text.split(value).length - 1;
 }
 
-test("/status aggregates health, path, LSP, and MCP into one reply", async () => {
+function createOpenCodeConfigFile(config: Record<string, unknown>): string {
+    const directory = mkdtempSync(join(tmpdir(), "opencode-tbot-status-"));
+    const filePath = join(directory, "opencode.json");
+
+    writeFileSync(filePath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+
+    return filePath;
+}
+
+test("/status aggregates health, path, plugins, LSP, and MCP into one reply", async () => {
     const project = createProject("project-1", "E:/repo-1");
+    const configFilePath = createOpenCodeConfigFile({
+        plugin: [
+            "opencode-tbot@latest",
+            "workspace-tools",
+        ],
+    });
     const replies: StatusReply[] = [];
     const { dependencies, getStatusUseCase, sessionRepo } = createDependencies({
         async getCurrentProject() {
@@ -93,7 +111,7 @@ test("/status aggregates health, path, LSP, and MCP into one reply", async () =>
             return {
                 home: "E:/Users/demo",
                 state: "E:/Users/demo/.opencode",
-                config: "E:/repo/opencode.json",
+                config: configFilePath,
                 worktree: "E:/repo",
                 directory: "E:/repo-1",
             };
@@ -153,13 +171,17 @@ test("/status aggregates health, path, LSP, and MCP into one reply", async () =>
 
     assert.equal(replies[0]?.text, expected);
     assert.deepEqual(replies[0]?.options, { parse_mode: "MarkdownV2" });
-    assert.match(replies[0]?.text ?? "", /\*📊 Service Status\*/);
-    assert.match(replies[0]?.text ?? "", /\*🖥️ Server\*/);
-    assert.match(replies[0]?.text ?? "", /\*📁 Workspace\*/);
-    assert.match(replies[0]?.text ?? "", /\*🔌 MCP \\\(Model Context Protocol\\\)\*/);
-    assert.match(replies[0]?.text ?? "", /\*🧠 LSP \\\(Language Server\\\)\*/);
-    assert.match(replies[0]?.text ?? "", /Service\s+\|\s+Status\s+\|\s+Notes/);
-    assert.match(replies[0]?.text ?? "", /Language\s+\|\s+Status\s+\|\s+Root/);
+    assert.match(replies[0]?.text ?? "", /\*📊 Service Status\*/u);
+    assert.match(replies[0]?.text ?? "", /\*🖥️ Server\*/u);
+    assert.match(replies[0]?.text ?? "", /\*📁 Workspace\*/u);
+    assert.match(replies[0]?.text ?? "", /\*🧩 Plugins\*/u);
+    assert.match(replies[0]?.text ?? "", /\*🔌 MCP \\\(Model Context Protocol\\\)\*/u);
+    assert.match(replies[0]?.text ?? "", /\*🧠 LSP \\\(Language Server\\\)\*/u);
+    assert.match(replies[0]?.text ?? "", /opencode-tbot@latest/u);
+    assert.match(replies[0]?.text ?? "", /workspace-tools/u);
+    assert.doesNotMatch(replies[0]?.text ?? "", /Service\s+\|\s+Status\s+\|\s+Notes/u);
+    assert.doesNotMatch(replies[0]?.text ?? "", /Language\s+\|\s+Status\s+\|\s+Root/u);
+    assert.doesNotMatch(replies[0]?.text ?? "", /```/u);
     assert.match(replies[0]?.text ?? "", /_Last updated: \d{4}\\-\d{2}\\-\d{2}_/);
     assert.equal(countOccurrences(replies[0]?.text ?? "", "Current Directory"), 1);
     assert.doesNotMatch(replies[0]?.text ?? "", /Current project/);
@@ -204,11 +226,11 @@ test("/status keeps successful sections when one section fails", async () => {
     );
 
     assert.deepEqual(replies[0]?.options, { parse_mode: "MarkdownV2" });
-    assert.match(replies[0]?.text ?? "", /\*📊 Service Status\*/);
-    assert.match(replies[0]?.text ?? "", /Unexpected error\./);
+    assert.match(replies[0]?.text ?? "", /\*📊 Service Status\*/u);
+    assert.match(replies[0]?.text ?? "", /Unexpected error\\\./);
     assert.match(replies[0]?.text ?? "", /health boom/);
     assert.match(replies[0]?.text ?? "", /E:\/repo\/src/);
-    assert.match(replies[0]?.text ?? "", /No LSP servers detected for the current project\./);
+    assert.match(replies[0]?.text ?? "", /No LSP servers detected for the current project\\\./);
     assert.match(replies[0]?.text ?? "", /mcp boom/);
     assert.doesNotMatch(replies[0]?.text ?? "", /Current project/);
     assert.equal(await sessionRepo.getByChatId(2), null);
@@ -274,7 +296,8 @@ test("/status uses the selected chat language", async () => {
 
     assert.equal(replies[0]?.text, expected);
     assert.deepEqual(replies[0]?.options, { parse_mode: "MarkdownV2" });
-    assert.match(replies[0]?.text ?? "", /^\*📊 服务状态\*/m);
-    assert.match(replies[0]?.text ?? "", /\*🖥️ 服务端\*/);
-    assert.match(replies[0]?.text ?? "", /\*📁 工作区\*/);
+    assert.match(replies[0]?.text ?? "", /^\*📊 服务状态\*/mu);
+    assert.match(replies[0]?.text ?? "", /\*🖥️ 服务端\*/u);
+    assert.match(replies[0]?.text ?? "", /\*📁 工作区\*/u);
+    assert.match(replies[0]?.text ?? "", /\*🧩 插件\*/u);
 });

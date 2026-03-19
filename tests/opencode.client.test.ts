@@ -138,6 +138,57 @@ test("buildOpenCodeSdkConfig omits auth when the API key is blank", () => {
     );
 });
 
+test("getHealth falls back to the raw /global/health endpoint for legacy injected SDK clients", async () => {
+    const calls: Array<{ options: unknown }> = [];
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            _client: {
+                async get(options: unknown) {
+                    calls.push({ options });
+                    return {
+                        data: {
+                            healthy: true,
+                            version: "2.0.0",
+                        },
+                    };
+                },
+            },
+            config: {
+                get: async () => ({ provider: {} }),
+                providers: async () => ({ providers: [], default: {} }),
+            },
+            global: {} as never,
+            path: {
+                get: async () => createPath(),
+            },
+            project: {
+                list: async () => [],
+                current: async () => createProject("project-1", "E:/repo-1"),
+            },
+            session: {
+                create: async () => createSession("session-1", "project-1", "E:/repo-1"),
+                prompt: async () => ({
+                    info: {} as never,
+                    parts: [],
+                }),
+            },
+        } as never,
+    );
+
+    assert.deepEqual(await client.getHealth(), {
+        healthy: true,
+        version: "2.0.0",
+    });
+    assert.deepEqual(calls, [{
+        options: {
+            responseStyle: "data",
+            throwOnError: true,
+            url: "/global/health",
+        },
+    }]);
+});
+
 test("createSessionForDirectory forwards directory and title to the SDK", async () => {
     const calls: Array<{ input: unknown; options: unknown }> = [];
     const client = new OpenCodeClient(

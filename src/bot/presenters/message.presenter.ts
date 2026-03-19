@@ -7,6 +7,7 @@ import type {
     OpenCodePath,
     OpenCodeSession,
 } from "../../services/opencode/opencode.client.js";
+import { OPENCODE_TBOT_VERSION } from "../../app/package-info.js";
 import type { GetStatusResult } from "../../use-cases/get-status.usecase.js";
 import {
     BOT_COPY,
@@ -56,27 +57,34 @@ interface LspMessageInput {
 }
 
 interface StatusLayoutCopy {
-    currentDirectoryLabel: string;
+    connectivityLabel: string;
+    configuredPluginsLabel: string;
+    currentProjectLabel: string;
+    currentSessionLabel: string;
     detailsLabel: string;
-    divider: string;
     errorStatus: string;
-    healthyStatus: string;
-    languageLabel: string;
-    lastUpdatedLabel: string;
     lspTitle: string;
+    mcpFailedStatus: string;
     mcpNotesLabel: string;
     mcpRegistrationRequiredStatus: string;
     mcpTitle: string;
-    mcpFailedStatus: string;
+    noPluginsMessage: string;
     noneStatus: string;
+    openCodeVersionLabel: string;
     okLabel: string;
+    overviewTitle: string;
     pageTitle: string;
+    pluginsTitle: string;
     rootLabel: string;
-    serverTitle: string;
-    serviceLabel: string;
     statusLabel: string;
-    versionLabel: string;
+    tbotVersionLabel: string;
     workspaceTitle: string;
+}
+
+interface StatusDetailLine {
+    codeValue?: boolean;
+    label: string;
+    value: string;
 }
 
 const VARIANT_ORDER = ["minimal", "none", "low", "medium", "high", "xhigh", "max"];
@@ -96,12 +104,11 @@ export function presentPathMessage(path: OpenCodePath, copy: BotCopy = BOT_COPY)
 export function presentStatusMessage(input: GetStatusResult, copy: BotCopy = BOT_COPY): string {
     const layout = getStatusLayoutCopy(copy);
     const sections = [
-        presentStatusPlainSection(layout.serverTitle, presentStatusPlainServerLines(input, copy, layout)),
+        presentStatusPlainSection(layout.overviewTitle, presentStatusPlainOverviewLines(input, copy, layout)),
         presentStatusPlainSection(layout.workspaceTitle, presentStatusPlainWorkspaceLines(input, copy, layout)),
+        presentStatusPlainSection(layout.pluginsTitle, presentStatusPlainPluginLines(input, copy, layout)),
         presentStatusPlainSection(layout.mcpTitle, presentStatusPlainMcpLines(input, copy, layout)),
         presentStatusPlainSection(layout.lspTitle, presentStatusPlainLspLines(input, copy, layout)),
-        layout.divider,
-        `${layout.lastUpdatedLabel}: ${formatStatusDate(new Date())}`,
     ];
 
     return presentStatusSections(layout.pageTitle, sections);
@@ -110,12 +117,11 @@ export function presentStatusMessage(input: GetStatusResult, copy: BotCopy = BOT
 export function presentStatusMarkdownMessage(input: GetStatusResult, copy: BotCopy = BOT_COPY): string {
     const layout = getStatusLayoutCopy(copy);
     const sections = [
-        presentStatusMarkdownSection(layout.serverTitle, presentStatusMarkdownServerLines(input, copy, layout)),
+        presentStatusMarkdownSection(layout.overviewTitle, presentStatusMarkdownOverviewLines(input, copy, layout)),
         presentStatusMarkdownSection(layout.workspaceTitle, presentStatusMarkdownWorkspaceLines(input, copy, layout)),
+        presentStatusMarkdownSection(layout.pluginsTitle, presentStatusMarkdownPluginLines(input, copy, layout)),
         presentStatusMarkdownSection(layout.mcpTitle, presentStatusMarkdownMcpLines(input, copy, layout)),
         presentStatusMarkdownSection(layout.lspTitle, presentStatusMarkdownLspLines(input, copy, layout)),
-        layout.divider,
-        `_${layout.lastUpdatedLabel}: ${formatStatusDate(new Date())}_`,
     ];
 
     return presentStatusSections(`# ${layout.pageTitle}`, sections);
@@ -177,175 +183,270 @@ function presentStatusMarkdownSection(title: string, lines: string[]): string {
     ].join("\n");
 }
 
-function presentStatusPlainServerLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
+function presentStatusPlainOverviewLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
+    const lines = [
+        presentPlainStatusBullet(
+            layout.connectivityLabel,
+            input.health.status === "error"
+                ? layout.errorStatus
+                : formatHealthBadge(input.health.data.healthy, layout),
+        ),
+    ];
+
     if (input.health.status === "error") {
-        return presentStatusPlainErrorLines(input.health.error, copy, layout);
+        return [
+            ...lines,
+            ...presentStatusPlainErrorDetailLines(input.health.error, copy, layout),
+            presentPlainStatusBullet(layout.tbotVersionLabel, OPENCODE_TBOT_VERSION),
+        ];
     }
 
     return [
-        presentPlainStatusBullet(layout.statusLabel, formatHealthBadge(input.health.data.healthy, layout)),
-        presentPlainStatusBullet(layout.versionLabel, input.health.data.version),
+        ...lines,
+        presentPlainStatusBullet(layout.openCodeVersionLabel, input.health.data.version),
+        presentPlainStatusBullet(layout.tbotVersionLabel, OPENCODE_TBOT_VERSION),
     ];
 }
 
-function presentStatusMarkdownServerLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
+function presentStatusMarkdownOverviewLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
+    const lines = [
+        presentMarkdownStatusBullet(
+            layout.connectivityLabel,
+            input.health.status === "error"
+                ? layout.errorStatus
+                : formatHealthBadge(input.health.data.healthy, layout),
+        ),
+    ];
+
     if (input.health.status === "error") {
-        return presentStatusMarkdownErrorLines(input.health.error, copy, layout);
+        return [
+            ...lines,
+            ...presentStatusMarkdownErrorDetailLines(input.health.error, copy, layout),
+            presentMarkdownStatusBullet(layout.tbotVersionLabel, OPENCODE_TBOT_VERSION),
+        ];
     }
 
     return [
-        presentMarkdownStatusBullet(layout.statusLabel, formatHealthBadge(input.health.data.healthy, layout)),
-        presentMarkdownStatusBullet(layout.versionLabel, input.health.data.version),
+        ...lines,
+        presentMarkdownStatusBullet(layout.openCodeVersionLabel, input.health.data.version),
+        presentMarkdownStatusBullet(layout.tbotVersionLabel, OPENCODE_TBOT_VERSION),
     ];
 }
 
 function presentStatusPlainWorkspaceLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
-    if (input.path.status === "error") {
-        return presentStatusPlainErrorLines(input.path.error, copy, layout);
+    if (input.workspace.status === "error") {
+        return presentStatusPlainErrorLines(input.workspace.error, copy, layout);
     }
 
     return [
-        presentPlainStatusBullet(layout.currentDirectoryLabel, input.path.data.directory),
+        presentPlainStatusBullet(layout.currentProjectLabel, input.workspace.data.currentProject),
+        presentPlainStatusBullet(layout.currentSessionLabel, input.workspace.data.currentSession ?? copy.common.notSelected),
     ];
 }
 
 function presentStatusMarkdownWorkspaceLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
-    if (input.path.status === "error") {
-        return presentStatusMarkdownErrorLines(input.path.error, copy, layout);
+    if (input.workspace.status === "error") {
+        return presentStatusMarkdownErrorLines(input.workspace.error, copy, layout);
     }
 
     return [
-        presentMarkdownStatusBullet(layout.currentDirectoryLabel, input.path.data.directory, {
+        presentMarkdownStatusBullet(layout.currentProjectLabel, input.workspace.data.currentProject, {
             codeValue: true,
         }),
+        presentMarkdownStatusBullet(layout.currentSessionLabel, input.workspace.data.currentSession ?? copy.common.notSelected),
+    ];
+}
+
+function presentStatusPlainPluginLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
+    if (input.plugins.status === "error") {
+        return presentStatusPlainErrorLines(input.plugins.error, copy, layout);
+    }
+
+    if (input.plugins.data.plugins.length === 0) {
+        return [
+            ...presentPlainEmptyStatusLines(layout.noPluginsMessage, layout),
+        ];
+    }
+
+    return [
+        `- ${layout.configuredPluginsLabel}:`,
+        ...input.plugins.data.plugins.map((plugin) => `  - ${plugin}`),
+    ];
+}
+
+function presentStatusMarkdownPluginLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
+    if (input.plugins.status === "error") {
+        return presentStatusMarkdownErrorLines(input.plugins.error, copy, layout);
+    }
+
+    if (input.plugins.data.plugins.length === 0) {
+        return [
+            ...presentMarkdownEmptyStatusLines(layout.noPluginsMessage, layout),
+        ];
+    }
+
+    return [
+        `- **${layout.configuredPluginsLabel}:**`,
+        ...input.plugins.data.plugins.map((plugin) => `  - \`${plugin}\``),
     ];
 }
 
 function presentStatusPlainLspLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
-    return buildPlainStatusTable(
-        [layout.languageLabel, layout.statusLabel, layout.rootLabel],
-        buildLspStatusRows(input, copy, layout),
-    );
-}
-
-function presentStatusMarkdownLspLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
-    return buildMarkdownStatusTable(
-        [layout.languageLabel, layout.statusLabel, layout.rootLabel],
-        buildLspStatusRows(input, copy, layout),
-    );
-}
-
-function presentStatusPlainMcpLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
-    return buildPlainStatusTable(
-        [layout.serviceLabel, layout.statusLabel, layout.mcpNotesLabel],
-        buildMcpStatusRows(input, copy, layout),
-    );
-}
-
-function presentStatusMarkdownMcpLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
-    return buildMarkdownStatusTable(
-        [layout.serviceLabel, layout.statusLabel, layout.mcpNotesLabel],
-        buildMcpStatusRows(input, copy, layout),
-    );
-}
-
-function buildLspStatusRows(
-    input: GetStatusResult,
-    copy: BotCopy,
-    layout: StatusLayoutCopy,
-): string[][] {
     if (input.lsp.status === "error") {
-        return [["-", layout.errorStatus, flattenStatusError(input.lsp.error, copy)]];
+        return presentStatusPlainErrorLines(input.lsp.error, copy, layout);
     }
 
     if (input.lsp.data.statuses.length === 0) {
-        return [["-", layout.noneStatus, copy.lsp.none]];
+        return presentPlainEmptyStatusLines(copy.lsp.none, layout);
     }
 
-    return input.lsp.data.statuses.map((status) => [
-        status.name,
-        formatLspStatusBadge(status, copy),
-        status.root || "-",
-    ]);
+    return input.lsp.data.statuses.flatMap((status) => presentPlainStatusGroup(status.name, [
+        {
+            label: layout.statusLabel,
+            value: formatLspStatusBadge(status, copy),
+        },
+        {
+            codeValue: !!status.root,
+            label: layout.rootLabel,
+            value: status.root || "-",
+        },
+    ]));
 }
 
-function buildMcpStatusRows(
-    input: GetStatusResult,
-    copy: BotCopy,
-    layout: StatusLayoutCopy,
-): string[][] {
+function presentStatusMarkdownLspLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
+    if (input.lsp.status === "error") {
+        return presentStatusMarkdownErrorLines(input.lsp.error, copy, layout);
+    }
+
+    if (input.lsp.data.statuses.length === 0) {
+        return presentMarkdownEmptyStatusLines(copy.lsp.none, layout);
+    }
+
+    return input.lsp.data.statuses.flatMap((status) => presentMarkdownStatusGroup(status.name, [
+        {
+            label: layout.statusLabel,
+            value: formatLspStatusBadge(status, copy),
+        },
+        {
+            codeValue: !!status.root,
+            label: layout.rootLabel,
+            value: status.root || "-",
+        },
+    ]));
+}
+
+function presentStatusPlainMcpLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
     if (input.mcp.status === "error") {
-        return [["-", layout.errorStatus, flattenStatusError(input.mcp.error, copy)]];
+        return presentStatusPlainErrorLines(input.mcp.error, copy, layout);
     }
 
     if (input.mcp.data.statuses.length === 0) {
-        return [["-", layout.noneStatus, copy.mcp.none]];
+        return presentPlainEmptyStatusLines(copy.mcp.none, layout);
     }
 
-    return input.mcp.data.statuses.map(({ name, status }) => [
-        name,
-        formatMcpStatusBadge(status, copy, layout),
-        formatMcpStatusNotes(status, layout),
-    ]);
+    return input.mcp.data.statuses.flatMap(({ name, status }) => presentPlainStatusGroup(name, [
+        {
+            label: layout.statusLabel,
+            value: formatMcpStatusBadge(status, copy, layout),
+        },
+        {
+            label: layout.mcpNotesLabel,
+            value: formatMcpStatusNotes(status, layout),
+        },
+    ]));
 }
 
-function buildPlainStatusTable(headers: string[], rows: string[][]): string[] {
-    return [
-        formatPlainTableRow(headers),
-        formatPlainTableSeparator(headers.length),
-        ...rows.map((row) => formatPlainTableRow(row)),
-    ];
-}
+function presentStatusMarkdownMcpLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
+    if (input.mcp.status === "error") {
+        return presentStatusMarkdownErrorLines(input.mcp.error, copy, layout);
+    }
 
-function buildMarkdownStatusTable(headers: string[], rows: string[][]): string[] {
-    return [
-        `| ${headers.map(sanitizeTableCell).join(" | ")} |`,
-        `| ${headers.map(() => "---").join(" | ")} |`,
-        ...rows.map((row) => `| ${row.map(sanitizeTableCell).join(" | ")} |`),
-    ];
-}
+    if (input.mcp.data.statuses.length === 0) {
+        return presentMarkdownEmptyStatusLines(copy.mcp.none, layout);
+    }
 
-function formatPlainTableRow(columns: string[]): string {
-    return `| ${columns.map(sanitizeTableCell).join(" | ")} |`;
-}
-
-function formatPlainTableSeparator(columnCount: number): string {
-    return `| ${Array.from({ length: columnCount }, () => "---").join(" | ")} |`;
-}
-
-function sanitizeTableCell(value: string): string {
-    return value
-        .replace(/\r\n?/g, " / ")
-        .replace(/\|/g, "/")
-        .trim();
+    return input.mcp.data.statuses.flatMap(({ name, status }) => presentMarkdownStatusGroup(name, [
+        {
+            label: layout.statusLabel,
+            value: formatMcpStatusBadge(status, copy, layout),
+        },
+        {
+            label: layout.mcpNotesLabel,
+            value: formatMcpStatusNotes(status, layout),
+        },
+    ], {
+        codeName: true,
+    }));
 }
 
 function presentStatusPlainErrorLines(error: unknown, copy: BotCopy, layout: StatusLayoutCopy): string[] {
-    const detailLines = splitStatusLines(presentError(error, copy));
-
     return [
         presentPlainStatusBullet(layout.statusLabel, layout.errorStatus),
-        ...detailLines.map((line) => presentPlainStatusBullet(layout.detailsLabel, line)),
+        ...presentStatusPlainErrorDetailLines(error, copy, layout),
     ];
+}
+
+function presentStatusPlainErrorDetailLines(error: unknown, copy: BotCopy, layout: StatusLayoutCopy): string[] {
+    const detailLines = splitStatusLines(presentError(error, copy));
+
+    return detailLines.map((line) => presentPlainStatusBullet(layout.detailsLabel, line));
 }
 
 function presentStatusMarkdownErrorLines(error: unknown, copy: BotCopy, layout: StatusLayoutCopy): string[] {
-    const detailLines = splitStatusLines(presentError(error, copy));
-
     return [
         presentMarkdownStatusBullet(layout.statusLabel, layout.errorStatus),
-        ...detailLines.map((line) => presentMarkdownStatusBullet(layout.detailsLabel, line)),
+        ...presentStatusMarkdownErrorDetailLines(error, copy, layout),
     ];
 }
 
-function flattenStatusError(error: unknown, copy: BotCopy): string {
-    const lines = splitStatusLines(presentError(error, copy));
+function presentStatusMarkdownErrorDetailLines(error: unknown, copy: BotCopy, layout: StatusLayoutCopy): string[] {
+    const detailLines = splitStatusLines(presentError(error, copy));
 
-    return lines.join(" / ");
+    return detailLines.map((line) => presentMarkdownStatusBullet(layout.detailsLabel, line));
+}
+
+function presentPlainEmptyStatusLines(message: string, layout: StatusLayoutCopy): string[] {
+    return [
+        presentPlainStatusBullet(layout.statusLabel, layout.noneStatus),
+        presentPlainStatusBullet(layout.detailsLabel, message),
+    ];
+}
+
+function presentMarkdownEmptyStatusLines(message: string, layout: StatusLayoutCopy): string[] {
+    return [
+        presentMarkdownStatusBullet(layout.statusLabel, layout.noneStatus),
+        presentMarkdownStatusBullet(layout.detailsLabel, message),
+    ];
+}
+
+function presentPlainStatusGroup(name: string, details: StatusDetailLine[]): string[] {
+    return [
+        `- ${normalizeStatusInlineValue(name)}`,
+        ...details.map((detail) => `  - ${detail.label}: ${formatStatusValue(detail.value)}`),
+    ];
+}
+
+function presentMarkdownStatusGroup(
+    name: string,
+    details: StatusDetailLine[],
+    options: {
+        codeName?: boolean;
+    } = {},
+): string[] {
+    const renderedName = options.codeName
+        ? `\`${normalizeStatusInlineValue(name)}\``
+        : `**${normalizeStatusInlineValue(name)}**`;
+
+    return [
+        `- ${renderedName}`,
+        ...details.map((detail) => detail.codeValue
+            ? `  - **${detail.label}:** \`${formatStatusValue(detail.value)}\``
+            : `  - **${detail.label}:** ${formatStatusValue(detail.value)}`),
+    ];
 }
 
 function presentPlainStatusBullet(label: string, value: string): string {
-    return `- ${label}: ${value}`;
+    return `- ${label}: ${formatStatusValue(value)}`;
 }
 
 function presentMarkdownStatusBullet(
@@ -356,8 +457,8 @@ function presentMarkdownStatusBullet(
     } = {},
 ): string {
     return options.codeValue
-        ? `- **${label}:** \`${value}\``
-        : `- **${label}:** ${value}`;
+        ? `- **${label}:** \`${formatStatusValue(value)}\``
+        : `- **${label}:** ${formatStatusValue(value)}`;
 }
 
 function splitStatusLines(text: string): string[] {
@@ -368,15 +469,15 @@ function splitStatusLines(text: string): string[] {
 }
 
 function formatHealthBadge(healthy: boolean, layout: StatusLayoutCopy): string {
-    return healthy ? layout.healthyStatus : layout.errorStatus;
+    return healthy ? "\uD83D\uDFE2" : layout.errorStatus;
 }
 
-function formatLspStatusBadge(status: OpenCodeLspStatus, copy: BotCopy): string {
+function formatLspStatusBadge(status: OpenCodeLspStatus): string {
     switch (status.status) {
         case "connected":
-            return `🟢 ${copy.lsp.connected}`;
+            return "\uD83D\uDFE2";
         case "error":
-            return `🔴 ${copy.lsp.error}`;
+            return "\uD83D\uDD34";
     }
 
     const exhaustiveStatus: never = status.status;
@@ -384,14 +485,14 @@ function formatLspStatusBadge(status: OpenCodeLspStatus, copy: BotCopy): string 
     return exhaustiveStatus;
 }
 
-function formatMcpStatusBadge(status: OpenCodeMcpStatus, copy: BotCopy, layout: StatusLayoutCopy): string {
+function formatMcpStatusBadge(status: OpenCodeMcpStatus, layout: StatusLayoutCopy): string {
     switch (status.status) {
         case "connected":
-            return `🟢 ${copy.mcp.connected}`;
+            return "\uD83D\uDFE2";
         case "disabled":
-            return `⚪ ${copy.mcp.disabled}`;
+            return "\u26AA";
         case "needs_auth":
-            return `🟡 ${copy.mcp.needsAuth}`;
+            return "\uD83D\uDFE1";
         case "failed":
             return layout.mcpFailedStatus;
         case "needs_client_registration":
@@ -403,14 +504,14 @@ function formatMcpStatusBadge(status: OpenCodeMcpStatus, copy: BotCopy, layout: 
     return exhaustiveStatus;
 }
 
-function formatMcpStatusNotes(status: OpenCodeMcpStatus, layout: StatusLayoutCopy): string {
+function formatMcpStatusNotes(status: OpenCodeMcpStatus, copy: BotCopy, layout: StatusLayoutCopy): string {
     switch (status.status) {
         case "connected":
             return layout.okLabel;
         case "disabled":
-            return "-";
+            return copy.mcp.disabled;
         case "needs_auth":
-            return "-";
+            return copy.mcp.needsAuth;
         case "failed":
             return status.error;
         case "needs_client_registration":
@@ -422,8 +523,19 @@ function formatMcpStatusNotes(status: OpenCodeMcpStatus, layout: StatusLayoutCop
     return exhaustiveStatus;
 }
 
-function formatStatusDate(value: Date): string {
-    return value.toISOString().slice(0, 10);
+function formatStatusValue(value: string): string {
+    const normalized = value
+        .replace(/\r\n?/g, "\n")
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+        .join(" / ");
+
+    return normalized.length > 0 ? normalized : "-";
+}
+
+function normalizeStatusInlineValue(value: string): string {
+    return formatStatusValue(value);
 }
 
 function getStatusLayoutCopy(copy: BotCopy): StatusLayoutCopy {
@@ -431,52 +543,54 @@ function getStatusLayoutCopy(copy: BotCopy): StatusLayoutCopy {
 
     if (isEnglish) {
         return {
-            currentDirectoryLabel: "Current Directory",
+            connectivityLabel: "Connectivity",
+            configuredPluginsLabel: "Configured Plugins",
+            currentProjectLabel: "Current Project",
+            currentSessionLabel: "Current Session",
             detailsLabel: "Details",
-            divider: "────────────────",
-            errorStatus: "🔴 Unhealthy",
-            healthyStatus: "🟢 Healthy",
-            languageLabel: "Language",
-            lastUpdatedLabel: "Last updated",
-            lspTitle: "🧠 LSP (Language Server)",
+            errorStatus: "\uD83D\uDD34",
+            lspTitle: "\uD83E\uDDE0 LSP",
+            mcpFailedStatus: "\uD83D\uDD34",
             mcpNotesLabel: "Notes",
-            mcpRegistrationRequiredStatus: "🟡 Registration Required",
-            mcpTitle: "🔌 MCP (Model Context Protocol)",
-            mcpFailedStatus: "🔴 Failed",
-            noneStatus: "⚪ None",
+            mcpRegistrationRequiredStatus: "\uD83D\uDFE1",
+            mcpTitle: "\uD83D\uDD0C MCP",
+            noPluginsMessage: "No plugins configured in the OpenCode config.",
+            noneStatus: "\u26AA",
+            openCodeVersionLabel: "OpenCode Version",
             okLabel: "OK",
-            pageTitle: "📊 Service Status",
+            overviewTitle: "\uD83D\uDDA5\uFE0F Overview",
+            pageTitle: "\uD83D\uDCCA Service Status",
+            pluginsTitle: "\uD83E\uDDE9 Plugins",
             rootLabel: "Root",
-            serverTitle: "🖥️ Server",
-            serviceLabel: "Service",
             statusLabel: "Status",
-            versionLabel: "Version",
-            workspaceTitle: "📁 Workspace",
+            tbotVersionLabel: "opencode-tbot Version",
+            workspaceTitle: "\uD83D\uDCC1 Workspace",
         };
     }
 
     return {
-        currentDirectoryLabel: "当前目录",
-        detailsLabel: "详情",
-        divider: "────────────────",
-        errorStatus: "🔴 异常",
-        healthyStatus: "🟢 健康",
-        languageLabel: "语言",
-        lastUpdatedLabel: "最后更新",
-        lspTitle: "🧠 LSP (Language Server)",
-        mcpNotesLabel: "说明",
-        mcpRegistrationRequiredStatus: "🟡 需要注册",
-        mcpTitle: "🔌 MCP (Model Context Protocol)",
-        mcpFailedStatus: "🔴 失败",
-        noneStatus: "⚪ 无",
-        okLabel: "正常",
-        pageTitle: "📊 服务状态",
-        rootLabel: "根目录",
-        serverTitle: "🖥️ 服务端",
-        serviceLabel: "服务",
-        statusLabel: "状态",
-        versionLabel: "版本",
-        workspaceTitle: "📁 工作区",
+        connectivityLabel: "\u8FDE\u901A\u6027",
+        configuredPluginsLabel: "\u5DF2\u914D\u7F6E\u63D2\u4EF6",
+        currentProjectLabel: "\u5F53\u524D\u9879\u76EE",
+        currentSessionLabel: "\u5F53\u524D\u4F1A\u8BDD",
+        detailsLabel: "\u8BE6\u60C5",
+        errorStatus: "\uD83D\uDD34",
+        lspTitle: "\uD83E\uDDE0 LSP",
+        mcpFailedStatus: "\uD83D\uDD34",
+        mcpNotesLabel: "\u8BF4\u660E",
+        mcpRegistrationRequiredStatus: "\uD83D\uDFE1",
+        mcpTitle: "\uD83D\uDD0C MCP",
+        noPluginsMessage: "\u5F53\u524D OpenCode \u914D\u7F6E\u4E2D\u672A\u914D\u7F6E\u63D2\u4EF6\u3002",
+        noneStatus: "\u26AA",
+        openCodeVersionLabel: "OpenCode\u7248\u672C",
+        okLabel: "\u6B63\u5E38",
+        overviewTitle: "\uD83D\uDDA5\uFE0F \u6982\u89C8",
+        pageTitle: "\uD83D\uDCCA \u670D\u52A1\u72B6\u6001",
+        pluginsTitle: "\uD83E\uDDE9 \u63D2\u4EF6",
+        rootLabel: "\u6839\u76EE\u5F55",
+        statusLabel: "\u72B6\u6001",
+        tbotVersionLabel: "opencode-tbot\u7248\u672C",
+        workspaceTitle: "\uD83D\uDCC1 \u5DE5\u4F5C\u533A",
     };
 }
 

@@ -102,7 +102,17 @@ export interface OpenCodeConfiguredModel {
     variants: Record<string, Record<string, unknown>>;
 }
 
-export type OpenCodeSdkClientLike = Pick<OpencodeClient, "app" | "config" | "global" | "lsp" | "mcp" | "path" | "permission" | "project" | "session">;
+type RawSdkHttpClient = {
+    get(options: {
+        responseStyle?: "data" | "fields";
+        throwOnError?: boolean;
+        url: string;
+    }): Promise<unknown>;
+};
+
+export type OpenCodeSdkClientLike = Pick<OpencodeClient, "app" | "config" | "global" | "lsp" | "mcp" | "path" | "permission" | "project" | "session"> & {
+    _client?: RawSdkHttpClient;
+};
 type MaybeWrappedResponse<T> = T | { data: T };
 type OpenCodeProviderCatalog = {
     providers: OpenCodeProvider[];
@@ -187,7 +197,27 @@ export class OpenCodeClient implements OpenCodeClientLike {
     }
 
     async getHealth(): Promise<OpenCodeHealth> {
-        const response = await this.client.global.health(SDK_OPTIONS) as MaybeWrappedResponse<OpenCodeHealth>;
+        const healthEndpoint = this.client.global?.health;
+
+        if (typeof healthEndpoint === "function") {
+            const response = await healthEndpoint.call(
+                this.client.global,
+                SDK_OPTIONS,
+            ) as MaybeWrappedResponse<OpenCodeHealth>;
+
+            return unwrapSdkData(response);
+        }
+
+        const rawClient = getRawSdkClient(this.client);
+
+        if (!rawClient) {
+            throw new Error("OpenCode SDK client does not expose a compatible health endpoint.");
+        }
+
+        const response = await rawClient.get({
+            url: "/global/health",
+            ...SDK_OPTIONS,
+        }) as MaybeWrappedResponse<OpenCodeHealth>;
 
         return unwrapSdkData(response);
     }
@@ -672,6 +702,14 @@ function unwrapSdkData<T>(response: MaybeWrappedResponse<T>): T {
     }
 
     return response;
+}
+
+function getRawSdkClient(client: OpenCodeSdkClientLike): RawSdkHttpClient | null {
+    const withRawClient = client as OpenCodeSdkClientLike & {
+        client?: RawSdkHttpClient;
+    };
+
+    return withRawClient.client ?? client._client ?? null;
 }
 
 async function resolveProviderAvailability(

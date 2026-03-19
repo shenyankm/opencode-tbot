@@ -72,33 +72,6 @@ Project config is merged on top of the global config. `telegram`, `state`, and `
 | `openrouter.transcriptionPrompt` | No | `""` | Optional extra instruction appended to the transcription prompt. |
 | `logLevel` | No | `info` | Plugin log level. Logs are emitted through `client.app.log()`. |
 
-## Deployment
-
-There are two configuration layers:
-
-- global plugin registration in `~/.config/opencode/opencode.json`
-- plugin runtime defaults in `~/.config/opencode/opencode-tbot/config.json`
-
-Optional project overrides can be added in:
-
-- `<worktree>/tbot.config.json`
-
-Use the installer as the primary path for end users:
-
-```bash
-npx opencode-tbot@latest install
-```
-
-## Local Development Bridge
-
-Use this mode when developing from source inside this repository.
-
-1. Install dependencies with `pnpm install`.
-2. Build with `pnpm build` when you need the bundle.
-3. Create `tbot.config.json` if you want worktree-specific overrides.
-4. Start OpenCode in this worktree.
-5. OpenCode loads [.opencode/plugins/opencode-tbot.ts](./.opencode/plugins/opencode-tbot.ts), which re-exports [src/plugin.ts](./src/plugin.ts).
-
 ## Runtime Expectations
 
 Required:
