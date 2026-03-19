@@ -42,7 +42,12 @@ function createProject(id: string, worktree: string): OpenCodeProject {
     } as OpenCodeProject;
 }
 
-function createDependencies(client: OpenCodeClientLike) {
+function createDependencies(
+    client: OpenCodeClientLike,
+    options: {
+        voiceTranscriptionEnabled?: boolean;
+    } = {},
+) {
     const sessionRepo = new InMemorySessionRepository();
     const getHealthUseCase = new GetHealthUseCase(client);
     const getPathUseCase = new GetPathUseCase(client);
@@ -56,6 +61,7 @@ function createDependencies(client: OpenCodeClientLike) {
         listMcpUseCase,
         listSessionsUseCase,
         sessionRepo,
+        options.voiceTranscriptionEnabled ?? false,
     );
 
     return {
@@ -87,10 +93,6 @@ function renderExpectedStatusMarkdown(
     return rendered;
 }
 
-function countOccurrences(text: string, value: string): number {
-    return text.split(value).length - 1;
-}
-
 function createOpenCodeConfigFile(config: Record<string, unknown>): string {
     const directory = mkdtempSync(join(tmpdir(), "opencode-tbot-status-"));
     const filePath = join(directory, "opencode.json");
@@ -108,6 +110,10 @@ function escapeRegExp(value: string): string {
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function expectLine(markdown: string, line: string) {
+    assert.match(markdown, new RegExp(`^${escapeRegExp(line)}$`, "mu"));
+}
+
 test("/status aggregates health, path, plugins, LSP, and MCP into one reply", async () => {
     const project = createProject("project-1", "E:/repo-1");
     const configDirectoryPath = createOpenCodeConfigDirectory({
@@ -117,59 +123,64 @@ test("/status aggregates health, path, plugins, LSP, and MCP into one reply", as
         ],
     });
     const replies: StatusReply[] = [];
-    const { dependencies, getStatusUseCase, sessionRepo } = createDependencies({
-        async getCurrentProject() {
-            return project;
-        },
-        async getHealth() {
-            return {
-                healthy: true,
-                version: "1.0.0",
-            };
-        },
-        async getPath() {
-            return {
-                home: "E:/Users/demo",
-                state: "E:/Users/demo/.opencode",
-                config: configDirectoryPath,
-                worktree: "E:/repo",
-                directory: "E:/repo-1",
-            };
-        },
-        async listSessions() {
-            return [
-                {
-                    id: "session-1",
-                    slug: "build-status",
-                    title: "Build status",
-                    projectID: "project-1",
-                },
-            ] as never;
-        },
-        async listProjects() {
-            return [project];
-        },
-        async listLspStatuses(directory) {
-            assert.equal(directory, "E:/repo-1");
+    const { dependencies, getStatusUseCase, sessionRepo } = createDependencies(
+        {
+            async getCurrentProject() {
+                return project;
+            },
+            async getHealth() {
+                return {
+                    healthy: true,
+                    version: "1.0.0",
+                };
+            },
+            async getPath() {
+                return {
+                    home: "E:/Users/demo",
+                    state: "E:/Users/demo/.opencode",
+                    config: configDirectoryPath,
+                    worktree: "E:/repo",
+                    directory: "E:/repo-1",
+                };
+            },
+            async listSessions() {
+                return [
+                    {
+                        id: "session-1",
+                        slug: "build-status",
+                        title: "Build status",
+                        projectID: "project-1",
+                    },
+                ] as never;
+            },
+            async listProjects() {
+                return [project];
+            },
+            async listLspStatuses(directory) {
+                assert.equal(directory, "E:/repo-1");
 
-            return [
-                { id: "ts-2", name: "TypeScript", root: "E:/repo-1/packages/app", status: "connected" },
-                { id: "go-1", name: "Go", root: "E:/repo-1/server", status: "error" },
-                { id: "ts-1", name: "TypeScript", root: "E:/repo-1", status: "connected" },
-            ] as never;
-        },
-        async listMcpStatuses(directory) {
-            assert.equal(directory, "E:/repo-1");
+                return [
+                    { id: "ts-2", name: "TypeScript", root: "E:/repo-1/packages/app", status: "connected" },
+                    { id: "go-1", name: "Go", root: "E:/repo-1/server", status: "error" },
+                    { id: "ts-1", name: "TypeScript", root: "E:/repo-1", status: "connected" },
+                ] as never;
+            },
+            async listMcpStatuses(directory) {
+                assert.equal(directory, "E:/repo-1");
 
-            return {
-                zed: { status: "needs_auth" },
-                alpha: { status: "connected" },
-                beta: { status: "disabled" },
-                delta: { status: "failed", error: "timeout" },
-                gamma: { status: "needs_client_registration", error: "missing metadata" },
-            };
+                return {
+                    zed: { status: "needs_auth" },
+                    alpha: { status: "connected" },
+                    beta: { status: "disabled" },
+                    delta: { status: "failed", error: "timeout" },
+                    gamma: { status: "needs_client_registration", error: "missing metadata" },
+                };
+            },
+        } as never,
+        {
+            voiceTranscriptionEnabled: true,
         },
-    } as never);
+    );
 
     await sessionRepo.setCurrent({
         chatId: 1,
@@ -202,29 +213,29 @@ test("/status aggregates health, path, plugins, LSP, and MCP into one reply", as
 
     assert.equal(replies[0]?.text, expected);
     assert.deepEqual(replies[0]?.options, { parse_mode: "MarkdownV2" });
-    assert.match(markdown, /^# 📊 Service Status$/mu);
-    assert.match(markdown, /^## 🖥️ Overview$/mu);
-    assert.match(markdown, /^## 📁 Workspace$/mu);
-    assert.match(markdown, /^## 🧩 Plugins$/mu);
-    assert.match(markdown, /^## 🔌 MCP$/mu);
-    assert.match(markdown, /^## 🧠 LSP$/mu);
-    assert.match(markdown, /- \*\*Connectivity:\*\* 🟢/u);
-    assert.match(markdown, /- \*\*OpenCode Version:\*\* 1\.0\.0/u);
-    assert.match(markdown, new RegExp(`- \\*\\*opencode-tbot Version:\\*\\* ${escapeRegExp(OPENCODE_TBOT_VERSION)}`));
-    assert.match(markdown, /- \*\*Current Project:\*\* `E:\/repo-1`/u);
-    assert.match(markdown, /- \*\*Current Session:\*\* Build status \(build-status\)/u);
-    assert.match(markdown, /opencode-tbot@latest/u);
-    assert.match(markdown, /workspace-tools/u);
-    assert.match(markdown, /- \*\*Status:\*\* 🟢/u);
-    assert.doesNotMatch(markdown, /Config File/u);
+    expectLine(markdown, "# \uD83D\uDCCA Service Status");
+    expectLine(markdown, "## \uD83D\uDDA5\uFE0F Overview");
+    expectLine(markdown, "## \uD83D\uDCC1 Workspace");
+    expectLine(markdown, "## \uD83E\uDDE9 Plugins");
+    expectLine(markdown, "## \uD83D\uDD0C MCP");
+    expectLine(markdown, "## \uD83E\uDDE0 LSP");
+    expectLine(markdown, "- **Connectivity:** \uD83D\uDFE2");
+    expectLine(markdown, "- **Voice Recognition:** \uD83D\uDFE2");
+    expectLine(markdown, "- **OpenCode Version:** 1.0.0");
+    expectLine(markdown, `- **opencode-tbot Version:** ${OPENCODE_TBOT_VERSION}`);
+    expectLine(markdown, "- **Current Project:** `E:/repo-1`");
+    expectLine(markdown, "- **Current Session:** Build status (build-status)");
+    expectLine(markdown, "- `opencode-tbot@latest`");
+    expectLine(markdown, "- `workspace-tools`");
+    assert.match(markdown, /- `beta`\n  - \*\*Status:\*\* \u26AA/u);
+    assert.doesNotMatch(markdown, /Configured Plugins/u);
+    assert.doesNotMatch(markdown, /beta[\s\S]*disabled/u);
     assert.doesNotMatch(markdown, /Model Context Protocol/u);
     assert.doesNotMatch(markdown, /Language Server/u);
-    assert.doesNotMatch(markdown, /connected/u);
     assert.doesNotMatch(markdown, /Service\s+\|\s+Status\s+\|\s+Notes/u);
     assert.doesNotMatch(markdown, /Language\s+\|\s+Status\s+\|\s+Root/u);
     assert.doesNotMatch(markdown, /```/u);
     assert.doesNotMatch(markdown, /Last updated/u);
-    assert.equal(countOccurrences(markdown, "Current Project"), 1);
 });
 
 test("/status keeps successful sections when one section fails", async () => {
@@ -270,14 +281,15 @@ test("/status keeps successful sections when one section fails", async () => {
     const markdown = renderStatusMarkdown(result, copy);
 
     assert.deepEqual(replies[0]?.options, { parse_mode: "MarkdownV2" });
-    assert.match(markdown, /- \*\*Connectivity:\*\* 🔴/u);
+    expectLine(markdown, "- **Connectivity:** \uD83D\uDD34");
+    expectLine(markdown, "- **Voice Recognition:** \u26AA");
+    expectLine(markdown, "- **Current Project:** `E:/repo/src`");
+    expectLine(markdown, "- **Current Session:** OpenCode Default");
     assert.match(markdown, /- \*\*Details:\*\* Unexpected error\./u);
     assert.match(markdown, /- \*\*Details:\*\* Cause: health boom/u);
-    assert.match(markdown, new RegExp(`- \\*\\*opencode-tbot Version:\\*\\* ${escapeRegExp(OPENCODE_TBOT_VERSION)}`));
-    assert.match(markdown, /- \*\*Current Project:\*\* `E:\/repo\/src`/u);
+    assert.match(markdown, /- \*\*Details:\*\* Cause: mcp boom/u);
+    assert.match(markdown, /No plugins configured in the OpenCode config\./u);
     assert.match(markdown, /No LSP servers detected for the current project\./u);
-    assert.match(markdown, /mcp boom/u);
-    assert.doesNotMatch(markdown, /Last updated/u);
     assert.equal(await sessionRepo.getByChatId(2), null);
 });
 
@@ -345,16 +357,19 @@ test("/status uses the selected chat language", async () => {
 
     assert.equal(replies[0]?.text, expected);
     assert.deepEqual(replies[0]?.options, { parse_mode: "MarkdownV2" });
-    assert.match(markdown, /^# 📊 服务状态$/mu);
-    assert.match(markdown, /^## 🖥️ 概览$/mu);
-    assert.match(markdown, /^## 📁 工作区$/mu);
-    assert.match(markdown, /^## 🧩 插件$/mu);
-    assert.match(markdown, /^## 🔌 MCP$/mu);
-    assert.match(markdown, /^## 🧠 LSP$/mu);
-    assert.match(markdown, /- \*\*连通性:\*\* 🟢/u);
-    assert.match(markdown, /- \*\*OpenCode版本:\*\* 1\.0\.0/u);
-    assert.match(markdown, new RegExp(`- \\*\\*opencode-tbot版本:\\*\\* ${escapeRegExp(OPENCODE_TBOT_VERSION)}`));
-    assert.match(markdown, /- \*\*当前项目:\*\* `E:\/repo-1`/u);
-    assert.match(markdown, /- \*\*当前会话:\*\* 未选择/u);
-    assert.doesNotMatch(markdown, /最后更新/u);
+    expectLine(markdown, "# \uD83D\uDCCA \u670D\u52A1\u72B6\u6001");
+    expectLine(markdown, "## \uD83D\uDDA5\uFE0F \u6982\u89C8");
+    expectLine(markdown, "## \uD83D\uDCC1 \u5DE5\u4F5C\u533A");
+    expectLine(markdown, "## \uD83E\uDDE9 \u63D2\u4EF6");
+    expectLine(markdown, "## \uD83D\uDD0C MCP");
+    expectLine(markdown, "## \uD83E\uDDE0 LSP");
+    expectLine(markdown, "- **\u8FDE\u901A\u6027:** \uD83D\uDFE2");
+    expectLine(markdown, "- **\u8BED\u97F3\u8BC6\u522B:** \u26AA");
+    expectLine(markdown, "- **OpenCode\u7248\u672C:** 1.0.0");
+    expectLine(markdown, `- **opencode-tbot\u7248\u672C:** ${OPENCODE_TBOT_VERSION}`);
+    expectLine(markdown, "- **\u5F53\u524D\u9879\u76EE:** `E:/repo-1`");
+    expectLine(markdown, "- **\u5F53\u524D\u4F1A\u8BDD:** OpenCode \u9ED8\u8BA4");
+    assert.doesNotMatch(markdown, /\u5DF2\u914D\u7F6E\u63D2\u4EF6/u);
+    assert.doesNotMatch(markdown, /\u5DF2\u7981\u7528/u);
+    assert.doesNotMatch(markdown, /\u6700\u540E\u66F4\u65B0/u);
 });

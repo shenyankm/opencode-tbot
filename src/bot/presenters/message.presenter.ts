@@ -58,9 +58,9 @@ interface LspMessageInput {
 
 interface StatusLayoutCopy {
     connectivityLabel: string;
-    configuredPluginsLabel: string;
     currentProjectLabel: string;
     currentSessionLabel: string;
+    defaultSessionValue: string;
     detailsLabel: string;
     errorStatus: string;
     lspTitle: string;
@@ -78,6 +78,7 @@ interface StatusLayoutCopy {
     rootLabel: string;
     statusLabel: string;
     tbotVersionLabel: string;
+    voiceRecognitionLabel: string;
     workspaceTitle: string;
 }
 
@@ -191,6 +192,10 @@ function presentStatusPlainOverviewLines(input: GetStatusResult, copy: BotCopy, 
                 ? layout.errorStatus
                 : formatHealthBadge(input.health.data.healthy, layout),
         ),
+        presentPlainStatusBullet(
+            layout.voiceRecognitionLabel,
+            formatVoiceRecognitionBadge(input.voiceRecognition.enabled),
+        ),
     ];
 
     if (input.health.status === "error") {
@@ -216,6 +221,10 @@ function presentStatusMarkdownOverviewLines(input: GetStatusResult, copy: BotCop
                 ? layout.errorStatus
                 : formatHealthBadge(input.health.data.healthy, layout),
         ),
+        presentMarkdownStatusBullet(
+            layout.voiceRecognitionLabel,
+            formatVoiceRecognitionBadge(input.voiceRecognition.enabled),
+        ),
     ];
 
     if (input.health.status === "error") {
@@ -240,7 +249,7 @@ function presentStatusPlainWorkspaceLines(input: GetStatusResult, copy: BotCopy,
 
     return [
         presentPlainStatusBullet(layout.currentProjectLabel, input.workspace.data.currentProject),
-        presentPlainStatusBullet(layout.currentSessionLabel, input.workspace.data.currentSession ?? copy.common.notSelected),
+        presentPlainStatusBullet(layout.currentSessionLabel, input.workspace.data.currentSession ?? layout.defaultSessionValue),
     ];
 }
 
@@ -253,7 +262,7 @@ function presentStatusMarkdownWorkspaceLines(input: GetStatusResult, copy: BotCo
         presentMarkdownStatusBullet(layout.currentProjectLabel, input.workspace.data.currentProject, {
             codeValue: true,
         }),
-        presentMarkdownStatusBullet(layout.currentSessionLabel, input.workspace.data.currentSession ?? copy.common.notSelected),
+        presentMarkdownStatusBullet(layout.currentSessionLabel, input.workspace.data.currentSession ?? layout.defaultSessionValue),
     ];
 }
 
@@ -268,10 +277,7 @@ function presentStatusPlainPluginLines(input: GetStatusResult, copy: BotCopy, la
         ];
     }
 
-    return [
-        `- ${layout.configuredPluginsLabel}:`,
-        ...input.plugins.data.plugins.map((plugin) => `  - ${plugin}`),
-    ];
+    return input.plugins.data.plugins.map((plugin) => `- ${plugin}`);
 }
 
 function presentStatusMarkdownPluginLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
@@ -285,10 +291,7 @@ function presentStatusMarkdownPluginLines(input: GetStatusResult, copy: BotCopy,
         ];
     }
 
-    return [
-        `- **${layout.configuredPluginsLabel}:**`,
-        ...input.plugins.data.plugins.map((plugin) => `  - \`${plugin}\``),
-    ];
+    return input.plugins.data.plugins.map((plugin) => `- \`${plugin}\``);
 }
 
 function presentStatusPlainLspLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
@@ -344,16 +347,9 @@ function presentStatusPlainMcpLines(input: GetStatusResult, copy: BotCopy, layou
         return presentPlainEmptyStatusLines(copy.mcp.none, layout);
     }
 
-    return input.mcp.data.statuses.flatMap(({ name, status }) => presentPlainStatusGroup(name, [
-        {
-            label: layout.statusLabel,
-            value: formatMcpStatusBadge(status, layout),
-        },
-        {
-            label: layout.mcpNotesLabel,
-            value: formatMcpStatusNotes(status, copy, layout),
-        },
-    ]));
+    return input.mcp.data.statuses.flatMap(({ name, status }) =>
+        presentPlainStatusGroup(name, getMcpStatusDetailLines(status, copy, layout)),
+    );
 }
 
 function presentStatusMarkdownMcpLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
@@ -365,18 +361,11 @@ function presentStatusMarkdownMcpLines(input: GetStatusResult, copy: BotCopy, la
         return presentMarkdownEmptyStatusLines(copy.mcp.none, layout);
     }
 
-    return input.mcp.data.statuses.flatMap(({ name, status }) => presentMarkdownStatusGroup(name, [
-        {
-            label: layout.statusLabel,
-            value: formatMcpStatusBadge(status, layout),
-        },
-        {
-            label: layout.mcpNotesLabel,
-            value: formatMcpStatusNotes(status, copy, layout),
-        },
-    ], {
-        codeName: true,
-    }));
+    return input.mcp.data.statuses.flatMap(({ name, status }) =>
+        presentMarkdownStatusGroup(name, getMcpStatusDetailLines(status, copy, layout), {
+            codeName: true,
+        }),
+    );
 }
 
 function presentStatusPlainErrorLines(error: unknown, copy: BotCopy, layout: StatusLayoutCopy): string[] {
@@ -472,6 +461,10 @@ function formatHealthBadge(healthy: boolean, layout: StatusLayoutCopy): string {
     return healthy ? "\uD83D\uDFE2" : layout.errorStatus;
 }
 
+function formatVoiceRecognitionBadge(enabled: boolean): string {
+    return enabled ? "\uD83D\uDFE2" : "\u26AA";
+}
+
 function formatLspStatusBadge(status: OpenCodeLspStatus): string {
     switch (status.status) {
         case "connected":
@@ -504,12 +497,38 @@ function formatMcpStatusBadge(status: OpenCodeMcpStatus, layout: StatusLayoutCop
     return exhaustiveStatus;
 }
 
-function formatMcpStatusNotes(status: OpenCodeMcpStatus, copy: BotCopy, layout: StatusLayoutCopy): string {
+function getMcpStatusDetailLines(
+    status: OpenCodeMcpStatus,
+    copy: BotCopy,
+    layout: StatusLayoutCopy,
+): StatusDetailLine[] {
+    const notes = formatMcpStatusNotes(status, copy, layout);
+
+    return notes
+        ? [
+            {
+                label: layout.statusLabel,
+                value: formatMcpStatusBadge(status, layout),
+            },
+            {
+                label: layout.mcpNotesLabel,
+                value: notes,
+            },
+        ]
+        : [
+            {
+                label: layout.statusLabel,
+                value: formatMcpStatusBadge(status, layout),
+            },
+        ];
+}
+
+function formatMcpStatusNotes(status: OpenCodeMcpStatus, copy: BotCopy, layout: StatusLayoutCopy): string | null {
     switch (status.status) {
         case "connected":
             return layout.okLabel;
         case "disabled":
-            return copy.mcp.disabled;
+            return null;
         case "needs_auth":
             return copy.mcp.needsAuth;
         case "failed":
@@ -544,9 +563,9 @@ function getStatusLayoutCopy(copy: BotCopy): StatusLayoutCopy {
     if (isEnglish) {
         return {
             connectivityLabel: "Connectivity",
-            configuredPluginsLabel: "Configured Plugins",
             currentProjectLabel: "Current Project",
             currentSessionLabel: "Current Session",
+            defaultSessionValue: "OpenCode Default",
             detailsLabel: "Details",
             errorStatus: "\uD83D\uDD34",
             lspTitle: "\uD83E\uDDE0 LSP",
@@ -564,15 +583,16 @@ function getStatusLayoutCopy(copy: BotCopy): StatusLayoutCopy {
             rootLabel: "Root",
             statusLabel: "Status",
             tbotVersionLabel: "opencode-tbot Version",
+            voiceRecognitionLabel: "Voice Recognition",
             workspaceTitle: "\uD83D\uDCC1 Workspace",
         };
     }
 
     return {
         connectivityLabel: "\u8FDE\u901A\u6027",
-        configuredPluginsLabel: "\u5DF2\u914D\u7F6E\u63D2\u4EF6",
         currentProjectLabel: "\u5F53\u524D\u9879\u76EE",
         currentSessionLabel: "\u5F53\u524D\u4F1A\u8BDD",
+        defaultSessionValue: "OpenCode \u9ED8\u8BA4",
         detailsLabel: "\u8BE6\u60C5",
         errorStatus: "\uD83D\uDD34",
         lspTitle: "\uD83E\uDDE0 LSP",
@@ -590,6 +610,7 @@ function getStatusLayoutCopy(copy: BotCopy): StatusLayoutCopy {
         rootLabel: "\u6839\u76EE\u5F55",
         statusLabel: "\u72B6\u6001",
         tbotVersionLabel: "opencode-tbot\u7248\u672C",
+        voiceRecognitionLabel: "\u8BED\u97F3\u8BC6\u522B",
         workspaceTitle: "\uD83D\uDCC1 \u5DE5\u4F5C\u533A",
     };
 }

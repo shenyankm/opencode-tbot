@@ -35,12 +35,17 @@ export interface WorkspaceStatusResult {
     currentSession: string | null;
 }
 
+export interface VoiceRecognitionStatusResult {
+    enabled: boolean;
+}
+
 export interface GetStatusResult {
     health: StatusSectionResult<OpenCodeHealth>;
     lsp: StatusSectionResult<ListLspResult>;
     mcp: StatusSectionResult<ListMcpResult>;
     path: StatusSectionResult<OpenCodePath>;
     plugins: StatusSectionResult<ConfiguredPluginsResult>;
+    voiceRecognition: VoiceRecognitionStatusResult;
     workspace: StatusSectionResult<WorkspaceStatusResult>;
 }
 
@@ -52,6 +57,7 @@ export class GetStatusUseCase {
         private readonly listMcpUseCase: ListMcpUseCase,
         private readonly listSessionsUseCase: ListSessionsUseCase,
         private readonly sessionRepo: SessionRepository,
+        private readonly voiceTranscriptionEnabled: boolean,
     ) { }
 
     async execute(input: { chatId: number }): Promise<GetStatusResult> {
@@ -76,6 +82,9 @@ export class GetStatusUseCase {
             health: mapSettledResult(health),
             path: pathResult,
             plugins,
+            voiceRecognition: {
+                enabled: this.voiceTranscriptionEnabled,
+            },
             workspace,
             lsp: mapSettledResult(lsp),
             mcp: mapSettledResult(mcp),
