@@ -173,7 +173,7 @@ pnpm test
 - 通过 `.opencode/plugins/opencode-tbot.ts` 的本地开发桥接
 - 在外部项目中通过 re-export `dist/plugin.js` 的构建产物桥接
 
-更完整的部署说明见 [docs/deployment.md](./docs/deployment.md)。
+更完整的部署说明见 [INSTALL.md](./INSTALL.md)。
 
 ## 常见问题
 

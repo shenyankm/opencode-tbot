@@ -173,7 +173,7 @@ Supported deployment modes:
 - Local development bridge through `.opencode/plugins/opencode-tbot.ts`
 - Unpublished external-project bridge that re-exports `dist/plugin.js`
 
-Deployment details are documented in [docs/deployment.md](./docs/deployment.md).
+Additional deployment notes are documented in [INSTALL.md](./INSTALL.md).
 
 ## FAQ
 
