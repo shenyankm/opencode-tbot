@@ -303,7 +303,7 @@ function presentStatusPlainLspLines(input: GetStatusResult, copy: BotCopy, layou
     return input.lsp.data.statuses.flatMap((status) => presentPlainStatusGroup(status.name, [
         {
             label: layout.statusLabel,
-            value: formatLspStatusBadge(status, copy),
+            value: formatLspStatusBadge(status),
         },
         {
             codeValue: !!status.root,
@@ -325,7 +325,7 @@ function presentStatusMarkdownLspLines(input: GetStatusResult, copy: BotCopy, la
     return input.lsp.data.statuses.flatMap((status) => presentMarkdownStatusGroup(status.name, [
         {
             label: layout.statusLabel,
-            value: formatLspStatusBadge(status, copy),
+            value: formatLspStatusBadge(status),
         },
         {
             codeValue: !!status.root,
@@ -347,11 +347,11 @@ function presentStatusPlainMcpLines(input: GetStatusResult, copy: BotCopy, layou
     return input.mcp.data.statuses.flatMap(({ name, status }) => presentPlainStatusGroup(name, [
         {
             label: layout.statusLabel,
-            value: formatMcpStatusBadge(status, copy, layout),
+            value: formatMcpStatusBadge(status, layout),
         },
         {
             label: layout.mcpNotesLabel,
-            value: formatMcpStatusNotes(status, layout),
+            value: formatMcpStatusNotes(status, copy, layout),
         },
     ]));
 }
@@ -368,11 +368,11 @@ function presentStatusMarkdownMcpLines(input: GetStatusResult, copy: BotCopy, la
     return input.mcp.data.statuses.flatMap(({ name, status }) => presentMarkdownStatusGroup(name, [
         {
             label: layout.statusLabel,
-            value: formatMcpStatusBadge(status, copy, layout),
+            value: formatMcpStatusBadge(status, layout),
         },
         {
             label: layout.mcpNotesLabel,
-            value: formatMcpStatusNotes(status, layout),
+            value: formatMcpStatusNotes(status, copy, layout),
         },
     ], {
         codeName: true,

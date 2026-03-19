@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import test from "node:test";
+import { OPENCODE_TBOT_VERSION } from "../src/app/package-info.js";
 import { getChatCopy } from "../src/bot/i18n.js";
 import { handleStatusCommand } from "../src/bot/commands/status.js";
 import { presentStatusMarkdownMessage } from "../src/bot/presenters/message.presenter.js";
@@ -18,6 +19,7 @@ import { GetPathUseCase } from "../src/use-cases/get-path.usecase.js";
 import { GetStatusUseCase } from "../src/use-cases/get-status.usecase.js";
 import { ListLspUseCase } from "../src/use-cases/list-lsp.usecase.js";
 import { ListMcpUseCase } from "../src/use-cases/list-mcp.usecase.js";
+import { ListSessionsUseCase } from "../src/use-cases/list-sessions.usecase.js";
 
 const logger = {
     error() { },
@@ -46,11 +48,14 @@ function createDependencies(client: OpenCodeClientLike) {
     const getPathUseCase = new GetPathUseCase(client);
     const listLspUseCase = new ListLspUseCase(sessionRepo, client);
     const listMcpUseCase = new ListMcpUseCase(sessionRepo, client);
+    const listSessionsUseCase = new ListSessionsUseCase(sessionRepo, client);
     const getStatusUseCase = new GetStatusUseCase(
         getHealthUseCase,
         getPathUseCase,
         listLspUseCase,
         listMcpUseCase,
+        listSessionsUseCase,
+        sessionRepo,
     );
 
     return {
@@ -64,11 +69,18 @@ function createDependencies(client: OpenCodeClientLike) {
     };
 }
 
+function renderStatusMarkdown(
+    result: Awaited<ReturnType<GetStatusUseCase["execute"]>>,
+    copy: Awaited<ReturnType<typeof getChatCopy>>,
+): string {
+    return presentStatusMarkdownMessage(result, copy);
+}
+
 function renderExpectedStatusMarkdown(
     result: Awaited<ReturnType<GetStatusUseCase["execute"]>>,
     copy: Awaited<ReturnType<typeof getChatCopy>>,
 ): string {
-    const rendered = renderMarkdownToTelegramMarkdownV2(presentStatusMarkdownMessage(result, copy));
+    const rendered = renderMarkdownToTelegramMarkdownV2(renderStatusMarkdown(result, copy));
 
     assert.ok(rendered);
 
@@ -88,9 +100,17 @@ function createOpenCodeConfigFile(config: Record<string, unknown>): string {
     return filePath;
 }
 
+function createOpenCodeConfigDirectory(config: Record<string, unknown>): string {
+    return dirname(createOpenCodeConfigFile(config));
+}
+
+function escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 test("/status aggregates health, path, plugins, LSP, and MCP into one reply", async () => {
     const project = createProject("project-1", "E:/repo-1");
-    const configFilePath = createOpenCodeConfigFile({
+    const configDirectoryPath = createOpenCodeConfigDirectory({
         plugin: [
             "opencode-tbot@latest",
             "workspace-tools",
@@ -111,10 +131,20 @@ test("/status aggregates health, path, plugins, LSP, and MCP into one reply", as
             return {
                 home: "E:/Users/demo",
                 state: "E:/Users/demo/.opencode",
-                config: configFilePath,
+                config: configDirectoryPath,
                 worktree: "E:/repo",
                 directory: "E:/repo-1",
             };
+        },
+        async listSessions() {
+            return [
+                {
+                    id: "session-1",
+                    slug: "build-status",
+                    title: "Build status",
+                    projectID: "project-1",
+                },
+            ] as never;
         },
         async listProjects() {
             return [project];
@@ -167,30 +197,40 @@ test("/status aggregates health, path, plugins, LSP, and MCP into one reply", as
 
     const copy = await getChatCopy(sessionRepo, 1);
     const result = await getStatusUseCase.execute({ chatId: 1 });
+    const markdown = renderStatusMarkdown(result, copy);
     const expected = renderExpectedStatusMarkdown(result, copy);
 
     assert.equal(replies[0]?.text, expected);
     assert.deepEqual(replies[0]?.options, { parse_mode: "MarkdownV2" });
-    assert.match(replies[0]?.text ?? "", /\*📊 Service Status\*/u);
-    assert.match(replies[0]?.text ?? "", /\*🖥️ Server\*/u);
-    assert.match(replies[0]?.text ?? "", /\*📁 Workspace\*/u);
-    assert.match(replies[0]?.text ?? "", /\*🧩 Plugins\*/u);
-    assert.match(replies[0]?.text ?? "", /\*🔌 MCP \\\(Model Context Protocol\\\)\*/u);
-    assert.match(replies[0]?.text ?? "", /\*🧠 LSP \\\(Language Server\\\)\*/u);
-    assert.match(replies[0]?.text ?? "", /opencode-tbot@latest/u);
-    assert.match(replies[0]?.text ?? "", /workspace-tools/u);
-    assert.doesNotMatch(replies[0]?.text ?? "", /Service\s+\|\s+Status\s+\|\s+Notes/u);
-    assert.doesNotMatch(replies[0]?.text ?? "", /Language\s+\|\s+Status\s+\|\s+Root/u);
-    assert.doesNotMatch(replies[0]?.text ?? "", /```/u);
-    assert.match(replies[0]?.text ?? "", /_Last updated: \d{4}\\-\d{2}\\-\d{2}_/);
-    assert.equal(countOccurrences(replies[0]?.text ?? "", "Current Directory"), 1);
-    assert.doesNotMatch(replies[0]?.text ?? "", /Current project/);
+    assert.match(markdown, /^# 📊 Service Status$/mu);
+    assert.match(markdown, /^## 🖥️ Overview$/mu);
+    assert.match(markdown, /^## 📁 Workspace$/mu);
+    assert.match(markdown, /^## 🧩 Plugins$/mu);
+    assert.match(markdown, /^## 🔌 MCP$/mu);
+    assert.match(markdown, /^## 🧠 LSP$/mu);
+    assert.match(markdown, /- \*\*Connectivity:\*\* 🟢/u);
+    assert.match(markdown, /- \*\*OpenCode Version:\*\* 1\.0\.0/u);
+    assert.match(markdown, new RegExp(`- \\*\\*opencode-tbot Version:\\*\\* ${escapeRegExp(OPENCODE_TBOT_VERSION)}`));
+    assert.match(markdown, /- \*\*Current Project:\*\* `E:\/repo-1`/u);
+    assert.match(markdown, /- \*\*Current Session:\*\* Build status \(build-status\)/u);
+    assert.match(markdown, /opencode-tbot@latest/u);
+    assert.match(markdown, /workspace-tools/u);
+    assert.match(markdown, /- \*\*Status:\*\* 🟢/u);
+    assert.doesNotMatch(markdown, /Config File/u);
+    assert.doesNotMatch(markdown, /Model Context Protocol/u);
+    assert.doesNotMatch(markdown, /Language Server/u);
+    assert.doesNotMatch(markdown, /connected/u);
+    assert.doesNotMatch(markdown, /Service\s+\|\s+Status\s+\|\s+Notes/u);
+    assert.doesNotMatch(markdown, /Language\s+\|\s+Status\s+\|\s+Root/u);
+    assert.doesNotMatch(markdown, /```/u);
+    assert.doesNotMatch(markdown, /Last updated/u);
+    assert.equal(countOccurrences(markdown, "Current Project"), 1);
 });
 
 test("/status keeps successful sections when one section fails", async () => {
     const project = createProject("project-1", "E:/repo-1");
     const replies: StatusReply[] = [];
-    const { dependencies, sessionRepo } = createDependencies({
+    const { dependencies, getStatusUseCase, sessionRepo } = createDependencies({
         async getCurrentProject() {
             return project;
         },
@@ -225,14 +265,19 @@ test("/status keeps successful sections when one section fails", async () => {
         dependencies,
     );
 
+    const copy = await getChatCopy(sessionRepo, 2);
+    const result = await getStatusUseCase.execute({ chatId: 2 });
+    const markdown = renderStatusMarkdown(result, copy);
+
     assert.deepEqual(replies[0]?.options, { parse_mode: "MarkdownV2" });
-    assert.match(replies[0]?.text ?? "", /\*📊 Service Status\*/u);
-    assert.match(replies[0]?.text ?? "", /Unexpected error\\\./);
-    assert.match(replies[0]?.text ?? "", /health boom/);
-    assert.match(replies[0]?.text ?? "", /E:\/repo\/src/);
-    assert.match(replies[0]?.text ?? "", /No LSP servers detected for the current project\\\./);
-    assert.match(replies[0]?.text ?? "", /mcp boom/);
-    assert.doesNotMatch(replies[0]?.text ?? "", /Current project/);
+    assert.match(markdown, /- \*\*Connectivity:\*\* 🔴/u);
+    assert.match(markdown, /- \*\*Details:\*\* Unexpected error\./u);
+    assert.match(markdown, /- \*\*Details:\*\* Cause: health boom/u);
+    assert.match(markdown, new RegExp(`- \\*\\*opencode-tbot Version:\\*\\* ${escapeRegExp(OPENCODE_TBOT_VERSION)}`));
+    assert.match(markdown, /- \*\*Current Project:\*\* `E:\/repo\/src`/u);
+    assert.match(markdown, /No LSP servers detected for the current project\./u);
+    assert.match(markdown, /mcp boom/u);
+    assert.doesNotMatch(markdown, /Last updated/u);
     assert.equal(await sessionRepo.getByChatId(2), null);
 });
 
@@ -257,6 +302,9 @@ test("/status uses the selected chat language", async () => {
                 worktree: "E:/repo",
                 directory: "E:/repo/src",
             };
+        },
+        async listSessions() {
+            return [] as never;
         },
         async listLspStatuses() {
             return [];
@@ -292,12 +340,21 @@ test("/status uses the selected chat language", async () => {
 
     const copy = await getChatCopy(sessionRepo, 3);
     const result = await getStatusUseCase.execute({ chatId: 3 });
+    const markdown = renderStatusMarkdown(result, copy);
     const expected = renderExpectedStatusMarkdown(result, copy);
 
     assert.equal(replies[0]?.text, expected);
     assert.deepEqual(replies[0]?.options, { parse_mode: "MarkdownV2" });
-    assert.match(replies[0]?.text ?? "", /^\*📊 服务状态\*/mu);
-    assert.match(replies[0]?.text ?? "", /\*🖥️ 服务端\*/u);
-    assert.match(replies[0]?.text ?? "", /\*📁 工作区\*/u);
-    assert.match(replies[0]?.text ?? "", /\*🧩 插件\*/u);
+    assert.match(markdown, /^# 📊 服务状态$/mu);
+    assert.match(markdown, /^## 🖥️ 概览$/mu);
+    assert.match(markdown, /^## 📁 工作区$/mu);
+    assert.match(markdown, /^## 🧩 插件$/mu);
+    assert.match(markdown, /^## 🔌 MCP$/mu);
+    assert.match(markdown, /^## 🧠 LSP$/mu);
+    assert.match(markdown, /- \*\*连通性:\*\* 🟢/u);
+    assert.match(markdown, /- \*\*OpenCode版本:\*\* 1\.0\.0/u);
+    assert.match(markdown, new RegExp(`- \\*\\*opencode-tbot版本:\\*\\* ${escapeRegExp(OPENCODE_TBOT_VERSION)}`));
+    assert.match(markdown, /- \*\*当前项目:\*\* `E:\/repo-1`/u);
+    assert.match(markdown, /- \*\*当前会话:\*\* 未选择/u);
+    assert.doesNotMatch(markdown, /最后更新/u);
 });

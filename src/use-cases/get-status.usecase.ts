@@ -222,7 +222,7 @@ function formatSessionStatusLabel(session: OpenCodeSession | null, fallbackId: s
 
     return title === session.slug
         ? title
-        : `${title} [${session.slug}]`;
+        : `${title} (${session.slug})`;
 }
 
 async function resolveOpenCodeConfigFilePath(configPath: string): Promise<string> {
