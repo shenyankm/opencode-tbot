@@ -10,7 +10,7 @@ export interface BotCopy {
         new: string;
         agents: string;
         sessions: string;
-        abort: string;
+        cancel: string;
         model: string;
         language: string;
     };
@@ -52,6 +52,13 @@ export interface BotCopy {
         providerAuth: string;
         requestAborted: string;
         structuredOutput: string;
+        voiceNotConfigured: string;
+        voiceDownload: string;
+        voiceTranscription: string;
+        voiceEmpty: string;
+        voiceUnsupported: string;
+        imageDownload: string;
+        imageUnsupported: string;
         outputLength: string;
         contextOverflow: string;
         providerRequest: string;
@@ -77,10 +84,22 @@ export interface BotCopy {
     sessions: {
         none: string;
         title: string;
+        actionTitle: string;
+        chooseAction: string;
         currentProject(worktree: string): string;
         currentSession(session: string): string;
+        selectedSession(session: string): string;
         switched: string;
         created: string;
+        renamed: string;
+        renameCancelled: string;
+        renameEmpty: string;
+        renameExpired: string;
+        renamePendingInput: string;
+        renamePrompt(session: string): string;
+        switchAction: string;
+        renameAction: string;
+        backToList: string;
         expired: string;
     };
     lsp: {
@@ -146,7 +165,7 @@ const EN_BOT_COPY: BotCopy = {
         new: "Create a new session",
         agents: "View and switch agents",
         sessions: "View and switch sessions",
-        abort: "Abort running request",
+        cancel: "Cancel rename or abort running request",
         model: "View and switch models",
         language: "View and switch language",
     },
@@ -194,6 +213,13 @@ const EN_BOT_COPY: BotCopy = {
         providerAuth: "Provider authentication failed.",
         requestAborted: "Request was aborted.",
         structuredOutput: "Structured output validation failed.",
+        voiceNotConfigured: "Voice transcription is not configured.",
+        voiceDownload: "Failed to download the Telegram voice file.",
+        voiceTranscription: "Voice transcription failed.",
+        voiceEmpty: "Voice transcription returned empty text.",
+        voiceUnsupported: "Voice message file is too large or unsupported.",
+        imageDownload: "Failed to download the Telegram image file.",
+        imageUnsupported: "Image file is too large or unsupported.",
         outputLength: "Reply hit the model output limit.",
         contextOverflow: "Conversation exceeded the model context window.",
         providerRequest: "Provider request failed.",
@@ -233,14 +259,34 @@ const EN_BOT_COPY: BotCopy = {
     sessions: {
         none: "No sessions available in the current project.",
         title: "Session List",
+        actionTitle: "Session Actions",
+        chooseAction: "Choose what to do with this session.",
         currentProject(worktree: string) {
             return `Current project: ${worktree}`;
         },
         currentSession(session: string) {
             return `Current session: ${session}`;
         },
+        selectedSession(session: string) {
+            return `Selected session: ${session}`;
+        },
         switched: "Session switched.",
         created: "Session created.",
+        renamed: "Session renamed.",
+        renameCancelled: "Session rename cancelled.",
+        renameEmpty: "Session name cannot be empty. Send a new name or /cancel.",
+        renameExpired: "The session is no longer available. Run /sessions again.",
+        renamePendingInput: "Waiting for the new session name. Send plain text or /cancel.",
+        renamePrompt(session: string) {
+            return [
+                `Rename session: ${session}`,
+                "Send the new session name as your next text message.",
+                "Send /cancel to cancel.",
+            ].join("\n");
+        },
+        switchAction: "Switch",
+        renameAction: "Rename",
+        backToList: "Back",
         expired: "The session is no longer available. Run /sessions again.",
     },
     lsp: {
@@ -328,7 +374,7 @@ const ZH_CN_BOT_COPY: BotCopy = {
         new: "新建会话",
         agents: "查看并切换代理",
         sessions: "查看并切换会话",
-        abort: "中止正在运行的请求",
+        cancel: "取消重命名或中止运行中的请求",
         model: "查看并切换模型",
         language: "查看并切换语言",
     },
@@ -376,6 +422,13 @@ const ZH_CN_BOT_COPY: BotCopy = {
         providerAuth: "Provider 认证失败。",
         requestAborted: "请求已中止。",
         structuredOutput: "结构化输出校验失败。",
+        voiceNotConfigured: "未配置语音转写服务。",
+        voiceDownload: "下载 Telegram 语音文件失败。",
+        voiceTranscription: "语音转写失败。",
+        voiceEmpty: "语音转写结果为空。",
+        voiceUnsupported: "语音文件过大或不受支持。",
+        imageDownload: "下载 Telegram 图片文件失败。",
+        imageUnsupported: "图片文件过大或不受支持。",
         outputLength: "回复触发了模型输出长度上限。",
         contextOverflow: "会话已超过模型上下文窗口。",
         providerRequest: "Provider 请求失败。",
@@ -415,14 +468,34 @@ const ZH_CN_BOT_COPY: BotCopy = {
     sessions: {
         none: "当前项目下没有可用会话。",
         title: "会话列表",
+        actionTitle: "会话操作",
+        chooseAction: "请选择对该会话执行的操作。",
         currentProject(worktree: string) {
             return `当前项目: ${worktree}`;
         },
         currentSession(session: string) {
             return `当前会话: ${session}`;
         },
+        selectedSession(session: string) {
+            return `目标会话: ${session}`;
+        },
         switched: "会话已切换。",
         created: "会话已创建。",
+        renamed: "会话已重命名。",
+        renameCancelled: "已取消会话重命名。",
+        renameEmpty: "会话名称不能为空。请重新发送名称或发送 /cancel。",
+        renameExpired: "该会话已不可用。请重新运行 /sessions。",
+        renamePendingInput: "当前正在等待新的会话名称。请发送纯文本或 /cancel。",
+        renamePrompt(session: string) {
+            return [
+                `重命名会话: ${session}`,
+                "请发送新的会话名称。",
+                "发送 /cancel 取消。",
+            ].join("\n");
+        },
+        switchAction: "切换",
+        renameAction: "重命名",
+        backToList: "返回列表",
         expired: "该会话已不可用。请重新运行 /sessions。",
     },
     lsp: {

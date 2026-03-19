@@ -1,6 +1,6 @@
 import type { Bot } from "grammy";
-import { registerAbortCommand } from "./commands/abort.js";
 import { registerAgentsCommand } from "./commands/agents.js";
+import { registerCancelCommand } from "./commands/cancel.js";
 import { registerHealthCommand } from "./commands/health.js";
 import { registerLanguageCommand } from "./commands/language.js";
 import { registerLspCommand } from "./commands/lsp.js";
@@ -12,7 +12,9 @@ import type { BotDependencies } from "./types.js";
 import { registerSessionsCommand } from "./commands/sessions.js";
 import { registerStartCommand } from "./commands/start.js";
 import { registerCallbackHandler } from "./handlers/callback.handler.js";
+import { registerFileHandler } from "./handlers/file.handler.js";
 import { registerMessageHandler } from "./handlers/message.handler.js";
+import { registerVoiceHandler } from "./handlers/voice.handler.js";
 import { authMiddleware } from "./middlewares/auth.js";
 import { loggingMiddleware } from "./middlewares/logging.js";
 
@@ -21,7 +23,7 @@ export function registerBot(bot: Bot, container: BotDependencies) {
     bot.use(authMiddleware);
 
     registerStartCommand(bot, container);
-    registerAbortCommand(bot, container);
+    registerCancelCommand(bot, container);
     registerHealthCommand(bot, container);
     registerPathCommand(bot, container);
     registerLspCommand(bot, container);
@@ -32,5 +34,7 @@ export function registerBot(bot: Bot, container: BotDependencies) {
     registerModelsCommand(bot, container);
     registerSessionsCommand(bot, container);
     registerCallbackHandler(bot, container);
+    registerFileHandler(bot, container);
     registerMessageHandler(bot, container);
+    registerVoiceHandler(bot, container);
 }

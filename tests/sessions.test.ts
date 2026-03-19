@@ -4,6 +4,7 @@ import type { Logger } from "pino";
 import { handleSessionsCommand } from "../src/bot/commands/sessions.js";
 import { handleSessionsCallback } from "../src/bot/handlers/callback.handler.js";
 import type { BotDependencies } from "../src/bot/types.js";
+import { InMemoryPendingActionRepository } from "../src/repositories/pending-action.repo.js";
 import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
 import type {
     OpenCodeClientLike,
@@ -11,6 +12,7 @@ import type {
     OpenCodeSession,
 } from "../src/services/opencode/opencode.client.js";
 import { ListSessionsUseCase } from "../src/use-cases/list-sessions.usecase.js";
+import { RenameSessionUseCase } from "../src/use-cases/rename-session.usecase.js";
 import { SwitchSessionUseCase } from "../src/use-cases/switch-session.usecase.js";
 
 const logger = {
@@ -44,22 +46,22 @@ function createSession(id: string, projectID: string, directory: string, title =
 
 function createDependencies(client: OpenCodeClientLike) {
     const repo = new InMemorySessionRepository();
+    const pendingActionRepo = new InMemoryPendingActionRepository();
     const dependencies: BotDependencies = {
-        logger,
-        sessionRepo: repo,
-        getConfigUseCase: {} as never,
-        getHealthUseCase: {} as never,
-        getPathUseCase: {} as never,
-        listAgentsUseCase: {} as never,
-        listModelsUseCase: {} as never,
+        abortPromptUseCase: {
+            async execute() {
+                return { sessionId: null, sessionStatus: null, status: "no_session" as const };
+            },
+        },
         listSessionsUseCase: new ListSessionsUseCase(repo, client),
-        sendPromptUseCase: {} as never,
-        switchAgentUseCase: {} as never,
-        switchModelUseCase: {} as never,
+        logger,
+        pendingActionRepo,
+        renameSessionUseCase: new RenameSessionUseCase(repo, client, logger),
+        sessionRepo: repo,
         switchSessionUseCase: new SwitchSessionUseCase(repo, client, logger),
-    };
+    } as never;
 
-    return { dependencies, repo };
+    return { dependencies, pendingActionRepo, repo };
 }
 
 test("/sessions shows the first page of sessions for the current project", async () => {
@@ -103,7 +105,7 @@ test("/sessions shows the first page of sessions for the current project", async
     const keyboard = replies[0].other?.reply_markup as {
         inline_keyboard: Array<Array<{ callback_data: string; text: string }>>;
     };
-    assert.equal(keyboard.inline_keyboard[0][0].callback_data, "sessions:select:session-1");
+    assert.equal(keyboard.inline_keyboard[0][0].callback_data, "sessions:pick:0:session-1");
     assert.equal(keyboard.inline_keyboard.at(-1)?.at(-1)?.callback_data, "sessions:page:1");
 });
 
@@ -146,7 +148,63 @@ test("session page callbacks re-render the requested page", async () => {
     assert.doesNotMatch(edits[0].text, /^1\. Session 1 \[session-1\]$/m);
 });
 
-test("session selection callbacks switch the binding within the current project", async () => {
+test("session pick callbacks open the second-level action menu", async () => {
+    const currentProject = createProject("project-2", "E:/repo-2");
+    const sessions = [
+        createSession("session-1", currentProject.id, currentProject.worktree, "Session 1"),
+        createSession("session-2", currentProject.id, currentProject.worktree, "Session 2"),
+    ];
+    const { dependencies } = createDependencies({
+        async getCurrentProject() {
+            return currentProject;
+        },
+        async listSessions() {
+            return sessions;
+        },
+    } as never);
+    const edits: Array<{ text: string; other?: { reply_markup?: unknown } }> = [];
+
+    await handleSessionsCallback(
+        {
+            chat: { id: 2 },
+            callbackQuery: { data: "sessions:pick:0:session-2" },
+            async answerCallbackQuery() {
+                return {};
+            },
+            async editMessageText(text, other) {
+                edits.push({ text, other });
+                return {};
+            },
+        },
+        dependencies,
+    );
+
+    assert.equal(edits.length, 1);
+    assert.equal(
+        edits[0].text,
+        [
+            "Session Actions",
+            "Current project: E:/repo-2",
+            "Selected session: Session 2 [session-2]",
+            "",
+            "Choose what to do with this session.",
+        ].join("\n"),
+    );
+    const keyboard = edits[0].other?.reply_markup as {
+        inline_keyboard: Array<Array<{ callback_data: string; text: string }>>;
+    };
+    assert.deepEqual(keyboard.inline_keyboard, [
+        [
+            { text: "Switch", callback_data: "sessions:switch:0:session-2" },
+            { text: "Rename", callback_data: "sessions:rename:0:session-2" },
+        ],
+        [
+            { text: "Back", callback_data: "sessions:back:0" },
+        ],
+    ]);
+});
+
+test("session switch callbacks switch the binding within the current project", async () => {
     const currentProject = createProject("project-2", "E:/repo-2");
     const sessions = [
         createSession("session-1", currentProject.id, currentProject.worktree, "Session 1"),
@@ -166,7 +224,7 @@ test("session selection callbacks switch the binding within the current project"
     await handleSessionsCallback(
         {
             chat: { id: 7 },
-            callbackQuery: { data: "sessions:select:session-2" },
+            callbackQuery: { data: "sessions:switch:0:session-2" },
             async answerCallbackQuery() {
                 return {};
             },
@@ -195,7 +253,64 @@ test("session selection callbacks switch the binding within the current project"
     });
 });
 
-test("invalid session selections ask the user to rerun /sessions", async () => {
+test("session rename callbacks enter pending rename mode", async () => {
+    const currentProject = createProject("project-2", "E:/repo-2");
+    const sessions = [
+        createSession("session-1", currentProject.id, currentProject.worktree, "Session 1"),
+        createSession("session-2", currentProject.id, currentProject.worktree, "Session 2"),
+    ];
+    const { dependencies, pendingActionRepo } = createDependencies({
+        async getCurrentProject() {
+            return currentProject;
+        },
+        async listSessions() {
+            return sessions;
+        },
+        async renameSession(sessionId, title) {
+            return createSession(sessionId, currentProject.id, currentProject.worktree, title);
+        },
+    } as never);
+    const edits: string[] = [];
+
+    await handleSessionsCallback(
+        {
+            chat: { id: 8 },
+            callbackQuery: {
+                data: "sessions:rename:1:session-2",
+                message: {
+                    message_id: 987,
+                },
+            },
+            async answerCallbackQuery() {
+                return {};
+            },
+            async editMessageText(text) {
+                edits.push(text);
+                return {};
+            },
+        },
+        dependencies,
+    );
+
+    assert.equal(
+        edits[0],
+        [
+            "Rename session: Session 2 [session-2]",
+            "Send the new session name as your next text message.",
+            "Send /cancel to cancel.",
+        ].join("\n"),
+    );
+    assert.deepEqual(await pendingActionRepo.getByChatId(8), {
+        chatId: 8,
+        kind: "session_rename",
+        sessionId: "session-2",
+        menuMessageId: 987,
+        returnPage: 1,
+        updatedAt: (await pendingActionRepo.getByChatId(8))?.updatedAt,
+    });
+});
+
+test("invalid session actions ask the user to rerun /sessions", async () => {
     const currentProject = createProject("project-2", "E:/repo-2");
     const { dependencies } = createDependencies({
         async getCurrentProject() {
@@ -210,7 +325,7 @@ test("invalid session selections ask the user to rerun /sessions", async () => {
     await handleSessionsCallback(
         {
             chat: { id: 7 },
-            callbackQuery: { data: "sessions:select:missing-session" },
+            callbackQuery: { data: "sessions:switch:0:missing-session" },
             async answerCallbackQuery() {
                 return {};
             },

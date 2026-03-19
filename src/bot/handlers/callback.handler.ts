@@ -13,7 +13,6 @@ import {
     buildLanguageKeyboard,
     buildModelsKeyboard,
     buildModelVariantsKeyboard,
-    buildSessionsKeyboard,
 } from "../presenters/keyboard.presenter.js";
 import { presentError } from "../presenters/error.presenter.js";
 import {
@@ -24,14 +23,21 @@ import {
     presentModelsMessage,
     presentModelSwitchMessage,
     presentModelVariantsMessage,
-    presentSessionsMessage,
+    presentSessionRenamePromptMessage,
     presentSessionSwitchMessage,
 } from "../presenters/message.presenter.js";
+import {
+    buildSessionActionView,
+    buildSessionsListView,
+} from "../sessions-menu.js";
 
 const AGENTS_PAGE_PREFIX = "agents:page:";
 const AGENTS_SELECT_PREFIX = "agents:select:";
 const SESSIONS_PAGE_PREFIX = "sessions:page:";
-const SESSIONS_SELECT_PREFIX = "sessions:select:";
+const SESSIONS_PICK_PREFIX = "sessions:pick:";
+const SESSIONS_SWITCH_PREFIX = "sessions:switch:";
+const SESSIONS_RENAME_PREFIX = "sessions:rename:";
+const SESSIONS_BACK_PREFIX = "sessions:back:";
 const MODEL_PAGE_PREFIX = "model:page:";
 const MODEL_PICK_PREFIX = "model:pick:";
 const MODEL_VARIANT_PREFIX = "model:variant:";
@@ -39,7 +45,7 @@ const LANGUAGE_SELECT_PREFIX = "language:select:";
 
 interface CallbackContext {
     chat?: { id: number };
-    callbackQuery: { data: string };
+    callbackQuery: { data: string; message?: { message_id: number } };
     answerCallbackQuery(): Promise<unknown>;
     editMessageText(text: string, other?: { reply_markup?: unknown }): Promise<unknown>;
     api?: Pick<Bot["api"], "setMyCommands">;
@@ -264,37 +270,58 @@ export async function handleSessionsCallback(ctx: CallbackContext, dependencies:
     try {
         if (data.startsWith(SESSIONS_PAGE_PREFIX)) {
             const requestedPage = Number(data.slice(SESSIONS_PAGE_PREFIX.length));
-            const result = await dependencies.listSessionsUseCase.execute({
-                chatId: ctx.chat.id,
-            });
+            const view = await buildSessionsListView(ctx.chat.id, requestedPage, dependencies);
 
-            if (result.sessions.length === 0) {
-                await ctx.editMessageText(copy.sessions.none);
-                return;
-            }
-
-            const { keyboard, page } = buildSessionsKeyboard(result.sessions, requestedPage, copy);
-
-            await ctx.editMessageText(
-                presentSessionsMessage({
-                    currentDirectory: result.currentDirectory,
-                    currentSessionId: result.currentSessionId,
-                    page: page.page,
-                    sessions: result.sessions,
-                }, copy),
-                {
-                    reply_markup: keyboard,
-                },
-            );
+            await ctx.editMessageText(view.text, view.keyboard ? { reply_markup: view.keyboard } : undefined);
 
             return;
         }
 
-        if (data.startsWith(SESSIONS_SELECT_PREFIX)) {
-            const sessionId = data.slice(SESSIONS_SELECT_PREFIX.length);
+        if (data.startsWith(SESSIONS_BACK_PREFIX)) {
+            const requestedPage = Number(data.slice(SESSIONS_BACK_PREFIX.length));
+            const view = await buildSessionsListView(ctx.chat.id, requestedPage, dependencies);
+
+            await ctx.editMessageText(view.text, view.keyboard ? { reply_markup: view.keyboard } : undefined);
+            return;
+        }
+
+        if (data.startsWith(SESSIONS_PICK_PREFIX)) {
+            const target = parseSessionActionTarget(data, SESSIONS_PICK_PREFIX);
+
+            if (!target) {
+                await ctx.editMessageText(copy.sessions.expired);
+                return;
+            }
+
+            const view = await buildSessionActionView(
+                ctx.chat.id,
+                target.page,
+                target.sessionId,
+                dependencies,
+            );
+
+            if (!view.found) {
+                await ctx.editMessageText(copy.sessions.expired);
+                return;
+            }
+
+            await ctx.editMessageText(view.text, {
+                reply_markup: view.keyboard,
+            });
+            return;
+        }
+
+        if (data.startsWith(SESSIONS_SWITCH_PREFIX)) {
+            const target = parseSessionActionTarget(data, SESSIONS_SWITCH_PREFIX);
+
+            if (!target) {
+                await ctx.editMessageText(copy.sessions.expired);
+                return;
+            }
+
             const result = await dependencies.switchSessionUseCase.execute({
                 chatId: ctx.chat.id,
-                sessionId,
+                sessionId: target.sessionId,
             });
 
             if (!result.found) {
@@ -303,6 +330,46 @@ export async function handleSessionsCallback(ctx: CallbackContext, dependencies:
             }
 
             await ctx.editMessageText(presentSessionSwitchMessage(result.session, copy));
+            return;
+        }
+
+        if (data.startsWith(SESSIONS_RENAME_PREFIX)) {
+            const target = parseSessionActionTarget(data, SESSIONS_RENAME_PREFIX);
+
+            if (!target) {
+                await ctx.editMessageText(copy.sessions.renameExpired);
+                return;
+            }
+
+            const view = await buildSessionActionView(
+                ctx.chat.id,
+                target.page,
+                target.sessionId,
+                dependencies,
+            );
+
+            if (!view.found) {
+                await ctx.editMessageText(copy.sessions.renameExpired);
+                return;
+            }
+
+            const menuMessageId = ctx.callbackQuery.message?.message_id;
+
+            if (!Number.isInteger(menuMessageId)) {
+                await ctx.editMessageText(copy.sessions.renameExpired);
+                return;
+            }
+
+            await dependencies.pendingActionRepo.set({
+                chatId: ctx.chat.id,
+                kind: "session_rename",
+                sessionId: view.session.id,
+                menuMessageId,
+                returnPage: view.page,
+                updatedAt: new Date().toISOString(),
+            });
+
+            await ctx.editMessageText(presentSessionRenamePromptMessage(view.session, copy));
         }
     } catch (error) {
         dependencies.logger.error({ error }, "failed to handle session callback");
@@ -367,4 +434,25 @@ export function registerCallbackHandler(bot: Bot, dependencies: BotDependencies)
     bot.callbackQuery(/^language:/, async (ctx) => {
         await handleLanguageCallback(ctx, dependencies);
     });
+}
+
+function parseSessionActionTarget(data: string, prefix: string) {
+    const suffix = data.slice(prefix.length);
+    const separatorIndex = suffix.indexOf(":");
+
+    if (separatorIndex === -1) {
+        return null;
+    }
+
+    const page = Number(suffix.slice(0, separatorIndex));
+    const sessionId = suffix.slice(separatorIndex + 1).trim();
+
+    if (!Number.isInteger(page) || page < 0 || !sessionId) {
+        return null;
+    }
+
+    return {
+        page,
+        sessionId,
+    };
 }

@@ -1,5 +1,9 @@
 import type { Logger } from "pino";
+import type { PendingActionRepository } from "../domain/pending-action/pending-action.repository.js";
 import type { SessionRepository } from "../domain/session/session.repository.js";
+import type { SttServiceLike } from "../services/stt/stt.service.js";
+import type { TelegramFileClientLike } from "../services/telegram/telegram.client.js";
+import type { UploadFileUseCase } from "../use-cases/upload-file.usecase.js";
 import type { CreateSessionUseCase } from "../use-cases/create-session.usecase.js";
 import type { GetHealthUseCase } from "../use-cases/get-health.usecase.js";
 import type { GetPathUseCase } from "../use-cases/get-path.usecase.js";
@@ -10,6 +14,7 @@ import type { ListMcpUseCase } from "../use-cases/list-mcp.usecase.js";
 import type { ListModelsUseCase } from "../use-cases/list-models.usecase.js";
 import type { ListSessionsUseCase } from "../use-cases/list-sessions.usecase.js";
 import type { SendPromptUseCase } from "../use-cases/send-prompt.usecase.js";
+import type { RenameSessionUseCase } from "../use-cases/rename-session.usecase.js";
 import type { SwitchAgentUseCase } from "../use-cases/switch-agent.usecase.js";
 import type { SwitchModelUseCase } from "../use-cases/switch-model.usecase.js";
 import type { SwitchSessionUseCase } from "../use-cases/switch-session.usecase.js";
@@ -25,16 +30,26 @@ export interface BotDependencies {
     logger: Logger;
     listModelsUseCase: ListModelsUseCase;
     listSessionsUseCase: ListSessionsUseCase;
+    pendingActionRepo: PendingActionRepository;
+    renameSessionUseCase: RenameSessionUseCase;
     sessionRepo: SessionRepository;
     sendPromptUseCase: SendPromptUseCase;
+    sttService: SttServiceLike;
     switchAgentUseCase: SwitchAgentUseCase;
     switchModelUseCase: SwitchModelUseCase;
     switchSessionUseCase: SwitchSessionUseCase;
+    telegramFileClient: TelegramFileClientLike;
+    uploadFileUseCase: UploadFileUseCase;
 }
 
 export type AgentsCallbackData = `agents:page:${number}` | `agents:select:${number}`;
 export type LanguageCallbackData = `language:select:${"en" | "zh-CN"}`;
-export type SessionsCallbackData = `sessions:page:${number}` | `sessions:select:${string}`;
+export type SessionsCallbackData =
+    | `sessions:page:${number}`
+    | `sessions:pick:${number}:${string}`
+    | `sessions:switch:${number}:${string}`
+    | `sessions:rename:${number}:${string}`
+    | `sessions:back:${number}`;
 export type ModelCallbackData =
     | `model:page:${number}`
     | `model:pick:${number}`

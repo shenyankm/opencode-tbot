@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { SQLitePendingActionRepository } from "../src/repositories/pending-action.repo.js";
 import { SQLiteSessionRepository } from "../src/repositories/session.repo.js";
 import { openSQLiteDatabase } from "../src/services/storage/sqlite.js";
 
@@ -92,5 +93,47 @@ test("SQLiteSessionRepository touch only updates the timestamp", async () => {
     assert.notEqual(touchedBinding?.updatedAt, binding.updatedAt);
 
     database.close();
+    tempDatabase.cleanup();
+});
+
+test("SQLitePendingActionRepository persists and clears pending rename actions", async () => {
+    const tempDatabase = createTempDatabasePath();
+    const initialAction = {
+        chatId: 12,
+        kind: "session_rename" as const,
+        sessionId: "session-12",
+        menuMessageId: 345,
+        returnPage: 2,
+        updatedAt: new Date(0).toISOString(),
+    };
+
+    const databaseOne = openSQLiteDatabase(tempDatabase.filePath);
+    const repositoryOne = new SQLitePendingActionRepository(databaseOne);
+    await repositoryOne.set(initialAction);
+    databaseOne.close();
+
+    const databaseTwo = openSQLiteDatabase(tempDatabase.filePath);
+    const repositoryTwo = new SQLitePendingActionRepository(databaseTwo);
+
+    assert.deepEqual(await repositoryTwo.getByChatId(12), initialAction);
+
+    await repositoryTwo.set({
+        ...initialAction,
+        menuMessageId: 678,
+        returnPage: 3,
+        updatedAt: new Date(1_000).toISOString(),
+    });
+
+    assert.deepEqual(await repositoryTwo.getByChatId(12), {
+        ...initialAction,
+        menuMessageId: 678,
+        returnPage: 3,
+        updatedAt: new Date(1_000).toISOString(),
+    });
+
+    await repositoryTwo.clear(12);
+    assert.equal(await repositoryTwo.getByChatId(12), null);
+
+    databaseTwo.close();
     tempDatabase.cleanup();
 });

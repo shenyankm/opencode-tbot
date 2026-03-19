@@ -81,12 +81,24 @@ export function buildSessionsKeyboard(
     const keyboard = buildNumberedKeyboard(
         page.items,
         page.startIndex,
-        (session) => `sessions:select:${session.id}`,
+        (session) => `sessions:pick:${page.page}:${session.id}`,
     );
 
     appendPaginationButtons(keyboard, page.page, page.totalPages, "sessions:page", copy);
 
     return { keyboard, page };
+}
+
+export function buildSessionActionKeyboard(
+    sessionId: string,
+    page: number,
+    copy: BotCopy = BOT_COPY,
+) {
+    return new InlineKeyboard()
+        .text(copy.sessions.switchAction, `sessions:switch:${page}:${sessionId}`)
+        .text(copy.sessions.renameAction, `sessions:rename:${page}:${sessionId}`)
+        .row()
+        .text(copy.sessions.backToList, `sessions:back:${page}`);
 }
 
 export function buildModelVariantsKeyboard(variants: string[], modelIndex: number) {

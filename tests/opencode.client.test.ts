@@ -184,6 +184,57 @@ test("createSessionForDirectory forwards directory and title to the SDK", async 
     ]);
 });
 
+test("renameSession forwards the session id and new title to the SDK update endpoint", async () => {
+    const calls: Array<{ input: unknown; options: unknown }> = [];
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            config: {
+                get: async () => ({ provider: {} }),
+                providers: async () => ({ providers: [], default: {} }),
+            },
+            path: {
+                get: async () => createPath(),
+            },
+            project: {
+                list: async () => [],
+                current: async () => createProject("project-1", "E:/repo-1"),
+            },
+            session: {
+                async update(input: unknown, options: unknown) {
+                    calls.push({ input, options });
+                    return {
+                        data: createSession("session-1", "project-1", "E:/repo-1"),
+                    };
+                },
+                create: async () => createSession("session-1", "project-1", "E:/repo-1"),
+                prompt: async () => ({
+                    data: {
+                        info: {} as never,
+                        parts: [],
+                    },
+                }),
+            },
+        } as never,
+    );
+
+    const session = await client.renameSession("session-1", "Renamed session");
+
+    assert.equal(session.id, "session-1");
+    assert.deepEqual(calls, [
+        {
+            input: {
+                sessionID: "session-1",
+                title: "Renamed session",
+            },
+            options: {
+                responseStyle: "data",
+                throwOnError: true,
+            },
+        },
+    ]);
+});
+
 test("getPath forwards to the SDK path endpoint", async () => {
     const calls: Array<{ input: unknown; options: unknown }> = [];
     const pathInfo = createPath();
@@ -607,6 +658,89 @@ test("promptSession forwards model selection and JSON schema format and returns 
                     {
                         type: "text",
                         text: "hello from telegram",
+                    },
+                ],
+            },
+            options: {
+                responseStyle: "data",
+                throwOnError: true,
+            },
+        },
+    ]);
+});
+
+test("promptSession includes file parts when image attachments are provided", async () => {
+    const calls: Array<{ input: unknown; options: unknown }> = [];
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            config: {
+                get: async () => ({ provider: {} }),
+                providers: async () => ({ providers: [], default: {} }),
+            },
+            path: {
+                get: async () => createPath(),
+            },
+            project: {
+                list: async () => [],
+                current: async () => createProject("project-1", "E:/repo-1"),
+            },
+            session: {
+                create: async () => createSession("session-1", "project-1", "E:/repo-1"),
+                prompt: async (input: unknown, options: unknown) => {
+                    calls.push({ input, options });
+
+                    return {
+                        data: {
+                            info: {} as never,
+                            parts: [{ type: "text", text: "fallback text" }] as never,
+                        },
+                    };
+                },
+            },
+        } as never,
+    );
+
+    await client.promptSession({
+        sessionId: "session-1",
+        prompt: "analyze this image",
+        files: [{
+            filename: "telegram.jpg",
+            mime: "image/jpeg",
+            url: "data:image/jpeg;base64,/9j/",
+        }],
+        structured: true,
+    });
+
+    assert.deepEqual(calls, [
+        {
+            input: {
+                sessionID: "session-1",
+                format: {
+                    type: "json_schema",
+                    retryCount: 2,
+                    schema: {
+                        type: "object",
+                        additionalProperties: false,
+                        required: ["body_md"],
+                        properties: {
+                            body_md: {
+                                type: "string",
+                                description: "Markdown body only. Do not include duration, token usage, or any footer. Do not wrap the whole answer in ```md or ```markdown fences. Use Markdown formatting directly unless the user explicitly asks for raw Markdown source.",
+                            },
+                        },
+                    },
+                },
+                parts: [
+                    {
+                        type: "text",
+                        text: "analyze this image",
+                    },
+                    {
+                        type: "file",
+                        filename: "telegram.jpg",
+                        mime: "image/jpeg",
+                        url: "data:image/jpeg;base64,/9j/",
                     },
                 ],
             },

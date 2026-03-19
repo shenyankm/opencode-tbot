@@ -5,6 +5,7 @@ import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
 import type {
     OpenCodeAgent,
     OpenCodeClientLike,
+    PromptSessionFilePartInput,
     OpenCodeProject,
     PromptSessionResult,
     OpenCodeSession,
@@ -72,6 +73,20 @@ function createPromptReply(text: string): PromptSessionResult {
             body_md: text,
         },
     };
+}
+
+function withImageTurnGuidance(text?: string): string {
+    const sections = [
+        "System note for this turn: The user attached one or more images in this message and you can inspect those images directly. Ignore any earlier statements in this conversation claiming that you could not view images or attachments, because those may have come from a previous model or an earlier limitation. If an image is blurry or unreadable, say that it is blurry or unreadable instead of saying that you cannot view images.",
+    ];
+
+    const trimmedText = text?.trim();
+
+    if (trimmedText) {
+        sections.push(trimmedText);
+    }
+
+    return sections.join("\n\n");
 }
 
 test("SendPromptUseCase creates a session in the current project when the chat is unbound", async () => {
@@ -521,4 +536,149 @@ test("SendPromptUseCase clears stale selected agents before prompting", async ()
         },
     ]);
     assert.equal(binding?.agentName, null);
+});
+
+test("SendPromptUseCase forwards image file parts alongside the prompt text", async () => {
+    const repo = new InMemorySessionRepository();
+    await repo.setCurrent({
+        chatId: 99,
+        sessionId: "session-1",
+        projectId: "project-1",
+        directory: "E:/repo-1",
+        agentName: null,
+        modelProviderId: null,
+        modelId: null,
+        modelVariant: null,
+        language: null,
+        updatedAt: new Date(0).toISOString(),
+    });
+
+    const promptCalls: unknown[] = [];
+    const client: OpenCodeClientLike = {
+        async abortSession() {
+            return true;
+        },
+        async createSessionForDirectory(directory) {
+            return createSession("session-1", "project-1", directory);
+        },
+        async getCurrentProject() {
+            return createProject("project-1", "E:/repo-1");
+        },
+        async getSessionStatuses() {
+            return {};
+        },
+        async listModels() {
+            return [];
+        },
+        async listAgents() {
+            return [createAgent("build")];
+        },
+        async listProjects() {
+            return [createProject("project-1", "E:/repo-1")];
+        },
+        async listSessions() {
+            return [createSession("session-1", "project-1", "E:/repo-1")];
+        },
+        async getPath() {
+            throw new Error("unused");
+        },
+        async promptSession(input) {
+            promptCalls.push(input);
+            return createPromptReply("reply with image");
+        },
+    };
+    const files: PromptSessionFilePartInput[] = [{
+        filename: "telegram.jpg",
+        mime: "image/jpeg",
+        url: "data:image/jpeg;base64,/9j/",
+    }];
+
+    const useCase = new SendPromptUseCase(repo, client, logger);
+    await useCase.execute({
+        chatId: 99,
+        text: "analyze this image",
+        files,
+    });
+
+    assert.deepEqual(promptCalls, [
+        {
+            sessionId: "session-1",
+            prompt: withImageTurnGuidance("analyze this image"),
+            files,
+            structured: true,
+            agent: "build",
+        },
+    ]);
+});
+
+test("SendPromptUseCase adds image guidance even when the user sends only an image", async () => {
+    const repo = new InMemorySessionRepository();
+    await repo.setCurrent({
+        chatId: 109,
+        sessionId: "session-1",
+        projectId: "project-1",
+        directory: "E:/repo-1",
+        agentName: null,
+        modelProviderId: null,
+        modelId: null,
+        modelVariant: null,
+        language: null,
+        updatedAt: new Date(0).toISOString(),
+    });
+
+    const promptCalls: unknown[] = [];
+    const client: OpenCodeClientLike = {
+        async abortSession() {
+            return true;
+        },
+        async createSessionForDirectory(directory) {
+            return createSession("session-1", "project-1", directory);
+        },
+        async getCurrentProject() {
+            return createProject("project-1", "E:/repo-1");
+        },
+        async getSessionStatuses() {
+            return {};
+        },
+        async listModels() {
+            return [];
+        },
+        async listAgents() {
+            return [createAgent("build")];
+        },
+        async listProjects() {
+            return [createProject("project-1", "E:/repo-1")];
+        },
+        async listSessions() {
+            return [createSession("session-1", "project-1", "E:/repo-1")];
+        },
+        async getPath() {
+            throw new Error("unused");
+        },
+        async promptSession(input) {
+            promptCalls.push(input);
+            return createPromptReply("reply with image only");
+        },
+    };
+    const files: PromptSessionFilePartInput[] = [{
+        filename: "telegram.jpg",
+        mime: "image/jpeg",
+        url: "data:image/jpeg;base64,/9j/",
+    }];
+
+    const useCase = new SendPromptUseCase(repo, client, logger);
+    await useCase.execute({
+        chatId: 109,
+        files,
+    });
+
+    assert.deepEqual(promptCalls, [
+        {
+            sessionId: "session-1",
+            prompt: withImageTurnGuidance(),
+            files,
+            structured: true,
+            agent: "build",
+        },
+    ]);
 });

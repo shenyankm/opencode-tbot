@@ -32,7 +32,7 @@ export function buildOpenCodeSdkConfig(options: OpenCodeClientOptions) {
 
 export interface PromptSessionInput {
     sessionId: string;
-    prompt: string;
+    prompt?: string | null;
     agent?: string | null;
     structured?: boolean;
     model?: {
@@ -40,6 +40,13 @@ export interface PromptSessionInput {
         modelID: string;
     };
     variant?: string | null;
+    files?: PromptSessionFilePartInput[];
+}
+
+export interface PromptSessionFilePartInput {
+    filename?: string;
+    mime: string;
+    url: string;
 }
 
 export interface PromptSessionTokenMetrics {
@@ -142,6 +149,7 @@ export interface OpenCodeClientLike {
     listSessions(): Promise<OpenCodeSession[]>;
     getCurrentProject(): Promise<OpenCodeProject>;
     createSessionForDirectory(directory: string, title?: string): Promise<OpenCodeSession>;
+    renameSession(sessionId: string, title: string): Promise<OpenCodeSession>;
     listAgents(): Promise<OpenCodeAgent[]>;
     listModels(): Promise<OpenCodeConfiguredModel[]>;
     promptSession(input: PromptSessionInput): Promise<PromptSessionResult>;
@@ -235,6 +243,15 @@ export class OpenCodeClient implements OpenCodeClientLike {
         return unwrapSdkData(response);
     }
 
+    async renameSession(sessionId: string, title: string): Promise<OpenCodeSession> {
+        const response = await this.client.session.update(
+            { sessionID: sessionId, title },
+            SDK_OPTIONS,
+        ) as MaybeWrappedResponse<OpenCodeSession>;
+
+        return unwrapSdkData(response);
+    }
+
     async listAgents(): Promise<OpenCodeAgent[]> {
         const response = await this.client.app.agents(undefined, SDK_OPTIONS) as MaybeWrappedResponse<OpenCodeAgent[]>;
 
@@ -259,18 +276,33 @@ export class OpenCodeClient implements OpenCodeClientLike {
 
     async promptSession(input: PromptSessionInput): Promise<PromptSessionResult> {
         const startedAt = Date.now();
+        const promptText = input.prompt?.trim() ?? "";
+        const parts = [
+            ...(promptText
+                ? [{
+                    type: "text" as const,
+                    text: promptText,
+                }]
+                : []),
+            ...((input.files ?? []).map((file) => ({
+                type: "file" as const,
+                filename: file.filename,
+                mime: file.mime,
+                url: file.url,
+            }))),
+        ];
+
+        if (parts.length === 0) {
+            throw new Error("Prompt requires text or file attachments.");
+        }
+
         const response = await this.client.session.prompt({
             sessionID: input.sessionId,
             ...(input.agent ? { agent: input.agent } : {}),
             ...(input.structured ? { format: STRUCTURED_REPLY_SCHEMA } : {}),
             ...(input.model ? { model: input.model } : {}),
             ...(input.variant ? { variant: input.variant } : {}),
-            parts: [
-                {
-                    type: "text",
-                    text: input.prompt,
-                },
-            ],
+            parts,
         }, SDK_OPTIONS) as MaybeWrappedResponse<OpenCodePromptResponse>;
         const data = unwrapSdkData(response);
         const finishedAt = Date.now();

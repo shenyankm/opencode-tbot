@@ -38,8 +38,8 @@ export function getTelegramCommands(language: BotLanguage = "en"): BotCommand[] 
             description: copy.commands.sessions,
         },
         {
-            command: "abort",
-            description: copy.commands.abort,
+            command: "cancel",
+            description: copy.commands.cancel,
         },
         {
             command: "model",

@@ -38,6 +38,55 @@ function normalizeError(error: unknown, copy: BotCopy): PresentedError {
         };
     }
 
+    if (isNamedError(error, "VoiceTranscriptionNotConfiguredError")) {
+        return {
+            message: copy.errors.voiceNotConfigured,
+            cause: extractMessage(error.data) ?? null,
+        };
+    }
+
+    if (isNamedError(error, "TelegramFileDownloadError")) {
+        return {
+            message: copy.errors.voiceDownload,
+            cause: extractMessage(error.data) ?? null,
+        };
+    }
+
+    if (isNamedError(error, "VoiceTranscriptionFailedError")) {
+        return {
+            message: copy.errors.voiceTranscription,
+            cause: extractMessage(error.data) ?? null,
+        };
+    }
+
+    if (isNamedError(error, "VoiceTranscriptEmptyError")) {
+        return {
+            message: copy.errors.voiceEmpty,
+            cause: extractMessage(error.data) ?? null,
+        };
+    }
+
+    if (isNamedError(error, "VoiceMessageUnsupportedError")) {
+        return {
+            message: copy.errors.voiceUnsupported,
+            cause: extractMessage(error.data) ?? null,
+        };
+    }
+
+    if (isNamedError(error, "ImageFileDownloadError")) {
+        return {
+            message: copy.errors.imageDownload,
+            cause: extractMessage(error.data) ?? null,
+        };
+    }
+
+    if (isNamedError(error, "ImageMessageUnsupportedError")) {
+        return {
+            message: copy.errors.imageUnsupported,
+            cause: extractMessage(error.data) ?? null,
+        };
+    }
+
     if (isNamedError(error, "MessageOutputLengthError")) {
         return {
             message: copy.errors.outputLength,

@@ -135,6 +135,30 @@ export function presentSessionCreatedMessage(session: OpenCodeSession, copy: Bot
     ].join("\n");
 }
 
+export function presentSessionActionsMessage(
+    input: { currentDirectory: string; session: OpenCodeSession },
+    copy: BotCopy = BOT_COPY,
+): string {
+    return [
+        copy.sessions.actionTitle,
+        copy.sessions.currentProject(input.currentDirectory),
+        copy.sessions.selectedSession(formatSessionLabel(input.session)),
+        "",
+        copy.sessions.chooseAction,
+    ].join("\n");
+}
+
+export function presentSessionRenamePromptMessage(session: OpenCodeSession, copy: BotCopy = BOT_COPY): string {
+    return copy.sessions.renamePrompt(formatSessionLabel(session));
+}
+
+export function presentSessionRenamedMessage(session: OpenCodeSession, copy: BotCopy = BOT_COPY): string {
+    return [
+        copy.sessions.renamed,
+        copy.sessions.currentSession(formatSessionLabel(session)),
+    ].join("\n");
+}
+
 export function presentAgentsMessage(input: AgentsMessageInput, copy: BotCopy = BOT_COPY): string {
     if (input.agents.length === 0) {
         return copy.agents.none;

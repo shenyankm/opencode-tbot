@@ -1,7 +1,10 @@
 import type { ChatSessionBinding } from "../domain/session/session.entity.js";
 import type { Logger } from "pino";
 import type { SessionRepository } from "../domain/session/session.repository.js";
-import type { OpenCodeClientLike } from "../services/opencode/opencode.client.js";
+import type {
+    OpenCodeClientLike,
+    PromptSessionFilePartInput,
+} from "../services/opencode/opencode.client.js";
 import { resolveSelectedAgent } from "./agent-selection.js";
 import {
     clearStoredAgentSelection,
@@ -24,7 +27,14 @@ export class SendPromptUseCase {
         private readonly logger: Logger,
     ) { }
 
-    async execute(input: { chatId: number; text: string }) {
+    async execute(input: { chatId: number; text?: string | null; files?: PromptSessionFilePartInput[] }) {
+        const files = input.files ?? [];
+        const promptText = buildPromptText(input.text, files);
+
+        if (!promptText && files.length === 0) {
+            throw new Error("Prompt requires text or file attachments.");
+        }
+
         let binding = await this.sessionRepo.getByChatId(input.chatId);
 
         if (binding?.projectId && binding.directory) {
@@ -131,7 +141,8 @@ export class SendPromptUseCase {
 
         const result = await this.opencodeClient.promptSession({
             sessionId: activeBinding.sessionId,
-            prompt: input.text,
+            prompt: promptText,
+            ...(files.length > 0 ? { files } : {}),
             ...(selectedAgent ? { agent: selectedAgent.name } : {}),
             structured: true,
             ...(model ? { model } : {}),
@@ -162,4 +173,34 @@ export class SendPromptUseCase {
 
         return nextBinding;
     }
+}
+
+function buildPromptText(
+    text: string | null | undefined,
+    files: PromptSessionFilePartInput[],
+): string {
+    const trimmedText = text?.trim() ?? "";
+
+    if (!files.some(isImageFile)) {
+        return trimmedText;
+    }
+
+    const promptSections = [
+        [
+            "System note for this turn:",
+            "The user attached one or more images in this message and you can inspect those images directly.",
+            "Ignore any earlier statements in this conversation claiming that you could not view images or attachments, because those may have come from a previous model or an earlier limitation.",
+            "If an image is blurry or unreadable, say that it is blurry or unreadable instead of saying that you cannot view images.",
+        ].join(" "),
+    ];
+
+    if (trimmedText) {
+        promptSections.push(trimmedText);
+    }
+
+    return promptSections.join("\n\n");
+}
+
+function isImageFile(file: PromptSessionFilePartInput): boolean {
+    return file.mime.trim().toLowerCase().startsWith("image/");
 }
