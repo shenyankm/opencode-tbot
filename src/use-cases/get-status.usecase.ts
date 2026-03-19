@@ -1,5 +1,5 @@
 import { readFile, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { parse, printParseErrorCode, type ParseError } from "jsonc-parser";
 import type { SessionRepository } from "../domain/session/session.repository.js";
 import type {
@@ -196,13 +196,13 @@ async function loadWorkspaceStatusResult(
     }
 
     const binding = await sessionRepo.getByChatId(chatId);
-    let currentProject = path.data.directory;
+    let currentProject = resolveWorkspaceProjectPath(path.data);
     let currentSession = binding?.sessionId ?? null;
 
     try {
         const sessions = await listSessionsUseCase.execute({ chatId });
 
-        currentProject = sessions.currentDirectory;
+        currentProject = resolveWorkspaceProjectPath(path.data, sessions.currentDirectory);
         currentSession = sessions.currentSessionId
             ? formatSessionStatusLabel(
                 sessions.sessions.find((session) => session.id === sessions.currentSessionId) ?? null,
@@ -232,6 +232,35 @@ function formatSessionStatusLabel(session: OpenCodeSession | null, fallbackId: s
     return title === session.slug
         ? title
         : `${title} (${session.slug})`;
+}
+
+function resolveWorkspaceProjectPath(path: OpenCodePath, preferredPath?: string | null): string {
+    const candidates = [
+        preferredPath,
+        path.worktree,
+        path.directory,
+    ];
+
+    for (const candidate of candidates) {
+        if (isUsableWorkspacePath(candidate)) {
+            return candidate;
+        }
+    }
+
+    return preferredPath ?? path.worktree ?? path.directory;
+}
+
+function isUsableWorkspacePath(value: string | null | undefined): value is string {
+    if (typeof value !== "string") {
+        return false;
+    }
+
+    const normalized = value.trim();
+
+    return normalized.length > 0
+        && normalized !== "/"
+        && normalized !== "\\"
+        && isAbsolute(normalized);
 }
 
 async function resolveOpenCodeConfigFilePath(configPath: string): Promise<string> {

@@ -71,9 +71,7 @@ interface StatusLayoutCopy {
     noPluginsMessage: string;
     noneStatus: string;
     openCodeVersionLabel: string;
-    okLabel: string;
     overviewTitle: string;
-    pageTitle: string;
     pluginsTitle: string;
     rootLabel: string;
     statusLabel: string;
@@ -112,7 +110,7 @@ export function presentStatusMessage(input: GetStatusResult, copy: BotCopy = BOT
         presentStatusPlainSection(layout.lspTitle, presentStatusPlainLspLines(input, copy, layout)),
     ];
 
-    return presentStatusSections(layout.pageTitle, sections);
+    return presentStatusSections(sections);
 }
 
 export function presentStatusMarkdownMessage(input: GetStatusResult, copy: BotCopy = BOT_COPY): string {
@@ -125,7 +123,7 @@ export function presentStatusMarkdownMessage(input: GetStatusResult, copy: BotCo
         presentStatusMarkdownSection(layout.lspTitle, presentStatusMarkdownLspLines(input, copy, layout)),
     ];
 
-    return presentStatusSections(`# ${layout.pageTitle}`, sections);
+    return presentStatusSections(sections);
 }
 
 export function presentMcpMessage(input: McpMessageInput, copy: BotCopy = BOT_COPY): string {
@@ -162,12 +160,8 @@ export function presentLspMessage(input: LspMessageInput, copy: BotCopy = BOT_CO
     return lines.join("\n");
 }
 
-function presentStatusSections(title: string, sections: string[]): string {
-    return [
-        title,
-        "",
-        ...sections.flatMap((section, index) => index === 0 ? [section] : ["", section]),
-    ].join("\n");
+function presentStatusSections(sections: string[]): string {
+    return sections.flatMap((section, index) => index === 0 ? [section] : ["", section]).join("\n");
 }
 
 function presentStatusPlainSection(title: string, lines: string[]): string {
@@ -526,7 +520,7 @@ function getMcpStatusDetailLines(
 function formatMcpStatusNotes(status: OpenCodeMcpStatus, copy: BotCopy, layout: StatusLayoutCopy): string | null {
     switch (status.status) {
         case "connected":
-            return layout.okLabel;
+            return null;
         case "disabled":
             return null;
         case "needs_auth":
@@ -576,9 +570,7 @@ function getStatusLayoutCopy(copy: BotCopy): StatusLayoutCopy {
             noPluginsMessage: "No plugins configured in the OpenCode config.",
             noneStatus: "\u26AA",
             openCodeVersionLabel: "OpenCode Version",
-            okLabel: "OK",
             overviewTitle: "\uD83D\uDDA5\uFE0F Overview",
-            pageTitle: "\uD83D\uDCCA Service Status",
             pluginsTitle: "\uD83E\uDDE9 Plugins",
             rootLabel: "Root",
             statusLabel: "Status",
@@ -603,9 +595,7 @@ function getStatusLayoutCopy(copy: BotCopy): StatusLayoutCopy {
         noPluginsMessage: "\u5F53\u524D OpenCode \u914D\u7F6E\u4E2D\u672A\u914D\u7F6E\u63D2\u4EF6\u3002",
         noneStatus: "\u26AA",
         openCodeVersionLabel: "OpenCode\u7248\u672C",
-        okLabel: "\u6B63\u5E38",
         overviewTitle: "\uD83D\uDDA5\uFE0F \u6982\u89C8",
-        pageTitle: "\uD83D\uDCCA \u670D\u52A1\u72B6\u6001",
         pluginsTitle: "\uD83E\uDDE9 \u63D2\u4EF6",
         rootLabel: "\u6839\u76EE\u5F55",
         statusLabel: "\u72B6\u6001",

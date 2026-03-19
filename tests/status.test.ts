@@ -213,7 +213,6 @@ test("/status aggregates health, path, plugins, LSP, and MCP into one reply", as
 
     assert.equal(replies[0]?.text, expected);
     assert.deepEqual(replies[0]?.options, { parse_mode: "MarkdownV2" });
-    expectLine(markdown, "# \uD83D\uDCCA Service Status");
     expectLine(markdown, "## \uD83D\uDDA5\uFE0F Overview");
     expectLine(markdown, "## \uD83D\uDCC1 Workspace");
     expectLine(markdown, "## \uD83E\uDDE9 Plugins");
@@ -227,11 +226,13 @@ test("/status aggregates health, path, plugins, LSP, and MCP into one reply", as
     expectLine(markdown, "- **Current Session:** Build status (build-status)");
     expectLine(markdown, "- `opencode-tbot@latest`");
     expectLine(markdown, "- `workspace-tools`");
+    assert.match(markdown, /- `alpha`\n  - \*\*Status:\*\* \uD83D\uDFE2\n- `beta`/u);
     assert.match(markdown, /- `beta`\n  - \*\*Status:\*\* \u26AA/u);
     assert.doesNotMatch(markdown, /Configured Plugins/u);
     assert.doesNotMatch(markdown, /beta[\s\S]*disabled/u);
     assert.doesNotMatch(markdown, /Model Context Protocol/u);
     assert.doesNotMatch(markdown, /Language Server/u);
+    assert.doesNotMatch(markdown, /Service Status/u);
     assert.doesNotMatch(markdown, /Service\s+\|\s+Status\s+\|\s+Notes/u);
     assert.doesNotMatch(markdown, /Language\s+\|\s+Status\s+\|\s+Root/u);
     assert.doesNotMatch(markdown, /```/u);
@@ -283,7 +284,7 @@ test("/status keeps successful sections when one section fails", async () => {
     assert.deepEqual(replies[0]?.options, { parse_mode: "MarkdownV2" });
     expectLine(markdown, "- **Connectivity:** \uD83D\uDD34");
     expectLine(markdown, "- **Voice Recognition:** \u26AA");
-    expectLine(markdown, "- **Current Project:** `E:/repo/src`");
+    expectLine(markdown, "- **Current Project:** `E:/repo`");
     expectLine(markdown, "- **Current Session:** OpenCode Default");
     assert.match(markdown, /- \*\*Details:\*\* Unexpected error\./u);
     assert.match(markdown, /- \*\*Details:\*\* Cause: health boom/u);
@@ -294,7 +295,7 @@ test("/status keeps successful sections when one section fails", async () => {
 });
 
 test("/status uses the selected chat language", async () => {
-    const project = createProject("project-1", "E:/repo-1");
+    const project = createProject("project-1", "/");
     const replies: StatusReply[] = [];
     const { dependencies, getStatusUseCase, sessionRepo } = createDependencies({
         async getCurrentProject() {
@@ -357,7 +358,6 @@ test("/status uses the selected chat language", async () => {
 
     assert.equal(replies[0]?.text, expected);
     assert.deepEqual(replies[0]?.options, { parse_mode: "MarkdownV2" });
-    expectLine(markdown, "# \uD83D\uDCCA \u670D\u52A1\u72B6\u6001");
     expectLine(markdown, "## \uD83D\uDDA5\uFE0F \u6982\u89C8");
     expectLine(markdown, "## \uD83D\uDCC1 \u5DE5\u4F5C\u533A");
     expectLine(markdown, "## \uD83E\uDDE9 \u63D2\u4EF6");
@@ -367,9 +367,10 @@ test("/status uses the selected chat language", async () => {
     expectLine(markdown, "- **\u8BED\u97F3\u8BC6\u522B:** \u26AA");
     expectLine(markdown, "- **OpenCode\u7248\u672C:** 1.0.0");
     expectLine(markdown, `- **opencode-tbot\u7248\u672C:** ${OPENCODE_TBOT_VERSION}`);
-    expectLine(markdown, "- **\u5F53\u524D\u9879\u76EE:** `E:/repo-1`");
+    expectLine(markdown, "- **\u5F53\u524D\u9879\u76EE:** `E:/repo`");
     expectLine(markdown, "- **\u5F53\u524D\u4F1A\u8BDD:** OpenCode \u9ED8\u8BA4");
     assert.doesNotMatch(markdown, /\u5DF2\u914D\u7F6E\u63D2\u4EF6/u);
     assert.doesNotMatch(markdown, /\u5DF2\u7981\u7528/u);
+    assert.doesNotMatch(markdown, /\u670D\u52A1\u72B6\u6001/u);
     assert.doesNotMatch(markdown, /\u6700\u540E\u66F4\u65B0/u);
 });
