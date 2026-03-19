@@ -19,46 +19,39 @@ This repository now runs only as an OpenCode plugin. There is no standalone bot 
 
 ## Installation
 
+Follow these steps to register the plugin globally and configure the current OpenCode worktree.
+
+### Requirements
+
+- OpenCode must be installed and able to load plugins.
+- Node.js 22.12.0 or newer is required for local builds and development.
+- You need a Telegram bot token from BotFather.
+
+### Configuration Layers
+
 There are two configuration surfaces:
 
 - global plugin registration in `~/.config/opencode/opencode.json`
-- per-project Telegram runtime configuration in the current worktree `tbot.config.json`
-
-### Option A: Let OpenCode or an agent install it
-
-The quickest path is to give an LLM agent the install contract from [INSTALL.md](./INSTALL.md).
-
-Copy this prompt into OpenCode, Claude Code, Cursor, or another coding agent:
-
-```text
-Install the opencode-tbot plugin for OpenCode.
-
-Do all of the following without removing existing unrelated configuration:
-1. Open or create ~/.config/opencode/opencode.json
-2. Ensure the config uses the singular "plugin" key
-3. Append "opencode-tbot@latest" to the "plugin" array if it is not already present
-4. In the current project, open or create tbot.config.json
-5. Ask me for the Telegram bot token and write it to telegram.botToken if I provide it
-6. If I do not provide the token, leave tbot.config.json ready for manual completion and do not block plugin registration
-7. Preserve any existing plugins and any unrelated configuration keys
-8. After editing, show me the exact changes and tell me to restart OpenCode
-```
+- per-worktree Telegram runtime configuration in `tbot.config.json`
 
 Windows note: `~` resolves to your user home directory.
 
-### Option B: Manual setup
+### Manual Setup
 
-1. Register the plugin globally in `~/.config/opencode/opencode.json`:
+1. Open or create `~/.config/opencode/opencode.json`.
+2. Ensure the config uses the singular `plugin` key, not `plugins`.
+3. Append `opencode-tbot@latest` to the `plugin` array if it is not already present.
+4. In the OpenCode worktree where the bot should run, create or update `tbot.config.json`.
+5. Start from `tbot.config.example.json` if you want a template.
+6. Set `telegram.botToken`, then adjust optional fields as needed.
+7. Restart OpenCode from the same worktree that contains `tbot.config.json`.
+8. Send `/start` or `/status` to verify the plugin.
 
-```json
-{
-  "plugin": ["opencode-tbot@latest"]
-}
-```
+If `telegram.botToken` is already configured, the bot starts immediately after OpenCode reloads the plugin. If it is missing, interactive startup will prompt for the token and write it back to `tbot.config.json`. Non-interactive startup fails fast with a configuration error.
 
-If `opencode.json` already exists, keep the singular `plugin` key, preserve existing entries, and append `opencode-tbot@latest` only if it is missing.
+If you want an agent to perform the setup, use the contract in [INSTALL.md](./INSTALL.md).
 
-2. Create or update `tbot.config.json` in the project where OpenCode runs:
+### Example `tbot.config.json`
 
 ```json
 {
@@ -80,51 +73,46 @@ If `opencode.json` already exists, keep the singular `plugin` key, preserve exis
 }
 ```
 
-3. Restart OpenCode from the same worktree that contains `tbot.config.json`.
-
-4. Verify the plugin:
-
-- If `telegram.botToken` is already configured, send `/start` or `/status` to the bot.
-- If you skipped the token during install, add it to `tbot.config.json` first and then restart OpenCode.
-
-### For LLM agents
-
-Merge rules for automated installers:
-
-- create `~/.config/opencode/opencode.json` if it does not exist
-- use `plugin`, not `plugins`
-- append `opencode-tbot@latest` without duplicating it
-- preserve unrelated JSON keys and existing plugin entries
-- create or update only the current worktree `tbot.config.json`
-- preserve unrelated config keys when writing `telegram.botToken`
+Global registration does not make Telegram credentials global. Each worktree reads its own `tbot.config.json` unless you intentionally reuse the same token across projects.
 
 ## Package Entry
 
 The package root entry and [src/plugin.ts](./src/plugin.ts) both resolve to the plugin runtime. `dist/index.js` is the npm/OpenCode package entry, and `dist/plugin.js` remains the explicit subpath export.
 
-For local development inside this repository, [.opencode/plugins/opencode-tbot.ts](./.opencode/plugins/opencode-tbot.ts) still acts as a source bridge.
+For local development inside this repository, [.opencode/plugins/opencode-tbot.ts](./.opencode/plugins/opencode-tbot.ts) re-exports `src/plugin.ts` so OpenCode can load the source tree directly.
 
 ## Configuration
 
-Required in `tbot.config.json`:
+`tbot.config.json` is the primary runtime config file. The legacy filename `opencode-tbot.config.json` is still accepted for backward compatibility.
+
+Required field:
 
 - `telegram.botToken`
 
-The legacy filename `opencode-tbot.config.json` is still accepted for backward compatibility.
+Optional fields:
+
+- `telegram.allowedChatIds`
+- `database.path`
+- `openrouter.apiKey`
+- `openrouter.model`
+- `openrouter.timeoutMs`
+- `openrouter.transcriptionPrompt`
+- `logLevel`
+- `opencodeApiKey`
 
 Configuration fields:
 
-| Field | Required | Description |
-| --- | --- | --- |
-| `telegram.botToken` | Yes | Telegram bot token. If missing during interactive plugin startup, the plugin prompts and saves it to `tbot.config.json`. |
-| `telegram.allowedChatIds` | No | Array of allowed Telegram chat IDs. If empty, the bot accepts messages from any chat. |
-| `opencodeApiKey` | No | Optional compatibility setting retained in plugin config. The plugin runtime itself uses the injected OpenCode SDK client. |
-| `openrouter.apiKey` | No | OpenRouter API key. Required only for Telegram voice transcription. |
-| `openrouter.model` | No | OpenRouter model used for audio transcription. Default: `openai/gpt-audio-mini`. |
-| `openrouter.timeoutMs` | No | Timeout for voice transcription requests in milliseconds. Default: `30000`. |
-| `openrouter.transcriptionPrompt` | No | Optional extra instructions appended to the built-in transcription prompt. |
-| `logLevel` | No | Logger level. Default: `info`. |
-| `database.path` | No | SQLite file path for chat state. Default: `./data/opencode-tbot.sqlite`. Resolved relative to the current OpenCode worktree. |
+| Field | Required | Default | Description |
+| --- | --- | --- | --- |
+| `telegram.botToken` | Yes | - | Telegram bot token. If missing during interactive plugin startup, the plugin prompts and saves it to `tbot.config.json`. |
+| `telegram.allowedChatIds` | No | `[]` | Array of allowed Telegram chat IDs. If empty, the bot accepts messages from any chat. |
+| `database.path` | No | `./data/opencode-tbot.sqlite` | SQLite file path for chat state. The path is resolved relative to the current OpenCode worktree. |
+| `openrouter.apiKey` | No | `""` | OpenRouter API key. Required only for Telegram voice transcription. |
+| `openrouter.model` | No | `openai/gpt-audio-mini` | OpenRouter model used for audio transcription. |
+| `openrouter.timeoutMs` | No | `30000` | Timeout for voice transcription requests in milliseconds. |
+| `openrouter.transcriptionPrompt` | No | `""` | Optional extra instructions appended to the built-in transcription prompt. |
+| `logLevel` | No | `info` | Logger level used by the plugin runtime. |
+| `opencodeApiKey` | No | `""` | Compatibility field retained in plugin config. The runtime itself uses the injected OpenCode SDK client. |
 
 Global installation does not imply global Telegram credentials. The plugin is registered once through `~/.config/opencode/opencode.json`, but `telegram.botToken` is still read from each worktree's `tbot.config.json` unless you manually reuse the same token across projects.
 
@@ -195,7 +183,14 @@ pnpm audit
 
 ## Deployment
 
-Deployment details are in [docs/deployment.md](./docs/deployment.md).
+Supported deployment modes:
+
+- Recommended npm installation: register `opencode-tbot@latest` globally in OpenCode and keep Telegram runtime config in each worktree's `tbot.config.json`.
+- Agent-driven installation: let OpenCode, Claude Code, Cursor, or another agent apply the same setup using the prompt in [INSTALL.md](./INSTALL.md).
+- Local development bridge: use [.opencode/plugins/opencode-tbot.ts](./.opencode/plugins/opencode-tbot.ts) in this repository to re-export `src/plugin.ts`.
+- Unpublished external project fallback: build `dist` and create a bridge file that re-exports `dist/plugin.js`.
+
+The full deployment notes and tradeoffs are documented in [docs/deployment.md](./docs/deployment.md).
 
 ## FAQ
 

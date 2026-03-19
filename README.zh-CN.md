@@ -1,49 +1,58 @@
-﻿# opencode-tbot
+# opencode-tbot
 
-涓€涓€氳繃 Telegram 椹卞姩 [OpenCode](https://opencode.ai) 鐨勬彃浠跺紡鏈哄櫒浜恒€?
-[English](./README.md) | [绠€浣撲腑鏂嘳(./README.zh-CN.md)
+一个通过 Telegram 驱动 [OpenCode](https://opencode.ai) 的插件。
 
-> 鏈」鐩苟闈炵敱 OpenCode 瀹樻柟鍥㈤槦寮€鍙戯紝涔熶笉闅跺睘浜?OpenCode 瀹樻柟銆?
-## 椤圭洰璇存槑
+[English](./README.md) | [简体中文](./README.zh-CN.md)
 
-`opencode-tbot` 鍏佽浣犵洿鎺ュ湪 Telegram 涓拰 OpenCode 浜や簰銆?
-- 鏂囨湰娑堟伅浼氳杞彂鍒板綋鍓?OpenCode 浼氳瘽銆?- Telegram 鍥剧墖浼氫綔涓?OpenCode 鏂囦欢鐗囨涓婁紶锛屽浘鐗囪鏄庝細浣滀负 prompt 鏂囨湰涓€璧峰彂閫併€?- Telegram 璇煶娑堟伅鍙互鍏堢粡杩囧吋瀹?OpenRouter 鐨勮闊宠浆鍐欐湇鍔★紝鍐嶈繘鍏ユ甯哥殑 OpenCode 娴佺▼銆?- 姣忎釜鑱婂ぉ鐨勪細璇濈粦瀹氥€佹ā鍨嬮€夋嫨銆佷唬鐞嗛€夋嫨銆佹帹鐞嗘。浣嶅拰鐣岄潰璇█閮戒細鎸佷箙鍖栧埌 SQLite銆?
-椤圭洰鐜板湪鍙繚鐣欐彃浠舵ā寮忥紝涓嶅啀鏀寔鐙珛杩愯妯″紡銆?
-## 瀹夎
+> 本项目不是由 OpenCode 团队开发，也不隶属于 OpenCode 官方。
 
-杩欓噷鏈変袱灞傞厤缃細
+## 项目说明
 
-- 鍏ㄥ眬 OpenCode 鎻掍欢娉ㄥ唽锛歚~/.config/opencode/opencode.json`
-- 褰撳墠椤圭洰鐨?Telegram 杩愯閰嶇疆锛氳 worktree 涓嬬殑 `tbot.config.json`
+`opencode-tbot` 允许你直接在 Telegram 中与 OpenCode 交互。
 
-### 鏂规 A锛氳 OpenCode 鎴栦唬鐞嗚嚜鍔ㄥ畨瑁?
-鏈€鐪佷簨鐨勬柟寮忔槸鎶?[INSTALL.md](./INSTALL.md) 閲岀殑瀹夎濂戠害浜ょ粰 OpenCode銆丆laude Code銆丆ursor 鎴栧叾浠栫紪鐮佷唬鐞嗐€?
-涔熷彲浠ョ洿鎺ュ鍒朵笅闈㈣繖娈垫彁绀鸿瘝锛?
-```text
-Install the opencode-tbot plugin for OpenCode.
+- 文本消息会转发到当前活跃的 OpenCode 会话。
+- Telegram 图片会作为 OpenCode 文件片段上传，若带有 caption，则会一起作为 prompt 文本发送。
+- Telegram 语音消息可以先通过 OpenRouter 语音转写，再进入正常的 prompt 流程。
+- 每个聊天的状态会持久化到 SQLite，包括绑定的会话、选定的 agent、模型、推理变体和偏好的界面语言。
 
-Do all of the following without removing existing unrelated configuration:
-1. Open or create ~/.config/opencode/opencode.json
-2. Ensure the config uses the singular "plugin" key
-3. Append "opencode-tbot@latest" to the "plugin" array if it is not already present
-4. In the current project, open or create tbot.config.json
-5. Ask me for the Telegram bot token and write it to telegram.botToken if I provide it
-6. If I do not provide the token, leave tbot.config.json ready for manual completion and do not block plugin registration
-7. Preserve any existing plugins and any unrelated configuration keys
-8. After editing, show me the exact changes and tell me to restart OpenCode
-```
+当前仓库只保留 OpenCode 插件模式，不再支持独立运行的 bot 进程。
 
-Windows 涓?`~` 琛ㄧず褰撳墠鐢ㄦ埛鐨勪富鐩綍銆?
-### 鏂规 B锛氭墜鍔ㄥ畨瑁?
-1. 缂栬緫 `~/.config/opencode/opencode.json`锛屾敞鍐屽叏灞€鎻掍欢锛?
-```json
-{
-  "plugin": ["opencode-tbot@latest"]
-}
-```
+## 安装
 
-濡傛灉璇ユ枃浠跺凡缁忓瓨鍦紝璇蜂繚鐣欏師鏈夐厤缃紝鍙湪 `plugin` 鏁扮粍涓ˉ鍏?`opencode-tbot@latest`锛屼笉瑕佹敼鎴?`plugins`銆?
-2. 鍦ㄥ綋鍓嶉」鐩腑鍒涘缓鎴栨洿鏂?`tbot.config.json`锛?
+请按以下步骤完成全局注册和当前工作区配置。
+
+### 环境要求
+
+- 需要安装并能够加载 OpenCode。
+- 本地构建和开发需要 Node.js 22.12.0 或更高版本。
+- 你需要一个来自 BotFather 的 Telegram bot token。
+
+### 配置层级
+
+项目有两层配置：
+
+- 全局插件注册：`~/.config/opencode/opencode.json`
+- 当前 worktree 的运行配置：`tbot.config.json`
+
+Windows 下，`~` 会解析为当前用户的主目录。
+
+### 手动安装
+
+1. 打开或创建 `~/.config/opencode/opencode.json`。
+2. 确保使用的是单数 `plugin` 键，而不是 `plugins`。
+3. 将 `opencode-tbot@latest` 加入 `plugin` 数组，如果已经存在就不要重复添加。
+4. 在要运行 bot 的 OpenCode worktree 中，创建或更新 `tbot.config.json`。
+5. 可以直接参考 `tbot.config.example.json` 作为模板。
+6. 设置 `telegram.botToken`，再按需调整其他可选字段。
+7. 重新启动 OpenCode，并确保它是在同一个 worktree 中启动的。
+8. 发送 `/start` 或 `/status` 验证插件是否正常工作。
+
+如果 `telegram.botToken` 已经配置好，OpenCode 重新加载插件后即可直接启动。若缺少 token，交互式启动会提示输入，并将值写回 `tbot.config.json`。非交互式启动会直接报配置错误。
+
+如果你希望由 OpenCode 或其他代理自动完成安装，可使用 [INSTALL.md](./INSTALL.md) 中的安装契约。
+
+### `tbot.config.json` 示例
+
 ```json
 {
   "telegram": {
@@ -64,80 +73,135 @@ Windows 涓?`~` 琛ㄧず褰撳墠鐢ㄦ埛鐨勪富鐩綍銆?
 }
 ```
 
-3. 閲嶅惎 OpenCode銆?
-### 缁?LLM 浠ｇ悊鐨勫悎骞惰鍒?
-- `~/.config/opencode/opencode.json` 涓嶅瓨鍦ㄦ椂瑕佸垱寤?- 蹇呴』浣跨敤 `plugin`锛屼笉瑕佷娇鐢?`plugins`
-- 鍙拷鍔?`opencode-tbot@latest`锛屼笉鑳介噸澶嶏紝涔熶笉鑳藉垹鎺夊叾浠栨彃浠?- 鍙慨鏀瑰綋鍓?worktree 鐨?`tbot.config.json`
-- 鍐欏叆 `telegram.botToken` 鏃跺繀椤讳繚鐣欏叾浠栭厤缃瓧娈?
-## 鍖呭叆鍙?
-鍖呮牴鍏ュ彛鍜?[src/plugin.ts](./src/plugin.ts) 閮戒細瀵煎悜鎻掍欢杩愯鏃躲€俙dist/index.js` 鏄?npm/OpenCode 榛樿鍏ュ彛锛宍dist/plugin.js` 淇濈暀涓烘樉寮忓瓙璺緞瀵煎嚭銆?
-濡傛灉鏄湪鏈粨搴撻噷鍋氭湰鍦板紑鍙戯紝[.opencode/plugins/opencode-tbot.ts](./.opencode/plugins/opencode-tbot.ts) 浠嶇劧淇濈暀涓烘簮鐮佹ˉ鎺ユ枃浠躲€?
-## 閰嶇疆
+全局注册并不代表 Telegram 凭证也是全局共享的。除非你手动在多个项目里复用同一个 token，否则每个 worktree 仍然读取自己的 `tbot.config.json`。
 
-`tbot.config.json` 涓嚦灏戦渶瑕侊細
+## 包入口
+
+包根入口和 [src/plugin.ts](./src/plugin.ts) 都会指向插件运行时。`dist/index.js` 是 npm/OpenCode 使用的包入口，`dist/plugin.js` 则保留为显式子路径导出。
+
+在本仓库内进行本地开发时，[.opencode/plugins/opencode-tbot.ts](./.opencode/plugins/opencode-tbot.ts) 会直接把 `src/plugin.ts` 暴露给 OpenCode，从源码目录加载插件。
+
+## 配置
+
+`tbot.config.json` 是主运行时配置文件。旧文件名 `opencode-tbot.config.json` 仍然兼容。
+
+必填项：
 
 - `telegram.botToken`
 
-閰嶇疆椤硅鏄庯細
+可选项：
 
-| 閰嶇疆椤?| 蹇呭～ | 璇存槑 |
-| --- | --- | --- |
-| `telegram.botToken` | 鏄?| Telegram 鏈哄櫒浜?token銆傛彃浠跺惎鍔ㄦ椂鑻ョ己澶变笖缁堢鍙氦浜掞紝浼氭彁绀鸿緭鍏ュ苟鍐欏洖 `tbot.config.json`銆?|
-| `telegram.allowedChatIds` | 鍚?| 鍏佽璁块棶鐨?Telegram Chat ID 鏁扮粍銆備负绌烘椂鍏佽浠绘剰鑱婂ぉ銆?|
-| `opencodeApiKey` | 鍚?| 淇濈暀鐨勫吋瀹归厤缃」銆傛彃浠惰繍琛屾椂鏈韩浣跨敤瀹夸富娉ㄥ叆鐨?OpenCode SDK client銆?|
-| `openrouter.apiKey` | 否 | OpenRouter API Key，仅在启用 Telegram 语音转写时需要。 |
-| `openrouter.model` | 否 | OpenRouter 语音转写模型，默认 `openai/gpt-audio-mini`。 |
-| `openrouter.timeoutMs` | 否 | 语音转写超时时间，默认 `30000`。 |
-| `openrouter.transcriptionPrompt` | 否 | 附加到内置转写指令后的可选提示词。 |
-| `logLevel` | 鍚?| 鏃ュ織绾у埆锛岄粯璁?`info`銆?|
-| `database.path` | 鍚?| SQLite 鐘舵€佹枃浠惰矾寰勶紝榛樿 `./data/opencode-tbot.sqlite`锛岀浉瀵瑰綋鍓?OpenCode worktree 瑙ｆ瀽銆?|
+- `telegram.allowedChatIds`
+- `database.path`
+- `openrouter.apiKey`
+- `openrouter.model`
+- `openrouter.timeoutMs`
+- `openrouter.transcriptionPrompt`
+- `logLevel`
+- `opencodeApiKey`
 
-鍏ㄥ眬瀹夎骞朵笉浠ｈ〃鍏ㄥ眬 Telegram 鍑瘉銆傛彃浠堕€氳繃 `~/.config/opencode/opencode.json` 鍏ㄥ眬娉ㄥ唽锛屼絾 `telegram.botToken` 浠嶇劧鎸夐」鐩粠鍚勮嚜 worktree 鐨?`tbot.config.json` 璇诲彇锛岄櫎闈炰綘鎵嬪姩鍦ㄥ涓」鐩噷澶嶇敤鍚屼竴涓?token銆?
-璇煶璇存槑锛?
-- 璇煶杈撳叆鏄彲閫夎兘鍔涳紝涓嶉厤缃?OpenRouter 语音转写 鏃舵枃鏈拰鍥剧墖鍔熻兘浠嶇劧姝ｅ父銆?- 褰撳墠鍙鐞?Telegram `voice` 娑堟伅锛屼笉澶勭悊 `audio`銆乣document` 鎴?`video_note`銆?- 璇煶鏂囦欢鍙湪鍐呭瓨涓鐞嗭紝涓嶄細钀界洏淇濆瓨銆?
-鍥剧墖璇存槑锛?
-- 鏀寔 Telegram `photo` 娑堟伅銆?- 涔熸敮鎸佷互 `document` 褰㈠紡鍙戦€佺殑鍥剧墖鏂囦欢銆?- 鍥剧墖鍦ㄥ唴瀛樹腑涓嬭浇鍚庝細杞垚 OpenCode 鏂囦欢鐗囨涓婁紶銆?
-## 鍔熻兘
+配置字段：
 
-- 鍦?Telegram 涓悜 OpenCode 鍙戦€佹枃鏈?prompt
-- 鎶?Telegram 鍥剧墖杩炲悓鍙€?caption 涓€璧疯浆鍙戠粰 OpenCode
-- 閫氳繃鍏煎 OpenRouter 鐨?OpenRouter 语音转写 鏈嶅姟澶勭悊 Telegram 璇煶娑堟伅
-- 鍦ㄨ亰澶╀腑鍒涘缓鍜屽垏鎹?OpenCode 浼氳瘽
-- 鏌ョ湅骞跺垏鎹唬鐞?- 鏌ョ湅骞跺垏鎹㈡ā鍨嬩笌鎺ㄧ悊妗ｄ綅
-- 閫氳繃 `/status` 鏌ョ湅鍋ュ悍鐘舵€併€佽矾寰勩€丩SP 鍜?MCP 鐘舵€?- 鏀寔鑻辨枃鍜岀畝浣撲腑鏂囩晫闈?- 鏀寔 Telegram Chat ID 鐧藉悕鍗?- 浣跨敤 SQLite 鎸佷箙鍖栬亰澶╃姸鎬?
-## 鍛戒护
+| 字段 | 必填 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `telegram.botToken` | 是 | - | Telegram bot token。交互式插件启动时如果缺少该值，插件会提示输入并写回 `tbot.config.json`。 |
+| `telegram.allowedChatIds` | 否 | `[]` | 允许访问的 Telegram chat ID 数组。如果为空，表示接受任意聊天。 |
+| `database.path` | 否 | `./data/opencode-tbot.sqlite` | 聊天状态的 SQLite 文件路径，会相对于当前 OpenCode worktree 解析。 |
+| `openrouter.apiKey` | 否 | `""` | OpenRouter API key，仅在启用 Telegram 语音转写时需要。 |
+| `openrouter.model` | 否 | `openai/gpt-audio-mini` | 用于语音转写的 OpenRouter 模型。 |
+| `openrouter.timeoutMs` | 否 | `30000` | 语音转写请求超时时间，单位毫秒。 |
+| `openrouter.transcriptionPrompt` | 否 | `""` | 追加到内置语音转写提示词后面的可选说明。 |
+| `logLevel` | 否 | `info` | 插件运行时使用的日志级别。 |
+| `opencodeApiKey` | 否 | `""` | 保留的兼容字段。插件运行时实际使用的是注入的 OpenCode SDK client。 |
 
-- `/start` 鏄剧ず娆㈣繋淇℃伅鍜屽揩閫熷紑濮嬫彁绀?- `/help` 鏄剧ず瀹屾暣鍛戒护璇存槑鍜岀ず渚?- `/status` 鏌ョ湅 OpenCode 鍋ュ悍鐘舵€併€佽矾寰勩€丩SP 鍜?MCP 淇℃伅
-- `/new [title]` 鍒涘缓鏂扮殑 OpenCode 浼氳瘽
-- `/agents` 鎴?`/agent` 鏌ョ湅骞跺垏鎹唬鐞?- `/sessions` 鏌ョ湅骞跺垏鎹細璇?- `/cancel` 鍙栨秷浼氳瘽閲嶅懡鍚嶆垨涓褰撳墠璇锋眰
-- `/model` 鎴?`/models` 鏌ョ湅骞跺垏鎹㈡ā鍨?- `/language` 鍒囨崲鏈哄櫒浜烘樉绀鸿瑷€
+全局安装并不意味着 Telegram 凭证也会全局共享。插件只会通过 `~/.config/opencode/opencode.json` 做一次全局注册，但 `telegram.botToken` 仍然按 worktree 从各自的 `tbot.config.json` 读取，除非你手动在多个项目中复用同一个 token。
 
-浠讳綍闈炲懡浠ゆ枃鏈兘浼氳褰撲綔 prompt 鍙戦€佸埌 OpenCode銆傞厤缃?OpenRouter 语音转写 鍚庯紝Telegram `voice` 娑堟伅浼氬厛杞啓鍐嶈繘鍏ュ悓涓€鏉?prompt 娴佺▼銆傚浘鐗囦細浣滀负 OpenCode 鏂囦欢鐗囨鍙戦€併€?
-## 寮€鍙?
-鏋勫缓鎻掍欢锛?
+### 语音转写说明
+
+- 语音输入是可选的。如果没有配置 OpenRouter 语音转写，文本和图片功能仍然正常工作。
+- 当前版本只处理 Telegram 的 `voice` 消息，不处理 `audio`、`document` 或 `video_note`。
+- 语音文件只在内存中处理，不会落盘保存。
+
+### 图片说明
+
+- 支持 Telegram `photo` 消息。
+- 也支持以 `document` 形式发送的图片文件。
+- 图片会在内存中下载后，作为 OpenCode 文件片段继续转发。
+
+## 功能
+
+- 在 Telegram 中向 OpenCode 发送文本 prompt
+- 将 Telegram 图片连同可选 caption 一起转发给 OpenCode
+- 通过 OpenRouter 语音转写处理 Telegram 语音消息
+- 在聊天中创建和切换 OpenCode 会话
+- 查看和切换 agent
+- 查看和切换模型与推理级别
+- 通过 `/status` 查看健康状态、路径、LSP 和 MCP 信息
+- 支持英文和简体中文界面
+- 支持 Telegram Chat ID 白名单
+- 使用 SQLite 持久化聊天绑定状态
+
+## 命令
+
+- `/start` 显示欢迎信息和快速开始步骤
+- `/help` 显示完整命令说明和示例
+- `/status` 显示聚合后的 OpenCode 健康状态、路径、LSP 和 MCP 状态
+- `/new [title]` 创建新的 OpenCode 会话
+- `/agents` 或 `/agent` 列出可用 agent 并切换当前 agent
+- `/sessions` 列出会话并切换当前会话
+- `/cancel` 取消会话重命名，或中止当前会话正在运行的请求
+- `/model` 或 `/models` 列出可用模型并切换当前模型
+- `/language` 切换 bot 的显示语言
+
+任何非命令文本都会被当作 prompt 发送给 OpenCode。如果配置了 OpenRouter 语音转写，Telegram `voice` 消息也会先转写再进入同一条 prompt 流程。图片会作为 OpenCode 文件片段上传。
+
+## 开发
+
+构建插件 bundle：
+
 ```bash
 pnpm build
 ```
 
-绫诲瀷妫€鏌ワ細
+类型检查：
 
 ```bash
 pnpm typecheck
 ```
 
-杩愯娴嬭瘯锛?
+运行测试：
+
 ```bash
 pnpm test
 ```
 
-渚濊禆瀹夊叏妫€鏌ワ細
+执行依赖安全检查：
 
 ```bash
 pnpm audit
 ```
 
-## 閮ㄧ讲
+## 部署
 
-閮ㄧ讲璇存槑瑙?[docs/deployment.md](./docs/deployment.md)銆?
+支持的部署模式：
 
+- 推荐的 npm 安装：在 OpenCode 中全局注册 `opencode-tbot@latest`，并在每个 worktree 中保留自己的 `tbot.config.json`。
+- 代理驱动安装：让 OpenCode、Claude Code、Cursor 或其他代理按照 [INSTALL.md](./INSTALL.md) 中的提示词自动完成安装。
+- 本地开发桥接：在本仓库中使用 [.opencode/plugins/opencode-tbot.ts](./.opencode/plugins/opencode-tbot.ts) 直接 re-export `src/plugin.ts`。
+- 未发布外部项目回退：先构建 `dist`，再在目标 OpenCode 项目中创建一个 bridge 文件去 re-export `dist/plugin.js`。
 
+更完整的部署说明和取舍分析请参考 [docs/deployment.md](./docs/deployment.md)。
+
+## 常见问题
+
+### 我需要一个正在运行的 OpenCode 实例吗？
+
+需要。这个仓库提供的是 Telegram 集成层，依赖加载它的 OpenCode 主进程。
+
+### 这是 OpenCode 官方项目吗？
+
+不是。它只是与 OpenCode 集成，不属于 OpenCode 官方团队。
+
+### 为什么推荐 Node.js 22？
+
+项目使用了较新的 Node API，包括 `node:sqlite`，因此 Node.js 22 及以上是最稳妥的基线版本。
