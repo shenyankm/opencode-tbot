@@ -8,6 +8,7 @@ dist/
 build/
 data/
 *.log
+*.tgz
 /.codex-e2e/
 tbot.config.json
 opencode-tbot.config.json
