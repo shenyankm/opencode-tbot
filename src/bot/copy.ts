@@ -55,6 +55,7 @@ export interface BotCopy {
         unexpected: string;
         providerAuth: string;
         requestAborted: string;
+        promptTimeout: string;
         structuredOutput: string;
         voiceNotConfigured: string;
         voiceDownload: string;
@@ -251,6 +252,7 @@ const EN_BOT_COPY: BotCopy = {
         unexpected: "Unexpected error.",
         providerAuth: "Provider authentication failed.",
         requestAborted: "Request was aborted.",
+        promptTimeout: "OpenCode request timed out.",
         structuredOutput: "Structured output validation failed.",
         voiceNotConfigured: "Voice transcription is not configured.",
         voiceDownload: "Failed to download the Telegram voice file.",
@@ -495,6 +497,7 @@ const ZH_CN_BOT_COPY: BotCopy = {
         unexpected: "发生未知错误。",
         providerAuth: "Provider 认证失败。",
         requestAborted: "请求已中止。",
+        promptTimeout: "OpenCode 响应超时。",
         structuredOutput: "结构化输出校验失败。",
         voiceNotConfigured: "未配置语音转写服务。",
         voiceDownload: "下载 Telegram 语音文件失败。",

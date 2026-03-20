@@ -3,6 +3,7 @@ import test from "node:test";
 import {
     buildOpenCodeSdkConfig,
     OpenCodeClient,
+    OpenCodePromptTimeoutError,
     type OpenCodeModel,
     type OpenCodePath,
     type OpenCodeProject,
@@ -111,6 +112,37 @@ function createPath(overrides: Partial<OpenCodePath> = {}): OpenCodePath {
         directory: "E:/repo/src",
         ...overrides,
     };
+}
+
+function setPromptRequestTimeouts(
+    client: OpenCodeClient,
+    overrides: Partial<{
+        pollRequestMs: number;
+        sendMs: number;
+        totalPollMs: number;
+    }>,
+) {
+    Object.assign(
+        (client as unknown as {
+            promptRequestTimeouts: {
+                pollRequestMs: number;
+                sendMs: number;
+                totalPollMs: number;
+            };
+        }).promptRequestTimeouts,
+        overrides,
+    );
+}
+
+function omitSignal(options: unknown): Record<string, unknown> {
+    const normalized = options as Record<string, unknown>;
+    const { signal: _signal, ...rest } = normalized;
+
+    return rest;
+}
+
+function assertOptionsIncludeSignal(options: unknown) {
+    assert.ok((options as { signal?: unknown }).signal instanceof AbortSignal);
 }
 
 test("buildOpenCodeSdkConfig forwards trimmed auth tokens when an API key is configured", () => {
@@ -272,7 +304,10 @@ test("renameSession forwards the session id and new title to the SDK update endp
     const session = await client.renameSession("session-1", "Renamed session");
 
     assert.equal(session.id, "session-1");
-    assert.deepEqual(calls, [
+    assert.deepEqual(calls.map((call) => ({
+        ...call,
+        options: omitSignal(call.options),
+    })), [
         {
             input: {
                 sessionID: "session-1",
@@ -566,7 +601,10 @@ test("abortSession forwards the session id to the SDK abort endpoint", async () 
     );
 
     assert.equal(await client.abortSession("session-1"), true);
-    assert.deepEqual(calls, [
+    assert.deepEqual(calls.map((call) => ({
+        ...call,
+        options: omitSignal(call.options),
+    })), [
         {
             input: {
                 sessionID: "session-1",
@@ -766,7 +804,10 @@ test("promptSession forwards model selection and JSON schema format and returns 
             body_md: "## Hello\n- world",
         },
     });
-    assert.deepEqual(calls, [
+    assert.deepEqual(calls.map((call) => ({
+        ...call,
+        options: omitSignal(call.options),
+    })), [
         {
             input: {
                 sessionID: "session-1",
@@ -804,6 +845,7 @@ test("promptSession forwards model selection and JSON schema format and returns 
             },
         },
     ]);
+    assertOptionsIncludeSignal(calls[0]?.options);
 });
 
 test("promptSession includes file parts when image attachments are provided", async () => {
@@ -849,7 +891,10 @@ test("promptSession includes file parts when image attachments are provided", as
         structured: true,
     });
 
-    assert.deepEqual(calls, [
+    assert.deepEqual(calls.map((call) => ({
+        ...call,
+        options: omitSignal(call.options),
+    })), [
         {
             input: {
                 sessionID: "session-1",
@@ -887,6 +932,7 @@ test("promptSession includes file parts when image attachments are provided", as
             },
         },
     ]);
+    assertOptionsIncludeSignal(calls[0]?.options);
 });
 
 test("promptSession falls back to text parts and summed tokens when structured output is invalid", async () => {
@@ -1103,7 +1149,10 @@ test("promptSession waits for a raw-client reply without message id and reads st
         body_md: "## Raw Hello",
     });
     assert.equal(statusCallCount, 1);
-    assert.deepEqual(calls[0], {
+    assert.deepEqual({
+        ...calls[0],
+        options: omitSignal(calls[0]?.options),
+    }, {
         kind: "get",
         options: {
             responseStyle: "data",
@@ -1117,7 +1166,10 @@ test("promptSession waits for a raw-client reply without message id and reads st
             },
         },
     });
-    assert.deepEqual(calls[1], {
+    assert.deepEqual({
+        ...calls[1],
+        options: omitSignal(calls[1]?.options),
+    }, {
         kind: "post",
         options: {
             responseStyle: "data",
@@ -1151,6 +1203,7 @@ test("promptSession waits for a raw-client reply without message id and reads st
             },
         },
     });
+    assertOptionsIncludeSignal(calls[1]?.options);
 });
 
 test("promptSession keeps polling recent messages after the session turns idle and does not resend the prompt", async () => {
@@ -1374,7 +1427,10 @@ test("promptSession polls the created message when the initial reply is still em
     assert.equal(result.bodyMd, "## Hello");
     assert.equal(result.fallbackText, "Hello");
     assert.deepEqual(result.parts, [{ type: "text", text: "Hello" }]);
-    assert.deepEqual(calls, [
+    assert.deepEqual(calls.map((call) => ({
+        ...call,
+        options: omitSignal(call.options),
+    })), [
         {
             kind: "prompt",
             input: {
@@ -1418,6 +1474,8 @@ test("promptSession polls the created message when the initial reply is still em
             },
         },
     ]);
+    assertOptionsIncludeSignal(calls[0]?.options);
+    assertOptionsIncludeSignal(calls[1]?.options);
 });
 
 test("promptSession keeps polling when the placeholder message is already marked completed but still empty", async () => {
@@ -2053,6 +2111,306 @@ test("promptSession preserves assistant errors from successful prompt responses"
     assert.equal(result.fallbackText, "OpenCode returned empty response.");
     assert.equal(result.metrics.tokens.total, 11);
 });
+
+test("promptSession continues when capturing known messages times out before sending the prompt", async () => {
+    const calls: Array<{ kind: "get" | "post"; options: unknown }> = [];
+    let messageListCallCount = 0;
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            _client: {
+                get: async (options: unknown) => {
+                    calls.push({ kind: "get", options });
+                    const request = options as { url: string };
+
+                    if (request.url === "/session/{sessionID}/message") {
+                        messageListCallCount += 1;
+
+                        if (messageListCallCount === 1) {
+                            return await new Promise<never>(() => undefined);
+                        }
+
+                        return {
+                            data: [],
+                        };
+                    }
+
+                    if (request.url === "/session/status") {
+                        return {
+                            data: {
+                                "session-1": { type: "idle" },
+                            },
+                        };
+                    }
+
+                    throw new Error(`Unexpected raw GET ${request.url}`);
+                },
+                post: async (options: unknown) => {
+                    calls.push({ kind: "post", options });
+
+                    return {
+                        data: {
+                            info: {
+                                role: "assistant",
+                                sessionID: "session-1",
+                                time: {
+                                    created: 100,
+                                    completed: 180,
+                                },
+                                tokens: {
+                                    input: 2,
+                                    output: 3,
+                                    reasoning: 0,
+                                    cache: {
+                                        read: 0,
+                                        write: 0,
+                                    },
+                                },
+                                structured_output: {
+                                    body_md: "## Immediate Reply",
+                                },
+                            },
+                            parts: [],
+                        },
+                    };
+                },
+            },
+            app: {
+                agents: async () => [],
+                log: async () => true,
+            },
+        } as never,
+    );
+    setPromptRequestTimeouts(client, {
+        pollRequestMs: 5,
+        sendMs: 20,
+        totalPollMs: 20,
+    });
+
+    const result = await client.promptSession({
+        sessionId: "session-1",
+        prompt: "hello from telegram",
+        structured: true,
+    });
+
+    assert.equal(result.bodyMd, "## Immediate Reply");
+    assert.equal(result.fallbackText, "## Immediate Reply");
+    assert.equal(calls.filter((call) => call.kind === "post").length, 1);
+});
+
+test("promptSession times out when the initial prompt request never resolves", async () => {
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            _client: {
+                get: async (options: unknown) => {
+                    const request = options as { url: string };
+
+                    if (request.url === "/session/{sessionID}/message") {
+                        return {
+                            data: [],
+                        };
+                    }
+
+                    throw new Error(`Unexpected raw GET ${request.url}`);
+                },
+                post: async () => await new Promise<never>(() => undefined),
+            },
+            app: {
+                agents: async () => [],
+                log: async () => true,
+            },
+        } as never,
+    );
+    setPromptRequestTimeouts(client, {
+        pollRequestMs: 5,
+        sendMs: 5,
+        totalPollMs: 20,
+    });
+
+    await assert.rejects(
+        client.promptSession({
+            sessionId: "session-1",
+            prompt: "hello from telegram",
+            structured: true,
+        }),
+        (error: unknown) => error instanceof OpenCodePromptTimeoutError
+            && error.data.stage === "send-prompt"
+            && error.data.timeoutMs === 5,
+    );
+});
+
+test("promptSession keeps polling when a single message fetch hangs", async () => {
+    let messageCallCount = 0;
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            config: {
+                get: async () => ({ provider: {} }),
+                providers: async () => ({ providers: [], default: {} }),
+            },
+            path: {
+                get: async () => createPath(),
+            },
+            project: {
+                list: async () => [],
+                current: async () => createProject("project-1", "E:/repo-1"),
+            },
+            session: {
+                create: async () => createSession("session-1", "project-1", "E:/repo-1"),
+                prompt: async () => ({
+                    data: {
+                        info: {
+                            id: "assistant-1",
+                            role: "assistant",
+                            sessionID: "session-1",
+                            time: {
+                                created: 100,
+                            },
+                            tokens: {
+                                input: 0,
+                                output: 0,
+                                reasoning: 0,
+                                cache: {
+                                    read: 0,
+                                    write: 0,
+                                },
+                            },
+                        } as never,
+                        parts: [],
+                    },
+                }),
+                message: async () => {
+                    messageCallCount += 1;
+
+                    if (messageCallCount === 1) {
+                        return await new Promise<never>(() => undefined);
+                    }
+
+                    return {
+                        data: {
+                            info: {
+                                id: "assistant-1",
+                                role: "assistant",
+                                sessionID: "session-1",
+                                time: {
+                                    created: 100,
+                                    completed: 220,
+                                },
+                                tokens: {
+                                    input: 3,
+                                    output: 4,
+                                    reasoning: 0,
+                                    cache: {
+                                        read: 0,
+                                        write: 0,
+                                    },
+                                },
+                                structured: {
+                                    body_md: "## Recovered Reply",
+                                },
+                            } as never,
+                            parts: [{ type: "text", text: "Recovered Reply" }] as never,
+                        },
+                    };
+                },
+                messages: async () => ({
+                    data: [],
+                }),
+                status: async () => ({
+                    data: {},
+                }),
+            },
+            app: {
+                log: async () => true,
+            },
+        } as never,
+    );
+    setPromptRequestTimeouts(client, {
+        pollRequestMs: 5,
+        sendMs: 20,
+        totalPollMs: 40,
+    });
+
+    const result = await client.promptSession({
+        sessionId: "session-1",
+        prompt: "hello from telegram",
+        structured: true,
+    });
+
+    assert.equal(result.bodyMd, "## Recovered Reply");
+    assert.equal(result.fallbackText, "Recovered Reply");
+    assert.equal(messageCallCount, 2);
+});
+
+test("promptSession throws a timeout error when the recovery budget expires without a usable reply", async () => {
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            _client: {
+                get: async (options: unknown) => {
+                    const request = options as { url: string };
+
+                    if (request.url === "/session/{sessionID}/message/{messageID}") {
+                        return await new Promise<never>(() => undefined);
+                    }
+
+                    if (request.url === "/session/{sessionID}/message") {
+                        return await new Promise<never>(() => undefined);
+                    }
+
+                    if (request.url === "/session/status") {
+                        return await new Promise<never>(() => undefined);
+                    }
+
+                    throw new Error(`Unexpected raw GET ${request.url}`);
+                },
+                post: async () => ({
+                    data: {
+                        info: {
+                            id: "assistant-placeholder",
+                            role: "assistant",
+                            sessionID: "session-1",
+                            time: {
+                                created: 100,
+                            },
+                            tokens: {
+                                input: 0,
+                                output: 0,
+                                reasoning: 0,
+                                cache: {
+                                    read: 0,
+                                    write: 0,
+                                },
+                            },
+                        },
+                        parts: [],
+                    },
+                }),
+            },
+            app: {
+                agents: async () => [],
+                log: async () => true,
+            },
+        } as never,
+    );
+    setPromptRequestTimeouts(client, {
+        pollRequestMs: 5,
+        sendMs: 20,
+        totalPollMs: 5,
+    });
+
+    await assert.rejects(
+        client.promptSession({
+            sessionId: "session-1",
+            prompt: "hello from telegram",
+            structured: true,
+        }),
+        (error: unknown) => error instanceof OpenCodePromptTimeoutError
+            && error.data.stage === "final-scan",
+    );
+});
+
 test("listModels returns configured models, connected-provider models, and available custom-provider models", async () => {
     const project = createProject("project-1", "E:/repo-1");
     const configuredModel = createModel("openai", "gpt-5.3-codex", "GPT-5.3 Codex", {

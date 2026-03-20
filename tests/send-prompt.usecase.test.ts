@@ -7,9 +7,11 @@ import type {
     OpenCodeClientLike,
     PromptSessionFilePartInput,
     OpenCodeProject,
+    OpenCodePromptTimeoutErrorData,
     PromptSessionResult,
     OpenCodeSession,
 } from "../src/services/opencode/opencode.client.js";
+import { OpenCodePromptTimeoutError } from "../src/services/opencode/opencode.client.js";
 import { SendPromptUseCase } from "../src/use-cases/send-prompt.usecase.js";
 
 const logger = {
@@ -681,4 +683,94 @@ test("SendPromptUseCase adds image guidance even when the user sends only an ima
             agent: "build",
         },
     ]);
+});
+
+test("SendPromptUseCase ends the foreground session when promptSession times out", async () => {
+    const repo = new InMemorySessionRepository();
+    const trackerCalls = {
+        began: [] as string[],
+        ended: 0,
+    };
+    const timeoutError = new OpenCodePromptTimeoutError({
+        elapsedMs: 5,
+        sessionId: "session-1",
+        stage: "send-prompt",
+        timeoutMs: 5,
+    } satisfies OpenCodePromptTimeoutErrorData);
+    const client: OpenCodeClientLike = {
+        async abortSession() {
+            return true;
+        },
+        async createSessionForDirectory(directory) {
+            return createSession("session-1", "project-1", directory);
+        },
+        async getCurrentProject() {
+            return createProject("project-1", "E:/repo-1");
+        },
+        async getSessionStatuses() {
+            return {};
+        },
+        async listModels() {
+            return [];
+        },
+        async listAgents() {
+            return [createAgent("build")];
+        },
+        async listProjects() {
+            return [createProject("project-1", "E:/repo-1")];
+        },
+        async listSessions() {
+            return [createSession("session-1", "project-1", "E:/repo-1")];
+        },
+        async getPath() {
+            throw new Error("unused");
+        },
+        async promptSession() {
+            throw timeoutError;
+        },
+    };
+
+    const useCase = new SendPromptUseCase(
+        repo,
+        client,
+        logger,
+        {
+            begin(sessionId: string) {
+                trackerCalls.began.push(sessionId);
+
+                return () => {
+                    trackerCalls.ended += 1;
+                };
+            },
+            clear() {
+                return false;
+            },
+            isForeground() {
+                return false;
+            },
+        },
+    );
+
+    await repo.setCurrent({
+        chatId: 500,
+        sessionId: "session-1",
+        projectId: "project-1",
+        directory: "E:/repo-1",
+        agentName: null,
+        modelProviderId: null,
+        modelId: null,
+        modelVariant: null,
+        language: null,
+        updatedAt: new Date(0).toISOString(),
+    });
+
+    await assert.rejects(
+        useCase.execute({
+            chatId: 500,
+            text: "hello",
+        }),
+        (error: unknown) => error === timeoutError,
+    );
+    assert.deepEqual(trackerCalls.began, ["session-1"]);
+    assert.equal(trackerCalls.ended, 1);
 });

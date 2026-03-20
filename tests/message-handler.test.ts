@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { PromptSessionResult } from "../src/services/opencode/opencode.client.js";
+import {
+    OpenCodePromptTimeoutError,
+    type PromptSessionResult,
+} from "../src/services/opencode/opencode.client.js";
 import { handleTextMessage } from "../src/bot/handlers/message.handler.js";
 import { InMemoryPendingActionRepository } from "../src/repositories/pending-action.repo.js";
 import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
@@ -304,6 +307,66 @@ test("handleTextMessage also deletes the processing placeholder after sending an
     ]);
     assert.deepEqual(deleted, [{ chatId: 9, messageId: 300 }]);
     assert.equal(errors.length, 1);
+});
+
+test("handleTextMessage releases the active chat lock and deletes the placeholder after a prompt timeout", async () => {
+    const replies: Array<{ text: string; other?: unknown }> = [];
+    const deleted: Array<{ chatId: number; messageId: number }> = [];
+    let nextMessageId = 350;
+    let callCount = 0;
+    const { dependencies } = createDependencies({
+        sendPrompt: async () => {
+            callCount += 1;
+
+            if (callCount === 1) {
+                throw new OpenCodePromptTimeoutError({
+                    elapsedMs: 5,
+                    sessionId: "session-1",
+                    stage: "send-prompt",
+                    timeoutMs: 5,
+                });
+            }
+
+            return {
+                assistantReply: createPromptReply(),
+            };
+        },
+    });
+
+    const ctx = {
+        chat: { id: 10 },
+        message: { text: "hello" },
+        api: {
+            async deleteMessage(chatId: number, messageId: number) {
+                deleted.push({ chatId, messageId });
+                return true;
+            },
+            async editMessageText() {
+                return true;
+            },
+        },
+        async reply(text: string, other?: unknown) {
+            replies.push({ text, other });
+            return { message_id: nextMessageId++ };
+        },
+    };
+
+    await handleTextMessage(ctx, dependencies);
+    await handleTextMessage(ctx, dependencies);
+
+    assert.deepEqual(replies, [
+        { text: "Processing...", other: undefined },
+        { text: "OpenCode request timed out.", other: undefined },
+        { text: "Processing...", other: undefined },
+        {
+            text: "*Hello*\n\nDuration: 120 ms \\| Tokens: 42",
+            other: { parse_mode: "MarkdownV2" },
+        },
+    ]);
+    assert.deepEqual(deleted, [
+        { chatId: 10, messageId: 350 },
+        { chatId: 10, messageId: 352 },
+    ]);
 });
 
 test("handleTextMessage rejects a second plain-text prompt while one is already running", async () => {

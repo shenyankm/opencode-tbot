@@ -28,6 +28,13 @@ function normalizeError(error: unknown, copy: BotCopy): PresentedError {
         };
     }
 
+    if (isNamedError(error, "OpenCodePromptTimeoutError")) {
+        return {
+            message: copy.errors.promptTimeout,
+            cause: null,
+        };
+    }
+
     if (isNamedError(error, "StructuredOutputError")) {
         return {
             message: copy.errors.structuredOutput,

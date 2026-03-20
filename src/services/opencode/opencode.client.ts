@@ -99,39 +99,21 @@ export interface OpenCodeConfiguredModel {
     variants: Record<string, Record<string, unknown>>;
 }
 
+type RawSdkRequestOptions = {
+    body?: unknown;
+    path?: Record<string, unknown>;
+    query?: Record<string, unknown>;
+    responseStyle?: "data" | "fields";
+    signal?: AbortSignal;
+    throwOnError?: boolean;
+    url: string;
+};
+
 type RawSdkHttpClient = {
-    delete?(options: {
-        body?: unknown;
-        path?: Record<string, unknown>;
-        query?: Record<string, unknown>;
-        responseStyle?: "data" | "fields";
-        throwOnError?: boolean;
-        url: string;
-    }): Promise<unknown>;
-    get?(options: {
-        body?: unknown;
-        path?: Record<string, unknown>;
-        query?: Record<string, unknown>;
-        responseStyle?: "data" | "fields";
-        throwOnError?: boolean;
-        url: string;
-    }): Promise<unknown>;
-    patch?(options: {
-        body?: unknown;
-        path?: Record<string, unknown>;
-        query?: Record<string, unknown>;
-        responseStyle?: "data" | "fields";
-        throwOnError?: boolean;
-        url: string;
-    }): Promise<unknown>;
-    post?(options: {
-        body?: unknown;
-        path?: Record<string, unknown>;
-        query?: Record<string, unknown>;
-        responseStyle?: "data" | "fields";
-        throwOnError?: boolean;
-        url: string;
-    }): Promise<unknown>;
+    delete?(options: RawSdkRequestOptions): Promise<unknown>;
+    get?(options: RawSdkRequestOptions): Promise<unknown>;
+    patch?(options: RawSdkRequestOptions): Promise<unknown>;
+    post?(options: RawSdkRequestOptions): Promise<unknown>;
 };
 
 export type OpenCodeSdkClientLike = Pick<OpencodeClient, "app" | "config" | "global" | "lsp" | "mcp" | "path" | "permission" | "project" | "session"> & {
@@ -149,6 +131,33 @@ type OpenCodePromptResponse = {
     info: unknown;
     parts?: Part[] | null;
 };
+
+export type OpenCodePromptTimeoutStage =
+    | "capture-known-messages"
+    | "send-prompt"
+    | "poll-message"
+    | "poll-messages"
+    | "poll-status"
+    | "final-scan";
+
+export interface OpenCodePromptTimeoutErrorData {
+    elapsedMs: number;
+    message?: string;
+    messageId?: string;
+    sessionId: string;
+    stage: OpenCodePromptTimeoutStage;
+    timeoutMs: number;
+}
+
+export class OpenCodePromptTimeoutError extends Error {
+    readonly data: OpenCodePromptTimeoutErrorData;
+
+    constructor(data: OpenCodePromptTimeoutErrorData) {
+        super(data.message ?? "OpenCode prompt timed out.");
+        this.name = "OpenCodePromptTimeoutError";
+        this.data = data;
+    }
+}
 
 export interface OpenCodeAssistantError {
     data?: Record<string, unknown>;
@@ -194,8 +203,11 @@ export interface OpenCodeAssistantMessage {
 const EMPTY_RESPONSE_TEXT = "OpenCode returned empty response.";
 const PROMPT_MESSAGE_POLL_INITIAL_DELAYS_MS = [0, 100, 250, 500, 1000];
 const PROMPT_MESSAGE_POLL_INTERVAL_MS = 2000;
+const PROMPT_POLL_REQUEST_TIMEOUT_MS = 15_000;
+const PROMPT_SEND_TIMEOUT_MS = 30_000;
 const PROMPT_MESSAGE_POLL_TIMEOUT_MS = 60_000;
 const PROMPT_MESSAGE_POLL_LIMIT = 20;
+const PROMPT_LOG_SERVICE = "opencode-tbot";
 const STRUCTURED_REPLY_SCHEMA = {
     type: "json_schema" as const,
     retryCount: 2,
@@ -242,6 +254,11 @@ export interface OpenCodeClientLike {
 export class OpenCodeClient implements OpenCodeClientLike {
     readonly client: OpenCodeSdkClientLike;
     private readonly fetchFn: typeof fetch;
+    private promptRequestTimeouts = {
+        pollRequestMs: PROMPT_POLL_REQUEST_TIMEOUT_MS,
+        sendMs: PROMPT_SEND_TIMEOUT_MS,
+        totalPollMs: PROMPT_MESSAGE_POLL_TIMEOUT_MS,
+    };
     private modelCache: {
         expiresAt: number;
         promise: Promise<OpenCodeConfiguredModel[]> | null;
@@ -375,19 +392,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
     }
 
     async getSessionStatuses(): Promise<Record<string, OpenCodeSessionStatus>> {
-        if (hasRawSdkMethod(this.client, "get")) {
-            return this.requestRaw<Record<string, OpenCodeSessionStatus>>(
-                "get",
-                { url: "/session/status" },
-            );
-        }
-
-        const response = await this.client.session.status(
-            undefined,
-            SDK_OPTIONS,
-        ) as MaybeWrappedResponse<Record<string, OpenCodeSessionStatus>>;
-
-        return unwrapSdkData(response);
+        return this.loadSessionStatuses();
     }
 
     async listProjects(): Promise<OpenCodeProject[]> {
@@ -633,7 +638,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
             structured,
         };
         let bestCandidate = selectPromptResponseCandidate([data], candidateOptions) ?? data;
-        const deadlineAt = Date.now() + PROMPT_MESSAGE_POLL_TIMEOUT_MS;
+        const deadlineAt = Date.now() + this.promptRequestTimeouts.totalPollMs;
         let idleStatusSeen = false;
         let attempt = 0;
 
@@ -669,6 +674,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
             const latest = await this.findLatestPromptResponse(
                 input.sessionId,
                 candidateOptions,
+                "poll-messages",
             );
 
             if (latest) {
@@ -700,12 +706,31 @@ export class OpenCodeClient implements OpenCodeClientLike {
         const latest = await this.findLatestPromptResponse(
             input.sessionId,
             candidateOptions,
+            "final-scan",
         );
 
-        return selectPromptResponseCandidate(
+        const resolved = selectPromptResponseCandidate(
             [bestCandidate, latest],
             candidateOptions,
         ) ?? bestCandidate;
+
+        if (shouldPollPromptMessage(resolved, structured)) {
+            const error = createOpenCodePromptTimeoutError({
+                sessionId: input.sessionId,
+                stage: "final-scan",
+                timeoutMs: this.promptRequestTimeouts.totalPollMs,
+                messageId: messageId ?? undefined,
+            });
+            this.logPromptRequestFailure(error, {
+                sessionId: input.sessionId,
+                stage: "final-scan",
+                timeoutMs: this.promptRequestTimeouts.totalPollMs,
+                messageId,
+            });
+            throw error;
+        }
+
+        return resolved;
     }
 
     private async fetchPromptMessage(
@@ -713,39 +738,59 @@ export class OpenCodeClient implements OpenCodeClientLike {
         messageId: string,
     ): Promise<OpenCodePromptResponse | null> {
         try {
-            if (hasRawSdkMethod(this.client, "get")) {
-                return normalizePromptResponse(await this.requestRaw<OpenCodePromptResponse>(
-                    "get",
-                    {
-                        url: "/session/{sessionID}/message/{messageID}",
-                        path: {
+            return await this.runPromptRequestWithTimeout(
+                {
+                    sessionId,
+                    stage: "poll-message",
+                    timeoutMs: this.promptRequestTimeouts.pollRequestMs,
+                    messageId,
+                },
+                async (signal) => {
+                    if (hasRawSdkMethod(this.client, "get")) {
+                        return normalizePromptResponse(await this.requestRaw<OpenCodePromptResponse>(
+                            "get",
+                            {
+                                url: "/session/{sessionID}/message/{messageID}",
+                                path: {
+                                    sessionID: sessionId,
+                                    messageID: messageId,
+                                },
+                                signal,
+                            },
+                        ));
+                    }
+
+                    if (typeof this.client.session.message !== "function") {
+                        return null;
+                    }
+
+                    const response = await this.client.session.message(
+                        {
                             sessionID: sessionId,
                             messageID: messageId,
                         },
-                    },
-                ));
-            }
+                        {
+                            ...SDK_OPTIONS,
+                            signal,
+                        },
+                    ) as MaybeWrappedResponse<OpenCodePromptResponse>;
 
-            if (typeof this.client.session.message !== "function") {
-                return null;
-            }
-
-            const response = await this.client.session.message(
-                {
-                    sessionID: sessionId,
-                    messageID: messageId,
+                    return normalizePromptResponse(unwrapSdkData(response));
                 },
-                SDK_OPTIONS,
-            ) as MaybeWrappedResponse<OpenCodePromptResponse>;
-
-            return normalizePromptResponse(unwrapSdkData(response));
-        } catch {
+            );
+        } catch (error) {
+            this.logPromptRequestFailure(error, {
+                sessionId,
+                stage: "poll-message",
+                timeoutMs: this.promptRequestTimeouts.pollRequestMs,
+                messageId,
+            });
             return null;
         }
     }
 
     private async captureKnownMessageIds(sessionId: string): Promise<Set<string>> {
-        const messages = await this.fetchRecentPromptMessages(sessionId);
+        const messages = await this.fetchRecentPromptMessages(sessionId, "capture-known-messages");
 
         if (!messages) {
             return new Set();
@@ -758,49 +803,82 @@ export class OpenCodeClient implements OpenCodeClientLike {
         );
     }
 
-    private async fetchRecentPromptMessages(sessionId: string): Promise<OpenCodePromptResponse[] | null> {
+    private async fetchRecentPromptMessages(
+        sessionId: string,
+        stage: Extract<OpenCodePromptTimeoutStage, "capture-known-messages" | "poll-messages" | "final-scan">,
+    ): Promise<OpenCodePromptResponse[] | null> {
         try {
-            if (hasRawSdkMethod(this.client, "get")) {
-                const response = await this.requestRaw<OpenCodePromptResponse[]>(
-                    "get",
-                    {
-                        url: "/session/{sessionID}/message",
-                        path: {
+            return await this.runPromptRequestWithTimeout(
+                {
+                    sessionId,
+                    stage,
+                    timeoutMs: this.promptRequestTimeouts.pollRequestMs,
+                },
+                async (signal) => {
+                    if (hasRawSdkMethod(this.client, "get")) {
+                        const response = await this.requestRaw<OpenCodePromptResponse[]>(
+                            "get",
+                            {
+                                url: "/session/{sessionID}/message",
+                                path: {
+                                    sessionID: sessionId,
+                                },
+                                query: {
+                                    limit: PROMPT_MESSAGE_POLL_LIMIT,
+                                },
+                                signal,
+                            },
+                        );
+
+                        return normalizePromptResponses(response);
+                    }
+
+                    if (typeof this.client.session.messages !== "function") {
+                        return null;
+                    }
+
+                    const response = await this.client.session.messages(
+                        {
                             sessionID: sessionId,
-                        },
-                        query: {
                             limit: PROMPT_MESSAGE_POLL_LIMIT,
                         },
-                    },
-                );
+                        {
+                            ...SDK_OPTIONS,
+                            signal,
+                        },
+                    ) as MaybeWrappedResponse<OpenCodePromptResponse[]>;
 
-                return normalizePromptResponses(response);
-            }
-
-            if (typeof this.client.session.messages !== "function") {
-                return null;
-            }
-
-            const response = await this.client.session.messages(
-                {
-                    sessionID: sessionId,
-                    limit: PROMPT_MESSAGE_POLL_LIMIT,
+                    return normalizePromptResponses(unwrapSdkData(response));
                 },
-                SDK_OPTIONS,
-            ) as MaybeWrappedResponse<OpenCodePromptResponse[]>;
-
-            return normalizePromptResponses(unwrapSdkData(response));
-        } catch {
+            );
+        } catch (error) {
+            this.logPromptRequestFailure(error, {
+                sessionId,
+                stage,
+                timeoutMs: this.promptRequestTimeouts.pollRequestMs,
+            });
             return null;
         }
     }
 
     private async fetchPromptSessionStatus(sessionId: string): Promise<OpenCodeSessionStatus | null> {
         try {
-            const statuses = await this.getSessionStatuses();
+            const statuses = await this.runPromptRequestWithTimeout(
+                {
+                    sessionId,
+                    stage: "poll-status",
+                    timeoutMs: this.promptRequestTimeouts.pollRequestMs,
+                },
+                async (signal) => this.loadSessionStatuses(signal),
+            );
 
             return statuses[sessionId] ?? null;
-        } catch {
+        } catch (error) {
+            this.logPromptRequestFailure(error, {
+                sessionId,
+                stage: "poll-status",
+                timeoutMs: this.promptRequestTimeouts.pollRequestMs,
+            });
             return null;
         }
     }
@@ -808,8 +886,9 @@ export class OpenCodeClient implements OpenCodeClientLike {
     private async findLatestPromptResponse(
         sessionId: string,
         options: PromptResponseCandidateOptions,
+        stage: Extract<OpenCodePromptTimeoutStage, "poll-messages" | "final-scan">,
     ): Promise<OpenCodePromptResponse | null> {
-        const messages = await this.fetchRecentPromptMessages(sessionId);
+        const messages = await this.fetchRecentPromptMessages(sessionId, stage);
 
         if (!messages || messages.length === 0) {
             return null;
@@ -878,35 +957,57 @@ export class OpenCodeClient implements OpenCodeClientLike {
             | { type: "file"; filename?: string; mime: string; url: string }
         >,
     ): Promise<OpenCodePromptResponse> {
-        if (hasRawSdkMethod(this.client, "post")) {
-            return normalizePromptResponse(await this.requestRaw<OpenCodePromptResponse>(
-                "post",
+        try {
+            return await this.runPromptRequestWithTimeout(
                 {
-                    url: "/session/{sessionID}/message",
-                    path: {
+                    sessionId: input.sessionId,
+                    stage: "send-prompt",
+                    timeoutMs: this.promptRequestTimeouts.sendMs,
+                },
+                async (signal) => {
+                    if (hasRawSdkMethod(this.client, "post")) {
+                        return normalizePromptResponse(await this.requestRaw<OpenCodePromptResponse>(
+                            "post",
+                            {
+                                url: "/session/{sessionID}/message",
+                                path: {
+                                    sessionID: input.sessionId,
+                                },
+                                body: {
+                                    ...(input.agent ? { agent: input.agent } : {}),
+                                    ...(input.structured ? { format: STRUCTURED_REPLY_SCHEMA } : {}),
+                                    ...(input.model ? { model: input.model } : {}),
+                                    ...(input.variant ? { variant: input.variant } : {}),
+                                    parts,
+                                },
+                                signal,
+                            },
+                        ));
+                    }
+
+                    const response = await this.client.session.prompt({
                         sessionID: input.sessionId,
-                    },
-                    body: {
                         ...(input.agent ? { agent: input.agent } : {}),
                         ...(input.structured ? { format: STRUCTURED_REPLY_SCHEMA } : {}),
                         ...(input.model ? { model: input.model } : {}),
                         ...(input.variant ? { variant: input.variant } : {}),
                         parts,
-                    },
+                    }, {
+                        ...SDK_OPTIONS,
+                        signal,
+                    }) as MaybeWrappedResponse<OpenCodePromptResponse>;
+
+                    return normalizePromptResponse(unwrapSdkData(response));
                 },
-            ));
+            );
+        } catch (error) {
+            this.logPromptRequestFailure(error, {
+                sessionId: input.sessionId,
+                stage: "send-prompt",
+                timeoutMs: this.promptRequestTimeouts.sendMs,
+            });
+            throw error;
         }
-
-        const response = await this.client.session.prompt({
-            sessionID: input.sessionId,
-            ...(input.agent ? { agent: input.agent } : {}),
-            ...(input.structured ? { format: STRUCTURED_REPLY_SCHEMA } : {}),
-            ...(input.model ? { model: input.model } : {}),
-            ...(input.variant ? { variant: input.variant } : {}),
-            parts,
-        }, SDK_OPTIONS) as MaybeWrappedResponse<OpenCodePromptResponse>;
-
-        return normalizePromptResponse(unwrapSdkData(response));
     }
 
     private async requestRaw<T>(
@@ -915,6 +1016,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
             body?: unknown;
             path?: Record<string, unknown>;
             query?: Record<string, unknown>;
+            signal?: AbortSignal;
             url: string;
         },
     ): Promise<T> {
@@ -931,6 +1033,116 @@ export class OpenCodeClient implements OpenCodeClientLike {
         }) as MaybeWrappedResponse<T>;
 
         return unwrapSdkData(response);
+    }
+
+    private async loadSessionStatuses(
+        signal?: AbortSignal,
+    ): Promise<Record<string, OpenCodeSessionStatus>> {
+        if (hasRawSdkMethod(this.client, "get")) {
+            return this.requestRaw<Record<string, OpenCodeSessionStatus>>(
+                "get",
+                {
+                    url: "/session/status",
+                    ...(signal ? { signal } : {}),
+                },
+            );
+        }
+
+        const response = await this.client.session.status(
+            undefined,
+            {
+                ...SDK_OPTIONS,
+                ...(signal ? { signal } : {}),
+            },
+        ) as MaybeWrappedResponse<Record<string, OpenCodeSessionStatus>>;
+
+        return unwrapSdkData(response);
+    }
+
+    private async runPromptRequestWithTimeout<T>(
+        input: {
+            messageId?: string | null;
+            sessionId: string;
+            stage: OpenCodePromptTimeoutStage;
+            timeoutMs: number;
+        },
+        operation: (signal: AbortSignal) => Promise<T>,
+    ): Promise<T> {
+        const startedAt = Date.now();
+        const controller = new AbortController();
+        let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+
+        const timeoutPromise = new Promise<never>((_, reject) => {
+            timeoutHandle = setTimeout(() => {
+                reject(createOpenCodePromptTimeoutError({
+                    sessionId: input.sessionId,
+                    stage: input.stage,
+                    timeoutMs: input.timeoutMs,
+                    messageId: input.messageId ?? undefined,
+                    elapsedMs: Date.now() - startedAt,
+                }));
+                controller.abort();
+            }, input.timeoutMs);
+        });
+
+        try {
+            return await Promise.race([
+                operation(controller.signal),
+                timeoutPromise,
+            ]);
+        } finally {
+            if (timeoutHandle !== null) {
+                clearTimeout(timeoutHandle);
+            }
+        }
+    }
+
+    private logPromptRequestFailure(
+        error: unknown,
+        input: {
+            messageId?: string | null;
+            sessionId: string;
+            stage: OpenCodePromptTimeoutStage;
+            timeoutMs: number;
+        },
+    ) {
+        if (error instanceof OpenCodePromptTimeoutError) {
+            this.logPromptRequest("warn", {
+                elapsedMs: error.data.elapsedMs,
+                messageId: error.data.messageId,
+                sessionId: error.data.sessionId,
+                stage: error.data.stage,
+                timeoutMs: error.data.timeoutMs,
+            }, "OpenCode prompt request timed out");
+            return;
+        }
+
+        this.logPromptRequest("warn", {
+            error,
+            messageId: input.messageId ?? undefined,
+            sessionId: input.sessionId,
+            stage: input.stage,
+            timeoutMs: input.timeoutMs,
+        }, "OpenCode prompt request failed");
+    }
+
+    private logPromptRequest(
+        level: "warn" | "error" | "info",
+        extra: Record<string, unknown>,
+        message: string,
+    ) {
+        const log = this.client.app?.log;
+
+        if (typeof log !== "function") {
+            return;
+        }
+
+        void log.call(this.client.app, {
+            service: PROMPT_LOG_SERVICE,
+            level,
+            message,
+            extra,
+        }).catch(() => undefined);
     }
 }
 
@@ -1319,6 +1531,19 @@ function extractMessageId(message: unknown): string | null {
 
 function delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function createOpenCodePromptTimeoutError(
+    input: Omit<OpenCodePromptTimeoutErrorData, "elapsedMs" | "message"> & {
+        elapsedMs?: number;
+        message?: string;
+    },
+): OpenCodePromptTimeoutError {
+    return new OpenCodePromptTimeoutError({
+        ...input,
+        elapsedMs: input.elapsedMs ?? input.timeoutMs,
+        message: input.message ?? "The OpenCode host did not finish this request in time.",
+    });
 }
 
 function getPromptMessagePollDelayMs(attempt: number): number {
