@@ -128,7 +128,8 @@ type OpenCodePromptResponse = {
 };
 
 const EMPTY_RESPONSE_TEXT = "OpenCode returned empty response.";
-const PROMPT_MESSAGE_POLL_DELAYS_MS = [0, 150, 300, 600, 1200, 2000, 3200];
+const PROMPT_MESSAGE_POLL_DELAYS_MS = [0, 100, 250, 500, 1000, 2000, 4000, 8000];
+const PROMPT_MESSAGE_POLL_LIMIT = 20;
 const STRUCTURED_REPLY_SCHEMA = {
     type: "json_schema" as const,
     retryCount: 2,
@@ -386,6 +387,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
             throw new Error("Prompt requires text or file attachments.");
         }
 
+        const knownMessageIds = await this.captureKnownMessageIds(input.sessionId);
         const response = await this.client.session.prompt({
             sessionID: input.sessionId,
             ...(input.agent ? { agent: input.agent } : {}),
@@ -398,6 +400,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
         const resolvedData = await this.resolvePromptResponse(
             input,
             initialData,
+            knownMessageIds,
         );
         const finishedAt = Date.now();
 
@@ -412,15 +415,26 @@ export class OpenCodeClient implements OpenCodeClientLike {
     private async resolvePromptResponse(
         input: PromptSessionInput,
         data: OpenCodePromptResponse,
+        knownMessageIds: Set<string>,
     ): Promise<OpenCodePromptResponse> {
         if (!shouldPollPromptMessage(data, input.structured ?? false)) {
             return data;
         }
 
         const messageId = data.info?.id;
+        let bestCandidate = data;
 
         if (!messageId) {
-            return data;
+            const latest = await this.findLatestPromptResponse(
+                input.sessionId,
+                {
+                    initialMessageId: null,
+                    knownMessageIds,
+                    structured: input.structured ?? false,
+                },
+            );
+
+            return latest ?? data;
         }
 
         for (const delayMs of PROMPT_MESSAGE_POLL_DELAYS_MS) {
@@ -431,17 +445,52 @@ export class OpenCodeClient implements OpenCodeClientLike {
             const next = await this.fetchPromptMessage(input.sessionId, messageId);
 
             if (!next) {
+                const latest = await this.findLatestPromptResponse(
+                    input.sessionId,
+                    {
+                        initialMessageId: messageId,
+                        knownMessageIds,
+                        structured: input.structured ?? false,
+                    },
+                );
+
+                if (latest) {
+                    bestCandidate = latest;
+
+                    if (!shouldPollPromptMessage(bestCandidate, input.structured ?? false)) {
+                        return bestCandidate;
+                    }
+                }
+
                 continue;
             }
 
             data = next;
+            bestCandidate = next;
 
             if (!shouldPollPromptMessage(data, input.structured ?? false)) {
                 return data;
             }
+
+            const latest = await this.findLatestPromptResponse(
+                input.sessionId,
+                {
+                    initialMessageId: messageId,
+                    knownMessageIds,
+                    structured: input.structured ?? false,
+                },
+            );
+
+            if (latest) {
+                bestCandidate = latest;
+
+                if (!shouldPollPromptMessage(bestCandidate, input.structured ?? false)) {
+                    return bestCandidate;
+                }
+            }
         }
 
-        return data;
+        return bestCandidate;
     }
 
     private async fetchPromptMessage(
@@ -465,6 +514,91 @@ export class OpenCodeClient implements OpenCodeClientLike {
         } catch {
             return null;
         }
+    }
+
+    private async captureKnownMessageIds(sessionId: string): Promise<Set<string>> {
+        const messages = await this.fetchRecentPromptMessages(sessionId);
+
+        if (!messages) {
+            return new Set();
+        }
+
+        return new Set(
+            messages
+                .map((message) => message.info?.id)
+                .filter((id): id is string => typeof id === "string" && id.length > 0),
+        );
+    }
+
+    private async fetchRecentPromptMessages(sessionId: string): Promise<OpenCodePromptResponse[] | null> {
+        if (typeof this.client.session.messages !== "function") {
+            return null;
+        }
+
+        try {
+            const response = await this.client.session.messages(
+                {
+                    sessionID: sessionId,
+                    limit: PROMPT_MESSAGE_POLL_LIMIT,
+                },
+                SDK_OPTIONS,
+            ) as MaybeWrappedResponse<OpenCodePromptResponse[]>;
+
+            const data = unwrapSdkData(response);
+
+            return Array.isArray(data) ? data : null;
+        } catch {
+            return null;
+        }
+    }
+
+    private async findLatestPromptResponse(
+        sessionId: string,
+        options: {
+            initialMessageId: string | null;
+            knownMessageIds: Set<string>;
+            structured: boolean;
+        },
+    ): Promise<OpenCodePromptResponse | null> {
+        const messages = await this.fetchRecentPromptMessages(sessionId);
+
+        if (!messages || messages.length === 0) {
+            return null;
+        }
+
+        const candidates = messages
+            .filter((message) => toAssistantMessage(message.info) !== null)
+            .map((message) => {
+                const assistant = toAssistantMessage(message.info);
+                const id = assistant?.id ?? null;
+                const createdAt = typeof assistant?.time?.created === "number" && Number.isFinite(assistant.time.created)
+                    ? assistant.time.created
+                    : 0;
+                const isInitial = !!id && id === options.initialMessageId;
+                const isNew = !!id && !options.knownMessageIds.has(id);
+                const isUsable = !shouldPollPromptMessage(message, options.structured);
+
+                return {
+                    createdAt,
+                    id,
+                    isInitial,
+                    isNew,
+                    isUsable,
+                    message,
+                };
+            })
+            .sort((left, right) =>
+                Number(right.isUsable) - Number(left.isUsable)
+                || Number(right.isNew) - Number(left.isNew)
+                || Number(right.isInitial) - Number(left.isInitial)
+                || right.createdAt - left.createdAt,
+            );
+
+        const preferred = candidates.find((candidate) => candidate.isUsable && (candidate.isNew || candidate.isInitial))
+            ?? candidates.find((candidate) => candidate.isNew || candidate.isInitial)
+            ?? null;
+
+        return preferred?.message ?? null;
     }
 
     private async loadModels(): Promise<OpenCodeConfiguredModel[]> {

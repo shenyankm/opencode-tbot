@@ -1059,6 +1059,195 @@ test("promptSession polls the created message when the initial reply is still em
     ]);
 });
 
+test("promptSession falls back to recent session messages when the final reply uses a different message id", async () => {
+    const calls: Array<{ input: unknown; kind: "messages" | "prompt" | "message"; options: unknown }> = [];
+    let messageListCallCount = 0;
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            config: {
+                get: async () => ({ provider: {} }),
+                providers: async () => ({ providers: [], default: {} }),
+            },
+            path: {
+                get: async () => createPath(),
+            },
+            project: {
+                list: async () => [],
+                current: async () => createProject("project-1", "E:/repo-1"),
+            },
+            session: {
+                create: async () => createSession("session-1", "project-1", "E:/repo-1"),
+                messages: async (input: unknown, options: unknown) => {
+                    calls.push({ kind: "messages", input, options });
+                    messageListCallCount += 1;
+
+                    if (messageListCallCount === 1) {
+                        return {
+                            data: [{
+                                info: {
+                                    id: "assistant-old",
+                                    role: "assistant",
+                                    sessionID: "session-1",
+                                    parentID: "user-old",
+                                    modelID: "gpt-5",
+                                    providerID: "openai",
+                                    mode: "chat",
+                                    agent: "build",
+                                    path: {
+                                        cwd: "E:/repo-1",
+                                        root: "E:/repo-1",
+                                    },
+                                    cost: 0.01,
+                                    time: {
+                                        created: 50,
+                                        completed: 60,
+                                    },
+                                    tokens: {
+                                        total: 4,
+                                        input: 2,
+                                        output: 2,
+                                        reasoning: 0,
+                                        cache: {
+                                            read: 0,
+                                            write: 0,
+                                        },
+                                    },
+                                } as never,
+                                parts: [{ type: "text", text: "old answer" }] as never,
+                            }],
+                        };
+                    }
+
+                    return {
+                        data: [{
+                            info: {
+                                id: "assistant-new",
+                                role: "assistant",
+                                sessionID: "session-1",
+                                parentID: "user-new",
+                                modelID: "gpt-5",
+                                providerID: "openai",
+                                mode: "chat",
+                                agent: "build",
+                                path: {
+                                    cwd: "E:/repo-1",
+                                    root: "E:/repo-1",
+                                },
+                                cost: 0.02,
+                                time: {
+                                    created: 100,
+                                    completed: 300,
+                                },
+                                tokens: {
+                                    total: 6,
+                                    input: 2,
+                                    output: 4,
+                                    reasoning: 0,
+                                    cache: {
+                                        read: 0,
+                                        write: 0,
+                                    },
+                                },
+                                structured: {
+                                    body_md: "## New Answer",
+                                },
+                            } as never,
+                            parts: [{ type: "text", text: "New Answer" }] as never,
+                        }],
+                    };
+                },
+                prompt: async (input: unknown, options: unknown) => {
+                    calls.push({ kind: "prompt", input, options });
+
+                    return {
+                        data: {
+                            info: {
+                                id: "assistant-placeholder",
+                                role: "assistant",
+                                sessionID: "session-1",
+                                parentID: "user-new",
+                                modelID: "gpt-5",
+                                providerID: "openai",
+                                mode: "chat",
+                                agent: "build",
+                                path: {
+                                    cwd: "E:/repo-1",
+                                    root: "E:/repo-1",
+                                },
+                                cost: 0,
+                                time: {
+                                    created: 90,
+                                },
+                                tokens: {
+                                    input: 0,
+                                    output: 0,
+                                    reasoning: 0,
+                                    cache: {
+                                        read: 0,
+                                        write: 0,
+                                    },
+                                },
+                            } as never,
+                            parts: [],
+                        },
+                    };
+                },
+                message: async (input: unknown, options: unknown) => {
+                    calls.push({ kind: "message", input, options });
+
+                    return {
+                        data: {
+                            info: {
+                                id: "assistant-placeholder",
+                                role: "assistant",
+                                sessionID: "session-1",
+                                parentID: "user-new",
+                                modelID: "gpt-5",
+                                providerID: "openai",
+                                mode: "chat",
+                                agent: "build",
+                                path: {
+                                    cwd: "E:/repo-1",
+                                    root: "E:/repo-1",
+                                },
+                                cost: 0,
+                                time: {
+                                    created: 90,
+                                },
+                                tokens: {
+                                    input: 0,
+                                    output: 0,
+                                    reasoning: 0,
+                                    cache: {
+                                        read: 0,
+                                        write: 0,
+                                    },
+                                },
+                            } as never,
+                            parts: [],
+                        },
+                    };
+                },
+            },
+        } as never,
+    );
+
+    const result = await client.promptSession({
+        sessionId: "session-1",
+        prompt: "hello from telegram",
+        structured: true,
+    });
+
+    assert.equal(result.bodyMd, "## New Answer");
+    assert.equal(result.fallbackText, "New Answer");
+    assert.deepEqual(result.parts, [{ type: "text", text: "New Answer" }]);
+    assert.deepEqual(
+        calls.map((call) => call.kind),
+        ["messages", "prompt", "message", "messages"],
+    );
+});
+
 test("promptSession preserves assistant errors from successful prompt responses", async () => {
     const client = new OpenCodeClient(
         { baseUrl: "http://127.0.0.1:4096" },
