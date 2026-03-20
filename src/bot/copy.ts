@@ -156,14 +156,14 @@ export const SUPPORTED_BOT_LANGUAGES: readonly BotLanguage[] = ["en", "zh-CN", "
 const EN_BOT_COPY: BotCopy = {
     locale: "en",
     commands: {
-        start: "Welcome and quick start",
+        start: "Show welcome and quick start",
         status: "Show system status",
         new: "Create a new session",
-        agents: "View and switch agents",
-        sessions: "View and switch sessions",
+        agents: "Show and switch agents",
+        sessions: "Show and switch sessions",
         cancel: "Cancel rename or abort running request",
-        model: "View and switch models",
-        language: "View and switch language",
+        model: "Show and switch models",
+        language: "Show and switch language",
     },
     start: {
         lines: [
@@ -262,7 +262,7 @@ const EN_BOT_COPY: BotCopy = {
         none: "No sessions available in the current project.",
         title: "Session List",
         actionTitle: "Session Actions",
-        chooseAction: "Choose what to do with this session.",
+        chooseAction: "Choose an action for this session.",
         currentProject(worktree: string) {
             return `Current project: ${worktree}`;
         },
@@ -288,7 +288,7 @@ const EN_BOT_COPY: BotCopy = {
         },
         switchAction: "Switch",
         renameAction: "Rename",
-        backToList: "Back",
+        backToList: "Back to list",
         expired: "The session is no longer available. Run /sessions again.",
     },
     lsp: {
@@ -361,8 +361,8 @@ const EN_BOT_COPY: BotCopy = {
         expired: "The language option is no longer available. Run /language again.",
         labels: {
             en: "English",
-            "zh-CN": "Simplified Chinese",
-            ja: "Japanese",
+            "zh-CN": "简体中文",
+            ja: "日本語",
         },
     },
 };
@@ -370,12 +370,12 @@ const EN_BOT_COPY: BotCopy = {
 const ZH_CN_BOT_COPY: BotCopy = {
     locale: "zh-CN",
     commands: {
-        start: "查看欢迎与快速开始",
+        start: "查看欢迎信息与快速开始",
         status: "查看系统状态",
         new: "新建会话",
-        agents: "查看并切换代理",
+        agents: "查看并切换 Agent",
         sessions: "查看并切换会话",
-        cancel: "取消重命名或中止运行中的请求",
+        cancel: "取消重命名或中止当前请求",
         model: "查看并切换模型",
         language: "查看并切换语言",
     },
@@ -476,7 +476,7 @@ const ZH_CN_BOT_COPY: BotCopy = {
         none: "当前项目下没有可用会话。",
         title: "会话列表",
         actionTitle: "会话操作",
-        chooseAction: "请选择对该会话执行的操作。",
+        chooseAction: "请选择该会话的操作。",
         currentProject(worktree: string) {
             return `当前项目: ${worktree}`;
         },
@@ -484,7 +484,7 @@ const ZH_CN_BOT_COPY: BotCopy = {
             return `当前会话: ${session}`;
         },
         selectedSession(session: string) {
-            return `目标会话: ${session}`;
+            return `已选会话: ${session}`;
         },
         switched: "会话已切换。",
         created: "会话已创建。",
@@ -531,13 +531,13 @@ const ZH_CN_BOT_COPY: BotCopy = {
         },
     },
     agents: {
-        none: "没有可用代理。",
-        title: "代理列表",
+        none: "没有可用 Agent。",
+        title: "Agent 列表",
         current(agent: string) {
-            return `当前代理: ${agent}`;
+            return `当前 Agent: ${agent}`;
         },
-        switched: "代理已切换。",
-        expired: "该代理已不可用。请重新运行 /agents。",
+        switched: "Agent 已切换。",
+        expired: "该 Agent 已不可用。请重新运行 /agents。",
     },
     models: {
         none: "没有可用模型。",
@@ -567,7 +567,7 @@ const ZH_CN_BOT_COPY: BotCopy = {
     },
     language: {
         title: "语言",
-        choose: "选择机器人菜单和回复信息的显示语言。",
+        choose: "选择 Bot 菜单和回复的显示语言。",
         current(label: string) {
             return `当前语言: ${label}`;
         },
@@ -576,7 +576,7 @@ const ZH_CN_BOT_COPY: BotCopy = {
         labels: {
             en: "English",
             "zh-CN": "简体中文",
-            ja: "日语",
+            ja: "日本語",
         },
     },
 };
@@ -584,10 +584,10 @@ const ZH_CN_BOT_COPY: BotCopy = {
 const JA_BOT_COPY: BotCopy = {
     locale: "ja",
     commands: {
-        start: "ようこそ / クイックスタート",
+        start: "ようこそとクイックスタートを表示",
         status: "システム状態を表示",
         new: "新しいセッションを作成",
-        agents: "agent を表示して切り替え",
+        agents: "エージェントを表示して切り替え",
         sessions: "セッションを表示して切り替え",
         cancel: "名前変更を取り消すか実行中のリクエストを中止",
         model: "モデルを表示して切り替え",
@@ -716,7 +716,7 @@ const JA_BOT_COPY: BotCopy = {
         },
         switchAction: "切り替え",
         renameAction: "名前変更",
-        backToList: "戻る",
+        backToList: "一覧に戻る",
         expired: "このセッションはもう利用できません。/sessions を再実行してください。",
     },
     lsp: {
@@ -745,13 +745,13 @@ const JA_BOT_COPY: BotCopy = {
         },
     },
     agents: {
-        none: "利用可能な agent はありません。",
-        title: "agent 一覧",
+        none: "利用可能なエージェントはありません。",
+        title: "エージェント一覧",
         current(agent: string) {
-            return `現在の agent: ${agent}`;
+            return `現在のエージェント: ${agent}`;
         },
-        switched: "agent を切り替えました。",
-        expired: "この agent はもう利用できません。/agents を再実行してください。",
+        switched: "エージェントを切り替えました。",
+        expired: "このエージェントはもう利用できません。/agents を再実行してください。",
     },
     models: {
         none: "利用可能なモデルはありません。",
@@ -781,7 +781,7 @@ const JA_BOT_COPY: BotCopy = {
     },
     language: {
         title: "言語",
-        choose: "bot のメニューと返信に使う表示言語を選択してください。",
+        choose: "Bot のメニューと返信に使う表示言語を選択してください。",
         current(label: string) {
             return `現在の言語: ${label}`;
         },

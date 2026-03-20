@@ -187,7 +187,7 @@ test("session pick callbacks open the second-level action menu", async () => {
             "Current project: E:/repo-2",
             "Selected session: Session 2 [session-2]",
             "",
-            "Choose what to do with this session.",
+            "Choose an action for this session.",
         ].join("\n"),
     );
     const keyboard = edits[0].other?.reply_markup as {
@@ -199,7 +199,7 @@ test("session pick callbacks open the second-level action menu", async () => {
             { text: "Rename", callback_data: "sessions:rename:0:session-2" },
         ],
         [
-            { text: "Back", callback_data: "sessions:back:0" },
+            { text: "Back to list", callback_data: "sessions:back:0" },
         ],
     ]);
 });

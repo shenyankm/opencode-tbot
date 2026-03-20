@@ -16,7 +16,7 @@ test("TELEGRAM_COMMANDS only advertises implemented commands", () => {
     assert.deepEqual(TELEGRAM_COMMANDS, [
         {
             command: "start",
-            description: "Welcome and quick start",
+            description: "Show welcome and quick start",
         },
         {
             command: "status",
@@ -28,11 +28,11 @@ test("TELEGRAM_COMMANDS only advertises implemented commands", () => {
         },
         {
             command: "agents",
-            description: "View and switch agents",
+            description: "Show and switch agents",
         },
         {
             command: "sessions",
-            description: "View and switch sessions",
+            description: "Show and switch sessions",
         },
         {
             command: "cancel",
@@ -40,11 +40,11 @@ test("TELEGRAM_COMMANDS only advertises implemented commands", () => {
         },
         {
             command: "model",
-            description: "View and switch models",
+            description: "Show and switch models",
         },
         {
             command: "language",
-            description: "View and switch language",
+            description: "Show and switch language",
         },
     ]);
 });
@@ -104,7 +104,7 @@ test("getTelegramCommands returns Japanese descriptions when requested", () => {
     assert.deepEqual(getTelegramCommands("ja"), [
         {
             command: "start",
-            description: "ようこそ / クイックスタート",
+            description: "ようこそとクイックスタートを表示",
         },
         {
             command: "status",
@@ -116,7 +116,7 @@ test("getTelegramCommands returns Japanese descriptions when requested", () => {
         },
         {
             command: "agents",
-            description: "agent を表示して切り替え",
+            description: "エージェントを表示して切り替え",
         },
         {
             command: "sessions",
@@ -133,6 +133,43 @@ test("getTelegramCommands returns Japanese descriptions when requested", () => {
         {
             command: "language",
             description: "言語を表示して切り替え",
+        },
+    ]);
+});
+
+test("getTelegramCommands returns standardized Chinese descriptions when requested", () => {
+    assert.deepEqual(getTelegramCommands("zh-CN"), [
+        {
+            command: "start",
+            description: "查看欢迎信息与快速开始",
+        },
+        {
+            command: "status",
+            description: "查看系统状态",
+        },
+        {
+            command: "new",
+            description: "新建会话",
+        },
+        {
+            command: "agents",
+            description: "查看并切换 Agent",
+        },
+        {
+            command: "sessions",
+            description: "查看并切换会话",
+        },
+        {
+            command: "cancel",
+            description: "取消重命名或中止当前请求",
+        },
+        {
+            command: "model",
+            description: "查看并切换模型",
+        },
+        {
+            command: "language",
+            description: "查看并切换语言",
         },
     ]);
 });

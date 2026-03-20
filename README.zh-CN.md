@@ -45,12 +45,6 @@ npm exec --package opencode-tbot@latest opencode-tbot -- --version
 npm exec --package opencode-tbot@latest opencode-tbot -- update
 ```
 
-如果 OpenCode 把插件显示成 `file:///.../node_modules/...` 路径，可删除旧的本地 npm 安装：
-
-```bash
-npm uninstall opencode-tbot
-```
-
 ### CLI 参数
 
 `install` 支持：

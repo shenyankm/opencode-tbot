@@ -45,12 +45,6 @@ Update the registered npm plugin spec in OpenCode:
 npm exec --package opencode-tbot@latest opencode-tbot -- update
 ```
 
-If OpenCode shows the plugin as a `file:///.../node_modules/...` path, remove the legacy local npm install:
-
-```bash
-npm uninstall opencode-tbot
-```
-
 ### CLI Options
 
 `install` supports:

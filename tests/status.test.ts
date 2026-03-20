@@ -220,6 +220,8 @@ test("/status aggregates health, path, plugins, LSP, and MCP into one reply", as
     expectLine(markdown, "- `workspace-tools`");
     assert.match(markdown, /- `alpha`\n  - \*\*Status:\*\* \uD83D\uDFE2\n- `beta`/u);
     assert.match(markdown, /- `beta`\n  - \*\*Status:\*\* \u26AA/u);
+    assert.match(markdown, /- \*\*Go\*\*\n  - \*\*Status:\*\* \uD83D\uDD34/u);
+    assert.match(markdown, /- \*\*TypeScript\*\*\n  - \*\*Status:\*\* \uD83D\uDFE2/u);
     assert.doesNotMatch(markdown, /Configured Plugins/u);
     assert.doesNotMatch(markdown, /beta[\s\S]*disabled/u);
     assert.doesNotMatch(markdown, /Model Context Protocol/u);
@@ -227,6 +229,9 @@ test("/status aggregates health, path, plugins, LSP, and MCP into one reply", as
     assert.doesNotMatch(markdown, /Service Status/u);
     assert.doesNotMatch(markdown, /Service\s+\|\s+Status\s+\|\s+Notes/u);
     assert.doesNotMatch(markdown, /Language\s+\|\s+Status\s+\|\s+Root/u);
+    assert.doesNotMatch(markdown, /\*\*Root:\*\*/u);
+    assert.doesNotMatch(markdown, /E:\/repo-1\/packages\/app/u);
+    assert.doesNotMatch(markdown, /E:\/repo-1\/server/u);
     assert.doesNotMatch(markdown, /```/u);
     assert.doesNotMatch(markdown, /Last updated/u);
 });

@@ -45,12 +45,6 @@ OpenCode に登録済みの npm プラグイン spec を更新:
 npm exec --package opencode-tbot@latest opencode-tbot -- update
 ```
 
-OpenCode 上でプラグインが `file:///.../node_modules/...` のようなパスで表示される場合は、古いローカル npm インストールを削除します。
-
-```bash
-npm uninstall opencode-tbot
-```
-
 ### CLI オプション
 
 `install` で利用可能:

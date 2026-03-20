@@ -72,8 +72,8 @@ test("/language shows the current language and syncs chat commands", async () =>
     };
     assert.deepEqual(keyboard.inline_keyboard, [
         [{ text: "[English]", callback_data: "language:select:en" }],
-        [{ text: "Simplified Chinese", callback_data: "language:select:zh-CN" }],
-        [{ text: "Japanese", callback_data: "language:select:ja" }],
+        [{ text: "简体中文", callback_data: "language:select:zh-CN" }],
+        [{ text: "日本語", callback_data: "language:select:ja" }],
     ]);
 });
 
@@ -133,7 +133,7 @@ test("language callbacks switch the stored language and localize the menu", asyn
     assert.deepEqual(keyboard.inline_keyboard, [
         [{ text: "English", callback_data: "language:select:en" }],
         [{ text: "[简体中文]", callback_data: "language:select:zh-CN" }],
-        [{ text: "日语", callback_data: "language:select:ja" }],
+        [{ text: "日本語", callback_data: "language:select:ja" }],
     ]);
     assert.deepEqual(binding, {
         chatId: 7,

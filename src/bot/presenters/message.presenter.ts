@@ -73,7 +73,6 @@ interface StatusLayoutCopy {
     openCodeVersionLabel: string;
     overviewTitle: string;
     pluginsTitle: string;
-    rootLabel: string;
     statusLabel: string;
     tbotVersionLabel: string;
     workspaceTitle: string;
@@ -293,11 +292,6 @@ function presentStatusPlainLspLines(input: GetStatusResult, copy: BotCopy, layou
             label: layout.statusLabel,
             value: formatLspStatusBadge(status),
         },
-        {
-            codeValue: !!status.root,
-            label: layout.rootLabel,
-            value: status.root || "-",
-        },
     ]));
 }
 
@@ -314,11 +308,6 @@ function presentStatusMarkdownLspLines(input: GetStatusResult, copy: BotCopy, la
         {
             label: layout.statusLabel,
             value: formatLspStatusBadge(status),
-        },
-        {
-            codeValue: !!status.root,
-            label: layout.rootLabel,
-            value: status.root || "-",
         },
     ]));
 }
@@ -557,7 +546,6 @@ function getStatusLayoutCopy(copy: BotCopy): StatusLayoutCopy {
             openCodeVersionLabel: "OpenCode Version",
             overviewTitle: "\uD83D\uDDA5\uFE0F Overview",
             pluginsTitle: "\uD83E\uDDE9 Plugins",
-            rootLabel: "Root",
             statusLabel: "Status",
             tbotVersionLabel: "opencode-tbot Version",
             workspaceTitle: "\uD83D\uDCC1 Workspace",
@@ -582,7 +570,6 @@ function getStatusLayoutCopy(copy: BotCopy): StatusLayoutCopy {
             openCodeVersionLabel: "OpenCode バージョン",
             overviewTitle: "\uD83D\uDDA5\uFE0F 概要",
             pluginsTitle: "\uD83E\uDDE9 プラグイン",
-            rootLabel: "ルート",
             statusLabel: "状態",
             tbotVersionLabel: "opencode-tbot バージョン",
             workspaceTitle: "\uD83D\uDCC1 ワークスペース",
@@ -606,7 +593,6 @@ function getStatusLayoutCopy(copy: BotCopy): StatusLayoutCopy {
         openCodeVersionLabel: "OpenCode\u7248\u672C",
         overviewTitle: "\uD83D\uDDA5\uFE0F \u6982\u89C8",
         pluginsTitle: "\uD83E\uDDE9 \u63D2\u4EF6",
-        rootLabel: "\u6839\u76EE\u5F55",
         statusLabel: "\u72B6\u6001",
         tbotVersionLabel: "opencode-tbot\u7248\u672C",
         workspaceTitle: "\uD83D\uDCC1 \u5DE5\u4F5C\u533A",
