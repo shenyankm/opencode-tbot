@@ -2,24 +2,30 @@
 
 A Telegram plugin for driving [OpenCode](https://opencode.ai) from chat.
 
-[English](./README.md) | [简体中文](./README.zh-CN.md)
+[English](./README.md) | [简体中文](./README.zh-CN.md) | [日本語](./README.ja.md)
 
 > This project is not built by the OpenCode team and is not affiliated with them.
 
-## What It Does
+## Overview
 
 `opencode-tbot` lets you operate OpenCode from Telegram.
 
 - Text messages are forwarded to the active OpenCode session.
-- Telegram images are uploaded as OpenCode file parts.
-- Telegram voice messages are explicitly rejected with a localized error reply.
-- Permission requests raised by OpenCode can be approved or rejected directly from Telegram inline buttons.
+- Telegram photos and image documents are uploaded as OpenCode file parts.
+- Telegram voice messages are explicitly rejected with a localized reply.
+- Permission requests raised by OpenCode can be approved or rejected from Telegram inline buttons.
 - Session completion and error events can be reported back to the bound Telegram chat.
-- Chat state is stored in a JSON state file that works in both Node and Bun runtimes.
+- Chat bindings are stored in a JSON state file.
+
+## Requirements
+
+- A running OpenCode host process that loads the plugin.
+- A Telegram bot token.
+- Node.js `>=22.12.0` for the CLI and local development workflow.
 
 ## Install
 
-Run:
+Recommended install:
 
 ```bash
 npm exec --package opencode-tbot@latest opencode-tbot -- install
@@ -39,22 +45,39 @@ Update the registered npm plugin spec in OpenCode:
 npm exec --package opencode-tbot@latest opencode-tbot -- update
 ```
 
-Remove a legacy local npm install if OpenCode is showing the plugin as a `file:///.../node_modules/...` path:
+If OpenCode shows the plugin as a `file:///.../node_modules/...` path, remove the legacy local npm install:
 
 ```bash
 npm uninstall opencode-tbot
 ```
 
+### CLI Options
+
+`install` supports:
+
+- `--bot-token <token>` set the Telegram bot token non-interactively
+- `--telegram-api-root <url>` override the Telegram Bot API root
+- `--plugin-spec <spec>` register a custom npm plugin spec
+- `--skip-register` only rewrite plugin config without touching OpenCode plugin registration
+- `--home-dir <path>` use a custom home directory
+
+`update` supports:
+
+- `--plugin-spec <spec>`
+- `--home-dir <path>`
+
 ## Configuration
 
-The runtime config is loaded in this order:
+Runtime config is loaded in this order:
 
-1. global defaults from `~/.config/opencode/opencode-tbot/config.json`
-2. project overrides from `<worktree>/tbot.config.json`
+1. Global defaults from `~/.config/opencode/opencode-tbot/config.json`
+2. Project overrides from `<worktree>/tbot.config.json`
 
 Project config is merged on top of the global config. `telegram` and `state` are deep-merged by section.
 
 Legacy `openrouter` voice-transcription settings are ignored at runtime. When the installer rewrites the config, it removes them.
+
+The repository also includes [tbot.config.example.json](./tbot.config.example.json) as a minimal reference.
 
 ### Example `tbot.config.json`
 
@@ -82,29 +105,25 @@ Legacy `openrouter` voice-transcription settings are ignored at runtime. When th
 | `state.path` | No | `./data/opencode-tbot.state.json` | JSON state file path, resolved relative to the current OpenCode worktree. |
 | `logLevel` | No | `info` | Plugin log level. Logs are emitted through `client.app.log()`. |
 
-## Runtime Expectations
+### Notes
 
-Required:
-
-- `telegram.botToken`
-
-Optional:
-
-- `telegram.allowedChatIds`
-- `telegram.apiRoot`
-- `state.path`
-- `logLevel`
-
-Notes:
-
-- `state.path` defaults to `./data/opencode-tbot.state.json` and is resolved relative to the current OpenCode worktree.
-- Logs are emitted through `client.app.log()`.
+- `state.path` is resolved relative to the current OpenCode worktree.
+- If `telegram.allowedChatIds` is left empty, the bot accepts messages from any chat. Restrict it in production.
 - Permission approvals and session notifications are handled through plugin hooks.
+- `/language` currently supports English, Simplified Chinese, and Japanese.
+
+## Quick Start
+
+1. Install the plugin with `npm exec --package opencode-tbot@latest opencode-tbot -- install`.
+2. Set `telegram.allowedChatIds` in `tbot.config.json` if you want to restrict the bot to specific chats.
+3. Start OpenCode in the target worktree so the plugin runtime can load.
+4. In Telegram, run `/status` to verify the connection.
+5. Run `/new [title]` or send a text message directly to start working.
 
 ## Commands
 
 - `/start` show a short welcome message and quick-start steps
-- `/status` show aggregated OpenCode health, path, LSP, and MCP status
+- `/status` show aggregated OpenCode health, path, plugin, LSP, and MCP status
 - `/new [title]` create a new OpenCode session
 - `/agents` or `/agent` list available agents and switch the active one
 - `/sessions` list available sessions and switch the active one
@@ -112,7 +131,11 @@ Notes:
 - `/model` or `/models` list available models and switch the active one
 - `/language` switch the bot display language
 
-Any non-command text message is treated as a prompt and sent to OpenCode. Telegram images are forwarded as OpenCode file parts. Telegram voice messages are not supported and receive a localized rejection reply.
+Message handling:
+
+- Non-command text is treated as a prompt and sent to OpenCode.
+- Telegram photos and image documents are forwarded as OpenCode file parts.
+- Telegram voice messages are not supported and receive a localized rejection reply.
 
 ## Development
 
