@@ -579,6 +579,92 @@ test("abortSession forwards the session id to the SDK abort endpoint", async () 
     ]);
 });
 
+test("session mutation helpers use the raw client when available", async () => {
+    const calls: Array<{ kind: "patch" | "post"; options: unknown }> = [];
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            _client: {
+                post: async (options: unknown) => {
+                    calls.push({ kind: "post", options });
+
+                    const request = options as {
+                        body?: unknown;
+                        path?: Record<string, unknown>;
+                        query?: Record<string, unknown>;
+                        url: string;
+                    };
+
+                    if (request.url === "/session") {
+                        return {
+                            data: createSession("session-1", "project-1", "E:/repo-1"),
+                        };
+                    }
+
+                    if (request.url === "/session/{sessionID}/abort") {
+                        return {
+                            data: true,
+                        };
+                    }
+
+                    throw new Error(`Unexpected raw POST ${request.url}`);
+                },
+                patch: async (options: unknown) => {
+                    calls.push({ kind: "patch", options });
+                    return {
+                        data: createSession("session-1", "project-1", "E:/repo-1"),
+                    };
+                },
+            },
+        } as never,
+    );
+
+    assert.equal((await client.createSessionForDirectory("E:/repo-1", "Raw session")).id, "session-1");
+    assert.equal((await client.renameSession("session-1", "Renamed session")).id, "session-1");
+    assert.equal(await client.abortSession("session-1"), true);
+    assert.deepEqual(calls, [
+        {
+            kind: "post",
+            options: {
+                responseStyle: "data",
+                throwOnError: true,
+                url: "/session",
+                query: {
+                    directory: "E:/repo-1",
+                },
+                body: {
+                    title: "Raw session",
+                },
+            },
+        },
+        {
+            kind: "patch",
+            options: {
+                responseStyle: "data",
+                throwOnError: true,
+                url: "/session/{sessionID}",
+                path: {
+                    sessionID: "session-1",
+                },
+                body: {
+                    title: "Renamed session",
+                },
+            },
+        },
+        {
+            kind: "post",
+            options: {
+                responseStyle: "data",
+                throwOnError: true,
+                url: "/session/{sessionID}/abort",
+                path: {
+                    sessionID: "session-1",
+                },
+            },
+        },
+    ]);
+});
+
 test("promptSession forwards model selection and JSON schema format and returns normalized structured output", async () => {
     const calls: Array<{ input: unknown; options: unknown }> = [];
     const client = new OpenCodeClient(
@@ -903,6 +989,168 @@ test("promptSession tolerates SDK responses that omit the parts array", async ()
     assert.equal(result.bodyMd, "## Hello");
     assert.equal(result.fallbackText, "## Hello");
     assert.deepEqual(result.parts, []);
+});
+
+test("promptSession waits for a raw-client reply without message id and reads structured_output", async () => {
+    const calls: Array<{ kind: "get" | "post"; options: unknown }> = [];
+    let messageListCallCount = 0;
+    let statusCallCount = 0;
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            _client: {
+                get: async (options: unknown) => {
+                    calls.push({ kind: "get", options });
+                    const request = options as {
+                        path?: Record<string, unknown>;
+                        query?: Record<string, unknown>;
+                        url: string;
+                    };
+
+                    if (request.url === "/session/{sessionID}/message") {
+                        messageListCallCount += 1;
+
+                        if (messageListCallCount < 3) {
+                            return {
+                                data: [],
+                            };
+                        }
+
+                        return {
+                            data: [{
+                                info: {
+                                    id: "assistant-final",
+                                    role: "assistant",
+                                    sessionID: "session-1",
+                                    parentID: "user-1",
+                                    modelID: "gpt-5",
+                                    providerID: "openai",
+                                    time: {
+                                        created: 150,
+                                        completed: 420,
+                                    },
+                                    tokens: {
+                                        input: 2,
+                                        output: 6,
+                                        reasoning: 0,
+                                        cache: {
+                                            read: 0,
+                                            write: 0,
+                                        },
+                                    },
+                                    structured_output: {
+                                        body_md: "## Raw Hello",
+                                    },
+                                },
+                                parts: [],
+                            }],
+                        };
+                    }
+
+                    if (request.url === "/session/status") {
+                        statusCallCount += 1;
+
+                        return {
+                            data: {
+                                "session-1": statusCallCount === 1
+                                    ? { type: "busy" }
+                                    : { type: "idle" },
+                            },
+                        };
+                    }
+
+                    throw new Error(`Unexpected raw GET ${request.url}`);
+                },
+                post: async (options: unknown) => {
+                    calls.push({ kind: "post", options });
+
+                    return {
+                        data: {
+                            info: {
+                                role: "assistant",
+                                sessionID: "session-1",
+                                time: {
+                                    created: 100,
+                                },
+                                tokens: {
+                                    input: 0,
+                                    output: 0,
+                                    reasoning: 0,
+                                    cache: {
+                                        read: 0,
+                                        write: 0,
+                                    },
+                                },
+                            },
+                            parts: [],
+                        },
+                    };
+                },
+            },
+        } as never,
+    );
+
+    const result = await client.promptSession({
+        sessionId: "session-1",
+        prompt: "hello from telegram",
+        structured: true,
+    });
+
+    assert.equal(result.bodyMd, "## Raw Hello");
+    assert.equal(result.fallbackText, "## Raw Hello");
+    assert.deepEqual(result.parts, []);
+    assert.deepEqual(result.structured, {
+        body_md: "## Raw Hello",
+    });
+    assert.equal(statusCallCount, 1);
+    assert.deepEqual(calls[0], {
+        kind: "get",
+        options: {
+            responseStyle: "data",
+            throwOnError: true,
+            url: "/session/{sessionID}/message",
+            path: {
+                sessionID: "session-1",
+            },
+            query: {
+                limit: 20,
+            },
+        },
+    });
+    assert.deepEqual(calls[1], {
+        kind: "post",
+        options: {
+            responseStyle: "data",
+            throwOnError: true,
+            url: "/session/{sessionID}/message",
+            path: {
+                sessionID: "session-1",
+            },
+            body: {
+                format: {
+                    type: "json_schema",
+                    retryCount: 2,
+                    schema: {
+                        type: "object",
+                        additionalProperties: false,
+                        required: ["body_md"],
+                        properties: {
+                            body_md: {
+                                type: "string",
+                                description: "Markdown body only. Do not include duration, token usage, or any footer. Do not wrap the whole answer in ```md or ```markdown fences. Use Markdown formatting directly unless the user explicitly asks for raw Markdown source.",
+                            },
+                        },
+                    },
+                },
+                parts: [
+                    {
+                        type: "text",
+                        text: "hello from telegram",
+                    },
+                ],
+            },
+        },
+    });
 });
 
 test("promptSession polls the created message when the initial reply is still empty", async () => {

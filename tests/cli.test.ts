@@ -71,6 +71,34 @@ test("installPlugin can skip plugin registration for local integration tests", a
     assert.equal(existsSync(getGlobalPluginConfigFilePath(homeDir)), true);
 });
 
+test("installPlugin prints a single success line on normal completion", async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-success-"));
+    const originalCwd = process.cwd();
+    const originalWrite = process.stdout.write.bind(process.stdout);
+    let output = "";
+
+    process.chdir(homeDir);
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+        output += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
+        return true;
+    }) as typeof process.stdout.write;
+
+    try {
+        await installPlugin({
+            homeDir,
+            botToken: "telegram-token",
+            enableVoice: false,
+        });
+    } finally {
+        process.chdir(originalCwd);
+        process.stdout.write = originalWrite;
+    }
+
+    assert.match(output, /Success\.\n/u);
+    assert.doesNotMatch(output, /Registered .* in /u);
+    assert.doesNotMatch(output, /Wrote plugin defaults to /u);
+});
+
 test("runCli defaults to install mode", async () => {
     const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-default-"));
 
@@ -137,6 +165,40 @@ test("updatePlugin replaces stale opencode-tbot plugin specs and keeps unrelated
             ],
         },
     );
+});
+
+test("runCli update prints a single success line on normal completion", async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-update-output-"));
+    const openCodeConfigPath = getOpenCodeConfigFilePath(homeDir);
+    const originalCwd = process.cwd();
+    const originalWrite = process.stdout.write.bind(process.stdout);
+    let output = "";
+
+    mkdirSync(join(homeDir, ".config", "opencode"), { recursive: true });
+    writeFileSync(openCodeConfigPath, JSON.stringify({
+        plugin: ["opencode-tbot@0.1.0"],
+    }, null, 2));
+    process.chdir(homeDir);
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+        output += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
+        return true;
+    }) as typeof process.stdout.write;
+
+    try {
+        const exitCode = await runCli([
+            "update",
+            "--home-dir",
+            homeDir,
+        ]);
+
+        assert.equal(exitCode, 0);
+    } finally {
+        process.chdir(originalCwd);
+        process.stdout.write = originalWrite;
+    }
+
+    assert.match(output, /Success\.\n/u);
+    assert.doesNotMatch(output, /Updated plugin registration to /u);
 });
 
 test("createPromptSession masks secret input with stars and supports backspace", async () => {

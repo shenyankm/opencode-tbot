@@ -128,12 +128,7 @@ export async function installPlugin(options: InstallCommandOptions = {}): Promis
         }
         await writePluginConfigFile(globalPluginConfigFilePath, nextPluginConfig);
 
-        if (options.registerPlugin === false) {
-            stdout.write(`Skipped plugin registration in ${openCodeConfigFilePath}\n`);
-        } else {
-            stdout.write(`Registered ${pluginSpec} in ${openCodeConfigFilePath}\n`);
-        }
-        stdout.write(`Wrote plugin defaults to ${globalPluginConfigFilePath}\n`);
+        stdout.write("Success.\n");
         await warnAboutLegacyLocalInstallations(homeDir);
     } finally {
         prompt.close();
@@ -148,7 +143,7 @@ export async function updatePlugin(options: Pick<InstallCommandOptions, "homeDir
     const nextOpenCodeConfig = replacePluginRegistration(openCodeConfig, pluginSpec);
 
     await writeJsonFile(openCodeConfigFilePath, nextOpenCodeConfig);
-    stdout.write(`Updated plugin registration to ${pluginSpec} in ${openCodeConfigFilePath}\n`);
+    stdout.write("Success.\n");
     await warnAboutLegacyLocalInstallations(homeDir);
 }
 
