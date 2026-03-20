@@ -18,6 +18,7 @@ import type { RenameSessionUseCase } from "../use-cases/rename-session.usecase.j
 import type { SwitchAgentUseCase } from "../use-cases/switch-agent.usecase.js";
 import type { SwitchModelUseCase } from "../use-cases/switch-model.usecase.js";
 import type { SwitchSessionUseCase } from "../use-cases/switch-session.usecase.js";
+import type { BotLanguage } from "./copy.js";
 
 export interface BotDependencies {
     abortPromptUseCase: AbortPromptUseCase;
@@ -43,7 +44,7 @@ export interface BotDependencies {
 }
 
 export type AgentsCallbackData = `agents:page:${number}` | `agents:select:${number}`;
-export type LanguageCallbackData = `language:select:${"en" | "zh-CN"}`;
+export type LanguageCallbackData = `language:select:${BotLanguage}`;
 export type SessionsCallbackData =
     | `sessions:page:${number}`
     | `sessions:pick:${number}:${string}`

@@ -73,6 +73,7 @@ test("/language shows the current language and syncs chat commands", async () =>
     assert.deepEqual(keyboard.inline_keyboard, [
         [{ text: "[English]", callback_data: "language:select:en" }],
         [{ text: "Simplified Chinese", callback_data: "language:select:zh-CN" }],
+        [{ text: "Japanese", callback_data: "language:select:ja" }],
     ]);
 });
 
@@ -132,6 +133,7 @@ test("language callbacks switch the stored language and localize the menu", asyn
     assert.deepEqual(keyboard.inline_keyboard, [
         [{ text: "English", callback_data: "language:select:en" }],
         [{ text: "[简体中文]", callback_data: "language:select:zh-CN" }],
+        [{ text: "日语", callback_data: "language:select:ja" }],
     ]);
     assert.deepEqual(binding, {
         chatId: 7,
@@ -143,6 +145,78 @@ test("language callbacks switch the stored language and localize the menu", asyn
         modelId: null,
         modelVariant: null,
         language: "zh-CN",
+        updatedAt: binding?.updatedAt,
+    });
+});
+
+test("language callbacks can switch the stored language to Japanese", async () => {
+    const { dependencies, sessionRepo } = createDependencies();
+    const edits: Array<{ text: string; other?: { reply_markup?: unknown } }> = [];
+    const commandCalls: Array<{ commands: unknown; other?: unknown }> = [];
+    let answered = 0;
+
+    await handleLanguageCallback(
+        {
+            chat: { id: 9 },
+            api: {
+                async setMyCommands(commands, other) {
+                    commandCalls.push({ commands, other });
+                    return true;
+                },
+            },
+            callbackQuery: { data: "language:select:ja" },
+            async answerCallbackQuery() {
+                answered += 1;
+                return {};
+            },
+            async editMessageText(text, other) {
+                edits.push({ text, other });
+                return {};
+            },
+        },
+        dependencies,
+    );
+
+    const binding = await sessionRepo.getByChatId(9);
+
+    assert.equal(answered, 1);
+    assert.deepEqual(commandCalls, [
+        {
+            commands: getTelegramCommands("ja"),
+            other: {
+                scope: {
+                    type: "chat",
+                    chat_id: 9,
+                },
+            },
+        },
+    ]);
+    assert.equal(edits.length, 1);
+    assert.equal(
+        edits[0].text,
+        [
+            "言語を切り替えました。",
+            "現在の言語: 日本語",
+        ].join("\n"),
+    );
+    const keyboard = edits[0].other?.reply_markup as {
+        inline_keyboard: Array<Array<{ callback_data: string; text: string }>>;
+    };
+    assert.deepEqual(keyboard.inline_keyboard, [
+        [{ text: "English", callback_data: "language:select:en" }],
+        [{ text: "简体中文", callback_data: "language:select:zh-CN" }],
+        [{ text: "[日本語]", callback_data: "language:select:ja" }],
+    ]);
+    assert.deepEqual(binding, {
+        chatId: 9,
+        sessionId: null,
+        projectId: null,
+        directory: null,
+        agentName: null,
+        modelProviderId: null,
+        modelId: null,
+        modelVariant: null,
+        language: "ja",
         updatedAt: binding?.updatedAt,
     });
 });

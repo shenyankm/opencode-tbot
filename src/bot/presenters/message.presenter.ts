@@ -539,9 +539,7 @@ function normalizeStatusInlineValue(value: string): string {
 }
 
 function getStatusLayoutCopy(copy: BotCopy): StatusLayoutCopy {
-    const isEnglish = copy.systemStatus.title === BOT_COPY.systemStatus.title;
-
-    if (isEnglish) {
+    if (copy.locale === "en") {
         return {
             connectivityLabel: "Connectivity",
             currentProjectLabel: "Current Project",
@@ -563,6 +561,31 @@ function getStatusLayoutCopy(copy: BotCopy): StatusLayoutCopy {
             statusLabel: "Status",
             tbotVersionLabel: "opencode-tbot Version",
             workspaceTitle: "\uD83D\uDCC1 Workspace",
+        };
+    }
+
+    if (copy.locale === "ja") {
+        return {
+            connectivityLabel: "接続性",
+            currentProjectLabel: "現在のプロジェクト",
+            currentSessionLabel: "現在のセッション",
+            defaultSessionValue: "OpenCode のデフォルト",
+            detailsLabel: "詳細",
+            errorStatus: "\uD83D\uDD34",
+            lspTitle: "\uD83E\uDDE0 LSP",
+            mcpFailedStatus: "\uD83D\uDD34",
+            mcpNotesLabel: "補足",
+            mcpRegistrationRequiredStatus: "\uD83D\uDFE1",
+            mcpTitle: "\uD83D\uDD0C MCP",
+            noPluginsMessage: "現在の OpenCode 設定にはプラグインが設定されていません。",
+            noneStatus: "\u26AA",
+            openCodeVersionLabel: "OpenCode バージョン",
+            overviewTitle: "\uD83D\uDDA5\uFE0F 概要",
+            pluginsTitle: "\uD83E\uDDE9 プラグイン",
+            rootLabel: "ルート",
+            statusLabel: "状態",
+            tbotVersionLabel: "opencode-tbot バージョン",
+            workspaceTitle: "\uD83D\uDCC1 ワークスペース",
         };
     }
 

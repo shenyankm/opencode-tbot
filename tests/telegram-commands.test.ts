@@ -99,3 +99,40 @@ test("syncTelegramCommandsForChat applies localized command descriptions to one 
         },
     ]);
 });
+
+test("getTelegramCommands returns Japanese descriptions when requested", () => {
+    assert.deepEqual(getTelegramCommands("ja"), [
+        {
+            command: "start",
+            description: "ようこそ / クイックスタート",
+        },
+        {
+            command: "status",
+            description: "システム状態を表示",
+        },
+        {
+            command: "new",
+            description: "新しいセッションを作成",
+        },
+        {
+            command: "agents",
+            description: "agent を表示して切り替え",
+        },
+        {
+            command: "sessions",
+            description: "セッションを表示して切り替え",
+        },
+        {
+            command: "cancel",
+            description: "名前変更を取り消すか実行中のリクエストを中止",
+        },
+        {
+            command: "model",
+            description: "モデルを表示して切り替え",
+        },
+        {
+            command: "language",
+            description: "言語を表示して切り替え",
+        },
+    ]);
+});

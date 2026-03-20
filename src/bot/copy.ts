@@ -1,6 +1,7 @@
-export type BotLanguage = "en" | "zh-CN";
+export type BotLanguage = "en" | "zh-CN" | "ja";
 
 export interface BotCopy {
+    locale: BotLanguage;
     commands: {
         start: string;
         status: string;
@@ -150,9 +151,10 @@ export interface BotCopy {
 }
 
 export const DEFAULT_BOT_LANGUAGE: BotLanguage = "en";
-export const SUPPORTED_BOT_LANGUAGES: readonly BotLanguage[] = ["en", "zh-CN"];
+export const SUPPORTED_BOT_LANGUAGES: readonly BotLanguage[] = ["en", "zh-CN", "ja"];
 
 const EN_BOT_COPY: BotCopy = {
+    locale: "en",
     commands: {
         start: "Welcome and quick start",
         status: "Show system status",
@@ -360,11 +362,13 @@ const EN_BOT_COPY: BotCopy = {
         labels: {
             en: "English",
             "zh-CN": "Simplified Chinese",
+            ja: "Japanese",
         },
     },
 };
 
 const ZH_CN_BOT_COPY: BotCopy = {
+    locale: "zh-CN",
     commands: {
         start: "查看欢迎与快速开始",
         status: "查看系统状态",
@@ -572,6 +576,221 @@ const ZH_CN_BOT_COPY: BotCopy = {
         labels: {
             en: "English",
             "zh-CN": "简体中文",
+            ja: "日语",
+        },
+    },
+};
+
+const JA_BOT_COPY: BotCopy = {
+    locale: "ja",
+    commands: {
+        start: "ようこそ / クイックスタート",
+        status: "システム状態を表示",
+        new: "新しいセッションを作成",
+        agents: "agent を表示して切り替え",
+        sessions: "セッションを表示して切り替え",
+        cancel: "名前変更を取り消すか実行中のリクエストを中止",
+        model: "モデルを表示して切り替え",
+        language: "言語を表示して切り替え",
+    },
+    start: {
+        lines: [
+            "# opencode-tbot へようこそ",
+            "",
+            "Telegram から OpenCode サーバーとやり取りできます。",
+            "",
+            "## クイックスタート",
+            "1. `/status` を実行してサーバーの準備完了を確認します。",
+            "2. `/new [title]` を実行して新しいセッションを作成します。",
+            "",
+            "そのままテキストまたは画像メッセージを送信できます。",
+        ],
+    },
+    systemStatus: {
+        title: "システム状態",
+    },
+    common: {
+        notSelected: "未選択",
+        openCodeDefault: "未選択（OpenCode のデフォルトを使用）",
+        previousPage: "前へ",
+        nextPage: "次へ",
+        page(currentPage: number, totalPages: number) {
+            return `ページ ${currentPage}/${totalPages}`;
+        },
+    },
+    status: {
+        processing: "処理中...",
+        alreadyProcessing: "別のリクエストがまだ実行中です。完了するまで新しいプロンプトを送信しないでください。",
+    },
+    prompt: {
+        emptyResponse: "OpenCode から空の応答が返されました。",
+    },
+    replyMetrics: {
+        durationLabel: "所要時間",
+        tokensLabel: "トークン",
+        totalLabel: "合計",
+        inputLabel: "入力",
+        outputLabel: "出力",
+        reasoningLabel: "推論",
+        cacheReadLabel: "キャッシュ読込",
+        cacheWriteLabel: "キャッシュ書込",
+        notAvailable: "該当なし",
+    },
+    abort: {
+        noSession: "このチャットにはまだアクティブなセッションが紐付いていません。",
+        notRunning: "現在のセッションで実行中のリクエストはありません。",
+        aborted: "現在のセッションに中止シグナルを送信しました。",
+    },
+    errors: {
+        unexpected: "予期しないエラーが発生しました。",
+        providerAuth: "Provider の認証に失敗しました。",
+        requestAborted: "リクエストは中止されました。",
+        promptTimeout: "OpenCode リクエストがタイムアウトしました。",
+        structuredOutput: "構造化出力の検証に失敗しました。",
+        voiceUnsupported: "音声メッセージには対応していません。代わりにテキストまたは画像を送信してください。",
+        imageDownload: "Telegram の画像ファイルをダウンロードできませんでした。",
+        imageUnsupported: "画像ファイルが大きすぎるか、サポートされていません。",
+        outputLength: "返信がモデルの出力上限に達しました。",
+        contextOverflow: "会話がモデルのコンテキスト上限を超えました。",
+        providerRequest: "Provider へのリクエストに失敗しました。",
+        notFound: "要求されたリソースが見つかりませんでした。",
+        badRequest: "リクエストは OpenCode に拒否されました。",
+        causeLabel: "原因",
+        retryableLabel: "再試行可能",
+        statusCodeLabel: "ステータス",
+    },
+    health: {
+        title: "サーバー状態",
+        status(healthy: boolean) {
+            return `状態: ${healthy ? "正常" : "異常"}`;
+        },
+        version(version: string) {
+            return `バージョン: ${version}`;
+        },
+    },
+    path: {
+        title: "現在のパス",
+        home(path: string) {
+            return `ホーム: ${path}`;
+        },
+        state(path: string) {
+            return `状態: ${path}`;
+        },
+        config(path: string) {
+            return `設定: ${path}`;
+        },
+        worktree(path: string) {
+            return `ワークツリー: ${path}`;
+        },
+        directory(path: string) {
+            return `現在の作業ディレクトリ: ${path}`;
+        },
+    },
+    sessions: {
+        none: "現在のプロジェクトで利用できるセッションはありません。",
+        title: "セッション一覧",
+        actionTitle: "セッション操作",
+        chooseAction: "このセッションに対する操作を選択してください。",
+        currentProject(worktree: string) {
+            return `現在のプロジェクト: ${worktree}`;
+        },
+        currentSession(session: string) {
+            return `現在のセッション: ${session}`;
+        },
+        selectedSession(session: string) {
+            return `選択中のセッション: ${session}`;
+        },
+        switched: "セッションを切り替えました。",
+        created: "セッションを作成しました。",
+        renamed: "セッション名を変更しました。",
+        renameCancelled: "セッション名の変更を取り消しました。",
+        renameEmpty: "セッション名は空にできません。新しい名前を送信するか /cancel を実行してください。",
+        renameExpired: "このセッションはもう利用できません。/sessions を再実行してください。",
+        renamePendingInput: "新しいセッション名の入力待ちです。プレーンテキストを送るか /cancel を実行してください。",
+        renamePrompt(session: string) {
+            return [
+                `セッション名を変更: ${session}`,
+                "次のテキストメッセージで新しいセッション名を送信してください。",
+                "/cancel で取り消します。",
+            ].join("\n");
+        },
+        switchAction: "切り替え",
+        renameAction: "名前変更",
+        backToList: "戻る",
+        expired: "このセッションはもう利用できません。/sessions を再実行してください。",
+    },
+    lsp: {
+        none: "現在のプロジェクトで LSP サーバーは検出されませんでした。",
+        title: "LSP サーバー",
+        currentProject(worktree: string) {
+            return `現在のプロジェクト: ${worktree}`;
+        },
+        connected: "接続済み",
+        error: "エラー",
+    },
+    mcp: {
+        none: "現在のプロジェクトで MCP サーバーは設定されていません。",
+        title: "MCP サーバー",
+        currentProject(worktree: string) {
+            return `現在のプロジェクト: ${worktree}`;
+        },
+        connected: "接続済み",
+        disabled: "無効",
+        needsAuth: "認証が必要",
+        failed(error: string) {
+            return `失敗: ${error}`;
+        },
+        needsClientRegistration(error: string) {
+            return `クライアント登録が必要: ${error}`;
+        },
+    },
+    agents: {
+        none: "利用可能な agent はありません。",
+        title: "agent 一覧",
+        current(agent: string) {
+            return `現在の agent: ${agent}`;
+        },
+        switched: "agent を切り替えました。",
+        expired: "この agent はもう利用できません。/agents を再実行してください。",
+    },
+    models: {
+        none: "利用可能なモデルはありません。",
+        title: "モデル一覧",
+        configuredOnly: "OpenCode と接続済み provider で現在利用可能なモデルのみ表示します。",
+        current(model: string) {
+            return `現在のモデル: ${model}`;
+        },
+        switched: "モデルを切り替えました。",
+        currentReasoningLevel(variant: string) {
+            return `現在の推論レベル: ${variant}`;
+        },
+        reasoningLevel(variant: string) {
+            return `推論レベル: ${variant}`;
+        },
+        noReasoningLevels: "このモデルには選択可能な推論レベルがありません。",
+        reasoningLevelsTitle: "推論レベル",
+        model(model: string) {
+            return `モデル: ${model}`;
+        },
+        modelNumber(modelIndex: number) {
+            return `モデル番号: ${modelIndex}`;
+        },
+        expired: "このモデルはもう利用できません。/model を再実行してください。",
+        reasoningLevelExpired: "この推論レベルはもう利用できません。/model を再実行してください。",
+        defaultReasoningLevel: "デフォルト",
+    },
+    language: {
+        title: "言語",
+        choose: "bot のメニューと返信に使う表示言語を選択してください。",
+        current(label: string) {
+            return `現在の言語: ${label}`;
+        },
+        switched: "言語を切り替えました。",
+        expired: "この言語オプションはもう利用できません。/language を再実行してください。",
+        labels: {
+            en: "English",
+            "zh-CN": "简体中文",
+            ja: "日本語",
         },
     },
 };
@@ -593,13 +812,25 @@ export function normalizeBotLanguage(value: string | null | undefined): BotLangu
         return "zh-CN";
     }
 
+    if (normalized === "ja" || normalized === "ja-jp" || normalized === "ja_jp") {
+        return "ja";
+    }
+
     return "en";
 }
 
 export function getBotCopy(language: BotLanguage | null | undefined = DEFAULT_BOT_LANGUAGE): BotCopy {
-    return normalizeBotLanguage(language) === "zh-CN"
-        ? ZH_CN_BOT_COPY
-        : EN_BOT_COPY;
+    const normalized = normalizeBotLanguage(language);
+
+    if (normalized === "zh-CN") {
+        return ZH_CN_BOT_COPY;
+    }
+
+    if (normalized === "ja") {
+        return JA_BOT_COPY;
+    }
+
+    return EN_BOT_COPY;
 }
 
 export function getLanguageLabel(language: BotLanguage, copy: BotCopy = BOT_COPY): string {
