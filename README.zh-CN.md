@@ -22,7 +22,7 @@
 执行：
 
 ```bash
-npm install opencode-tbot@latest
+npm exec --package opencode-tbot@latest opencode-tbot -- install
 ```
 
 安装器会注册全局插件并写入默认运行时配置。
@@ -30,13 +30,13 @@ npm install opencode-tbot@latest
 查看已安装的 CLI 版本：
 
 ```bash
-npm exec opencode-tbot -- --version
+npm exec --package opencode-tbot@latest opencode-tbot -- --version
 ```
 
 更新 OpenCode 中注册的 npm 插件 spec：
 
 ```bash
-npm exec opencode-tbot -- update
+npm exec --package opencode-tbot@latest opencode-tbot -- update
 ```
 
 从当前环境卸载 npm 包：

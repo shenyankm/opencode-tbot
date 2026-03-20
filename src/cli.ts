@@ -1,6 +1,6 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { stderr, stdin, stdout } from "node:process";
 import { createInterface } from "node:readline/promises";
 import { parse } from "jsonc-parser";
@@ -30,12 +30,25 @@ interface CliOptions extends InstallCommandOptions {
     command: "help" | "install" | "update" | "version";
 }
 
+export interface PromptSessionLike {
+    ask(question: string): Promise<string>;
+    askSecret(question: string): Promise<string>;
+    confirm(question: string, defaultValue: boolean): Promise<boolean>;
+    close(): void;
+}
+
+export interface CreatePromptSessionOptions {
+    input?: NodeJS.ReadStream;
+    output?: NodeJS.WriteStream;
+}
+
 interface OpenCodeGlobalConfig {
     plugin?: string[];
     [key: string]: unknown;
 }
 
 const DEFAULT_PLUGIN_SPEC = "opencode-tbot@latest";
+const PROMPT_CANCELLED_ERROR = "Prompt cancelled.";
 
 export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
     try {
@@ -83,7 +96,7 @@ export async function installPlugin(options: InstallCommandOptions = {}): Promis
 
     try {
         const botToken = normalizeRequiredString(
-            options.botToken ?? await prompt.ask("Telegram bot token: "),
+            options.botToken ?? await prompt.askSecret("Telegram bot token: "),
             "Telegram bot token is required.",
         );
         const enableVoice = options.enableVoice ?? await prompt.confirm(
@@ -92,7 +105,7 @@ export async function installPlugin(options: InstallCommandOptions = {}): Promis
         );
         const openrouterApiKey = enableVoice
             ? normalizeRequiredString(
-                options.openrouterApiKey ?? await prompt.ask("OpenRouter API key: "),
+                options.openrouterApiKey ?? await prompt.askSecret("OpenRouter API key: "),
                 "OpenRouter API key is required when voice transcription is enabled.",
             )
             : null;
@@ -121,6 +134,7 @@ export async function installPlugin(options: InstallCommandOptions = {}): Promis
             stdout.write(`Registered ${pluginSpec} in ${openCodeConfigFilePath}\n`);
         }
         stdout.write(`Wrote plugin defaults to ${globalPluginConfigFilePath}\n`);
+        await warnAboutLegacyLocalInstallations(homeDir);
     } finally {
         prompt.close();
     }
@@ -135,6 +149,7 @@ export async function updatePlugin(options: Pick<InstallCommandOptions, "homeDir
 
     await writeJsonFile(openCodeConfigFilePath, nextOpenCodeConfig);
     stdout.write(`Updated plugin registration to ${pluginSpec} in ${openCodeConfigFilePath}\n`);
+    await warnAboutLegacyLocalInstallations(homeDir);
 }
 
 function parseCliOptions(argv: string[]): CliOptions {
@@ -339,10 +354,14 @@ async function ensureParentDirectory(filePath: string): Promise<void> {
     await mkdir(dirname(filePath), { recursive: true });
 }
 
-function createPromptSession() {
-    if (!stdin.isTTY || !stdout.isTTY) {
+export function createPromptSession(options: CreatePromptSessionOptions = {}): PromptSessionLike {
+    const input = options.input ?? stdin;
+    const output = options.output ?? stdout;
+
+    if (!input.isTTY || !output.isTTY) {
         return {
             ask: async () => "",
+            askSecret: async () => "",
             async confirm(_question: string, defaultValue: boolean) {
                 return defaultValue;
             },
@@ -350,17 +369,15 @@ function createPromptSession() {
         };
     }
 
-    const readline = createInterface({
-        input: stdin,
-        output: stdout,
-    });
-
     return {
         ask(question: string) {
-            return readline.question(question);
+            return askQuestion(input, output, question);
+        },
+        askSecret(question: string) {
+            return askSecretQuestion(input, output, question);
         },
         async confirm(question: string, defaultValue: boolean) {
-            const answer = normalizeOptionalString(await readline.question(question));
+            const answer = normalizeOptionalString(await askQuestion(input, output, question));
 
             if (!answer) {
                 return defaultValue;
@@ -376,10 +393,117 @@ function createPromptSession() {
 
             throw new Error(`Unsupported answer: ${answer}`);
         },
-        close() {
-            readline.close();
-        },
+        close() { },
     };
+}
+
+async function askQuestion(
+    input: NodeJS.ReadStream,
+    output: NodeJS.WriteStream,
+    question: string,
+): Promise<string> {
+    const readline = createInterface({ input, output });
+
+    try {
+        return await readline.question(question);
+    } finally {
+        readline.close();
+    }
+}
+
+async function askSecretQuestion(
+    input: NodeJS.ReadStream,
+    output: NodeJS.WriteStream,
+    question: string,
+): Promise<string> {
+    if (typeof input.setRawMode !== "function") {
+        return askQuestion(input, output, question);
+    }
+
+    output.write(question);
+
+    try {
+        return await readMaskedInput(input, output);
+    } finally {
+        output.write("\n");
+    }
+}
+
+async function readMaskedInput(
+    input: NodeJS.ReadStream,
+    output: NodeJS.WriteStream,
+): Promise<string> {
+    return new Promise((resolvePromise, rejectPromise) => {
+        const buffer: string[] = [];
+        let settled = false;
+
+        const cleanup = () => {
+            input.off("data", handleData);
+            input.off("error", handleError);
+            input.pause();
+            input.setRawMode?.(false);
+        };
+
+        const rejectWith = (error: unknown) => {
+            if (settled) {
+                return;
+            }
+
+            settled = true;
+            cleanup();
+            rejectPromise(error);
+        };
+
+        const resolveWith = (value: string) => {
+            if (settled) {
+                return;
+            }
+
+            settled = true;
+            cleanup();
+            resolvePromise(value);
+        };
+
+        const handleError = (error: unknown) => {
+            rejectWith(error);
+        };
+
+        const handleData = (chunk: string | Buffer) => {
+            const text = Buffer.isBuffer(chunk) ? chunk.toString("utf8") : chunk;
+
+            for (const character of text) {
+                if (character === "\r" || character === "\n") {
+                    resolveWith(buffer.join(""));
+                    return;
+                }
+
+                if (character === "\u0003") {
+                    rejectWith(new Error(PROMPT_CANCELLED_ERROR));
+                    return;
+                }
+
+                if (character === "\u0008" || character === "\u007f") {
+                    if (buffer.length > 0) {
+                        buffer.pop();
+                        output.write("\b \b");
+                    }
+                    continue;
+                }
+
+                if (character < " " || character === "\u007f") {
+                    continue;
+                }
+
+                buffer.push(character);
+                output.write("*");
+            }
+        };
+
+        input.setRawMode?.(true);
+        input.resume();
+        input.on("error", handleError);
+        input.on("data", handleData);
+    });
 }
 
 function normalizeOptionalString(value: string | undefined | null): string | null {
@@ -414,10 +538,62 @@ function isOpencodeTbotPluginSpec(value: string): boolean {
     return normalized === "opencode-tbot" || normalized.startsWith("opencode-tbot@");
 }
 
+async function warnAboutLegacyLocalInstallations(homeDir: string): Promise<void> {
+    const legacyInstallations = await findLegacyLocalInstallations(homeDir);
+
+    if (legacyInstallations.length === 0) {
+        return;
+    }
+
+    stdout.write("\nDetected local opencode-tbot npm installation(s) that can make OpenCode show the plugin as file:///.../node_modules/...\n");
+
+    for (const installation of legacyInstallations) {
+        stdout.write(`- ${installation.packagePath}\n`);
+        stdout.write(`  cleanup: cd "${installation.rootDir}" && npm uninstall opencode-tbot\n`);
+    }
+
+    stdout.write("Recommended npm flow: npm exec --package opencode-tbot@latest opencode-tbot -- install\n");
+}
+
+async function findLegacyLocalInstallations(homeDir: string) {
+    const roots = [...new Set([
+        resolve(process.cwd()),
+        resolve(homeDir),
+    ])];
+    const installations: Array<{ packagePath: string; rootDir: string }> = [];
+
+    for (const rootDir of roots) {
+        const packagePath = join(rootDir, "node_modules", "opencode-tbot", "package.json");
+
+        if (await pathExists(packagePath)) {
+            installations.push({
+                packagePath: join(rootDir, "node_modules", "opencode-tbot"),
+                rootDir,
+            });
+        }
+    }
+
+    return installations;
+}
+
+async function pathExists(filePath: string): Promise<boolean> {
+    try {
+        await stat(filePath);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 function buildHelpText(): string {
     return [
         "Usage: opencode-tbot [install|update] [options]",
         "       opencode-tbot --version",
+        "",
+        "Recommended npm usage:",
+        "  npm exec --package opencode-tbot@latest opencode-tbot -- install",
+        "  npm exec --package opencode-tbot@latest opencode-tbot -- update",
+        "  npm exec --package opencode-tbot@latest opencode-tbot -- --version",
         "",
         "Commands:",
         "  install",

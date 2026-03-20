@@ -22,7 +22,7 @@ A Telegram plugin for driving [OpenCode](https://opencode.ai) from chat.
 Run:
 
 ```bash
-npm install opencode-tbot@latest
+npm exec --package opencode-tbot@latest opencode-tbot -- install
 ```
 
 The installer registers the plugin globally and writes the default runtime config.
@@ -30,16 +30,16 @@ The installer registers the plugin globally and writes the default runtime confi
 Check the installed CLI version:
 
 ```bash
-npm exec opencode-tbot -- --version
+npm exec --package opencode-tbot@latest opencode-tbot -- --version
 ```
 
 Update the registered npm plugin spec in OpenCode:
 
 ```bash
-npm exec opencode-tbot -- update
+npm exec --package opencode-tbot@latest opencode-tbot -- update
 ```
 
-Remove the npm package from the current environment:
+Remove a legacy local npm install if OpenCode is showing the plugin as a `file:///.../node_modules/...` path:
 
 ```bash
 npm uninstall opencode-tbot

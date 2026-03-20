@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { PassThrough } from "node:stream";
 import test from "node:test";
-import { installPlugin, runCli } from "../src/cli.js";
+import { createPromptSession, installPlugin, runCli } from "../src/cli.js";
 import { OPENCODE_TBOT_VERSION } from "../src/app/package-info.js";
 import { getGlobalPluginConfigFilePath, getOpenCodeConfigFilePath } from "../src/app/plugin-config.js";
 
@@ -136,4 +137,95 @@ test("updatePlugin replaces stale opencode-tbot plugin specs and keeps unrelated
             ],
         },
     );
+});
+
+test("createPromptSession masks secret input with stars and supports backspace", async () => {
+    const input = new PassThrough() as PassThrough & NodeJS.ReadStream;
+    const output = new PassThrough() as PassThrough & NodeJS.WriteStream;
+    const rawModes: boolean[] = [];
+    let rendered = "";
+
+    input.isTTY = true;
+    input.setRawMode = (mode: boolean) => {
+        rawModes.push(mode);
+        return input;
+    };
+    output.isTTY = true;
+    output.on("data", (chunk: Buffer | string) => {
+        rendered += chunk.toString();
+    });
+
+    const prompt = createPromptSession({
+        input,
+        output,
+    });
+    const secretPromise = prompt.askSecret("Telegram bot token: ");
+
+    input.write("abc");
+    input.write("\b");
+    input.write("d\r");
+
+    const secret = await secretPromise;
+
+    assert.equal(secret, "abd");
+    assert.deepEqual(rawModes, [true, false]);
+    assert.match(rendered, /Telegram bot token: /u);
+    assert.match(rendered, /\*\*\*/u);
+    assert.match(rendered, /\u0008 \u0008/u);
+    assert.doesNotMatch(rendered, /abd|abc/u);
+});
+
+test("createPromptSession aborts masked input on Ctrl+C", async () => {
+    const input = new PassThrough() as PassThrough & NodeJS.ReadStream;
+    const output = new PassThrough() as PassThrough & NodeJS.WriteStream;
+    const rawModes: boolean[] = [];
+
+    input.isTTY = true;
+    input.setRawMode = (mode: boolean) => {
+        rawModes.push(mode);
+        return input;
+    };
+    output.isTTY = true;
+
+    const prompt = createPromptSession({
+        input,
+        output,
+    });
+    const secretPromise = prompt.askSecret("OpenRouter API key: ");
+
+    input.write("\u0003");
+
+    await assert.rejects(secretPromise, /Prompt cancelled\./u);
+    assert.deepEqual(rawModes, [true, false]);
+});
+
+test("installPlugin warns when a legacy local npm install can affect the plugin display name", async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-legacy-"));
+    const legacyPackageDir = join(homeDir, "node_modules", "opencode-tbot");
+    let output = "";
+    const originalCwd = process.cwd();
+    const originalWrite = process.stdout.write.bind(process.stdout);
+
+    mkdirSync(legacyPackageDir, { recursive: true });
+    writeFileSync(join(legacyPackageDir, "package.json"), JSON.stringify({ name: "opencode-tbot" }));
+    process.chdir(homeDir);
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+        output += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
+        return true;
+    }) as typeof process.stdout.write;
+
+    try {
+        await installPlugin({
+            homeDir,
+            botToken: "telegram-token",
+            enableVoice: false,
+        });
+    } finally {
+        process.chdir(originalCwd);
+        process.stdout.write = originalWrite;
+    }
+
+    assert.match(output, /Detected local opencode-tbot npm installation\(s\)/u);
+    assert.match(output, /npm uninstall opencode-tbot/u);
+    assert.match(output, /npm exec --package opencode-tbot@latest opencode-tbot -- install/u);
 });

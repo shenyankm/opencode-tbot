@@ -422,6 +422,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
         }
 
         const messageId = data.info?.id;
+        let expectedParentId = toAssistantMessage(data.info)?.parentID ?? null;
         let bestCandidate = data;
 
         if (!messageId) {
@@ -429,6 +430,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
                 input.sessionId,
                 {
                     initialMessageId: null,
+                    initialParentId: expectedParentId,
                     knownMessageIds,
                     structured: input.structured ?? false,
                 },
@@ -449,6 +451,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
                     input.sessionId,
                     {
                         initialMessageId: messageId,
+                        initialParentId: expectedParentId,
                         knownMessageIds,
                         structured: input.structured ?? false,
                     },
@@ -467,6 +470,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
 
             data = next;
             bestCandidate = next;
+            expectedParentId = toAssistantMessage(next.info)?.parentID ?? expectedParentId;
 
             if (!shouldPollPromptMessage(data, input.structured ?? false)) {
                 return data;
@@ -476,6 +480,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
                 input.sessionId,
                 {
                     initialMessageId: messageId,
+                    initialParentId: expectedParentId,
                     knownMessageIds,
                     structured: input.structured ?? false,
                 },
@@ -556,6 +561,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
         sessionId: string,
         options: {
             initialMessageId: string | null;
+            initialParentId: string | null;
             knownMessageIds: Set<string>;
             structured: boolean;
         },
@@ -577,6 +583,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
                 const isInitial = !!id && id === options.initialMessageId;
                 const isNew = !!id && !options.knownMessageIds.has(id);
                 const isUsable = !shouldPollPromptMessage(message, options.structured);
+                const sharesParent = !!assistant?.parentID && assistant.parentID === options.initialParentId;
 
                 return {
                     createdAt,
@@ -584,18 +591,24 @@ export class OpenCodeClient implements OpenCodeClientLike {
                     isInitial,
                     isNew,
                     isUsable,
+                    sharesParent,
                     message,
                 };
             })
             .sort((left, right) =>
                 Number(right.isUsable) - Number(left.isUsable)
-                || Number(right.isNew) - Number(left.isNew)
                 || Number(right.isInitial) - Number(left.isInitial)
+                || Number(right.sharesParent) - Number(left.sharesParent)
+                || Number(right.isNew) - Number(left.isNew)
                 || right.createdAt - left.createdAt,
             );
 
-        const preferred = candidates.find((candidate) => candidate.isUsable && (candidate.isNew || candidate.isInitial))
-            ?? candidates.find((candidate) => candidate.isNew || candidate.isInitial)
+        const preferred = candidates.find((candidate) => candidate.isUsable && candidate.isInitial)
+            ?? candidates.find((candidate) => candidate.isUsable && candidate.sharesParent && candidate.isNew)
+            ?? candidates.find((candidate) => candidate.isUsable && candidate.isNew)
+            ?? candidates.find((candidate) => candidate.isInitial)
+            ?? candidates.find((candidate) => candidate.sharesParent && candidate.isNew)
+            ?? candidates.find((candidate) => candidate.isNew)
             ?? null;
 
         return preferred?.message ?? null;
@@ -847,10 +860,8 @@ function shouldPollPromptMessage(
     const responseParts = Array.isArray(data.parts) ? data.parts : [];
     const hasText = extractTextFromParts(responseParts).length > 0;
     const hasAssistantError = !!assistantInfo?.error;
-    const isCompleted = typeof assistantInfo?.time?.completed === "number"
-        && Number.isFinite(assistantInfo.time.completed);
 
-    return !hasText && !bodyMd && !hasAssistantError && !isCompleted;
+    return !hasText && !bodyMd && !hasAssistantError;
 }
 
 function toAssistantMessage(message: Message | null | undefined): OpenCodeAssistantMessage | null {
