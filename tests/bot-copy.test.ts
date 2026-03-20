@@ -26,9 +26,9 @@ test("agent terminology is standardized in Chinese and Japanese menu copy", () =
 
     assert.equal(zhCopy.commands.agents, "查看并切换 Agent");
     assert.equal(zhCopy.agents.title, "Agent 列表");
-    assert.equal(zhCopy.agents.current("build [primary]"), "当前 Agent: build [primary]");
+    assert.equal(zhCopy.agents.current("build"), "当前 Agent: build");
 
     assert.equal(jaCopy.commands.agents, "エージェントを表示して切り替え");
     assert.equal(jaCopy.agents.title, "エージェント一覧");
-    assert.equal(jaCopy.agents.current("build [primary]"), "現在のエージェント: build [primary]");
+    assert.equal(jaCopy.agents.current("build"), "現在のエージェント: build");
 });

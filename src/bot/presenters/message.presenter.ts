@@ -789,7 +789,7 @@ function compareVariantNames(left: string, right: string): number {
 }
 
 function formatAgentLabel(agent: OpenCodeAgent): string {
-    return `${agent.name} [${agent.mode}]`;
+    return agent.name;
 }
 
 function formatModelListLine(model: OpenCodeConfiguredModel, displayIndex: number): string {

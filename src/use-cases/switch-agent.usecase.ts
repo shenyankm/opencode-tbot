@@ -4,6 +4,7 @@ import type {
     OpenCodeAgent,
     OpenCodeClientLike,
 } from "../services/opencode/opencode.client.js";
+import { isSelectableAgent } from "./agent-selection.js";
 
 export type SwitchAgentResult =
     | {
@@ -26,7 +27,7 @@ export class SwitchAgentUseCase {
             this.sessionRepo.getByChatId(input.chatId),
             this.opencodeClient.listAgents(),
         ]);
-        const agent = agents.find((item) => item.name === input.agentName && !item.hidden);
+        const agent = agents.find((item) => item.name === input.agentName && isSelectableAgent(item));
 
         if (!agent) {
             return { found: false };
