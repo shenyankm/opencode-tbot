@@ -1153,6 +1153,119 @@ test("promptSession waits for a raw-client reply without message id and reads st
     });
 });
 
+test("promptSession keeps polling recent messages after the session turns idle and does not resend the prompt", async () => {
+    const calls: Array<{ kind: "get" | "post"; options: unknown }> = [];
+    let messageListCallCount = 0;
+    let statusCallCount = 0;
+    let postCallCount = 0;
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            _client: {
+                get: async (options: unknown) => {
+                    calls.push({ kind: "get", options });
+                    const request = options as {
+                        url: string;
+                    };
+
+                    if (request.url === "/session/{sessionID}/message") {
+                        messageListCallCount += 1;
+
+                        if (messageListCallCount < 3) {
+                            return {
+                                data: [],
+                            };
+                        }
+
+                        return {
+                            data: [{
+                                info: {
+                                    id: "assistant-final",
+                                    role: "assistant",
+                                    sessionID: "session-1",
+                                    modelID: "gpt-5",
+                                    providerID: "openai",
+                                    time: {
+                                        created: 150,
+                                        completed: 420,
+                                    },
+                                    tokens: {
+                                        input: 2,
+                                        output: 6,
+                                        reasoning: 0,
+                                        cache: {
+                                            read: 0,
+                                            write: 0,
+                                        },
+                                    },
+                                    structured_output: {
+                                        body_md: "## Final After Idle",
+                                    },
+                                },
+                                parts: [],
+                            }],
+                        };
+                    }
+
+                    if (request.url === "/session/status") {
+                        statusCallCount += 1;
+
+                        return {
+                            data: {
+                                "session-1": { type: "idle" },
+                            },
+                        };
+                    }
+
+                    throw new Error(`Unexpected raw GET ${request.url}`);
+                },
+                post: async (options: unknown) => {
+                    calls.push({ kind: "post", options });
+                    postCallCount += 1;
+
+                    return {
+                        data: {
+                            info: {
+                                role: "assistant",
+                                sessionID: "session-1",
+                                time: {
+                                    created: 100,
+                                },
+                                tokens: {
+                                    input: 0,
+                                    output: 0,
+                                    reasoning: 0,
+                                    cache: {
+                                        read: 0,
+                                        write: 0,
+                                    },
+                                },
+                            },
+                            parts: [],
+                        },
+                    };
+                },
+            },
+        } as never,
+    );
+
+    const result = await client.promptSession({
+        sessionId: "session-1",
+        prompt: "hello from telegram",
+        structured: true,
+    });
+
+    assert.equal(result.bodyMd, "## Final After Idle");
+    assert.equal(result.fallbackText, "## Final After Idle");
+    assert.equal(postCallCount, 1);
+    assert.equal(statusCallCount, 1);
+    assert.equal(messageListCallCount, 3);
+    assert.deepEqual(
+        calls.map((call) => call.kind),
+        ["get", "post", "get", "get", "get"],
+    );
+});
+
 test("promptSession polls the created message when the initial reply is still empty", async () => {
     const calls: Array<{ input: unknown; kind: "prompt" | "message"; options: unknown }> = [];
     const client = new OpenCodeClient(
@@ -1682,6 +1795,193 @@ test("promptSession falls back to recent session messages when the final reply u
     assert.equal(result.bodyMd, "## New Answer");
     assert.equal(result.fallbackText, "New Answer");
     assert.deepEqual(result.parts, [{ type: "text", text: "New Answer" }]);
+    assert.deepEqual(
+        calls.map((call) => call.kind),
+        ["messages", "prompt", "message", "messages"],
+    );
+});
+
+test("promptSession prefers newly created usable replies when only the created timestamp correlates", async () => {
+    const calls: Array<{ input: unknown; kind: "messages" | "prompt" | "message"; options: unknown }> = [];
+    let messageListCallCount = 0;
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            config: {
+                get: async () => ({ provider: {} }),
+                providers: async () => ({ providers: [], default: {} }),
+            },
+            path: {
+                get: async () => createPath(),
+            },
+            project: {
+                list: async () => [],
+                current: async () => createProject("project-1", "E:/repo-1"),
+            },
+            session: {
+                create: async () => createSession("session-1", "project-1", "E:/repo-1"),
+                messages: async (input: unknown, options: unknown) => {
+                    calls.push({ kind: "messages", input, options });
+                    messageListCallCount += 1;
+
+                    if (messageListCallCount === 1) {
+                        return {
+                            data: [{
+                                info: {
+                                    id: "assistant-known",
+                                    role: "assistant",
+                                    sessionID: "session-1",
+                                    modelID: "gpt-5",
+                                    providerID: "openai",
+                                    time: {
+                                        created: 40,
+                                        completed: 60,
+                                    },
+                                    tokens: {
+                                        total: 3,
+                                        input: 1,
+                                        output: 2,
+                                        reasoning: 0,
+                                        cache: {
+                                            read: 0,
+                                            write: 0,
+                                        },
+                                    },
+                                } as never,
+                                parts: [{ type: "text", text: "known answer" }] as never,
+                            }],
+                        };
+                    }
+
+                    return {
+                        data: [
+                            {
+                                info: {
+                                    id: "assistant-stale",
+                                    role: "assistant",
+                                    sessionID: "session-1",
+                                    modelID: "gpt-5",
+                                    providerID: "openai",
+                                    time: {
+                                        created: 80,
+                                        completed: 85,
+                                    },
+                                    tokens: {
+                                        total: 2,
+                                        input: 1,
+                                        output: 1,
+                                        reasoning: 0,
+                                        cache: {
+                                            read: 0,
+                                            write: 0,
+                                        },
+                                    },
+                                    structured: {
+                                        body_md: "## Stale Answer",
+                                    },
+                                } as never,
+                                parts: [{ type: "text", text: "Stale Answer" }] as never,
+                            },
+                            {
+                                info: {
+                                    id: "assistant-fresh",
+                                    role: "assistant",
+                                    sessionID: "session-1",
+                                    modelID: "gpt-5",
+                                    providerID: "openai",
+                                    time: {
+                                        created: 120,
+                                        completed: 180,
+                                    },
+                                    tokens: {
+                                        total: 4,
+                                        input: 1,
+                                        output: 3,
+                                        reasoning: 0,
+                                        cache: {
+                                            read: 0,
+                                            write: 0,
+                                        },
+                                    },
+                                    structured: {
+                                        body_md: "## Fresh Answer",
+                                    },
+                                } as never,
+                                parts: [{ type: "text", text: "Fresh Answer" }] as never,
+                            },
+                        ],
+                    };
+                },
+                prompt: async (input: unknown, options: unknown) => {
+                    calls.push({ kind: "prompt", input, options });
+
+                    return {
+                        data: {
+                            info: {
+                                id: "assistant-placeholder",
+                                role: "assistant",
+                                sessionID: "session-1",
+                                modelID: "gpt-5",
+                                providerID: "openai",
+                                time: {
+                                    created: 100,
+                                    completed: 101,
+                                },
+                                tokens: {
+                                    input: 0,
+                                    output: 0,
+                                    reasoning: 0,
+                                    cache: {
+                                        read: 0,
+                                        write: 0,
+                                    },
+                                },
+                            } as never,
+                            parts: [],
+                        },
+                    };
+                },
+                message: async (input: unknown, options: unknown) => {
+                    calls.push({ kind: "message", input, options });
+
+                    return {
+                        data: {
+                            info: {
+                                id: "assistant-placeholder",
+                                role: "assistant",
+                                sessionID: "session-1",
+                                modelID: "gpt-5",
+                                providerID: "openai",
+                                time: {
+                                    created: 100,
+                                    completed: 101,
+                                },
+                                tokens: {
+                                    input: 0,
+                                    output: 0,
+                                    reasoning: 0,
+                                    cache: {
+                                        read: 0,
+                                        write: 0,
+                                    },
+                                },
+                            } as never,
+                            parts: [],
+                        },
+                    };
+                },
+            },
+        } as never,
+    );
+
+    const result = await client.promptSession({
+        sessionId: "session-1",
+        prompt: "hello from telegram",
+        structured: true,
+    });
+
+    assert.equal(result.bodyMd, "## Fresh Answer");
+    assert.equal(result.fallbackText, "Fresh Answer");
     assert.deepEqual(
         calls.map((call) => call.kind),
         ["messages", "prompt", "message", "messages"],

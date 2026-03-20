@@ -221,6 +221,52 @@ test("handleTextMessage falls back to plain text when the preferred Telegram mar
     assert.deepEqual(deleted, [{ chatId: 2, messageId: 200 }]);
 });
 
+test("handleTextMessage shows recovered assistant text instead of the empty-response copy when markdown is unavailable", async () => {
+    const replies: Array<{ text: string; other?: unknown }> = [];
+    const deleted: Array<{ chatId: number; messageId: number }> = [];
+    let nextMessageId = 250;
+    const { dependencies } = createDependencies({
+        sendPrompt: async () => ({
+            assistantReply: createPromptReply({
+                bodyMd: null,
+                fallbackText: "Recovered reply",
+                parts: [{ type: "text", text: "Recovered reply" }] as never,
+                structured: null,
+            }),
+        }),
+    });
+
+    await handleTextMessage(
+        {
+            chat: { id: 3 },
+            message: { text: "hello" },
+            api: {
+                async deleteMessage(chatId, messageId) {
+                    deleted.push({ chatId, messageId });
+                    return true;
+                },
+                async editMessageText() {
+                    return true;
+                },
+            },
+            async reply(text, other) {
+                replies.push({ text, other });
+                return { message_id: nextMessageId++ };
+            },
+        },
+        dependencies,
+    );
+
+    assert.deepEqual(replies, [
+        { text: "Processing...", other: undefined },
+        {
+            text: "Recovered reply\n\nDuration: 120 ms | Tokens: 42",
+            other: undefined,
+        },
+    ]);
+    assert.deepEqual(deleted, [{ chatId: 3, messageId: 250 }]);
+});
+
 test("handleTextMessage also deletes the processing placeholder after sending an error reply", async () => {
     const replies: Array<{ text: string; other?: unknown }> = [];
     const deleted: Array<{ chatId: number; messageId: number }> = [];

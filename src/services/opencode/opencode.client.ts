@@ -192,7 +192,9 @@ export interface OpenCodeAssistantMessage {
 }
 
 const EMPTY_RESPONSE_TEXT = "OpenCode returned empty response.";
-const PROMPT_MESSAGE_POLL_DELAYS_MS = [0, 100, 250, 500, 1000, 2000, 4000, 8000];
+const PROMPT_MESSAGE_POLL_INITIAL_DELAYS_MS = [0, 100, 250, 500, 1000];
+const PROMPT_MESSAGE_POLL_INTERVAL_MS = 2000;
+const PROMPT_MESSAGE_POLL_TIMEOUT_MS = 60_000;
 const PROMPT_MESSAGE_POLL_LIMIT = 20;
 const STRUCTURED_REPLY_SCHEMA = {
     type: "json_schema" as const,
@@ -598,6 +600,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
             input,
             initialData,
             knownMessageIds,
+            startedAt,
         );
         const finishedAt = Date.now();
 
@@ -613,6 +616,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
         input: PromptSessionInput,
         data: OpenCodePromptResponse,
         knownMessageIds: Set<string>,
+        startedAt: number,
     ): Promise<OpenCodePromptResponse> {
         const structured = input.structured ?? false;
 
@@ -621,14 +625,30 @@ export class OpenCodeClient implements OpenCodeClientLike {
         }
 
         const messageId = extractMessageId(data.info);
-        let expectedParentId = toAssistantMessage(data.info)?.parentID ?? null;
-        let bestCandidate = data;
-        let hasWaited = false;
+        const candidateOptions: PromptResponseCandidateOptions = {
+            initialMessageId: messageId,
+            initialParentId: toAssistantMessage(data.info)?.parentID ?? null,
+            knownMessageIds,
+            requestStartedAt: resolvePromptCandidateStartTime(startedAt, data),
+            structured,
+        };
+        let bestCandidate = selectPromptResponseCandidate([data], candidateOptions) ?? data;
+        const deadlineAt = Date.now() + PROMPT_MESSAGE_POLL_TIMEOUT_MS;
+        let idleStatusSeen = false;
+        let attempt = 0;
 
-        for (const delayMs of PROMPT_MESSAGE_POLL_DELAYS_MS) {
+        while (true) {
+            const delayMs = getPromptMessagePollDelayMs(attempt);
+            attempt += 1;
+
             if (delayMs > 0) {
-                await delay(delayMs);
-                hasWaited = true;
+                const remainingMs = deadlineAt - Date.now();
+
+                if (remainingMs <= 0) {
+                    break;
+                }
+
+                await delay(Math.min(delayMs, remainingMs));
             }
 
             if (messageId) {
@@ -637,76 +657,54 @@ export class OpenCodeClient implements OpenCodeClientLike {
                 if (next) {
                     bestCandidate = selectPromptResponseCandidate(
                         [bestCandidate, next],
-                        {
-                            initialMessageId: messageId,
-                            initialParentId: expectedParentId,
-                            knownMessageIds,
-                            structured,
-                        },
+                        candidateOptions,
                     ) ?? bestCandidate;
 
-                    const nextAssistant = toAssistantMessage(next.info);
-                    expectedParentId = nextAssistant?.parentID ?? expectedParentId;
-
                     if (!shouldPollPromptMessage(next, structured)) {
-                        return next;
+                        return bestCandidate;
                     }
                 }
             }
 
             const latest = await this.findLatestPromptResponse(
                 input.sessionId,
-                {
-                    initialMessageId: messageId,
-                    initialParentId: expectedParentId,
-                    knownMessageIds,
-                    structured,
-                },
+                candidateOptions,
             );
 
             if (latest) {
                 bestCandidate = selectPromptResponseCandidate(
                     [bestCandidate, latest],
-                    {
-                        initialMessageId: messageId,
-                        initialParentId: expectedParentId,
-                        knownMessageIds,
-                        structured,
-                    },
+                    candidateOptions,
                 ) ?? bestCandidate;
-                const latestAssistant = toAssistantMessage(latest.info);
-                expectedParentId = latestAssistant?.parentID ?? expectedParentId;
 
-                if (!shouldPollPromptMessage(latest, structured)) {
-                    return latest;
+                if (!shouldPollPromptMessage(bestCandidate, structured)) {
+                    return bestCandidate;
                 }
             }
 
             const status = await this.fetchPromptSessionStatus(input.sessionId);
 
-            if (status?.type === "idle" && hasWaited) {
+            if (status?.type === "idle") {
+                if (idleStatusSeen) {
+                    break;
+                }
+
+                idleStatusSeen = true;
+            }
+
+            if (Date.now() >= deadlineAt) {
                 break;
             }
         }
 
         const latest = await this.findLatestPromptResponse(
             input.sessionId,
-            {
-                initialMessageId: messageId,
-                initialParentId: expectedParentId,
-                knownMessageIds,
-                structured,
-            },
+            candidateOptions,
         );
 
         return selectPromptResponseCandidate(
             [bestCandidate, latest],
-            {
-                initialMessageId: messageId,
-                initialParentId: expectedParentId,
-                knownMessageIds,
-                structured,
-            },
+            candidateOptions,
         ) ?? bestCandidate;
     }
 
@@ -809,12 +807,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
 
     private async findLatestPromptResponse(
         sessionId: string,
-        options: {
-            initialMessageId: string | null;
-            initialParentId: string | null;
-            knownMessageIds: Set<string>;
-            structured: boolean;
-        },
+        options: PromptResponseCandidateOptions,
     ): Promise<OpenCodePromptResponse | null> {
         const messages = await this.fetchRecentPromptMessages(sessionId);
 
@@ -1328,6 +1321,10 @@ function delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function getPromptMessagePollDelayMs(attempt: number): number {
+    return PROMPT_MESSAGE_POLL_INITIAL_DELAYS_MS[attempt] ?? PROMPT_MESSAGE_POLL_INTERVAL_MS;
+}
+
 function extractStructuredMarkdown(structured: unknown): string | null {
     const parsed = StructuredReplySchema.safeParse(structured);
 
@@ -1463,14 +1460,17 @@ function extractStructuredPayload(message: unknown): unknown | null {
     return null;
 }
 
+type PromptResponseCandidateOptions = {
+    initialMessageId: string | null;
+    initialParentId: string | null;
+    knownMessageIds: Set<string>;
+    requestStartedAt: number | null;
+    structured: boolean;
+};
+
 function selectPromptResponseCandidate(
     candidates: Array<OpenCodePromptResponse | null | undefined>,
-    options: {
-        initialMessageId: string | null;
-        initialParentId: string | null;
-        knownMessageIds: Set<string>;
-        structured: boolean;
-    },
+    options: PromptResponseCandidateOptions,
 ): OpenCodePromptResponse | null {
     const availableCandidates = candidates
         .filter((candidate): candidate is OpenCodePromptResponse => !!candidate)
@@ -1488,12 +1488,7 @@ function selectPromptResponseCandidate(
 function comparePromptResponseCandidates(
     left: OpenCodePromptResponse,
     right: OpenCodePromptResponse,
-    options: {
-        initialMessageId: string | null;
-        initialParentId: string | null;
-        knownMessageIds: Set<string>;
-        structured: boolean;
-    },
+    options: PromptResponseCandidateOptions,
 ): number {
     const leftRank = getPromptResponseCandidateRank(left, options);
     const rightRank = getPromptResponseCandidateRank(right, options);
@@ -1501,22 +1496,17 @@ function comparePromptResponseCandidates(
     return Number(rightRank.isUsable) - Number(leftRank.isUsable)
         || Number(rightRank.isInitial) - Number(leftRank.isInitial)
         || Number(rightRank.sharesParent) - Number(leftRank.sharesParent)
-        || Number(rightRank.isNew) - Number(leftRank.isNew)
+        || Number(rightRank.isNewSinceRequestStart) - Number(leftRank.isNewSinceRequestStart)
         || rightRank.createdAt - leftRank.createdAt;
 }
 
 function getPromptResponseCandidateRank(
     message: OpenCodePromptResponse,
-    options: {
-        initialMessageId: string | null;
-        initialParentId: string | null;
-        knownMessageIds: Set<string>;
-        structured: boolean;
-    },
+    options: PromptResponseCandidateOptions,
 ): {
     createdAt: number;
     isInitial: boolean;
-    isNew: boolean;
+    isNewSinceRequestStart: boolean;
     isUsable: boolean;
     sharesParent: boolean;
 } {
@@ -1529,10 +1519,53 @@ function getPromptResponseCandidateRank(
     return {
         createdAt,
         isInitial: !!id && id === options.initialMessageId,
-        isNew: !!id && !options.knownMessageIds.has(id),
+        isNewSinceRequestStart: isPromptResponseNewSinceRequestStart(
+            id,
+            createdAt,
+            options.knownMessageIds,
+            options.requestStartedAt,
+        ),
         isUsable: !shouldPollPromptMessage(message, options.structured),
         sharesParent: !!assistant?.parentID && assistant.parentID === options.initialParentId,
     };
+}
+
+function resolvePromptCandidateStartTime(
+    startedAt: number,
+    initialMessage: OpenCodePromptResponse,
+): number | null {
+    const initialCreatedAt = coerceFiniteNumber(toAssistantMessage(initialMessage.info)?.time?.created);
+
+    if (initialCreatedAt === null) {
+        return startedAt;
+    }
+
+    return areComparablePromptTimestamps(startedAt, initialCreatedAt)
+        ? startedAt
+        : initialCreatedAt;
+}
+
+function isPromptResponseNewSinceRequestStart(
+    messageId: string | null,
+    createdAt: number,
+    knownMessageIds: Set<string>,
+    requestStartedAt: number | null,
+): boolean {
+    if (!messageId || knownMessageIds.has(messageId)) {
+        return false;
+    }
+
+    if (requestStartedAt === null) {
+        return true;
+    }
+
+    return createdAt >= requestStartedAt;
+}
+
+function areComparablePromptTimestamps(left: number, right: number): boolean {
+    const epochThresholdMs = 1_000_000_000_000;
+
+    return left >= epochThresholdMs && right >= epochThresholdMs;
 }
 
 function isPlainRecord(value: unknown): value is Record<string, any> {
