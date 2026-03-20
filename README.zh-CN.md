@@ -22,7 +22,7 @@
 执行：
 
 ```bash
-npx opencode-tbot@latest install
+npm install opencode-tbot@latest
 ```
 
 安装器会注册全局插件并写入默认运行时配置。

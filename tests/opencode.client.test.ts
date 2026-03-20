@@ -905,6 +905,160 @@ test("promptSession tolerates SDK responses that omit the parts array", async ()
     assert.deepEqual(result.parts, []);
 });
 
+test("promptSession polls the created message when the initial reply is still empty", async () => {
+    const calls: Array<{ input: unknown; kind: "prompt" | "message"; options: unknown }> = [];
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            config: {
+                get: async () => ({ provider: {} }),
+                providers: async () => ({ providers: [], default: {} }),
+            },
+            path: {
+                get: async () => createPath(),
+            },
+            project: {
+                list: async () => [],
+                current: async () => createProject("project-1", "E:/repo-1"),
+            },
+            session: {
+                create: async () => createSession("session-1", "project-1", "E:/repo-1"),
+                prompt: async (input: unknown, options: unknown) => {
+                    calls.push({ kind: "prompt", input, options });
+
+                    return {
+                        data: {
+                            info: {
+                                id: "assistant-1",
+                                role: "assistant",
+                                sessionID: "session-1",
+                                parentID: "user-1",
+                                modelID: "gpt-5",
+                                providerID: "openai",
+                                mode: "chat",
+                                agent: "build",
+                                path: {
+                                    cwd: "E:/repo-1",
+                                    root: "E:/repo-1",
+                                },
+                                cost: 0,
+                                time: {
+                                    created: 100,
+                                },
+                                tokens: {
+                                    input: 0,
+                                    output: 0,
+                                    reasoning: 0,
+                                    cache: {
+                                        read: 0,
+                                        write: 0,
+                                    },
+                                },
+                            } as never,
+                            parts: [],
+                        },
+                    };
+                },
+                message: async (input: unknown, options: unknown) => {
+                    calls.push({ kind: "message", input, options });
+
+                    return {
+                        data: {
+                            info: {
+                                id: "assistant-1",
+                                role: "assistant",
+                                sessionID: "session-1",
+                                parentID: "user-1",
+                                modelID: "gpt-5",
+                                providerID: "openai",
+                                mode: "chat",
+                                agent: "build",
+                                path: {
+                                    cwd: "E:/repo-1",
+                                    root: "E:/repo-1",
+                                },
+                                cost: 0.01,
+                                time: {
+                                    created: 100,
+                                    completed: 500,
+                                },
+                                tokens: {
+                                    total: 8,
+                                    input: 3,
+                                    output: 5,
+                                    reasoning: 0,
+                                    cache: {
+                                        read: 0,
+                                        write: 0,
+                                    },
+                                },
+                                structured: {
+                                    body_md: "## Hello",
+                                },
+                            } as never,
+                            parts: [{ type: "text", text: "Hello" }] as never,
+                        },
+                    };
+                },
+            },
+        } as never,
+    );
+
+    const result = await client.promptSession({
+        sessionId: "session-1",
+        prompt: "hello from telegram",
+        structured: true,
+    });
+
+    assert.equal(result.bodyMd, "## Hello");
+    assert.equal(result.fallbackText, "Hello");
+    assert.deepEqual(result.parts, [{ type: "text", text: "Hello" }]);
+    assert.deepEqual(calls, [
+        {
+            kind: "prompt",
+            input: {
+                sessionID: "session-1",
+                format: {
+                    type: "json_schema",
+                    retryCount: 2,
+                    schema: {
+                        type: "object",
+                        additionalProperties: false,
+                        required: ["body_md"],
+                        properties: {
+                            body_md: {
+                                type: "string",
+                                description: "Markdown body only. Do not include duration, token usage, or any footer. Do not wrap the whole answer in ```md or ```markdown fences. Use Markdown formatting directly unless the user explicitly asks for raw Markdown source.",
+                            },
+                        },
+                    },
+                },
+                parts: [
+                    {
+                        type: "text",
+                        text: "hello from telegram",
+                    },
+                ],
+            },
+            options: {
+                responseStyle: "data",
+                throwOnError: true,
+            },
+        },
+        {
+            kind: "message",
+            input: {
+                sessionID: "session-1",
+                messageID: "assistant-1",
+            },
+            options: {
+                responseStyle: "data",
+                throwOnError: true,
+            },
+        },
+    ]);
+});
+
 test("promptSession preserves assistant errors from successful prompt responses", async () => {
     const client = new OpenCodeClient(
         { baseUrl: "http://127.0.0.1:4096" },

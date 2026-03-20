@@ -5,6 +5,7 @@ import {
     type Config,
     type LspStatus,
     type McpStatus,
+    type Message,
     type Model,
     type OpencodeClient,
     type Part,
@@ -122,11 +123,12 @@ type OpenCodeProviderAvailability = Map<string, Set<string> | null>;
 type OpenCodeProviderConfig = NonNullable<OpenCodeConfig["provider"]>[string];
 type OpenCodeModelConfig = NonNullable<OpenCodeProviderConfig["models"]>[string];
 type OpenCodePromptResponse = {
-    info: OpenCodeAssistantMessage;
-    parts: Part[];
+    info: Message;
+    parts?: Part[];
 };
 
 const EMPTY_RESPONSE_TEXT = "OpenCode returned empty response.";
+const PROMPT_MESSAGE_POLL_DELAYS_MS = [0, 150, 300, 600, 1200, 2000, 3200];
 const STRUCTURED_REPLY_SCHEMA = {
     type: "json_schema" as const,
     retryCount: 2,
@@ -392,21 +394,77 @@ export class OpenCodeClient implements OpenCodeClientLike {
             ...(input.variant ? { variant: input.variant } : {}),
             parts,
         }, SDK_OPTIONS) as MaybeWrappedResponse<OpenCodePromptResponse>;
-        const data = unwrapSdkData(response);
+        const initialData = unwrapSdkData(response);
+        const resolvedData = await this.resolvePromptResponse(
+            input,
+            initialData,
+        );
         const finishedAt = Date.now();
-        const bodyMd = input.structured ? extractStructuredMarkdown(data.info?.structured) : null;
-        const responseParts = Array.isArray(data.parts) ? data.parts : [];
-        const fallbackText = extractTextFromParts(responseParts) || bodyMd || EMPTY_RESPONSE_TEXT;
 
-        return {
-            assistantError: data.info?.error ?? null,
-            bodyMd,
-            fallbackText,
-            info: data.info ?? null,
-            metrics: extractPromptMetrics(data.info, startedAt, finishedAt),
-            parts: responseParts,
-            structured: data.info?.structured ?? null,
-        };
+        return buildPromptSessionResult(resolvedData, {
+            emptyResponseText: EMPTY_RESPONSE_TEXT,
+            finishedAt,
+            startedAt,
+            structured: input.structured ?? false,
+        });
+    }
+
+    private async resolvePromptResponse(
+        input: PromptSessionInput,
+        data: OpenCodePromptResponse,
+    ): Promise<OpenCodePromptResponse> {
+        if (!shouldPollPromptMessage(data, input.structured ?? false)) {
+            return data;
+        }
+
+        const messageId = data.info?.id;
+
+        if (!messageId) {
+            return data;
+        }
+
+        for (const delayMs of PROMPT_MESSAGE_POLL_DELAYS_MS) {
+            if (delayMs > 0) {
+                await delay(delayMs);
+            }
+
+            const next = await this.fetchPromptMessage(input.sessionId, messageId);
+
+            if (!next) {
+                continue;
+            }
+
+            data = next;
+
+            if (!shouldPollPromptMessage(data, input.structured ?? false)) {
+                return data;
+            }
+        }
+
+        return data;
+    }
+
+    private async fetchPromptMessage(
+        sessionId: string,
+        messageId: string,
+    ): Promise<OpenCodePromptResponse | null> {
+        if (typeof this.client.session.message !== "function") {
+            return null;
+        }
+
+        try {
+            const response = await this.client.session.message(
+                {
+                    sessionID: sessionId,
+                    messageID: messageId,
+                },
+                SDK_OPTIONS,
+            ) as MaybeWrappedResponse<OpenCodePromptResponse>;
+
+            return unwrapSdkData(response);
+        } catch {
+            return null;
+        }
     }
 
     private async loadModels(): Promise<OpenCodeConfiguredModel[]> {
@@ -619,6 +677,60 @@ function extractTextFromParts(parts: Part[] | null | undefined): string {
         .map((part) => part.text)
         .join("")
         .trim();
+}
+
+function buildPromptSessionResult(
+    data: OpenCodePromptResponse,
+    options: {
+        emptyResponseText: string;
+        finishedAt: number;
+        startedAt: number;
+        structured: boolean;
+    },
+): PromptSessionResult {
+    const assistantInfo = toAssistantMessage(data.info);
+    const bodyMd = options.structured ? extractStructuredMarkdown(assistantInfo?.structured) : null;
+    const responseParts = Array.isArray(data.parts) ? data.parts : [];
+    const fallbackText = extractTextFromParts(responseParts) || bodyMd || options.emptyResponseText;
+
+    return {
+        assistantError: assistantInfo?.error ?? null,
+        bodyMd,
+        fallbackText,
+        info: assistantInfo,
+        metrics: extractPromptMetrics(assistantInfo, options.startedAt, options.finishedAt),
+        parts: responseParts,
+        structured: assistantInfo?.structured ?? null,
+    };
+}
+
+function shouldPollPromptMessage(
+    data: OpenCodePromptResponse,
+    structured: boolean,
+): boolean {
+    const assistantInfo = toAssistantMessage(data.info);
+    const bodyMd = structured ? extractStructuredMarkdown(assistantInfo?.structured) : null;
+    const responseParts = Array.isArray(data.parts) ? data.parts : [];
+    const hasText = extractTextFromParts(responseParts).length > 0;
+    const hasAssistantError = !!assistantInfo?.error;
+    const isCompleted = typeof assistantInfo?.time?.completed === "number"
+        && Number.isFinite(assistantInfo.time.completed);
+
+    return !hasText && !bodyMd && !hasAssistantError && !isCompleted;
+}
+
+function toAssistantMessage(message: Message | null | undefined): OpenCodeAssistantMessage | null {
+    if (!message || typeof message !== "object") {
+        return null;
+    }
+
+    return !("role" in message) || message.role === "assistant"
+        ? message as OpenCodeAssistantMessage
+        : null;
+}
+
+function delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function extractStructuredMarkdown(structured: unknown): string | null {

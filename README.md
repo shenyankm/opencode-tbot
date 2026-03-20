@@ -22,7 +22,7 @@ A Telegram plugin for driving [OpenCode](https://opencode.ai) from chat.
 Run:
 
 ```bash
-npx opencode-tbot@latest install
+npm install opencode-tbot@latest
 ```
 
 The installer registers the plugin globally and writes the default runtime config.
