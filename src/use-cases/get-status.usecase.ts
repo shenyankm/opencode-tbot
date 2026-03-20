@@ -36,7 +36,8 @@ export interface WorkspaceStatusResult {
 }
 
 export interface VoiceRecognitionStatusResult {
-    enabled: boolean;
+    model: string | null;
+    status: "configured" | "not_configured";
 }
 
 export interface GetStatusResult {
@@ -57,7 +58,7 @@ export class GetStatusUseCase {
         private readonly listMcpUseCase: ListMcpUseCase,
         private readonly listSessionsUseCase: ListSessionsUseCase,
         private readonly sessionRepo: SessionRepository,
-        private readonly voiceTranscriptionEnabled: boolean,
+        private readonly voiceRecognitionStatus: VoiceRecognitionStatusResult,
     ) { }
 
     async execute(input: { chatId: number }): Promise<GetStatusResult> {
@@ -82,9 +83,7 @@ export class GetStatusUseCase {
             health: mapSettledResult(health),
             path: pathResult,
             plugins,
-            voiceRecognition: {
-                enabled: this.voiceTranscriptionEnabled,
-            },
+            voiceRecognition: this.voiceRecognitionStatus,
             workspace,
             lsp: mapSettledResult(lsp),
             mcp: mapSettledResult(mcp),

@@ -864,6 +864,47 @@ test("promptSession falls back to text parts and summed tokens when structured o
     });
 });
 
+test("promptSession tolerates SDK responses that omit the parts array", async () => {
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            config: {
+                get: async () => ({ provider: {} }),
+                providers: async () => ({ providers: [], default: {} }),
+            },
+            path: {
+                get: async () => createPath(),
+            },
+            project: {
+                list: async () => [],
+                current: async () => createProject("project-1", "E:/repo-1"),
+            },
+            session: {
+                create: async () => createSession("session-1", "project-1", "E:/repo-1"),
+                prompt: async () => ({
+                    data: {
+                        info: {
+                            structured: {
+                                body_md: "## Hello",
+                            },
+                        } as never,
+                    } as never,
+                }),
+            },
+        } as never,
+    );
+
+    const result = await client.promptSession({
+        sessionId: "session-1",
+        prompt: "hello from telegram",
+        structured: true,
+    });
+
+    assert.equal(result.bodyMd, "## Hello");
+    assert.equal(result.fallbackText, "## Hello");
+    assert.deepEqual(result.parts, []);
+});
+
 test("promptSession preserves assistant errors from successful prompt responses", async () => {
     const client = new OpenCodeClient(
         { baseUrl: "http://127.0.0.1:4096" },

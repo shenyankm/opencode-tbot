@@ -152,7 +152,10 @@ export class OpenRouterVoiceTranscriptionClient implements VoiceTranscriptionCli
             );
         } catch (error) {
             throw new VoiceTranscriptionFailedError(
-                extractErrorMessage(error) ?? "Failed to reach OpenRouter voice transcription.",
+                buildTranscriptionErrorMessage(error, {
+                    format,
+                    model: this.model,
+                }),
             );
         }
 
@@ -253,6 +256,11 @@ function extractTranscript(response: OpenRouterChatResponseLike): string {
         .trim();
 }
 
+interface VoiceTranscriptionErrorContext {
+    format: string;
+    model: string;
+}
+
 function isTextContentItem(value: unknown): value is { text: string; type: "text" } {
     return !!value
         && typeof value === "object"
@@ -262,8 +270,177 @@ function isTextContentItem(value: unknown): value is { text: string; type: "text
         && typeof (value as { text?: unknown }).text === "string";
 }
 
+function buildTranscriptionErrorMessage(
+    error: unknown,
+    context: VoiceTranscriptionErrorContext,
+): string {
+    const parsedBody = parseJsonBody(extractStringField(error, "body"));
+    const rawMessages = dedupeNonEmptyStrings([
+        extractErrorMessage(error),
+        extractErrorMessage(readField(error, "error")),
+        extractErrorMessage(readField(error, "data")),
+        extractErrorMessage(readField(readField(error, "data"), "error")),
+        extractErrorMessage(parsedBody),
+        extractErrorMessage(readField(parsedBody, "error")),
+        extractMetadataRawMessage(error),
+        extractMetadataRawMessage(parsedBody),
+    ]);
+    const messages = rawMessages.some((message) => !isGenericProviderMessage(message))
+        ? rawMessages.filter((message) => !isGenericProviderMessage(message))
+        : rawMessages;
+    const providerName = extractProviderName(error) ?? extractProviderName(parsedBody);
+    const statusCode = extractNumericField(error, "statusCode") ?? extractNumericField(parsedBody, "statusCode");
+    const errorCode = extractErrorCode(error, parsedBody);
+
+    return joinNonEmptyParts([
+        ...messages,
+        `model: ${context.model}`,
+        `format: ${context.format}`,
+        providerName ? `provider: ${providerName}` : null,
+        statusCode !== null ? `status: ${statusCode}` : null,
+        errorCode !== null ? `code: ${errorCode}` : null,
+    ]) ?? "Failed to reach OpenRouter voice transcription.";
+}
+
 function extractErrorMessage(error: unknown): string | null {
-    return error instanceof Error && error.message.trim().length > 0
-        ? error.message.trim()
+    if (error instanceof Error && error.message.trim().length > 0) {
+        return error.message.trim();
+    }
+
+    return extractStringField(error, "message");
+}
+
+function extractMetadataRawMessage(value: unknown): string | null {
+    const metadata = readField(value, "metadata")
+        ?? readField(readField(value, "error"), "metadata")
+        ?? readField(readField(readField(value, "data"), "error"), "metadata");
+    const raw = extractStringField(metadata, "raw");
+
+    if (!raw) {
+        return null;
+    }
+
+    return raw.length <= 280 ? raw : `${raw.slice(0, 277)}...`;
+}
+
+function extractProviderName(value: unknown): string | null {
+    const candidates = [
+        readField(value, "metadata"),
+        readField(readField(value, "error"), "metadata"),
+        readField(readField(readField(value, "data"), "error"), "metadata"),
+    ];
+
+    for (const candidate of candidates) {
+        const providerName = extractStringField(candidate, "provider_name")
+            ?? extractStringField(candidate, "providerName")
+            ?? extractStringField(candidate, "provider");
+
+        if (providerName) {
+            return providerName;
+        }
+    }
+
+    return null;
+}
+
+function extractErrorCode(...values: unknown[]): number | null {
+    for (const value of values) {
+        const candidates = [
+            value,
+            readField(value, "error"),
+            readField(value, "data"),
+            readField(readField(value, "data"), "error"),
+        ];
+
+        for (const candidate of candidates) {
+            const code = extractNumericField(candidate, "code");
+
+            if (code !== null) {
+                return code;
+            }
+        }
+    }
+
+    return null;
+}
+
+function extractNumericField(value: unknown, fieldName: string): number | null {
+    if (!value || typeof value !== "object" || !(fieldName in value)) {
+        return null;
+    }
+
+    const fieldValue = (value as Record<string, unknown>)[fieldName];
+
+    return typeof fieldValue === "number" && Number.isFinite(fieldValue)
+        ? fieldValue
         : null;
+}
+
+function extractStringField(value: unknown, fieldName: string): string | null {
+    if (!value || typeof value !== "object" || !(fieldName in value)) {
+        return null;
+    }
+
+    const fieldValue = (value as Record<string, unknown>)[fieldName];
+
+    return typeof fieldValue === "string" && fieldValue.trim().length > 0
+        ? fieldValue.trim()
+        : null;
+}
+
+function readField(value: unknown, fieldName: string): unknown {
+    return value && typeof value === "object" && fieldName in value
+        ? (value as Record<string, unknown>)[fieldName]
+        : null;
+}
+
+function parseJsonBody(body: string | null): unknown {
+    if (!body) {
+        return null;
+    }
+
+    try {
+        return JSON.parse(body);
+    } catch {
+        return null;
+    }
+}
+
+function dedupeNonEmptyStrings(values: Array<string | null | undefined>): string[] {
+    const seen = new Set<string>();
+    const result: string[] = [];
+
+    for (const value of values) {
+        const normalized = value?.trim();
+
+        if (!normalized) {
+            continue;
+        }
+
+        const key = normalized.toLowerCase();
+
+        if (seen.has(key)) {
+            continue;
+        }
+
+        seen.add(key);
+        result.push(normalized);
+    }
+
+    return result;
+}
+
+function joinNonEmptyParts(parts: Array<string | null | undefined>): string | null {
+    const filtered = parts
+        .map((part) => part?.trim())
+        .filter((part): part is string => !!part);
+
+    return filtered.length > 0 ? filtered.join(" | ") : null;
+}
+
+function isGenericProviderMessage(message: string): boolean {
+    const normalized = message.trim().toLowerCase();
+
+    return normalized === "provider returned error"
+        || normalized === "failed to reach openrouter voice transcription.";
 }

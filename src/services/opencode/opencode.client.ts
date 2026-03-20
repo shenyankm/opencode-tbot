@@ -395,7 +395,8 @@ export class OpenCodeClient implements OpenCodeClientLike {
         const data = unwrapSdkData(response);
         const finishedAt = Date.now();
         const bodyMd = input.structured ? extractStructuredMarkdown(data.info?.structured) : null;
-        const fallbackText = extractTextFromParts(data.parts) || bodyMd || EMPTY_RESPONSE_TEXT;
+        const responseParts = Array.isArray(data.parts) ? data.parts : [];
+        const fallbackText = extractTextFromParts(responseParts) || bodyMd || EMPTY_RESPONSE_TEXT;
 
         return {
             assistantError: data.info?.error ?? null,
@@ -403,7 +404,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
             fallbackText,
             info: data.info ?? null,
             metrics: extractPromptMetrics(data.info, startedAt, finishedAt),
-            parts: data.parts,
+            parts: responseParts,
             structured: data.info?.structured ?? null,
         };
     }
@@ -608,7 +609,11 @@ function normalizeVariants(
     );
 }
 
-function extractTextFromParts(parts: Part[]): string {
+function extractTextFromParts(parts: Part[] | null | undefined): string {
+    if (!Array.isArray(parts)) {
+        return "";
+    }
+
     return parts
         .filter((part): part is Extract<Part, { type: "text"; text: string }> => part.type === "text")
         .map((part) => part.text)

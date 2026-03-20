@@ -94,7 +94,10 @@ function createContainer(
         listMcpUseCase,
         listSessionsUseCase,
         sessionRepo,
-        config.openrouter.configured,
+        {
+            status: config.openrouter.configured ? "configured" : "not_configured",
+            model: config.openrouter.configured ? config.openrouter.model : null,
+        },
     );
     const listModelsUseCase = new ListModelsUseCase(sessionRepo, opencodeClient);
     const renameSessionUseCase = new RenameSessionUseCase(sessionRepo, opencodeClient, logger);

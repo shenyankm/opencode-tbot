@@ -61,7 +61,10 @@ function createDependencies(
         listMcpUseCase,
         listSessionsUseCase,
         sessionRepo,
-        options.voiceTranscriptionEnabled ?? false,
+        {
+            status: options.voiceTranscriptionEnabled ? "configured" : "not_configured",
+            model: options.voiceTranscriptionEnabled ? "openai/gpt-audio-mini" : null,
+        },
     );
 
     return {
@@ -219,7 +222,7 @@ test("/status aggregates health, path, plugins, LSP, and MCP into one reply", as
     expectLine(markdown, "## \uD83D\uDD0C MCP");
     expectLine(markdown, "## \uD83E\uDDE0 LSP");
     expectLine(markdown, "- **Connectivity:** \uD83D\uDFE2");
-    expectLine(markdown, "- **Voice Recognition:** \uD83D\uDFE2");
+    expectLine(markdown, "- **Voice Recognition:** \uD83D\uDFE1 configured (openai/gpt-audio-mini)");
     expectLine(markdown, "- **OpenCode Version:** 1.0.0");
     expectLine(markdown, `- **opencode-tbot Version:** ${OPENCODE_TBOT_VERSION}`);
     expectLine(markdown, "- **Current Project:** `E:/repo-1`");
@@ -283,7 +286,7 @@ test("/status keeps successful sections when one section fails", async () => {
 
     assert.deepEqual(replies[0]?.options, { parse_mode: "MarkdownV2" });
     expectLine(markdown, "- **Connectivity:** \uD83D\uDD34");
-    expectLine(markdown, "- **Voice Recognition:** \u26AA");
+    expectLine(markdown, "- **Voice Recognition:** \u26AA not configured");
     expectLine(markdown, "- **Current Project:** `E:/repo`");
     expectLine(markdown, "- **Current Session:** OpenCode Default");
     assert.match(markdown, /- \*\*Details:\*\* Unexpected error\./u);
@@ -364,7 +367,7 @@ test("/status uses the selected chat language", async () => {
     expectLine(markdown, "## \uD83D\uDD0C MCP");
     expectLine(markdown, "## \uD83E\uDDE0 LSP");
     expectLine(markdown, "- **\u8FDE\u901A\u6027:** \uD83D\uDFE2");
-    expectLine(markdown, "- **\u8BED\u97F3\u8BC6\u522B:** \u26AA");
+    expectLine(markdown, "- **\u8BED\u97F3\u8BC6\u522B:** \u26AA \u672A\u914D\u7F6E");
     expectLine(markdown, "- **OpenCode\u7248\u672C:** 1.0.0");
     expectLine(markdown, `- **opencode-tbot\u7248\u672C:** ${OPENCODE_TBOT_VERSION}`);
     expectLine(markdown, "- **\u5F53\u524D\u9879\u76EE:** `E:/repo`");

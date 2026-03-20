@@ -142,7 +142,58 @@ test("OpenRouterVoiceTranscriptionClient surfaces SDK failures as typed transcri
         }),
         (error: unknown) => {
             assert.ok(error instanceof VoiceTranscriptionFailedError);
-            assert.equal(error.message, "upstream failed");
+            assert.equal(
+                error.message,
+                "upstream failed | model: openai/gpt-audio-mini | format: ogg",
+            );
+            return true;
+        },
+    );
+});
+
+test("OpenRouterVoiceTranscriptionClient surfaces nested provider details for OpenRouter errors", async () => {
+    const client = new OpenRouterVoiceTranscriptionClient(
+        {
+            model: "openai/gpt-audio-mini",
+            timeoutMs: 10_000,
+        },
+        {
+            chat: {
+                async send() {
+                    const error = new Error("Provider returned error") as Error & {
+                        body?: string;
+                        statusCode?: number;
+                    };
+
+                    error.statusCode = 502;
+                    error.body = JSON.stringify({
+                        error: {
+                            code: 10_001,
+                            message: "Unsupported audio format",
+                            metadata: {
+                                provider_name: "OpenAI",
+                            },
+                        },
+                    });
+
+                    throw error;
+                },
+            },
+        },
+    );
+
+    await assert.rejects(
+        client.transcribe({
+            data: Uint8Array.from([1, 2, 3]),
+            filename: "voice.ogg",
+            mimeType: "audio/ogg",
+        }),
+        (error: unknown) => {
+            assert.ok(error instanceof VoiceTranscriptionFailedError);
+            assert.equal(
+                error.message,
+                "Unsupported audio format | model: openai/gpt-audio-mini | format: ogg | provider: OpenAI | status: 502 | code: 10001",
+            );
             return true;
         },
     );
