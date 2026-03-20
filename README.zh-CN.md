@@ -115,8 +115,7 @@ npm uninstall opencode-tbot
 
 ## 命令
 
-- `/start` 显示欢迎信息和快速开始说明
-- `/help` 显示完整命令说明和示例
+- `/start` 显示简短欢迎信息和快速开始说明
 - `/status` 显示 OpenCode 健康状态、路径、LSP 和 MCP 信息
 - `/new [title]` 创建新的 OpenCode 会话
 - `/agents` 或 `/agent` 列出可用 agent 并切换当前 agent

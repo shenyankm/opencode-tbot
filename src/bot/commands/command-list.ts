@@ -10,10 +10,6 @@ export function getTelegramCommands(language: BotLanguage = "en"): BotCommand[] 
             description: copy.commands.start,
         },
         {
-            command: "help",
-            description: copy.commands.help,
-        },
-        {
             command: "status",
             description: copy.commands.status,
         },

@@ -19,10 +19,6 @@ test("TELEGRAM_COMMANDS only advertises implemented commands", () => {
             description: "Welcome and quick start",
         },
         {
-            command: "help",
-            description: "Show commands and examples",
-        },
-        {
             command: "status",
             description: "Show system status",
         },

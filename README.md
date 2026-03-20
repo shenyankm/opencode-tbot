@@ -115,8 +115,7 @@ Notes:
 
 ## Commands
 
-- `/start` show the welcome message and quick-start steps
-- `/help` show the full command reference and examples
+- `/start` show a short welcome message and quick-start steps
 - `/status` show aggregated OpenCode health, path, LSP, and MCP status
 - `/new [title]` create a new OpenCode session
 - `/agents` or `/agent` list available agents and switch the active one
