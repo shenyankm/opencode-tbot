@@ -27,6 +27,24 @@ npm install opencode-tbot@latest
 
 安装器会注册全局插件并写入默认运行时配置。
 
+查看已安装的 CLI 版本：
+
+```bash
+npm exec opencode-tbot -- --version
+```
+
+更新 OpenCode 中注册的 npm 插件 spec：
+
+```bash
+npm exec opencode-tbot -- update
+```
+
+从当前环境卸载 npm 包：
+
+```bash
+npm uninstall opencode-tbot
+```
+
 ## 配置
 
 运行时配置按以下优先级加载：

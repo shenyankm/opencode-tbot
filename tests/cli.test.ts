@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { installPlugin, runCli } from "../src/cli.js";
+import { OPENCODE_TBOT_VERSION } from "../src/app/package-info.js";
 import { getGlobalPluginConfigFilePath, getOpenCodeConfigFilePath } from "../src/app/plugin-config.js";
 
 test("installPlugin registers the npm plugin and writes the global runtime config", async () => {
@@ -83,4 +84,56 @@ test("runCli defaults to install mode", async () => {
 
     assert.equal(exitCode, 0);
     assert.equal(existsSync(getGlobalPluginConfigFilePath(homeDir)), true);
+});
+
+test("runCli prints the package version for --version", async () => {
+    let output = "";
+    const originalWrite = process.stdout.write.bind(process.stdout);
+
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+        output += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
+        return true;
+    }) as typeof process.stdout.write;
+
+    try {
+        const exitCode = await runCli(["--version"]);
+
+        assert.equal(exitCode, 0);
+        assert.equal(output, `${OPENCODE_TBOT_VERSION}\n`);
+    } finally {
+        process.stdout.write = originalWrite;
+    }
+});
+
+test("updatePlugin replaces stale opencode-tbot plugin specs and keeps unrelated plugins", async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-update-"));
+    const openCodeConfigPath = getOpenCodeConfigFilePath(homeDir);
+
+    mkdirSync(join(homeDir, ".config", "opencode"), { recursive: true });
+    writeFileSync(openCodeConfigPath, JSON.stringify({
+        plugin: [
+            "other-plugin",
+            "opencode-tbot@0.1.0",
+            "opencode-tbot",
+        ],
+    }, null, 2));
+
+    const exitCode = await runCli([
+        "update",
+        "--home-dir",
+        homeDir,
+        "--plugin-spec",
+        "opencode-tbot@latest",
+    ]);
+
+    assert.equal(exitCode, 0);
+    assert.deepEqual(
+        JSON.parse(readFileSync(openCodeConfigPath, "utf8")) as { plugin: string[] },
+        {
+            plugin: [
+                "other-plugin",
+                "opencode-tbot@latest",
+            ],
+        },
+    );
 });

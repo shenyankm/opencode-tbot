@@ -8,6 +8,7 @@ import {
     DEFAULT_TELEGRAM_API_ROOT,
     type PluginConfigSource,
 } from "./app/config.js";
+import { OPENCODE_TBOT_VERSION } from "./app/package-info.js";
 import {
     getGlobalPluginConfigFilePath,
     getOpenCodeConfigFilePath,
@@ -26,7 +27,7 @@ export interface InstallCommandOptions {
 }
 
 interface CliOptions extends InstallCommandOptions {
-    command: "help" | "install";
+    command: "help" | "install" | "update" | "version";
 }
 
 interface OpenCodeGlobalConfig {
@@ -55,6 +56,16 @@ export async function runCli(argv: string[]): Promise<number> {
 
     if (options.command === "help") {
         stdout.write(`${buildHelpText()}\n`);
+        return 0;
+    }
+
+    if (options.command === "version") {
+        stdout.write(`${OPENCODE_TBOT_VERSION}\n`);
+        return 0;
+    }
+
+    if (options.command === "update") {
+        await updatePlugin(options);
         return 0;
     }
 
@@ -115,19 +126,34 @@ export async function installPlugin(options: InstallCommandOptions = {}): Promis
     }
 }
 
+export async function updatePlugin(options: Pick<InstallCommandOptions, "homeDir" | "pluginSpec"> = {}): Promise<void> {
+    const homeDir = options.homeDir ?? homedir();
+    const openCodeConfigFilePath = getOpenCodeConfigFilePath(homeDir);
+    const openCodeConfig = await readJsoncObject<OpenCodeGlobalConfig>(openCodeConfigFilePath);
+    const pluginSpec = normalizeOptionalString(options.pluginSpec) ?? DEFAULT_PLUGIN_SPEC;
+    const nextOpenCodeConfig = replacePluginRegistration(openCodeConfig, pluginSpec);
+
+    await writeJsonFile(openCodeConfigFilePath, nextOpenCodeConfig);
+    stdout.write(`Updated plugin registration to ${pluginSpec} in ${openCodeConfigFilePath}\n`);
+}
+
 function parseCliOptions(argv: string[]): CliOptions {
     const args = [...argv];
     const first = args[0];
     const command = !first || first.startsWith("-")
         ? "install"
         : first;
-    const values = command === "install"
+    const values = command === "install" || command === "version"
         ? args
         : args.slice(1);
     const options: CliOptions = {
         command: command === "help" || command === "--help" || command === "-h"
             ? "help"
-            : "install",
+            : command === "version" || command === "--version" || command === "-v"
+                ? "version"
+                : command === "update"
+                    ? "update"
+                    : "install",
     };
 
     for (let index = 0; index < values.length; index += 1) {
@@ -165,6 +191,10 @@ function parseCliOptions(argv: string[]): CliOptions {
             case "--help":
             case "-h":
                 options.command = "help";
+                break;
+            case "--version":
+            case "-v":
+                options.command = "version";
                 break;
             default:
                 throw new Error(`Unknown argument: ${value}`);
@@ -228,6 +258,39 @@ function ensurePluginRegistered(
     return {
         ...config,
         plugin: plugins,
+    };
+}
+
+function replacePluginRegistration(
+    config: OpenCodeGlobalConfig,
+    pluginSpec: string,
+): OpenCodeGlobalConfig {
+    const currentPlugins = Array.isArray(config.plugin)
+        ? config.plugin.filter((item): item is string => typeof item === "string")
+        : [];
+    const nextPlugins: string[] = [];
+    let inserted = false;
+
+    for (const currentPlugin of currentPlugins) {
+        if (isOpencodeTbotPluginSpec(currentPlugin)) {
+            if (!inserted) {
+                nextPlugins.push(pluginSpec);
+                inserted = true;
+            }
+
+            continue;
+        }
+
+        nextPlugins.push(currentPlugin);
+    }
+
+    if (!inserted) {
+        nextPlugins.push(pluginSpec);
+    }
+
+    return {
+        ...config,
+        plugin: nextPlugins,
     };
 }
 
@@ -345,9 +408,20 @@ function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
     return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
+function isOpencodeTbotPluginSpec(value: string): boolean {
+    const normalized = value.trim();
+
+    return normalized === "opencode-tbot" || normalized.startsWith("opencode-tbot@");
+}
+
 function buildHelpText(): string {
     return [
-        "Usage: opencode-tbot [install] [options]",
+        "Usage: opencode-tbot [install|update] [options]",
+        "       opencode-tbot --version",
+        "",
+        "Commands:",
+        "  install",
+        "  update",
         "",
         "Options:",
         "  --bot-token <token>",
@@ -358,6 +432,7 @@ function buildHelpText(): string {
         "  --plugin-spec <spec>",
         "  --skip-register",
         "  --home-dir <path>",
+        "  --version",
         "  --help",
     ].join("\n");
 }

@@ -27,6 +27,24 @@ npm install opencode-tbot@latest
 
 The installer registers the plugin globally and writes the default runtime config.
 
+Check the installed CLI version:
+
+```bash
+npm exec opencode-tbot -- --version
+```
+
+Update the registered npm plugin spec in OpenCode:
+
+```bash
+npm exec opencode-tbot -- update
+```
+
+Remove the npm package from the current environment:
+
+```bash
+npm uninstall opencode-tbot
+```
+
 ## Configuration
 
 The runtime config is loaded in this order:
