@@ -33,6 +33,7 @@ export async function preparePluginConfiguration(
         loadPluginConfigFile(projectConfigFilePath),
     ]);
     const config = mergePluginConfigSources(globalConfig, projectConfig, options.config);
+    applyGlobalOpenRouterApiKey(config, globalConfig);
     const configFilePath = await pathExists(projectConfigFilePath)
         ? projectConfigFilePath
         : globalConfigFilePath;
@@ -112,6 +113,36 @@ export function mergePluginConfigSources(
     return merged;
 }
 
+function applyGlobalOpenRouterApiKey(
+    config: PluginConfigSource,
+    globalConfig: PluginConfigSource,
+) {
+    const globalApiKey = normalizeOptionalString(globalConfig.openrouter?.apiKey);
+
+    if (!config.openrouter) {
+        if (!globalApiKey) {
+            return;
+        }
+
+        config.openrouter = {
+            apiKey: globalApiKey,
+        };
+
+        return;
+    }
+
+    if (globalApiKey) {
+        config.openrouter.apiKey = globalApiKey;
+        return;
+    }
+
+    delete config.openrouter.apiKey;
+
+    if (Object.keys(config.openrouter).length === 0) {
+        delete config.openrouter;
+    }
+}
+
 export function serializePluginConfig(config: PluginConfigSource): string {
     return `${JSON.stringify(orderPluginConfig(config), null, 2)}\n`;
 }
@@ -188,6 +219,14 @@ function orderPluginConfig(config: PluginConfigSource): PluginConfigSource {
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
     return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeOptionalString(value: string | undefined): string | null {
+    const normalized = value?.trim();
+
+    return normalized
+        ? normalized
+        : null;
 }
 
 function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {

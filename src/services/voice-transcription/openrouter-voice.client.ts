@@ -10,7 +10,13 @@ export interface VoiceTranscriptionResult {
     text: string;
 }
 
+export interface VoiceRecognitionStatus {
+    model: string | null;
+    status: "configured" | "not_configured";
+}
+
 export interface VoiceTranscriptionClientLike {
+    getStatus(): VoiceRecognitionStatus;
     transcribe(input: VoiceTranscriptionInput): Promise<VoiceTranscriptionResult>;
 }
 
@@ -60,6 +66,8 @@ export interface OpenRouterVoiceTranscriptionClientOptions {
     transcriptionPrompt?: string | null;
 }
 
+export type VoiceAudioFormat = "ogg" | "mp3" | "wav";
+
 export class VoiceTranscriptionNotConfiguredError extends Error {
     readonly data: { message: string };
 
@@ -91,9 +99,16 @@ export class VoiceTranscriptEmptyError extends Error {
 }
 
 export class DisabledVoiceTranscriptionClient implements VoiceTranscriptionClientLike {
+    getStatus(): VoiceRecognitionStatus {
+        return {
+            status: "not_configured",
+            model: null,
+        };
+    }
+
     async transcribe(): Promise<VoiceTranscriptionResult> {
         throw new VoiceTranscriptionNotConfiguredError(
-            "Set openrouter.apiKey in tbot.config.json to enable Telegram voice transcription.",
+            "Set openrouter.apiKey in the global config (~/.config/opencode/opencode-tbot/config.json) to enable Telegram voice transcription.",
         );
     }
 }
@@ -112,6 +127,13 @@ export class OpenRouterVoiceTranscriptionClient implements VoiceTranscriptionCli
         this.sdk = sdk;
         this.timeoutMs = options.timeoutMs;
         this.transcriptionPrompt = options.transcriptionPrompt?.trim() || null;
+    }
+
+    getStatus(): VoiceRecognitionStatus {
+        return {
+            status: "configured",
+            model: this.model,
+        };
     }
 
     async transcribe(input: VoiceTranscriptionInput): Promise<VoiceTranscriptionResult> {
@@ -165,31 +187,17 @@ export class OpenRouterVoiceTranscriptionClient implements VoiceTranscriptionCli
     }
 }
 
-const MIME_TYPE_FORMAT_MAP: Record<string, string> = {
-    "audio/aac": "aac",
-    "audio/aiff": "aiff",
-    "audio/flac": "flac",
-    "audio/m4a": "m4a",
+const MIME_TYPE_FORMAT_MAP: Record<string, VoiceAudioFormat> = {
     "audio/mp3": "mp3",
-    "audio/mp4": "m4a",
     "audio/mpeg": "mp3",
     "audio/ogg": "ogg",
     "audio/wav": "wav",
     "audio/wave": "wav",
-    "audio/x-aac": "aac",
-    "audio/x-aiff": "aiff",
-    "audio/x-flac": "flac",
-    "audio/x-m4a": "m4a",
     "audio/x-wav": "wav",
     "audio/vnd.wave": "wav",
 };
 
-const FILE_EXTENSION_FORMAT_MAP: Record<string, string> = {
-    ".aac": "aac",
-    ".aif": "aiff",
-    ".aiff": "aiff",
-    ".flac": "flac",
-    ".m4a": "m4a",
+const FILE_EXTENSION_FORMAT_MAP: Record<string, VoiceAudioFormat> = {
     ".mp3": "mp3",
     ".oga": "ogg",
     ".ogg": "ogg",
@@ -199,7 +207,7 @@ const FILE_EXTENSION_FORMAT_MAP: Record<string, string> = {
 export function resolveAudioFormat(
     filename: string,
     mimeType?: string | null,
-): string {
+): VoiceAudioFormat {
     const normalizedMimeType = mimeType?.trim().toLowerCase() || null;
 
     if (normalizedMimeType && MIME_TYPE_FORMAT_MAP[normalizedMimeType]) {
@@ -216,9 +224,13 @@ export function resolveAudioFormat(
 }
 
 function toBase64(data: Uint8Array | ArrayBuffer): string {
-    const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+    const bytes = toUint8Array(data);
 
     return Buffer.from(bytes).toString("base64");
+}
+
+function toUint8Array(data: Uint8Array | ArrayBuffer): Uint8Array {
+    return data instanceof Uint8Array ? data : new Uint8Array(data);
 }
 
 function buildTranscriptionPrompt(transcriptionPrompt: string | null): string {

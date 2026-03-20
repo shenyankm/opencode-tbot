@@ -68,6 +68,12 @@ function createDependencies(options: {
                 })),
             },
             voiceTranscriptionService: {
+                getStatus() {
+                    return {
+                        status: "configured" as const,
+                        model: "openai/gpt-audio-mini",
+                    };
+                },
                 transcribeVoice: options.transcribeVoice ?? (async () => ({
                     text: "voice prompt",
                 })),
@@ -316,7 +322,7 @@ test("handleVoiceMessage surfaces Telegram download failures and still deletes t
     assert.deepEqual(replies, [
         { text: "处理中...", other: undefined },
         {
-            text: "未配置语音转写服务。\n原因: Set openrouter.apiKey in tbot.config.json to enable Telegram voice transcription.",
+            text: "未配置语音转写服务。\n原因: Set openrouter.apiKey in the global config (~/.config/opencode/opencode-tbot/config.json) to enable Telegram voice transcription.",
             other: undefined,
         },
     ]);
@@ -341,7 +347,7 @@ test("handleVoiceMessage reports OpenRouter configuration errors with Chinese co
     const { dependencies, sessionRepo } = createDependencies({
         transcribeVoice: async () => {
             throw new VoiceTranscriptionNotConfiguredError(
-                "Set openrouter.apiKey in tbot.config.json to enable Telegram voice transcription.",
+                "Set openrouter.apiKey in the global config (~/.config/opencode/opencode-tbot/config.json) to enable Telegram voice transcription.",
             );
         },
     });
@@ -392,7 +398,7 @@ test("handleVoiceMessage reports OpenRouter configuration errors with Chinese co
     assert.deepEqual(replies, [
         { text: "处理中...", other: undefined },
         {
-            text: "未配置语音转写服务。\n原因: Set openrouter.apiKey in tbot.config.json to enable Telegram voice transcription.",
+            text: "未配置语音转写服务。\n原因: Set openrouter.apiKey in the global config (~/.config/opencode/opencode-tbot/config.json) to enable Telegram voice transcription.",
             other: undefined,
         },
     ]);
@@ -402,7 +408,7 @@ test("handleVoiceMessage reports OpenRouter configuration errors with Chinese co
     assert.deepEqual(replies, [
         { text: "处理中...", other: undefined },
         {
-            text: "未配置语音转写服务。\n原因: Set openrouter.apiKey in tbot.config.json to enable Telegram voice transcription.",
+            text: "未配置语音转写服务。\n原因: Set openrouter.apiKey in the global config (~/.config/opencode/opencode-tbot/config.json) to enable Telegram voice transcription.",
             other: undefined,
         },
     ]);

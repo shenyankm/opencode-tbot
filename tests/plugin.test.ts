@@ -178,6 +178,9 @@ test("preparePluginConfiguration merges global defaults with project overrides",
             state: {
                 path: "./global-state.json",
             },
+            openrouter: {
+                apiKey: "global-openrouter-key",
+            },
             logLevel: "debug",
         }),
         "utf8",
@@ -203,8 +206,75 @@ test("preparePluginConfiguration merges global defaults with project overrides",
     assert.equal(prepared.config.telegram?.botToken, "global-token");
     assert.equal(prepared.config.logLevel, "debug");
     assert.equal(prepared.config.state?.path, "./project-state.json");
+    assert.equal(prepared.config.openrouter?.apiKey, "global-openrouter-key");
     assert.equal(prepared.config.openrouter?.model, "openai/gpt-audio-mini");
     assert.equal(prepared.globalConfigFilePath, globalConfigFilePath);
+});
+
+test("preparePluginConfiguration ignores project OpenRouter apiKey overrides", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-plugin-global-key-"));
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-home-global-key-"));
+    const globalConfigFilePath = join(homeDir, ".config", "opencode", "opencode-tbot", "config.json");
+
+    mkdirSync(join(homeDir, ".config", "opencode", "opencode-tbot"), { recursive: true });
+    writeFileSync(
+        globalConfigFilePath,
+        serializePluginConfig({
+            telegram: {
+                botToken: "global-token",
+            },
+            openrouter: {
+                apiKey: "global-openrouter-key",
+                model: "openai/gpt-audio-mini",
+            },
+        }),
+        "utf8",
+    );
+    writeFileSync(
+        join(cwd, PLUGIN_CONFIG_FILE_NAME),
+        serializePluginConfig({
+            openrouter: {
+                apiKey: "project-openrouter-key",
+                timeoutMs: 60_000,
+            },
+        }),
+        "utf8",
+    );
+
+    const prepared = await preparePluginConfiguration({
+        cwd,
+        homeDir,
+    });
+
+    assert.equal(prepared.config.openrouter?.apiKey, "global-openrouter-key");
+    assert.equal(prepared.config.openrouter?.timeoutMs, 60_000);
+});
+
+test("preparePluginConfiguration ignores project OpenRouter apiKey when no global key exists", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-plugin-no-global-key-"));
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-home-no-global-key-"));
+
+    writeFileSync(
+        join(cwd, PLUGIN_CONFIG_FILE_NAME),
+        serializePluginConfig({
+            telegram: {
+                botToken: "project-token",
+            },
+            openrouter: {
+                apiKey: "project-openrouter-key",
+                model: "openai/gpt-audio-mini",
+            },
+        }),
+        "utf8",
+    );
+
+    const prepared = await preparePluginConfiguration({
+        cwd,
+        homeDir,
+    });
+
+    assert.equal(prepared.config.openrouter?.apiKey, undefined);
+    assert.equal(prepared.config.openrouter?.model, "openai/gpt-audio-mini");
 });
 
 test("preparePluginConfiguration keeps missing tokens unresolved for the installer flow", async () => {

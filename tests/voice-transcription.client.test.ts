@@ -43,6 +43,10 @@ test("OpenRouterVoiceTranscriptionClient sends OpenRouter audio chat requests an
     assert.deepEqual(result, {
         text: "hello from voice",
     });
+    assert.deepEqual(client.getStatus(), {
+        status: "configured",
+        model: "openai/gpt-audio-mini",
+    });
     assert.equal(calls.length, 1);
 
     const request = calls[0]?.request as {
@@ -84,7 +88,8 @@ test("OpenRouterVoiceTranscriptionClient sends OpenRouter audio chat requests an
     });
 });
 
-test("OpenRouterVoiceTranscriptionClient extracts transcript text from content arrays", async () => {
+test("OpenRouterVoiceTranscriptionClient accepts wav input without format conversion", async () => {
+    const calls: unknown[] = [];
     const client = new OpenRouterVoiceTranscriptionClient(
         {
             model: "openai/gpt-audio-mini",
@@ -92,7 +97,8 @@ test("OpenRouterVoiceTranscriptionClient extracts transcript text from content a
         },
         {
             chat: {
-                async send() {
+                async send(request) {
+                    calls.push(request);
                     return {
                         choices: [{
                             message: {
@@ -117,6 +123,67 @@ test("OpenRouterVoiceTranscriptionClient extracts transcript text from content a
     assert.deepEqual(result, {
         text: "first line\nsecond line",
     });
+    assert.equal(calls.length, 1);
+});
+
+test("OpenRouterVoiceTranscriptionClient accepts mp3 input without format conversion", async () => {
+    const calls: Array<{ request: unknown }> = [];
+    const client = new OpenRouterVoiceTranscriptionClient(
+        {
+            model: "openai/gpt-audio-mini",
+            timeoutMs: 10_000,
+        },
+        {
+            chat: {
+                async send(request) {
+                    calls.push({ request });
+
+                    return {
+                        choices: [{
+                            message: {
+                                content: "mp3 transcript",
+                            },
+                        }],
+                    };
+                },
+            },
+        },
+    );
+
+    const result = await client.transcribe({
+        data: Uint8Array.from([9, 8, 7]),
+        filename: "voice.mp3",
+        mimeType: "audio/mpeg",
+    });
+
+    assert.deepEqual(result, {
+        text: "mp3 transcript",
+    });
+
+    const request = calls[0]?.request as {
+        chatGenerationParams: {
+            messages: Array<{
+                content: Array<
+                    | { text: string; type: "text" }
+                    | {
+                        inputAudio: {
+                            data: string;
+                            format: string;
+                        };
+                        type: "input_audio";
+                    }
+                >;
+            }>;
+        };
+    };
+
+    assert.deepEqual(request.chatGenerationParams.messages[0]?.content[1], {
+        type: "input_audio",
+        inputAudio: {
+            data: Buffer.from(Uint8Array.from([9, 8, 7])).toString("base64"),
+            format: "mp3",
+        },
+    });
 });
 
 test("OpenRouterVoiceTranscriptionClient surfaces SDK failures as typed transcription errors", async () => {
@@ -137,14 +204,14 @@ test("OpenRouterVoiceTranscriptionClient surfaces SDK failures as typed transcri
     await assert.rejects(
         client.transcribe({
             data: Uint8Array.from([1, 2, 3]),
-            filename: "voice.ogg",
-            mimeType: "audio/ogg",
+            filename: "voice.wav",
+            mimeType: "audio/wav",
         }),
         (error: unknown) => {
             assert.ok(error instanceof VoiceTranscriptionFailedError);
             assert.equal(
                 error.message,
-                "upstream failed | model: openai/gpt-audio-mini | format: ogg",
+                "upstream failed | model: openai/gpt-audio-mini | format: wav",
             );
             return true;
         },
@@ -202,6 +269,11 @@ test("OpenRouterVoiceTranscriptionClient surfaces nested provider details for Op
 test("DisabledVoiceTranscriptionClient reports that voice transcription is not configured", async () => {
     const client = new DisabledVoiceTranscriptionClient();
 
+    assert.deepEqual(client.getStatus(), {
+        status: "not_configured",
+        model: null,
+    });
+
     await assert.rejects(
         client.transcribe({
             data: Uint8Array.from([1, 2, 3]),
@@ -212,7 +284,7 @@ test("DisabledVoiceTranscriptionClient reports that voice transcription is not c
             assert.ok(error instanceof VoiceTranscriptionNotConfiguredError);
             assert.equal(
                 error.message,
-                "Set openrouter.apiKey in tbot.config.json to enable Telegram voice transcription.",
+                "Set openrouter.apiKey in the global config (~/.config/opencode/opencode-tbot/config.json) to enable Telegram voice transcription.",
             );
             return true;
         },
@@ -221,11 +293,22 @@ test("DisabledVoiceTranscriptionClient reports that voice transcription is not c
 
 test("VoiceTranscriptionService rejects empty transcription payloads", async () => {
     const service = new VoiceTranscriptionService({
+        getStatus() {
+            return {
+                status: "configured" as const,
+                model: "openai/gpt-audio-mini",
+            };
+        },
         async transcribe() {
             return {
                 text: "   ",
             };
         },
+    });
+
+    assert.deepEqual(service.getStatus(), {
+        status: "configured",
+        model: "openai/gpt-audio-mini",
     });
 
     await assert.rejects(
@@ -245,7 +328,8 @@ test("VoiceTranscriptionService rejects empty transcription payloads", async () 
 });
 
 test("resolveAudioFormat prefers MIME type, then extension, then ogg fallback", () => {
-    assert.equal(resolveAudioFormat("voice.bin", "audio/flac"), "flac");
-    assert.equal(resolveAudioFormat("voice.m4a", null), "m4a");
+    assert.equal(resolveAudioFormat("voice.wav", "audio/ogg"), "ogg");
+    assert.equal(resolveAudioFormat("voice.mp3", null), "mp3");
+    assert.equal(resolveAudioFormat("voice.wav", null), "wav");
     assert.equal(resolveAudioFormat("voice.unknown", null), "ogg");
 });

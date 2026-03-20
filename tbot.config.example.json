@@ -8,7 +8,6 @@
     "path": "./data/opencode-tbot.state.json"
   },
   "openrouter": {
-    "apiKey": "",
     "model": "openai/gpt-audio-mini",
     "timeoutMs": 30000,
     "transcriptionPrompt": ""

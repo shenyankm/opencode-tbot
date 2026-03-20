@@ -76,9 +76,7 @@ interface StatusLayoutCopy {
     rootLabel: string;
     statusLabel: string;
     tbotVersionLabel: string;
-    voiceRecognitionConfiguredLabel: string;
     voiceRecognitionLabel: string;
-    voiceRecognitionNotConfiguredLabel: string;
     workspaceTitle: string;
 }
 
@@ -459,15 +457,15 @@ function formatHealthBadge(healthy: boolean, layout: StatusLayoutCopy): string {
 
 function formatVoiceRecognitionBadge(
     status: GetStatusResult["voiceRecognition"],
-    layout: StatusLayoutCopy,
+    _layout: StatusLayoutCopy,
 ): string {
     if (status.status === "configured") {
         return status.model
-            ? `\uD83D\uDFE1 ${layout.voiceRecognitionConfiguredLabel} (${status.model})`
-            : `\uD83D\uDFE1 ${layout.voiceRecognitionConfiguredLabel}`;
+            ? `\uD83D\uDFE2 (${status.model})`
+            : "\uD83D\uDFE1";
     }
 
-    return `\u26AA ${layout.voiceRecognitionNotConfiguredLabel}`;
+    return "\u26AA";
 }
 
 function formatLspStatusBadge(status: OpenCodeLspStatus): string {
@@ -586,9 +584,7 @@ function getStatusLayoutCopy(copy: BotCopy): StatusLayoutCopy {
             rootLabel: "Root",
             statusLabel: "Status",
             tbotVersionLabel: "opencode-tbot Version",
-            voiceRecognitionConfiguredLabel: "configured",
             voiceRecognitionLabel: "Voice Recognition",
-            voiceRecognitionNotConfiguredLabel: "not configured",
             workspaceTitle: "\uD83D\uDCC1 Workspace",
         };
     }
@@ -613,9 +609,7 @@ function getStatusLayoutCopy(copy: BotCopy): StatusLayoutCopy {
         rootLabel: "\u6839\u76EE\u5F55",
         statusLabel: "\u72B6\u6001",
         tbotVersionLabel: "opencode-tbot\u7248\u672C",
-        voiceRecognitionConfiguredLabel: "\u5DF2\u914D\u7F6E",
         voiceRecognitionLabel: "\u8BED\u97F3\u8BC6\u522B",
-        voiceRecognitionNotConfiguredLabel: "\u672A\u914D\u7F6E",
         workspaceTitle: "\uD83D\uDCC1 \u5DE5\u4F5C\u533A",
     };
 }
