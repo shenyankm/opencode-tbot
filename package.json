@@ -1,6 +1,6 @@
 {
     "name": "opencode-tbot",
-    "version": "0.1.16",
+    "version": "0.1.18",
     "type": "module",
     "description": "Telegram bot plugin for OpenCode",
     "license": "MIT",

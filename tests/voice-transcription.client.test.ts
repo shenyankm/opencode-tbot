@@ -3,14 +3,17 @@ import test from "node:test";
 import {
     DisabledVoiceTranscriptionClient,
     OpenRouterVoiceTranscriptionClient,
+    VoiceTranscodingDependencyError,
     VoiceTranscriptionFailedError,
     VoiceTranscriptionNotConfiguredError,
     resolveAudioFormat,
 } from "../src/services/voice-transcription/openrouter-voice.client.js";
+import { VoiceTranscodingFailedError } from "../src/services/voice-transcription/audio-transcoder.js";
 import { VoiceTranscriptionService } from "../src/services/voice-transcription/voice-transcription.service.js";
 
-test("OpenRouterVoiceTranscriptionClient sends OpenRouter audio chat requests and trims the returned text", async () => {
+test("OpenRouterVoiceTranscriptionClient transcodes ogg input to wav before calling OpenRouter", async () => {
     const calls: Array<{ options: { timeoutMs?: number } | undefined; request: unknown }> = [];
+    const transcodeCalls: Array<{ filename: string; sourceFormat: string; targetFormat: string }> = [];
     const client = new OpenRouterVoiceTranscriptionClient(
         {
             model: "openai/gpt-audio-mini",
@@ -30,6 +33,27 @@ test("OpenRouterVoiceTranscriptionClient sends OpenRouter audio chat requests an
                         }],
                     };
                 },
+            },
+        },
+        {
+            async transcode(input) {
+                transcodeCalls.push({
+                    filename: input.filename,
+                    sourceFormat: input.sourceFormat,
+                    targetFormat: input.targetFormat,
+                });
+
+                return {
+                    data: Uint8Array.from([4, 5, 6]),
+                    filename: "voice.wav",
+                    format: "wav",
+                    mimeType: "audio/wav",
+                };
+            },
+        },
+        {
+            probe() {
+                return { status: "ready" as const };
             },
         },
     );
@@ -70,11 +94,14 @@ test("OpenRouterVoiceTranscriptionClient sends OpenRouter audio chat requests an
     };
 
     assert.equal(calls[0]?.options?.timeoutMs, 10_000);
+    assert.deepEqual(transcodeCalls, [{
+        filename: "voice.ogg",
+        sourceFormat: "ogg",
+        targetFormat: "wav",
+    }]);
     assert.equal(request.chatGenerationParams.model, "openai/gpt-audio-mini");
     assert.equal(request.chatGenerationParams.stream, false);
     assert.equal(request.chatGenerationParams.temperature, 0);
-    assert.equal(request.chatGenerationParams.messages.length, 1);
-    assert.equal(request.chatGenerationParams.messages[0]?.content[0]?.type, "text");
     assert.match(
         (request.chatGenerationParams.messages[0]?.content[0] as { text: string }).text,
         /Additional instructions: transcribe carefully/,
@@ -82,14 +109,14 @@ test("OpenRouterVoiceTranscriptionClient sends OpenRouter audio chat requests an
     assert.deepEqual(request.chatGenerationParams.messages[0]?.content[1], {
         type: "input_audio",
         inputAudio: {
-            data: Buffer.from(Uint8Array.from([1, 2, 3])).toString("base64"),
-            format: "ogg",
+            data: Buffer.from(Uint8Array.from([4, 5, 6])).toString("base64"),
+            format: "wav",
         },
     });
 });
 
-test("OpenRouterVoiceTranscriptionClient accepts wav input without format conversion", async () => {
-    const calls: unknown[] = [];
+test("OpenRouterVoiceTranscriptionClient bypasses transcoding for wav input", async () => {
+    let transcodeCalled = false;
     const client = new OpenRouterVoiceTranscriptionClient(
         {
             model: "openai/gpt-audio-mini",
@@ -97,8 +124,7 @@ test("OpenRouterVoiceTranscriptionClient accepts wav input without format conver
         },
         {
             chat: {
-                async send(request) {
-                    calls.push(request);
+                async send() {
                     return {
                         choices: [{
                             message: {
@@ -112,6 +138,21 @@ test("OpenRouterVoiceTranscriptionClient accepts wav input without format conver
                 },
             },
         },
+        {
+            async transcode() {
+                transcodeCalled = true;
+                throw new Error("should not transcode wav");
+            },
+        },
+        {
+            probe() {
+                return {
+                    detail: "ffmpeg_missing" as const,
+                    message: "System ffmpeg is not available in PATH.",
+                    status: "dependency_missing" as const,
+                };
+            },
+        },
     );
 
     const result = await client.transcribe({
@@ -123,11 +164,10 @@ test("OpenRouterVoiceTranscriptionClient accepts wav input without format conver
     assert.deepEqual(result, {
         text: "first line\nsecond line",
     });
-    assert.equal(calls.length, 1);
+    assert.equal(transcodeCalled, false);
 });
 
-test("OpenRouterVoiceTranscriptionClient accepts mp3 input without format conversion", async () => {
-    const calls: Array<{ request: unknown }> = [];
+test("OpenRouterVoiceTranscriptionClient reports dependency_missing when ffmpeg is unavailable", async () => {
     const client = new OpenRouterVoiceTranscriptionClient(
         {
             model: "openai/gpt-audio-mini",
@@ -135,55 +175,85 @@ test("OpenRouterVoiceTranscriptionClient accepts mp3 input without format conver
         },
         {
             chat: {
-                async send(request) {
-                    calls.push({ request });
-
-                    return {
-                        choices: [{
-                            message: {
-                                content: "mp3 transcript",
-                            },
-                        }],
-                    };
+                async send() {
+                    throw new Error("should not reach provider");
                 },
+            },
+        },
+        {
+            async transcode() {
+                throw new Error("should not transcode without ffmpeg");
+            },
+        },
+        {
+            probe() {
+                return {
+                    detail: "ffmpeg_missing" as const,
+                    message: "System ffmpeg is not available in PATH.",
+                    status: "dependency_missing" as const,
+                };
             },
         },
     );
 
-    const result = await client.transcribe({
-        data: Uint8Array.from([9, 8, 7]),
-        filename: "voice.mp3",
-        mimeType: "audio/mpeg",
+    assert.deepEqual(client.getStatus(), {
+        status: "dependency_missing",
+        model: "openai/gpt-audio-mini",
+        detail: "ffmpeg_missing",
     });
 
-    assert.deepEqual(result, {
-        text: "mp3 transcript",
-    });
-
-    const request = calls[0]?.request as {
-        chatGenerationParams: {
-            messages: Array<{
-                content: Array<
-                    | { text: string; type: "text" }
-                    | {
-                        inputAudio: {
-                            data: string;
-                            format: string;
-                        };
-                        type: "input_audio";
-                    }
-                >;
-            }>;
-        };
-    };
-
-    assert.deepEqual(request.chatGenerationParams.messages[0]?.content[1], {
-        type: "input_audio",
-        inputAudio: {
-            data: Buffer.from(Uint8Array.from([9, 8, 7])).toString("base64"),
-            format: "mp3",
+    await assert.rejects(
+        client.transcribe({
+            data: Uint8Array.from([1, 2, 3]),
+            filename: "voice.ogg",
+            mimeType: "audio/ogg",
+        }),
+        (error: unknown) => {
+            assert.ok(error instanceof VoiceTranscodingDependencyError);
+            assert.equal(error.detail, "ffmpeg_missing");
+            assert.equal(error.message, "System ffmpeg is not available in PATH.");
+            return true;
         },
-    });
+    );
+});
+
+test("OpenRouterVoiceTranscriptionClient surfaces transcoding failures without wrapping them", async () => {
+    const client = new OpenRouterVoiceTranscriptionClient(
+        {
+            model: "openai/gpt-audio-mini",
+            timeoutMs: 10_000,
+        },
+        {
+            chat: {
+                async send() {
+                    throw new Error("should not reach provider");
+                },
+            },
+        },
+        {
+            async transcode() {
+                throw new VoiceTranscodingFailedError("Voice transcoding timed out.");
+            },
+        },
+        {
+            probe() {
+                return { status: "ready" as const };
+            },
+        },
+    );
+
+    await assert.rejects(
+        client.transcribe({
+            data: Uint8Array.from([1, 2, 3]),
+            filename: "voice.ogg",
+            mimeType: "audio/ogg",
+        }),
+        (error: unknown) => {
+            assert.ok(error instanceof VoiceTranscodingFailedError);
+            assert.equal(error.message, "Voice transcoding timed out.");
+            return true;
+        },
+    );
 });
 
 test("OpenRouterVoiceTranscriptionClient surfaces SDK failures as typed transcription errors", async () => {
@@ -199,13 +269,28 @@ test("OpenRouterVoiceTranscriptionClient surfaces SDK failures as typed transcri
                 },
             },
         },
+        {
+            async transcode() {
+                return {
+                    data: Uint8Array.from([7, 8, 9]),
+                    filename: "voice.wav",
+                    format: "wav" as const,
+                    mimeType: "audio/wav",
+                };
+            },
+        },
+        {
+            probe() {
+                return { status: "ready" as const };
+            },
+        },
     );
 
     await assert.rejects(
         client.transcribe({
             data: Uint8Array.from([1, 2, 3]),
-            filename: "voice.wav",
-            mimeType: "audio/wav",
+            filename: "voice.ogg",
+            mimeType: "audio/ogg",
         }),
         (error: unknown) => {
             assert.ok(error instanceof VoiceTranscriptionFailedError);
@@ -247,6 +332,21 @@ test("OpenRouterVoiceTranscriptionClient surfaces nested provider details for Op
                 },
             },
         },
+        {
+            async transcode() {
+                return {
+                    data: Uint8Array.from([7, 8, 9]),
+                    filename: "voice.wav",
+                    format: "wav" as const,
+                    mimeType: "audio/wav",
+                };
+            },
+        },
+        {
+            probe() {
+                return { status: "ready" as const };
+            },
+        },
     );
 
     await assert.rejects(
@@ -259,7 +359,7 @@ test("OpenRouterVoiceTranscriptionClient surfaces nested provider details for Op
             assert.ok(error instanceof VoiceTranscriptionFailedError);
             assert.equal(
                 error.message,
-                "Unsupported audio format | model: openai/gpt-audio-mini | format: ogg | provider: OpenAI | status: 502 | code: 10001",
+                "Unsupported audio format | model: openai/gpt-audio-mini | format: wav | provider: OpenAI | status: 502 | code: 10001",
             );
             return true;
         },

@@ -45,6 +45,8 @@ function createProject(id: string, worktree: string): OpenCodeProject {
 function createDependencies(
     client: OpenCodeClientLike,
     options: {
+        voiceRecognitionDetail?: "ffmpeg_missing" | "wav_encoder_missing";
+        voiceRecognitionStatus?: "configured" | "dependency_missing" | "not_configured";
         voiceTranscriptionEnabled?: boolean;
         voiceTranscriptionModel?: string | null;
     } = {},
@@ -64,13 +66,20 @@ function createDependencies(
         sessionRepo,
         {
             getStatus() {
+                const voiceRecognitionStatus = options.voiceRecognitionStatus
+                    ?? (options.voiceTranscriptionEnabled ? "configured" : "not_configured");
+                const model = voiceRecognitionStatus === "not_configured"
+                    ? null
+                    : options.voiceTranscriptionModel === undefined
+                        ? "openai/gpt-audio-mini"
+                        : options.voiceTranscriptionModel;
+
                 return {
-                    status: options.voiceTranscriptionEnabled ? "configured" : "not_configured",
-                    model: options.voiceTranscriptionEnabled
-                        ? options.voiceTranscriptionModel === undefined
-                            ? "openai/gpt-audio-mini"
-                            : options.voiceTranscriptionModel
-                        : null,
+                    status: voiceRecognitionStatus,
+                    model,
+                    detail: voiceRecognitionStatus === "dependency_missing"
+                        ? options.voiceRecognitionDetail ?? "ffmpeg_missing"
+                        : undefined,
                 };
             },
         },
@@ -442,4 +451,61 @@ test("/status shows yellow voice recognition when configured without a model nam
 
     assert.deepEqual(replies[0]?.options, { parse_mode: "MarkdownV2" });
     expectLine(markdown, "- **Voice Recognition:** \uD83D\uDFE1");
+});
+
+test("/status shows dependency-missing voice recognition details", async () => {
+    const replies: StatusReply[] = [];
+    const { dependencies, getStatusUseCase, sessionRepo } = createDependencies(
+        {
+            async getCurrentProject() {
+                return createProject("project-1", "E:/repo-1");
+            },
+            async getHealth() {
+                return {
+                    healthy: true,
+                    version: "1.0.0",
+                };
+            },
+            async getPath() {
+                return {
+                    home: "E:/Users/demo",
+                    state: "E:/Users/demo/.opencode",
+                    config: "E:/repo/opencode.json",
+                    worktree: "E:/repo-1",
+                    directory: "E:/repo-1",
+                };
+            },
+            async listSessions() {
+                return [] as never;
+            },
+            async listLspStatuses() {
+                return [];
+            },
+            async listMcpStatuses() {
+                return {};
+            },
+        } as never,
+        {
+            voiceRecognitionStatus: "dependency_missing",
+            voiceRecognitionDetail: "ffmpeg_missing",
+        },
+    );
+
+    await handleStatusCommand(
+        {
+            chat: { id: 5 },
+            async reply(text, options) {
+                replies.push({ text, options });
+                return {};
+            },
+        },
+        dependencies,
+    );
+
+    const copy = await getChatCopy(sessionRepo, 5);
+    const result = await getStatusUseCase.execute({ chatId: 5 });
+    const markdown = renderStatusMarkdown(result, copy);
+
+    assert.deepEqual(replies[0]?.options, { parse_mode: "MarkdownV2" });
+    expectLine(markdown, "- **Voice Recognition:** \uD83D\uDFE1 (openai/gpt-audio-mini, ffmpeg missing)");
 });

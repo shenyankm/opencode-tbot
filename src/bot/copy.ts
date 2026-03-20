@@ -55,6 +55,8 @@ export interface BotCopy {
         structuredOutput: string;
         voiceNotConfigured: string;
         voiceDownload: string;
+        voiceTranscodingDependency: string;
+        voiceTranscoding: string;
         voiceTranscription: string;
         voiceEmpty: string;
         voiceUnsupported: string;
@@ -223,6 +225,8 @@ const EN_BOT_COPY: BotCopy = {
         structuredOutput: "Structured output validation failed.",
         voiceNotConfigured: "Voice transcription is not configured.",
         voiceDownload: "Failed to download the Telegram voice file.",
+        voiceTranscodingDependency: "Voice transcoding dependency is unavailable.",
+        voiceTranscoding: "Voice transcoding failed.",
         voiceTranscription: "Voice transcription failed.",
         voiceEmpty: "Voice transcription returned empty text.",
         voiceUnsupported: "Voice message file is too large or unsupported.",
@@ -439,6 +443,8 @@ const ZH_CN_BOT_COPY: BotCopy = {
         structuredOutput: "结构化输出校验失败。",
         voiceNotConfigured: "未配置语音转写服务。",
         voiceDownload: "下载 Telegram 语音文件失败。",
+        voiceTranscodingDependency: "语音转码依赖不可用。",
+        voiceTranscoding: "语音转码失败。",
         voiceTranscription: "语音转写失败。",
         voiceEmpty: "语音转写结果为空。",
         voiceUnsupported: "语音文件过大或不受支持。",

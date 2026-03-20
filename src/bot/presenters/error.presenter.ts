@@ -59,6 +59,20 @@ function normalizeError(error: unknown, copy: BotCopy): PresentedError {
         };
     }
 
+    if (isNamedError(error, "VoiceTranscodingDependencyError")) {
+        return {
+            message: copy.errors.voiceTranscodingDependency,
+            cause: extractMessage(error.data) ?? null,
+        };
+    }
+
+    if (isNamedError(error, "VoiceTranscodingFailedError")) {
+        return {
+            message: copy.errors.voiceTranscoding,
+            cause: extractMessage(error.data) ?? null,
+        };
+    }
+
     if (isNamedError(error, "VoiceTranscriptionFailedError")) {
         return {
             message: copy.errors.voiceTranscription,

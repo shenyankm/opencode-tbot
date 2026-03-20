@@ -465,6 +465,16 @@ function formatVoiceRecognitionBadge(
             : "\uD83D\uDFE1";
     }
 
+    if (status.status === "dependency_missing") {
+        const detail = status.detail === "wav_encoder_missing"
+            ? "wav encoder missing"
+            : "ffmpeg missing";
+
+        return status.model
+            ? `\uD83D\uDFE1 (${status.model}, ${detail})`
+            : `\uD83D\uDFE1 (${detail})`;
+    }
+
     return "\u26AA";
 }
 

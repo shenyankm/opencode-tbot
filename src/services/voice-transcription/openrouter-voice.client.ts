@@ -1,4 +1,26 @@
 import { basename, extname } from "node:path";
+import {
+    SystemFfmpegProbe,
+    SystemFfmpegWavTranscoder,
+    type AudioTranscoderLike,
+    type FfmpegProbeLike,
+    type FfmpegProbeResult,
+    type VoiceTranscodingDependencyDetail,
+    VoiceTranscodingDependencyError,
+    VoiceTranscodingFailedError,
+} from "./audio-transcoder.js";
+
+export {
+    SystemFfmpegProbe,
+    SystemFfmpegWavTranscoder,
+    VoiceTranscodingDependencyError,
+    VoiceTranscodingFailedError,
+};
+export type {
+    AudioTranscoderLike,
+    FfmpegProbeLike,
+    VoiceTranscodingDependencyDetail,
+};
 
 export interface VoiceTranscriptionInput {
     data: Uint8Array | ArrayBuffer;
@@ -10,10 +32,22 @@ export interface VoiceTranscriptionResult {
     text: string;
 }
 
-export interface VoiceRecognitionStatus {
-    model: string | null;
-    status: "configured" | "not_configured";
-}
+export type VoiceRecognitionStatus =
+    | {
+        detail?: undefined;
+        model: string | null;
+        status: "configured";
+    }
+    | {
+        detail: VoiceTranscodingDependencyDetail;
+        model: string | null;
+        status: "dependency_missing";
+    }
+    | {
+        detail?: undefined;
+        model: null;
+        status: "not_configured";
+    };
 
 export interface VoiceTranscriptionClientLike {
     getStatus(): VoiceRecognitionStatus;
@@ -114,6 +148,8 @@ export class DisabledVoiceTranscriptionClient implements VoiceTranscriptionClien
 }
 
 export class OpenRouterVoiceTranscriptionClient implements VoiceTranscriptionClientLike {
+    private readonly audioTranscoder: AudioTranscoderLike;
+    private readonly ffmpegProbeResult: FfmpegProbeResult;
     private readonly model: string;
     private readonly sdk: OpenRouterSdkLike;
     private readonly timeoutMs: number;
@@ -122,7 +158,11 @@ export class OpenRouterVoiceTranscriptionClient implements VoiceTranscriptionCli
     constructor(
         options: OpenRouterVoiceTranscriptionClientOptions,
         sdk: OpenRouterSdkLike,
+        audioTranscoder: AudioTranscoderLike = new SystemFfmpegWavTranscoder(),
+        ffmpegProbe: FfmpegProbeLike = new SystemFfmpegProbe(),
     ) {
+        this.audioTranscoder = audioTranscoder;
+        this.ffmpegProbeResult = ffmpegProbe.probe();
         this.model = options.model;
         this.sdk = sdk;
         this.timeoutMs = options.timeoutMs;
@@ -130,6 +170,14 @@ export class OpenRouterVoiceTranscriptionClient implements VoiceTranscriptionCli
     }
 
     getStatus(): VoiceRecognitionStatus {
+        if (this.ffmpegProbeResult.status === "dependency_missing") {
+            return {
+                status: "dependency_missing",
+                model: this.model,
+                detail: this.ffmpegProbeResult.detail,
+            };
+        }
+
         return {
             status: "configured",
             model: this.model,
@@ -137,8 +185,14 @@ export class OpenRouterVoiceTranscriptionClient implements VoiceTranscriptionCli
     }
 
     async transcribe(input: VoiceTranscriptionInput): Promise<VoiceTranscriptionResult> {
-        const format = resolveAudioFormat(input.filename, input.mimeType);
-        const audioData = toBase64(input.data);
+        const sourceFormat = resolveAudioFormat(input.filename, input.mimeType);
+        const preparedAudio = await prepareAudioForTranscription(
+            input,
+            sourceFormat,
+            this.audioTranscoder,
+            this.ffmpegProbeResult,
+        );
+        const audioData = toBase64(preparedAudio.data);
         const prompt = buildTranscriptionPrompt(this.transcriptionPrompt);
 
         let response: OpenRouterChatResponseLike;
@@ -158,7 +212,7 @@ export class OpenRouterVoiceTranscriptionClient implements VoiceTranscriptionCli
                                     type: "input_audio",
                                     inputAudio: {
                                         data: audioData,
-                                        format,
+                                        format: preparedAudio.format,
                                     },
                                 },
                             ],
@@ -175,7 +229,7 @@ export class OpenRouterVoiceTranscriptionClient implements VoiceTranscriptionCli
         } catch (error) {
             throw new VoiceTranscriptionFailedError(
                 buildTranscriptionErrorMessage(error, {
-                    format,
+                    format: preparedAudio.format,
                     model: this.model,
                 }),
             );
@@ -185,6 +239,36 @@ export class OpenRouterVoiceTranscriptionClient implements VoiceTranscriptionCli
             text: extractTranscript(response),
         };
     }
+}
+
+async function prepareAudioForTranscription(
+    input: VoiceTranscriptionInput,
+    sourceFormat: VoiceAudioFormat,
+    audioTranscoder: AudioTranscoderLike,
+    ffmpegProbeResult: FfmpegProbeResult,
+): Promise<{
+    data: Uint8Array;
+    format: "wav";
+}> {
+    if (sourceFormat === "wav") {
+        return {
+            data: toUint8Array(input.data),
+            format: "wav",
+        };
+    }
+
+    ensureTranscodingDependencyReady(ffmpegProbeResult);
+    const transcoded = await audioTranscoder.transcode({
+        data: input.data,
+        filename: input.filename,
+        sourceFormat,
+        targetFormat: "wav",
+    });
+
+    return {
+        data: transcoded.data,
+        format: transcoded.format,
+    };
 }
 
 const MIME_TYPE_FORMAT_MAP: Record<string, VoiceAudioFormat> = {
@@ -231,6 +315,12 @@ function toBase64(data: Uint8Array | ArrayBuffer): string {
 
 function toUint8Array(data: Uint8Array | ArrayBuffer): Uint8Array {
     return data instanceof Uint8Array ? data : new Uint8Array(data);
+}
+
+function ensureTranscodingDependencyReady(result: FfmpegProbeResult): void {
+    if (result.status === "dependency_missing") {
+        throw new VoiceTranscodingDependencyError(result.detail, result.message);
+    }
 }
 
 function buildTranscriptionPrompt(transcriptionPrompt: string | null): string {

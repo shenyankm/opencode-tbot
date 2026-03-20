@@ -17,6 +17,8 @@ import { ForegroundSessionTracker } from "../services/session-activity/foregroun
 import {
     DisabledVoiceTranscriptionClient,
     OpenRouterVoiceTranscriptionClient,
+    SystemFfmpegProbe,
+    SystemFfmpegWavTranscoder,
 } from "../services/voice-transcription/openrouter-voice.client.js";
 import { VoiceTranscriptionService } from "../services/voice-transcription/voice-transcription.service.js";
 import { AbortPromptUseCase } from "../use-cases/abort-prompt.usecase.js";
@@ -158,6 +160,8 @@ function createVoiceTranscriptionClient(config: AppOpenRouterConfig) {
                 apiKey: config.apiKey,
                 timeoutMs: config.timeoutMs,
             }),
+            new SystemFfmpegWavTranscoder(),
+            new SystemFfmpegProbe(),
         )
         : new DisabledVoiceTranscriptionClient();
 }
