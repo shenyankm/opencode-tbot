@@ -17,9 +17,6 @@ importers:
       '@opencode-ai/sdk':
         specifier: 1.2.27
         version: 1.2.27
-      '@openrouter/sdk':
-        specifier: 0.9.11
-        version: 0.9.11
       grammy:
         specifier: ^1.38.0
         version: 1.41.1
@@ -227,9 +224,6 @@ packages:
 
   '@opencode-ai/sdk@1.2.27':
     resolution: {integrity: sha512-Wk0o/I+Fo+wE3zgvlJDs8Fb67KlKqX0PrV8dK5adSDkANq6r4Z25zXJg2iOir+a8ntg3rAcpel1OY4FV/TwRUA==}
-
-  '@openrouter/sdk@0.9.11':
-    resolution: {integrity: sha512-BgFu6NcIJO4a9aVjr04y3kZ8pyM71j15I+bzfVAGEvxnj+KQNIkBYQGgwrG3D+aT1QpDKLki8btcQmpaxUas6A==}
 
   '@oxc-project/types@0.120.0':
     resolution: {integrity: sha512-k1YNu55DuvAip/MGE1FTsIuU3FUCn6v/ujG9V7Nq5Df/kX2CWb13hhwD0lmJGMGqE+bE1MXvv9SZVnMzEXlWcg==}
@@ -696,10 +690,6 @@ snapshots:
       zod: 4.1.8
 
   '@opencode-ai/sdk@1.2.27': {}
-
-  '@openrouter/sdk@0.9.11':
-    dependencies:
-      zod: 3.25.76
 
   '@oxc-project/types@0.120.0': {}
 

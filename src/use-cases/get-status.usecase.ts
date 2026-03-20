@@ -7,10 +7,6 @@ import type {
     OpenCodePath,
     OpenCodeSession,
 } from "../services/opencode/opencode.client.js";
-import type {
-    VoiceRecognitionStatus,
-    VoiceTranscriptionServiceLike,
-} from "../services/voice-transcription/voice-transcription.service.js";
 import type { GetHealthUseCase } from "./get-health.usecase.js";
 import type { GetPathUseCase } from "./get-path.usecase.js";
 import type { ListLspResult, ListLspUseCase } from "./list-lsp.usecase.js";
@@ -39,15 +35,12 @@ export interface WorkspaceStatusResult {
     currentSession: string | null;
 }
 
-export type VoiceRecognitionStatusResult = VoiceRecognitionStatus;
-
 export interface GetStatusResult {
     health: StatusSectionResult<OpenCodeHealth>;
     lsp: StatusSectionResult<ListLspResult>;
     mcp: StatusSectionResult<ListMcpResult>;
     path: StatusSectionResult<OpenCodePath>;
     plugins: StatusSectionResult<ConfiguredPluginsResult>;
-    voiceRecognition: VoiceRecognitionStatusResult;
     workspace: StatusSectionResult<WorkspaceStatusResult>;
 }
 
@@ -59,7 +52,6 @@ export class GetStatusUseCase {
         private readonly listMcpUseCase: ListMcpUseCase,
         private readonly listSessionsUseCase: ListSessionsUseCase,
         private readonly sessionRepo: SessionRepository,
-        private readonly voiceTranscriptionService: Pick<VoiceTranscriptionServiceLike, "getStatus">,
     ) { }
 
     async execute(input: { chatId: number }): Promise<GetStatusResult> {
@@ -84,7 +76,6 @@ export class GetStatusUseCase {
             health: mapSettledResult(health),
             path: pathResult,
             plugins,
-            voiceRecognition: this.voiceTranscriptionService.getStatus(),
             workspace,
             lsp: mapSettledResult(lsp),
             mcp: mapSettledResult(mcp),

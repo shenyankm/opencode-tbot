@@ -60,7 +60,6 @@ test("OpenCode host loads the plugin and starts Telegram polling", { skip: !SHOU
     await installPlugin({
         homeDir,
         botToken: "123456:test-token",
-        enableVoice: false,
         registerPlugin: false,
         telegramApiRoot,
     });

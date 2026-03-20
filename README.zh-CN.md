@@ -12,8 +12,8 @@
 
 - 文本消息会转发到当前 OpenCode 会话。
 - Telegram 图片会作为 OpenCode 文件片段上传。
-- Telegram 语音消息可先通过 OpenRouter 转写，再进入正常 prompt 流程。
-- OpenCode 触发的权限请求可以直接在 Telegram 中通过内联按钮批准或拒绝。
+- Telegram 语音消息会被明确拒绝，并返回本地化提示。
+- OpenCode 触发的权限请求可以直接在 Telegram 内联按钮中批准或拒绝。
 - 会话完成和错误事件可以主动回推到绑定的 Telegram chat。
 - 聊天状态通过 JSON 状态文件持久化，可兼容 Node 和 Bun 运行环境。
 
@@ -39,7 +39,7 @@ npm exec --package opencode-tbot@latest opencode-tbot -- --version
 npm exec --package opencode-tbot@latest opencode-tbot -- update
 ```
 
-从当前环境卸载 npm 包：
+如果 OpenCode 把插件显示成 `file:///.../node_modules/...` 路径，可删除旧的本地 npm 安装：
 
 ```bash
 npm uninstall opencode-tbot
@@ -52,7 +52,9 @@ npm uninstall opencode-tbot
 1. 全局默认配置 `~/.config/opencode/opencode-tbot/config.json`
 2. 项目覆盖配置 `<worktree>/tbot.config.json`
 
-项目配置会覆盖全局默认值；`telegram`、`state`、`openrouter` 这些分段配置会进行深合并。
+项目配置会覆盖全局默认值；`telegram` 和 `state` 会按分段进行深合并。
+
+遗留的 `openrouter` 语音转写配置在运行时会被忽略；安装器重写配置时会自动清理这些字段。
 
 ### `tbot.config.json` 示例
 
@@ -66,12 +68,6 @@ npm uninstall opencode-tbot
   "state": {
     "path": "./data/opencode-tbot.state.json"
   },
-  "openrouter": {
-    "apiKey": "your_openrouter_api_key",
-    "model": "openai/gpt-audio-mini",
-    "timeoutMs": 30000,
-    "transcriptionPrompt": ""
-  },
   "logLevel": "info"
 }
 ```
@@ -84,10 +80,6 @@ npm uninstall opencode-tbot
 | `telegram.allowedChatIds` | 否 | `[]` | 允许访问的 Telegram chat ID 数组。为空时表示接受任意 chat。 |
 | `telegram.apiRoot` | 否 | `https://api.telegram.org` | Telegram Bot API 根地址，适合测试或自托管网关。 |
 | `state.path` | 否 | `./data/opencode-tbot.state.json` | JSON 状态文件路径，相对当前 OpenCode worktree 解析。 |
-| `openrouter.apiKey` | 否 | `""` | OpenRouter API key。仅在启用语音转写时需要。 |
-| `openrouter.model` | 否 | `openai/gpt-audio-mini` | 语音转写使用的 OpenRouter 模型。 |
-| `openrouter.timeoutMs` | 否 | `30000` | 语音转写超时时间，单位毫秒。 |
-| `openrouter.transcriptionPrompt` | 否 | `""` | 追加到内置转写提示词后的可选说明。 |
 | `logLevel` | 否 | `info` | 插件日志级别。日志统一通过 `client.app.log()` 上报。 |
 
 ## 运行时约定
@@ -101,17 +93,13 @@ npm uninstall opencode-tbot
 - `telegram.allowedChatIds`
 - `telegram.apiRoot`
 - `state.path`
-- `openrouter.apiKey`
-- `openrouter.model`
-- `openrouter.timeoutMs`
-- `openrouter.transcriptionPrompt`
 - `logLevel`
 
 说明：
 
-- `state.path` 默认是 `./data/opencode-tbot.state.json`，并相对当前 OpenCode worktree 解析
-- 日志通过 `client.app.log()` 统一输出
-- 权限审批和会话通知由插件 hook 处理
+- `state.path` 默认是 `./data/opencode-tbot.state.json`，并相对当前 OpenCode worktree 解析。
+- 日志通过 `client.app.log()` 统一输出。
+- 权限审批和会话通知由插件 hook 处理。
 
 ## 命令
 
@@ -124,7 +112,7 @@ npm uninstall opencode-tbot
 - `/model` 或 `/models` 列出可用模型并切换当前模型
 - `/language` 切换 bot 显示语言
 
-任意非命令文本都会被当作 prompt 发送给 OpenCode。配置了 OpenRouter 后，Telegram `voice` 消息会先转写再进入同一条 prompt 流程。图片会作为 OpenCode 文件片段上传。
+任意非命令文本都会被当作 prompt 发送给 OpenCode。图片会作为 OpenCode 文件片段上传。Telegram 语音消息当前不受支持，bot 会直接返回本地化拒绝提示。
 
 ## 开发
 
@@ -152,8 +140,8 @@ pnpm test
 
 ### 我需要一个正在运行的 OpenCode 实例吗？
 
-需要。这个仓库提供的是 Telegram 集成层，依赖加载它的 OpenCode Host 进程。
+需要。这一仓库提供的是 Telegram 集成层，依赖加载它的 OpenCode Host 进程。
 
 ### 这是 OpenCode 官方项目吗？
 
-不是。它只是与 OpenCode 集成，并非 OpenCode 官方项目。
+不是。它只是一个 OpenCode 集成，并非 OpenCode 官方项目。

@@ -5,7 +5,6 @@ import { tmpdir } from "node:os";
 import test from "node:test";
 import type { AppContainer } from "../src/app/container.js";
 import {
-    DEFAULT_OPENROUTER_MODEL,
     loadAppConfig,
     type AppConfig,
     type PluginConfigSource,
@@ -126,20 +125,16 @@ test("loadAppConfig resolves plugin configuration from the config file shape", (
     assert.equal(config.telegramBotToken, "telegram-token");
     assert.equal(config.telegramApiRoot, "https://api.telegram.org");
     assert.equal(config.stateFilePath, join(cwd, "data/opencode-tbot.state.json"));
-    assert.equal(config.openrouter.configured, false);
-    assert.equal(config.openrouter.model, DEFAULT_OPENROUTER_MODEL);
 });
 
-test("loadAppConfig enables OpenRouter voice transcription when apiKey is configured", () => {
+test("loadAppConfig ignores legacy openrouter configuration", () => {
     const config = loadAppConfig(createConfig({
         openrouter: {
             apiKey: "openrouter-key",
         },
     }));
 
-    assert.equal(config.openrouter.configured, true);
-    assert.equal(config.openrouter.apiKey, "openrouter-key");
-    assert.equal(config.openrouter.model, DEFAULT_OPENROUTER_MODEL);
+    assert.equal("openrouter" in config, false);
 });
 
 test("preparePluginConfiguration loads telegram.botToken from cwd config file", async () => {
@@ -206,19 +201,17 @@ test("preparePluginConfiguration merges global defaults with project overrides",
     assert.equal(prepared.config.telegram?.botToken, "global-token");
     assert.equal(prepared.config.logLevel, "debug");
     assert.equal(prepared.config.state?.path, "./project-state.json");
-    assert.equal(prepared.config.openrouter?.apiKey, "global-openrouter-key");
-    assert.equal(prepared.config.openrouter?.model, "openai/gpt-audio-mini");
+    assert.equal("openrouter" in prepared.config, false);
     assert.equal(prepared.globalConfigFilePath, globalConfigFilePath);
 });
 
-test("preparePluginConfiguration ignores project OpenRouter apiKey overrides", async () => {
+test("preparePluginConfiguration strips legacy openrouter config from global and project files", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-plugin-global-key-"));
     const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-home-global-key-"));
-    const globalConfigFilePath = join(homeDir, ".config", "opencode", "opencode-tbot", "config.json");
 
     mkdirSync(join(homeDir, ".config", "opencode", "opencode-tbot"), { recursive: true });
     writeFileSync(
-        globalConfigFilePath,
+        join(homeDir, ".config", "opencode", "opencode-tbot", "config.json"),
         serializePluginConfig({
             telegram: {
                 botToken: "global-token",
@@ -246,35 +239,7 @@ test("preparePluginConfiguration ignores project OpenRouter apiKey overrides", a
         homeDir,
     });
 
-    assert.equal(prepared.config.openrouter?.apiKey, "global-openrouter-key");
-    assert.equal(prepared.config.openrouter?.timeoutMs, 60_000);
-});
-
-test("preparePluginConfiguration ignores project OpenRouter apiKey when no global key exists", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-plugin-no-global-key-"));
-    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-home-no-global-key-"));
-
-    writeFileSync(
-        join(cwd, PLUGIN_CONFIG_FILE_NAME),
-        serializePluginConfig({
-            telegram: {
-                botToken: "project-token",
-            },
-            openrouter: {
-                apiKey: "project-openrouter-key",
-                model: "openai/gpt-audio-mini",
-            },
-        }),
-        "utf8",
-    );
-
-    const prepared = await preparePluginConfiguration({
-        cwd,
-        homeDir,
-    });
-
-    assert.equal(prepared.config.openrouter?.apiKey, undefined);
-    assert.equal(prepared.config.openrouter?.model, "openai/gpt-audio-mini");
+    assert.equal("openrouter" in prepared.config, false);
 });
 
 test("preparePluginConfiguration keeps missing tokens unresolved for the installer flow", async () => {

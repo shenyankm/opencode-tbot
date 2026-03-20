@@ -44,12 +44,6 @@ function createProject(id: string, worktree: string): OpenCodeProject {
 
 function createDependencies(
     client: OpenCodeClientLike,
-    options: {
-        voiceRecognitionDetail?: "ffmpeg_missing" | "wav_encoder_missing";
-        voiceRecognitionStatus?: "configured" | "dependency_missing" | "not_configured";
-        voiceTranscriptionEnabled?: boolean;
-        voiceTranscriptionModel?: string | null;
-    } = {},
 ) {
     const sessionRepo = new InMemorySessionRepository();
     const getHealthUseCase = new GetHealthUseCase(client);
@@ -64,25 +58,6 @@ function createDependencies(
         listMcpUseCase,
         listSessionsUseCase,
         sessionRepo,
-        {
-            getStatus() {
-                const voiceRecognitionStatus = options.voiceRecognitionStatus
-                    ?? (options.voiceTranscriptionEnabled ? "configured" : "not_configured");
-                const model = voiceRecognitionStatus === "not_configured"
-                    ? null
-                    : options.voiceTranscriptionModel === undefined
-                        ? "openai/gpt-audio-mini"
-                        : options.voiceTranscriptionModel;
-
-                return {
-                    status: voiceRecognitionStatus,
-                    model,
-                    detail: voiceRecognitionStatus === "dependency_missing"
-                        ? options.voiceRecognitionDetail ?? "ffmpeg_missing"
-                        : undefined,
-                };
-            },
-        },
     );
 
     return {
@@ -198,9 +173,6 @@ test("/status aggregates health, path, plugins, LSP, and MCP into one reply", as
                 };
             },
         } as never,
-        {
-            voiceTranscriptionEnabled: true,
-        },
     );
 
     await sessionRepo.setCurrent({
@@ -240,7 +212,6 @@ test("/status aggregates health, path, plugins, LSP, and MCP into one reply", as
     expectLine(markdown, "## \uD83D\uDD0C MCP");
     expectLine(markdown, "## \uD83E\uDDE0 LSP");
     expectLine(markdown, "- **Connectivity:** \uD83D\uDFE2");
-    expectLine(markdown, "- **Voice Recognition:** \uD83D\uDFE2 (openai/gpt-audio-mini)");
     expectLine(markdown, "- **OpenCode Version:** 1.0.0");
     expectLine(markdown, `- **opencode-tbot Version:** ${OPENCODE_TBOT_VERSION}`);
     expectLine(markdown, "- **Current Project:** `E:/repo-1`");
@@ -304,7 +275,6 @@ test("/status keeps successful sections when one section fails", async () => {
 
     assert.deepEqual(replies[0]?.options, { parse_mode: "MarkdownV2" });
     expectLine(markdown, "- **Connectivity:** \uD83D\uDD34");
-    expectLine(markdown, "- **Voice Recognition:** \u26AA");
     expectLine(markdown, "- **Current Project:** `E:/repo`");
     expectLine(markdown, "- **Current Session:** OpenCode Default");
     assert.match(markdown, /- \*\*Details:\*\* Unexpected error\./u);
@@ -385,7 +355,6 @@ test("/status uses the selected chat language", async () => {
     expectLine(markdown, "## \uD83D\uDD0C MCP");
     expectLine(markdown, "## \uD83E\uDDE0 LSP");
     expectLine(markdown, "- **\u8FDE\u901A\u6027:** \uD83D\uDFE2");
-    expectLine(markdown, "- **\u8BED\u97F3\u8BC6\u522B:** \u26AA");
     expectLine(markdown, "- **OpenCode\u7248\u672C:** 1.0.0");
     expectLine(markdown, `- **opencode-tbot\u7248\u672C:** ${OPENCODE_TBOT_VERSION}`);
     expectLine(markdown, "- **\u5F53\u524D\u9879\u76EE:** `E:/repo`");
@@ -394,118 +363,4 @@ test("/status uses the selected chat language", async () => {
     assert.doesNotMatch(markdown, /\u5DF2\u7981\u7528/u);
     assert.doesNotMatch(markdown, /\u670D\u52A1\u72B6\u6001/u);
     assert.doesNotMatch(markdown, /\u6700\u540E\u66F4\u65B0/u);
-});
-
-test("/status shows yellow voice recognition when configured without a model name", async () => {
-    const replies: StatusReply[] = [];
-    const { dependencies, getStatusUseCase, sessionRepo } = createDependencies(
-        {
-            async getCurrentProject() {
-                return createProject("project-1", "E:/repo-1");
-            },
-            async getHealth() {
-                return {
-                    healthy: true,
-                    version: "1.0.0",
-                };
-            },
-            async getPath() {
-                return {
-                    home: "E:/Users/demo",
-                    state: "E:/Users/demo/.opencode",
-                    config: "E:/repo/opencode.json",
-                    worktree: "E:/repo-1",
-                    directory: "E:/repo-1",
-                };
-            },
-            async listSessions() {
-                return [] as never;
-            },
-            async listLspStatuses() {
-                return [];
-            },
-            async listMcpStatuses() {
-                return {};
-            },
-        } as never,
-        {
-            voiceTranscriptionEnabled: true,
-            voiceTranscriptionModel: null,
-        },
-    );
-
-    await handleStatusCommand(
-        {
-            chat: { id: 4 },
-            async reply(text, options) {
-                replies.push({ text, options });
-                return {};
-            },
-        },
-        dependencies,
-    );
-
-    const copy = await getChatCopy(sessionRepo, 4);
-    const result = await getStatusUseCase.execute({ chatId: 4 });
-    const markdown = renderStatusMarkdown(result, copy);
-
-    assert.deepEqual(replies[0]?.options, { parse_mode: "MarkdownV2" });
-    expectLine(markdown, "- **Voice Recognition:** \uD83D\uDFE1");
-});
-
-test("/status shows dependency-missing voice recognition details", async () => {
-    const replies: StatusReply[] = [];
-    const { dependencies, getStatusUseCase, sessionRepo } = createDependencies(
-        {
-            async getCurrentProject() {
-                return createProject("project-1", "E:/repo-1");
-            },
-            async getHealth() {
-                return {
-                    healthy: true,
-                    version: "1.0.0",
-                };
-            },
-            async getPath() {
-                return {
-                    home: "E:/Users/demo",
-                    state: "E:/Users/demo/.opencode",
-                    config: "E:/repo/opencode.json",
-                    worktree: "E:/repo-1",
-                    directory: "E:/repo-1",
-                };
-            },
-            async listSessions() {
-                return [] as never;
-            },
-            async listLspStatuses() {
-                return [];
-            },
-            async listMcpStatuses() {
-                return {};
-            },
-        } as never,
-        {
-            voiceRecognitionStatus: "dependency_missing",
-            voiceRecognitionDetail: "ffmpeg_missing",
-        },
-    );
-
-    await handleStatusCommand(
-        {
-            chat: { id: 5 },
-            async reply(text, options) {
-                replies.push({ text, options });
-                return {};
-            },
-        },
-        dependencies,
-    );
-
-    const copy = await getChatCopy(sessionRepo, 5);
-    const result = await getStatusUseCase.execute({ chatId: 5 });
-    const markdown = renderStatusMarkdown(result, copy);
-
-    assert.deepEqual(replies[0]?.options, { parse_mode: "MarkdownV2" });
-    expectLine(markdown, "- **Voice Recognition:** \uD83D\uDFE1 (openai/gpt-audio-mini, ffmpeg missing)");
 });

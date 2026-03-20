@@ -76,7 +76,6 @@ interface StatusLayoutCopy {
     rootLabel: string;
     statusLabel: string;
     tbotVersionLabel: string;
-    voiceRecognitionLabel: string;
     workspaceTitle: string;
 }
 
@@ -186,10 +185,6 @@ function presentStatusPlainOverviewLines(input: GetStatusResult, copy: BotCopy, 
                 ? layout.errorStatus
                 : formatHealthBadge(input.health.data.healthy, layout),
         ),
-        presentPlainStatusBullet(
-            layout.voiceRecognitionLabel,
-            formatVoiceRecognitionBadge(input.voiceRecognition, layout),
-        ),
     ];
 
     if (input.health.status === "error") {
@@ -214,10 +209,6 @@ function presentStatusMarkdownOverviewLines(input: GetStatusResult, copy: BotCop
             input.health.status === "error"
                 ? layout.errorStatus
                 : formatHealthBadge(input.health.data.healthy, layout),
-        ),
-        presentMarkdownStatusBullet(
-            layout.voiceRecognitionLabel,
-            formatVoiceRecognitionBadge(input.voiceRecognition, layout),
         ),
     ];
 
@@ -455,29 +446,6 @@ function formatHealthBadge(healthy: boolean, layout: StatusLayoutCopy): string {
     return healthy ? "\uD83D\uDFE2" : layout.errorStatus;
 }
 
-function formatVoiceRecognitionBadge(
-    status: GetStatusResult["voiceRecognition"],
-    _layout: StatusLayoutCopy,
-): string {
-    if (status.status === "configured") {
-        return status.model
-            ? `\uD83D\uDFE2 (${status.model})`
-            : "\uD83D\uDFE1";
-    }
-
-    if (status.status === "dependency_missing") {
-        const detail = status.detail === "wav_encoder_missing"
-            ? "wav encoder missing"
-            : "ffmpeg missing";
-
-        return status.model
-            ? `\uD83D\uDFE1 (${status.model}, ${detail})`
-            : `\uD83D\uDFE1 (${detail})`;
-    }
-
-    return "\u26AA";
-}
-
 function formatLspStatusBadge(status: OpenCodeLspStatus): string {
     switch (status.status) {
         case "connected":
@@ -594,7 +562,6 @@ function getStatusLayoutCopy(copy: BotCopy): StatusLayoutCopy {
             rootLabel: "Root",
             statusLabel: "Status",
             tbotVersionLabel: "opencode-tbot Version",
-            voiceRecognitionLabel: "Voice Recognition",
             workspaceTitle: "\uD83D\uDCC1 Workspace",
         };
     }
@@ -619,7 +586,6 @@ function getStatusLayoutCopy(copy: BotCopy): StatusLayoutCopy {
         rootLabel: "\u6839\u76EE\u5F55",
         statusLabel: "\u72B6\u6001",
         tbotVersionLabel: "opencode-tbot\u7248\u672C",
-        voiceRecognitionLabel: "\u8BED\u97F3\u8BC6\u522B",
         workspaceTitle: "\uD83D\uDCC1 \u5DE5\u4F5C\u533A",
     };
 }

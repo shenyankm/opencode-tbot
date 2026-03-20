@@ -14,7 +14,6 @@ test("installPlugin registers the npm plugin and writes the global runtime confi
     await installPlugin({
         homeDir,
         botToken: "telegram-token",
-        enableVoice: false,
         telegramApiRoot: "http://127.0.0.1:9000",
     });
 
@@ -23,38 +22,42 @@ test("installPlugin registers the npm plugin and writes the global runtime confi
     const openCodeConfig = JSON.parse(readFileSync(openCodeConfigPath, "utf8")) as { plugin: string[] };
     const pluginConfig = JSON.parse(readFileSync(pluginConfigPath, "utf8")) as {
         telegram: { botToken: string; apiRoot: string };
-        openrouter?: { apiKey?: string };
     };
 
     assert.deepEqual(openCodeConfig.plugin, ["opencode-tbot@latest"]);
     assert.equal(pluginConfig.telegram.botToken, "telegram-token");
     assert.equal(pluginConfig.telegram.apiRoot, "http://127.0.0.1:9000");
-    assert.equal(pluginConfig.openrouter?.apiKey, undefined);
 });
 
-test("installPlugin is idempotent and stores the OpenRouter key when voice is enabled", async () => {
-    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-voice-"));
+test("installPlugin is idempotent and removes legacy openrouter config", async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-cleanup-"));
+    const pluginConfigPath = getGlobalPluginConfigFilePath(homeDir);
+
+    mkdirSync(join(homeDir, ".config", "opencode", "opencode-tbot"), { recursive: true });
+    writeFileSync(pluginConfigPath, JSON.stringify({
+        telegram: {
+            botToken: "old-token",
+        },
+        openrouter: {
+            apiKey: "openrouter-key",
+            model: "openai/gpt-audio-mini",
+        },
+    }, null, 2));
 
     await installPlugin({
         homeDir,
         botToken: "telegram-token",
-        enableVoice: true,
-        openrouterApiKey: "openrouter-key",
     });
     await installPlugin({
         homeDir,
         botToken: "telegram-token",
-        enableVoice: true,
-        openrouterApiKey: "openrouter-key",
     });
 
     const openCodeConfig = JSON.parse(readFileSync(getOpenCodeConfigFilePath(homeDir), "utf8")) as { plugin: string[] };
-    const pluginConfig = JSON.parse(readFileSync(getGlobalPluginConfigFilePath(homeDir), "utf8")) as {
-        openrouter: { apiKey: string };
-    };
+    const pluginConfig = JSON.parse(readFileSync(pluginConfigPath, "utf8")) as Record<string, unknown>;
 
     assert.deepEqual(openCodeConfig.plugin, ["opencode-tbot@latest"]);
-    assert.equal(pluginConfig.openrouter.apiKey, "openrouter-key");
+    assert.equal("openrouter" in pluginConfig, false);
 });
 
 test("installPlugin can skip plugin registration for local integration tests", async () => {
@@ -63,7 +66,6 @@ test("installPlugin can skip plugin registration for local integration tests", a
     await installPlugin({
         homeDir,
         botToken: "telegram-token",
-        enableVoice: false,
         registerPlugin: false,
     });
 
@@ -87,7 +89,6 @@ test("installPlugin prints a single success line on normal completion", async ()
         await installPlugin({
             homeDir,
             botToken: "telegram-token",
-            enableVoice: false,
         });
     } finally {
         process.chdir(originalCwd);
@@ -107,7 +108,6 @@ test("runCli defaults to install mode", async () => {
         homeDir,
         "--bot-token",
         "telegram-token",
-        "--disable-voice",
         "--skip-register",
     ]);
 
@@ -280,7 +280,6 @@ test("installPlugin warns when a legacy local npm install can affect the plugin 
         await installPlugin({
             homeDir,
             botToken: "telegram-token",
-            enableVoice: false,
         });
     } finally {
         process.chdir(originalCwd);

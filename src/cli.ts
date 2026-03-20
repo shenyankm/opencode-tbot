@@ -18,9 +18,7 @@ import {
 
 export interface InstallCommandOptions {
     botToken?: string;
-    enableVoice?: boolean;
     homeDir?: string;
-    openrouterApiKey?: string;
     pluginSpec?: string;
     registerPlugin?: boolean;
     telegramApiRoot?: string;
@@ -99,16 +97,6 @@ export async function installPlugin(options: InstallCommandOptions = {}): Promis
             options.botToken ?? await prompt.askSecret("Telegram bot token: "),
             "Telegram bot token is required.",
         );
-        const enableVoice = options.enableVoice ?? await prompt.confirm(
-            "Enable voice transcription? (y/N): ",
-            false,
-        );
-        const openrouterApiKey = enableVoice
-            ? normalizeRequiredString(
-                options.openrouterApiKey ?? await prompt.askSecret("OpenRouter API key: "),
-                "OpenRouter API key is required when voice transcription is enabled.",
-            )
-            : null;
         const telegramApiRoot = normalizeOptionalString(options.telegramApiRoot) ?? DEFAULT_TELEGRAM_API_ROOT;
         const pluginSpec = normalizeOptionalString(options.pluginSpec) ?? DEFAULT_PLUGIN_SPEC;
         const nextOpenCodeConfig = options.registerPlugin === false
@@ -118,7 +106,6 @@ export async function installPlugin(options: InstallCommandOptions = {}): Promis
             existingPluginConfig,
             botToken,
             telegramApiRoot,
-            openrouterApiKey,
         );
 
         if (options.registerPlugin === false) {
@@ -177,15 +164,6 @@ function parseCliOptions(argv: string[]): CliOptions {
             case "--bot-token":
                 options.botToken = values[++index];
                 break;
-            case "--enable-voice":
-                options.enableVoice = true;
-                break;
-            case "--disable-voice":
-                options.enableVoice = false;
-                break;
-            case "--openrouter-api-key":
-                options.openrouterApiKey = values[++index];
-                break;
             case "--plugin-spec":
                 options.pluginSpec = values[++index];
                 break;
@@ -218,7 +196,6 @@ function buildInstalledPluginConfig(
     current: PluginConfigSource,
     botToken: string,
     telegramApiRoot: string,
-    openrouterApiKey: string | null,
 ): PluginConfigSource {
     const merged = mergePluginConfigSources(current, {
         telegram: {
@@ -226,31 +203,11 @@ function buildInstalledPluginConfig(
             apiRoot: telegramApiRoot,
         },
     });
-    const nextOpenRouter = openrouterApiKey
-        ? {
-            ...(merged.openrouter ?? {}),
-            apiKey: openrouterApiKey,
-        }
-        : removeOpenRouterApiKey(merged.openrouter);
-
-    return {
-        ...merged,
-        ...(nextOpenRouter && Object.keys(nextOpenRouter).length > 0
-            ? { openrouter: nextOpenRouter }
-            : {}),
+    const { openrouter: _openrouter, ...nextConfig } = merged as PluginConfigSource & {
+        openrouter?: unknown;
     };
-}
 
-function removeOpenRouterApiKey(
-    config: PluginConfigSource["openrouter"],
-): PluginConfigSource["openrouter"] | undefined {
-    if (!config) {
-        return undefined;
-    }
-
-    const { apiKey: _apiKey, ...rest } = config;
-
-    return Object.keys(rest).length > 0 ? rest : undefined;
+    return nextConfig;
 }
 
 function ensurePluginRegistered(
@@ -596,9 +553,6 @@ function buildHelpText(): string {
         "",
         "Options:",
         "  --bot-token <token>",
-        "  --enable-voice",
-        "  --disable-voice",
-        "  --openrouter-api-key <key>",
         "  --telegram-api-root <url>",
         "  --plugin-spec <spec>",
         "  --skip-register",

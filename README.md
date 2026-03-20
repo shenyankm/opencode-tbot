@@ -12,7 +12,7 @@ A Telegram plugin for driving [OpenCode](https://opencode.ai) from chat.
 
 - Text messages are forwarded to the active OpenCode session.
 - Telegram images are uploaded as OpenCode file parts.
-- Telegram voice messages can be transcribed through OpenRouter before entering the normal prompt flow.
+- Telegram voice messages are explicitly rejected with a localized error reply.
 - Permission requests raised by OpenCode can be approved or rejected directly from Telegram inline buttons.
 - Session completion and error events can be reported back to the bound Telegram chat.
 - Chat state is stored in a JSON state file that works in both Node and Bun runtimes.
@@ -52,7 +52,9 @@ The runtime config is loaded in this order:
 1. global defaults from `~/.config/opencode/opencode-tbot/config.json`
 2. project overrides from `<worktree>/tbot.config.json`
 
-Project config is merged on top of the global config. `telegram`, `state`, and `openrouter` are deep-merged by section.
+Project config is merged on top of the global config. `telegram` and `state` are deep-merged by section.
+
+Legacy `openrouter` voice-transcription settings are ignored at runtime. When the installer rewrites the config, it removes them.
 
 ### Example `tbot.config.json`
 
@@ -66,12 +68,6 @@ Project config is merged on top of the global config. `telegram`, `state`, and `
   "state": {
     "path": "./data/opencode-tbot.state.json"
   },
-  "openrouter": {
-    "apiKey": "your_openrouter_api_key",
-    "model": "openai/gpt-audio-mini",
-    "timeoutMs": 30000,
-    "transcriptionPrompt": ""
-  },
   "logLevel": "info"
 }
 ```
@@ -84,10 +80,6 @@ Project config is merged on top of the global config. `telegram`, `state`, and `
 | `telegram.allowedChatIds` | No | `[]` | Allowed Telegram chat IDs. If empty, the bot accepts messages from any chat. |
 | `telegram.apiRoot` | No | `https://api.telegram.org` | Telegram Bot API base URL. Useful for tests or self-hosted gateways. |
 | `state.path` | No | `./data/opencode-tbot.state.json` | JSON state file path, resolved relative to the current OpenCode worktree. |
-| `openrouter.apiKey` | No | `""` | OpenRouter API key. Required only when voice transcription is enabled. |
-| `openrouter.model` | No | `openai/gpt-audio-mini` | OpenRouter model for voice transcription. |
-| `openrouter.timeoutMs` | No | `30000` | Voice transcription timeout in milliseconds. |
-| `openrouter.transcriptionPrompt` | No | `""` | Optional extra instruction appended to the transcription prompt. |
 | `logLevel` | No | `info` | Plugin log level. Logs are emitted through `client.app.log()`. |
 
 ## Runtime Expectations
@@ -101,10 +93,6 @@ Optional:
 - `telegram.allowedChatIds`
 - `telegram.apiRoot`
 - `state.path`
-- `openrouter.apiKey`
-- `openrouter.model`
-- `openrouter.timeoutMs`
-- `openrouter.transcriptionPrompt`
 - `logLevel`
 
 Notes:
@@ -124,7 +112,7 @@ Notes:
 - `/model` or `/models` list available models and switch the active one
 - `/language` switch the bot display language
 
-Any non-command text message is treated as a prompt and sent to OpenCode. Telegram `voice` messages follow the same prompt flow after transcription when OpenRouter is configured. Telegram images are forwarded as OpenCode file parts.
+Any non-command text message is treated as a prompt and sent to OpenCode. Telegram images are forwarded as OpenCode file parts. Telegram voice messages are not supported and receive a localized rejection reply.
 
 ## Development
 

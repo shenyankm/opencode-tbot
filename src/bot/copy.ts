@@ -53,12 +53,6 @@ export interface BotCopy {
         requestAborted: string;
         promptTimeout: string;
         structuredOutput: string;
-        voiceNotConfigured: string;
-        voiceDownload: string;
-        voiceTranscodingDependency: string;
-        voiceTranscoding: string;
-        voiceTranscription: string;
-        voiceEmpty: string;
         voiceUnsupported: string;
         imageDownload: string;
         imageUnsupported: string;
@@ -179,7 +173,7 @@ const EN_BOT_COPY: BotCopy = {
             "1. Run `/status` to confirm the server is ready.",
             "2. Run `/new [title]` to create a fresh session.",
             "",
-            "Send a text, image, or voice message directly.",
+            "Send a text or image message directly.",
         ],
     },
     systemStatus: {
@@ -223,13 +217,7 @@ const EN_BOT_COPY: BotCopy = {
         requestAborted: "Request was aborted.",
         promptTimeout: "OpenCode request timed out.",
         structuredOutput: "Structured output validation failed.",
-        voiceNotConfigured: "Voice transcription is not configured.",
-        voiceDownload: "Failed to download the Telegram voice file.",
-        voiceTranscodingDependency: "Voice transcoding dependency is unavailable.",
-        voiceTranscoding: "Voice transcoding failed.",
-        voiceTranscription: "Voice transcription failed.",
-        voiceEmpty: "Voice transcription returned empty text.",
-        voiceUnsupported: "Voice message file is too large or unsupported.",
+        voiceUnsupported: "Voice messages are not supported. Send text or an image instead.",
         imageDownload: "Failed to download the Telegram image file.",
         imageUnsupported: "Image file is too large or unsupported.",
         outputLength: "Reply hit the model output limit.",
@@ -397,7 +385,7 @@ const ZH_CN_BOT_COPY: BotCopy = {
             "1. 先运行 `/status` 确认服务状态正常。",
             "2. 运行 `/new [title]` 创建一个新会话。",
             "",
-            "直接发送文本、图片或语音消息即可。",
+            "直接发送文本或图片消息即可。",
         ],
     },
     systemStatus: {
@@ -441,13 +429,7 @@ const ZH_CN_BOT_COPY: BotCopy = {
         requestAborted: "请求已中止。",
         promptTimeout: "OpenCode 响应超时。",
         structuredOutput: "结构化输出校验失败。",
-        voiceNotConfigured: "未配置语音转写服务。",
-        voiceDownload: "下载 Telegram 语音文件失败。",
-        voiceTranscodingDependency: "语音转码依赖不可用。",
-        voiceTranscoding: "语音转码失败。",
-        voiceTranscription: "语音转写失败。",
-        voiceEmpty: "语音转写结果为空。",
-        voiceUnsupported: "语音文件过大或不受支持。",
+        voiceUnsupported: "暂不支持语音消息，请改发文本或图片。",
         imageDownload: "下载 Telegram 图片文件失败。",
         imageUnsupported: "图片文件过大或不受支持。",
         outputLength: "回复触发了模型输出长度上限。",

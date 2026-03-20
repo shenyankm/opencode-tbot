@@ -32,8 +32,7 @@ export async function preparePluginConfiguration(
         loadPluginConfigFile(globalConfigFilePath),
         loadPluginConfigFile(projectConfigFilePath),
     ]);
-    const config = mergePluginConfigSources(globalConfig, projectConfig, options.config);
-    applyGlobalOpenRouterApiKey(config, globalConfig);
+    const config = stripLegacyVoiceConfig(mergePluginConfigSources(globalConfig, projectConfig, options.config));
     const configFilePath = await pathExists(projectConfigFilePath)
         ? projectConfigFilePath
         : globalConfigFilePath;
@@ -84,7 +83,6 @@ export function mergePluginConfigSources(
         const normalized = source;
         const previousTelegram = merged.telegram;
         const previousState = merged.state;
-        const previousOpenRouter = merged.openrouter;
 
         Object.assign(merged, normalized);
 
@@ -101,46 +99,9 @@ export function mergePluginConfigSources(
                 ...normalized.state,
             };
         }
-
-        if (normalized.openrouter) {
-            merged.openrouter = {
-                ...(previousOpenRouter ?? {}),
-                ...normalized.openrouter,
-            };
-        }
     }
 
     return merged;
-}
-
-function applyGlobalOpenRouterApiKey(
-    config: PluginConfigSource,
-    globalConfig: PluginConfigSource,
-) {
-    const globalApiKey = normalizeOptionalString(globalConfig.openrouter?.apiKey);
-
-    if (!config.openrouter) {
-        if (!globalApiKey) {
-            return;
-        }
-
-        config.openrouter = {
-            apiKey: globalApiKey,
-        };
-
-        return;
-    }
-
-    if (globalApiKey) {
-        config.openrouter.apiKey = globalApiKey;
-        return;
-    }
-
-    delete config.openrouter.apiKey;
-
-    if (Object.keys(config.openrouter).length === 0) {
-        delete config.openrouter;
-    }
 }
 
 export function serializePluginConfig(config: PluginConfigSource): string {
@@ -187,7 +148,6 @@ function orderPluginConfig(config: PluginConfigSource): PluginConfigSource {
     const prioritizedKeys = new Set([
         "telegram",
         "state",
-        "openrouter",
         "logLevel",
     ]);
     const ordered: PluginConfigSource = {};
@@ -198,10 +158,6 @@ function orderPluginConfig(config: PluginConfigSource): PluginConfigSource {
 
     if (config.state) {
         ordered.state = config.state;
-    }
-
-    if (config.openrouter) {
-        ordered.openrouter = config.openrouter;
     }
 
     if (config.logLevel !== undefined) {
@@ -219,14 +175,6 @@ function orderPluginConfig(config: PluginConfigSource): PluginConfigSource {
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
     return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function normalizeOptionalString(value: string | undefined): string | null {
-    const normalized = value?.trim();
-
-    return normalized
-        ? normalized
-        : null;
 }
 
 function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
@@ -250,4 +198,12 @@ async function pathExists(filePath: string): Promise<boolean> {
 
         throw error;
     }
+}
+
+function stripLegacyVoiceConfig(config: PluginConfigSource): PluginConfigSource {
+    const { openrouter: _openrouter, ...rest } = config as PluginConfigSource & {
+        openrouter?: unknown;
+    };
+
+    return rest;
 }

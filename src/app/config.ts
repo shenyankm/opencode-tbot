@@ -1,7 +1,6 @@
 import { resolve } from "node:path";
 import { z } from "zod";
 
-export const DEFAULT_OPENROUTER_MODEL = "openai/gpt-audio-mini";
 export const DEFAULT_STATE_FILE_PATH = "./data/opencode-tbot.state.json";
 export const DEFAULT_TELEGRAM_API_ROOT = "https://api.telegram.org";
 
@@ -26,20 +25,9 @@ const StateConfigSchema = z.preprocess(
     }),
 );
 
-const OpenRouterConfigSchema = z.preprocess(
-    (value) => value ?? {},
-    z.object({
-        apiKey: z.string().default(""),
-        model: z.string().default(DEFAULT_OPENROUTER_MODEL),
-        timeoutMs: z.coerce.number().int().positive().default(30_000),
-        transcriptionPrompt: z.string().default(""),
-    }),
-);
-
 const AppConfigSchema = z.object({
     telegram: TelegramConfigSchema,
     state: StateConfigSchema,
-    openrouter: OpenRouterConfigSchema,
     logLevel: z.string().default("info"),
 });
 
@@ -54,23 +42,8 @@ export interface PluginConfigSource {
         path?: string;
         [key: string]: unknown;
     };
-    openrouter?: {
-        apiKey?: string;
-        model?: string;
-        timeoutMs?: number;
-        transcriptionPrompt?: string;
-        [key: string]: unknown;
-    };
     logLevel?: string;
     [key: string]: unknown;
-}
-
-export interface AppOpenRouterConfig {
-    configured: boolean;
-    apiKey: string | null;
-    model: string;
-    timeoutMs: number;
-    transcriptionPrompt: string | null;
 }
 
 export interface AppConfig {
@@ -79,7 +52,6 @@ export interface AppConfig {
     telegramApiRoot: string;
     logLevel: string;
     stateFilePath: string;
-    openrouter: AppOpenRouterConfig;
 }
 
 export interface LoadAppConfigOptions {
@@ -101,30 +73,13 @@ function buildAppConfig(
     data: z.infer<typeof AppConfigSchema>,
     options: LoadAppConfigOptions,
 ): AppConfig {
-    const openRouterApiKey = normalizeOptionalString(data.openrouter.apiKey);
-    const openRouterModel = normalizeOptionalString(data.openrouter.model) ?? DEFAULT_OPENROUTER_MODEL;
-    const transcriptionPrompt = normalizeOptionalString(data.openrouter.transcriptionPrompt);
-
     return {
         telegramBotToken: data.telegram.botToken,
         telegramAllowedChatIds: data.telegram.allowedChatIds,
         telegramApiRoot: normalizeApiRoot(data.telegram.apiRoot),
         logLevel: data.logLevel,
         stateFilePath: resolveStatePath(data, options.cwd ?? process.cwd()),
-        openrouter: {
-            configured: !!openRouterApiKey,
-            apiKey: openRouterApiKey,
-            model: openRouterModel,
-            timeoutMs: data.openrouter.timeoutMs,
-            transcriptionPrompt,
-        },
     };
-}
-
-function normalizeOptionalString(value: string): string | null {
-    const normalized = value.trim();
-
-    return normalized.length > 0 ? normalized : null;
 }
 
 function resolveStatePath(

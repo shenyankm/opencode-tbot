@@ -27,16 +27,6 @@ export class TelegramFileDownloadError extends Error {
     }
 }
 
-export class VoiceMessageUnsupportedError extends Error {
-    readonly data: { message: string };
-
-    constructor(message: string) {
-        super(message);
-        this.name = "VoiceMessageUnsupportedError";
-        this.data = { message };
-    }
-}
-
 export class TelegramFileClient implements TelegramFileClientLike {
     private readonly baseUrl: string;
     private readonly fetchFn: typeof fetch;
@@ -58,7 +48,7 @@ export class TelegramFileClient implements TelegramFileClientLike {
         try {
             response = await this.fetchFn(new URL(filePath, this.baseUrl));
         } catch (error) {
-            throw new TelegramFileDownloadError(extractErrorMessage(error) ?? "Failed to download the Telegram voice file.");
+            throw new TelegramFileDownloadError(extractErrorMessage(error) ?? "Failed to download the Telegram file.");
         }
 
         if (!response.ok) {
@@ -68,7 +58,7 @@ export class TelegramFileClient implements TelegramFileClientLike {
         const data = new Uint8Array(await response.arrayBuffer());
 
         if (data.byteLength === 0) {
-            throw new TelegramFileDownloadError("Telegram returned an empty voice file.");
+            throw new TelegramFileDownloadError("Telegram returned an empty file.");
         }
 
         return {

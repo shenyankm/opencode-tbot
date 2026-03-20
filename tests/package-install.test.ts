@@ -37,6 +37,7 @@ test("package.json exposes publishable plugin entrypoints", () => {
         "bin",
         "dist",
         "README.md",
+        "README.ja.md",
         "README.zh-CN.md",
         "tbot.config.example.json",
         "LICENSE",
@@ -47,7 +48,7 @@ test("package.json exposes publishable plugin entrypoints", () => {
     );
     assert.ok(packageJson.keywords?.includes("opencode"));
     assert.ok(packageJson.keywords?.includes("plugin"));
-    assert.equal(packageJson.dependencies?.["@openrouter/sdk"], "0.9.11");
+    assert.equal(packageJson.dependencies?.["@openrouter/sdk"], undefined);
     assert.equal(packageJson.dependencies?.dotenv, undefined);
 });
 

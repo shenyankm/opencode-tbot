@@ -49,7 +49,7 @@ test("/start sends the simplified quick-start welcome message with MarkdownV2", 
     }]);
     assert.match(replies[0]?.text ?? "", /\*Welcome to opencode\\-tbot\*/);
     assert.match(replies[0]?.text ?? "", /`\/status`/);
-    assert.match(replies[0]?.text ?? "", /Send a text, image, or voice message directly\\\./);
+    assert.match(replies[0]?.text ?? "", /Send a text or image message directly\\\./);
     assert.doesNotMatch(replies[0]?.text ?? "", /`\/help`/);
 });
 
@@ -75,6 +75,6 @@ test("/start falls back to plain text when the markdown reply cannot be sent", a
     assert.equal(replies.length, 1);
     assert.equal(replies[0]?.other, undefined);
     assert.match(replies[0]?.text ?? "", /Run \/new \[title\] to create a fresh session\./);
-    assert.match(replies[0]?.text ?? "", /Send a text, image, or voice message directly\./);
+    assert.match(replies[0]?.text ?? "", /Send a text or image message directly\./);
     assert.doesNotMatch(replies[0]?.text ?? "", /Use \/help/);
 });

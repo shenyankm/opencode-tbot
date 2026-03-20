@@ -1,4 +1,3 @@
-import { OpenRouter } from "@openrouter/sdk";
 import type { BotDependencies } from "../bot/types.js";
 import type { PermissionApprovalRepository } from "../domain/permission/approval.repository.js";
 import { createOpenCodeAppLogger } from "../infra/logger/index.js";
@@ -14,13 +13,6 @@ import { createDefaultOpencodeTbotState } from "../services/storage/bot-state.js
 import { JsonStateStore } from "../services/storage/json-state-store.js";
 import { TelegramFileClient } from "../services/telegram/telegram.client.js";
 import { ForegroundSessionTracker } from "../services/session-activity/foreground-session-tracker.js";
-import {
-    DisabledVoiceTranscriptionClient,
-    OpenRouterVoiceTranscriptionClient,
-    SystemFfmpegProbe,
-    SystemFfmpegWavTranscoder,
-} from "../services/voice-transcription/openrouter-voice.client.js";
-import { VoiceTranscriptionService } from "../services/voice-transcription/voice-transcription.service.js";
 import { AbortPromptUseCase } from "../use-cases/abort-prompt.usecase.js";
 import { CreateSessionUseCase } from "../use-cases/create-session.usecase.js";
 import { GetHealthUseCase } from "../use-cases/get-health.usecase.js";
@@ -37,10 +29,7 @@ import { SwitchAgentUseCase } from "../use-cases/switch-agent.usecase.js";
 import { SwitchModelUseCase } from "../use-cases/switch-model.usecase.js";
 import { SwitchSessionUseCase } from "../use-cases/switch-session.usecase.js";
 import { UploadFileUseCase } from "../use-cases/upload-file.usecase.js";
-import type {
-    AppConfig,
-    AppOpenRouterConfig,
-} from "./config.js";
+import type { AppConfig } from "./config.js";
 
 export interface AppContainer extends BotDependencies {
     opencodeClient: OpenCodeClientLike;
@@ -78,9 +67,6 @@ function createContainer(
         apiRoot: config.telegramApiRoot,
     });
     const uploadFileUseCase = new UploadFileUseCase(telegramFileClient);
-    const voiceTranscriptionService = new VoiceTranscriptionService(
-        createVoiceTranscriptionClient(config.openrouter),
-    );
     const abortPromptUseCase = new AbortPromptUseCase(sessionRepo, opencodeClient);
     const createSessionUseCase = new CreateSessionUseCase(sessionRepo, opencodeClient, logger);
     const getHealthUseCase = new GetHealthUseCase(opencodeClient);
@@ -96,7 +82,6 @@ function createContainer(
         listMcpUseCase,
         listSessionsUseCase,
         sessionRepo,
-        voiceTranscriptionService,
     );
     const listModelsUseCase = new ListModelsUseCase(sessionRepo, opencodeClient);
     const renameSessionUseCase = new RenameSessionUseCase(sessionRepo, opencodeClient, logger);
@@ -127,7 +112,6 @@ function createContainer(
         renameSessionUseCase,
         sessionRepo,
         sendPromptUseCase,
-        voiceTranscriptionService,
         switchAgentUseCase,
         switchModelUseCase,
         switchSessionUseCase,
@@ -146,22 +130,4 @@ function createContainer(
             await logger.flush();
         },
     };
-}
-
-function createVoiceTranscriptionClient(config: AppOpenRouterConfig) {
-    return config.configured && config.apiKey
-        ? new OpenRouterVoiceTranscriptionClient(
-            {
-                model: config.model,
-                timeoutMs: config.timeoutMs,
-                transcriptionPrompt: config.transcriptionPrompt,
-            },
-            new OpenRouter({
-                apiKey: config.apiKey,
-                timeoutMs: config.timeoutMs,
-            }),
-            new SystemFfmpegWavTranscoder(),
-            new SystemFfmpegProbe(),
-        )
-        : new DisabledVoiceTranscriptionClient();
 }
