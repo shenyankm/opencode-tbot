@@ -1,6 +1,7 @@
 import type { PendingActionRepository } from "../domain/pending-action/pending-action.repository.js";
 import type { SessionRepository } from "../domain/session/session.repository.js";
 import type { AppLogger } from "../infra/logger/index.js";
+import type { ForegroundSessionTrackerLike } from "../services/session-activity/foreground-session-tracker.js";
 import type { TelegramFileClientLike } from "../services/telegram/telegram.client.js";
 import type { UploadFileUseCase } from "../use-cases/upload-file.usecase.js";
 import type { CreateSessionUseCase } from "../use-cases/create-session.usecase.js";
@@ -23,6 +24,7 @@ import type { BotLanguage } from "./copy.js";
 export interface BotDependencies {
     abortPromptUseCase: AbortPromptUseCase;
     createSessionUseCase: CreateSessionUseCase;
+    foregroundSessionTracker: ForegroundSessionTrackerLike;
     getHealthUseCase: GetHealthUseCase;
     getPathUseCase: GetPathUseCase;
     getStatusUseCase: GetStatusUseCase;

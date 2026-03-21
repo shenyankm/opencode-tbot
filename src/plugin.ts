@@ -1,4 +1,5 @@
 import type { Hooks, Plugin, PluginInput } from "@opencode-ai/plugin";
+import type { Event as OpenCodeEvent } from "@opencode-ai/sdk/v2/client";
 import { bootstrapPluginApp } from "./app/bootstrap.js";
 import { handleTelegramBotPluginEvent } from "./app/plugin-events.js";
 import {
@@ -160,7 +161,7 @@ async function disposeTelegramBotPluginRuntimeState(
 function createHooks(runtime: TelegramBotRuntime): Hooks {
     return {
         async event({ event }) {
-            await handleTelegramBotPluginEvent(runtime, event as never);
+            await handleTelegramBotPluginEvent(runtime, event as OpenCodeEvent);
         },
         async "permission.ask"(input, output) {
             const bindings = await runtime.container.sessionRepo.listBySessionId(input.sessionID);

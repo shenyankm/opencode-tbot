@@ -100,6 +100,70 @@ function createSdkClientStub(): OpenCodeSdkClientLike {
     } as never;
 }
 
+function createLegacySdkClientStub(): OpenCodeSdkClientLike {
+    return {
+        app: {
+            agents: async () => [],
+        },
+        config: {
+            get: async () => ({ provider: {} }),
+            providers: async () => ({ providers: [], default: {} }),
+        },
+        lsp: {
+            status: async () => [],
+        },
+        mcp: {
+            status: async () => ({}),
+        },
+        path: {
+            get: async () => ({
+                home: "E:/Users/demo",
+                state: "E:/Users/demo/.opencode",
+                config: "E:/repo/opencode.json",
+                worktree: "E:/repo",
+                directory: "E:/repo",
+            }),
+        },
+        project: {
+            current: async () => ({
+                id: "project-1",
+                worktree: "E:/repo",
+                time: { created: 1, updated: 1 },
+                sandboxes: [],
+            }),
+            list: async () => [],
+        },
+        session: {
+            abort: async () => false,
+            create: async () => ({
+                id: "session-1",
+                slug: "session-1",
+                projectID: "project-1",
+                directory: "E:/repo",
+                title: "Session",
+                version: "1",
+                time: { created: 1, updated: 1 },
+            }),
+            list: async () => [],
+            prompt: async () => ({
+                info: {} as never,
+                parts: [],
+            }),
+            status: async () => ({}),
+            update: async () => ({
+                id: "session-1",
+                slug: "session-1",
+                projectID: "project-1",
+                directory: "E:/repo",
+                title: "Session",
+                version: "1",
+                time: { created: 1, updated: 1 },
+            }),
+        },
+        postSessionIdPermissionsPermissionId: async () => ({ data: true }),
+    } as never;
+}
+
 function createContainerStub(cwd = "E:/workspace") {
     const calls = {
         dispose: 0,
@@ -163,6 +227,41 @@ test("loadAppConfig ignores legacy openrouter configuration", () => {
     }));
 
     assert.equal("openrouter" in config, false);
+});
+
+test("loadAppConfig applies prompt timeout defaults and overrides", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-prompt-config-"));
+    const config = loadAppConfig(createConfig({
+        prompt: {
+            waitTimeoutMs: 90_000,
+        },
+    }), { cwd });
+
+    assert.equal(config.promptWaitTimeoutMs, 90_000);
+    assert.equal(config.promptPollRequestTimeoutMs, 15_000);
+    assert.equal(config.promptRecoveryInactivityTimeoutMs, 120_000);
+});
+
+test("mergePluginConfigSources merges prompt configuration by key", () => {
+    const merged = mergePluginConfigSources(
+        {
+            prompt: {
+                waitTimeoutMs: 10,
+                pollRequestTimeoutMs: 20,
+            },
+        },
+        {
+            prompt: {
+                recoveryInactivityTimeoutMs: 30,
+            },
+        },
+    );
+
+    assert.deepEqual(merged.prompt, {
+        waitTimeoutMs: 10,
+        pollRequestTimeoutMs: 20,
+        recoveryInactivityTimeoutMs: 30,
+    });
 });
 
 test("preparePluginConfiguration loads telegram.botToken from the global config file", async () => {
@@ -387,6 +486,54 @@ test("ensureTelegramBotPluginRuntime starts the Telegram runtime only once per w
             token: "telegram-token",
         }]);
         assert.equal(containerCalls?.warn.length, 0);
+    } finally {
+        await resetTelegramBotPluginRuntimeForTests();
+    }
+});
+
+test("ensureTelegramBotPluginRuntime accepts legacy injected SDK clients", async () => {
+    await resetTelegramBotPluginRuntimeForTests();
+
+    try {
+        const sdkClient = createLegacySdkClientStub();
+        const configSource = createConfig();
+        let started = 0;
+
+        const runtime = await ensureTelegramBotPluginRuntime({
+            context: {
+                client: sdkClient,
+                worktree: "E:/workspace-legacy",
+            },
+            config: configSource,
+            bootstrapApp: (
+                client: OpenCodeSdkClientLike,
+                runtimeConfig: PluginConfigSource | undefined,
+                options: { cwd?: string } = {},
+            ) => {
+                assert.equal(client, sdkClient);
+
+                return {
+                    config: loadAppConfig(runtimeConfig, options),
+                    container: createContainerStub(String(options.cwd)).container,
+                };
+            },
+            prepareConfiguration: async ({ cwd, config }) => createPreparedConfiguration(cwd, config, configSource),
+            startRuntime: async (input) => {
+                started += 1;
+
+                return {
+                    bot: {} as never,
+                    container: input.container,
+                    stop() { },
+                    dispose() {
+                        input.container.dispose();
+                    },
+                };
+            },
+        });
+
+        assert.ok(runtime);
+        assert.equal(started, 1);
     } finally {
         await resetTelegramBotPluginRuntimeForTests();
     }

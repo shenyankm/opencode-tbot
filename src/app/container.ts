@@ -46,7 +46,19 @@ export function createAppContainer(
         level: config.logLevel,
     });
 
-    return createContainer(config, createOpenCodeClientFromSdkClient(client), logger);
+    return createContainer(
+        config,
+        createOpenCodeClientFromSdkClient(
+            client,
+            fetch,
+            {
+                waitTimeoutMs: config.promptWaitTimeoutMs,
+                pollRequestTimeoutMs: config.promptPollRequestTimeoutMs,
+                recoveryInactivityTimeoutMs: config.promptRecoveryInactivityTimeoutMs,
+            },
+        ),
+        logger,
+    );
 }
 
 function createContainer(
@@ -93,7 +105,6 @@ function createContainer(
         sessionRepo,
         opencodeClient,
         logger,
-        foregroundSessionTracker,
     );
     const switchAgentUseCase = new SwitchAgentUseCase(sessionRepo, opencodeClient, logger);
     const switchModelUseCase = new SwitchModelUseCase(sessionRepo, opencodeClient, logger);

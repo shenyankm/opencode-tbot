@@ -80,6 +80,11 @@ npm exec --package opencode-tbot@latest opencode-tbot -- update
   "state": {
     "path": "./data/opencode-tbot.state.json"
   },
+  "prompt": {
+    "waitTimeoutMs": 1800000,
+    "pollRequestTimeoutMs": 15000,
+    "recoveryInactivityTimeoutMs": 120000
+  },
   "logLevel": "info"
 }
 ```

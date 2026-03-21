@@ -21,16 +21,15 @@ export interface PromptExecutionInput {
     text?: string | null;
 }
 
-const activePromptChats = new Set<number>();
-
 export async function executePromptRequest(
     ctx: PromptExecutionContext,
     dependencies: BotDependencies,
     resolvePrompt: () => Promise<PromptExecutionInput>,
 ) {
     const copy = await getChatCopy(dependencies.sessionRepo, ctx.chat.id);
+    const foregroundRequest = dependencies.foregroundSessionTracker.acquire(ctx.chat.id);
 
-    if (activePromptChats.has(ctx.chat.id)) {
+    if (!foregroundRequest) {
         await ctx.reply(copy.status.alreadyProcessing);
         return;
     }
@@ -39,14 +38,17 @@ export async function executePromptRequest(
     let sentTerminalReply = false;
 
     try {
-        activePromptChats.add(ctx.chat.id);
         processingMessage = await ctx.reply(copy.status.processing);
 
         const promptInput = await resolvePrompt();
         const result = await dependencies.sendPromptUseCase.execute({
             chatId: ctx.chat.id,
-            text: promptInput.text,
             files: promptInput.files,
+            onExecutionSession: (sessionId: string) => {
+                foregroundRequest.attachSession(sessionId);
+            },
+            signal: foregroundRequest.signal,
+            text: promptInput.text,
         });
         const promptReply = normalizePromptReplyForDisplay(result.assistantReply, copy, dependencies);
         const telegramReply = buildTelegramPromptReply(promptReply, copy);
@@ -66,7 +68,7 @@ export async function executePromptRequest(
         await ctx.reply(presentError(error, copy));
         sentTerminalReply = true;
     } finally {
-        activePromptChats.delete(ctx.chat.id);
+        foregroundRequest.dispose();
         if (processingMessage && sentTerminalReply) {
             try {
                 await ctx.api.deleteMessage(ctx.chat.id, processingMessage.message_id);

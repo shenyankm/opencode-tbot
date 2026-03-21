@@ -454,10 +454,15 @@ export async function handlePermissionApprovalCallback(
     }
 
     try {
-        await dependencies.opencodeClient.replyToPermission(parsed.requestId, parsed.reply);
-
         const approvals = await dependencies.permissionApprovalRepo.listByRequestId(parsed.requestId);
         const approval = approvals.find((item) => item.chatId === ctx.chat?.id);
+
+        await dependencies.opencodeClient.replyToPermission(
+            parsed.requestId,
+            parsed.reply,
+            undefined,
+            approval?.sessionId,
+        );
 
         if (approval) {
             await dependencies.permissionApprovalRepo.set({

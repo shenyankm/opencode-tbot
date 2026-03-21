@@ -118,20 +118,29 @@ function setPromptRequestTimeouts(
     client: OpenCodeClient,
     overrides: Partial<{
         pollRequestMs: number;
+        recoveryInactivityTimeoutMs: number;
         sendMs: number;
         totalPollMs: number;
+        waitTimeoutMs: number;
     }>,
 ) {
-    Object.assign(
-        (client as unknown as {
-            promptRequestTimeouts: {
-                pollRequestMs: number;
-                sendMs: number;
-                totalPollMs: number;
-            };
-        }).promptRequestTimeouts,
-        overrides,
-    );
+    client.configurePromptTimeoutPolicy({
+        ...(overrides.pollRequestMs !== undefined
+            ? { pollRequestTimeoutMs: overrides.pollRequestMs }
+            : {}),
+        ...(overrides.waitTimeoutMs !== undefined
+            ? { waitTimeoutMs: overrides.waitTimeoutMs }
+            : {}),
+        ...(overrides.sendMs !== undefined
+            ? { waitTimeoutMs: overrides.sendMs }
+            : {}),
+        ...(overrides.recoveryInactivityTimeoutMs !== undefined
+            ? { recoveryInactivityTimeoutMs: overrides.recoveryInactivityTimeoutMs }
+            : {}),
+        ...(overrides.totalPollMs !== undefined
+            ? { recoveryInactivityTimeoutMs: overrides.totalPollMs }
+            : {}),
+    });
 }
 
 function omitSignal(options: unknown): Record<string, unknown> {
@@ -711,13 +720,13 @@ test("session mutation helpers use the raw client when available", async () => {
                         };
                     }
 
-                    if (request.url === "/session/{sessionID}/abort") {
+                    if (request.url === "/session/{id}/abort") {
                         return {
                             data: true,
                         };
                     }
 
-                    if (request.url === "/session/{sessionID}/fork") {
+                    if (request.url === "/session/{id}/fork") {
                         return {
                             data: createSession("session-child", "project-1", "E:/repo-1"),
                         };
@@ -756,55 +765,55 @@ test("session mutation helpers use the raw client when available", async () => {
             },
         },
         {
-            kind: "patch",
-            options: {
-                responseStyle: "data",
-                throwOnError: true,
-                url: "/session/{sessionID}",
-                path: {
-                    sessionID: "session-1",
-                },
-                body: {
-                    title: "Renamed session",
-                },
-            },
-        },
-        {
-            kind: "post",
-            options: {
-                responseStyle: "data",
-                throwOnError: true,
-                url: "/session/{sessionID}/abort",
-                path: {
-                    sessionID: "session-1",
+                kind: "patch",
+                options: {
+                    responseStyle: "data",
+                    throwOnError: true,
+                    url: "/session/{id}",
+                    path: {
+                        id: "session-1",
+                    },
+                    body: {
+                        title: "Renamed session",
                 },
             },
         },
         {
-            kind: "post",
-            options: {
-                responseStyle: "data",
-                throwOnError: true,
-                url: "/session/{sessionID}/fork",
-                path: {
-                    sessionID: "session-1",
+                kind: "post",
+                options: {
+                    responseStyle: "data",
+                    throwOnError: true,
+                    url: "/session/{id}/abort",
+                    path: {
+                        id: "session-1",
+                    },
                 },
-                body: {
-                    messageID: "message-1",
+            },
+        {
+                kind: "post",
+                options: {
+                    responseStyle: "data",
+                    throwOnError: true,
+                    url: "/session/{id}/fork",
+                    path: {
+                        id: "session-1",
+                    },
+                    body: {
+                        messageID: "message-1",
                 },
             },
         },
         {
-            kind: "delete",
-            options: {
-                responseStyle: "data",
-                throwOnError: true,
-                url: "/session/{sessionID}",
-                path: {
-                    sessionID: "session-child",
+                kind: "delete",
+                options: {
+                    responseStyle: "data",
+                    throwOnError: true,
+                    url: "/session/{id}",
+                    path: {
+                        id: "session-child",
+                    },
                 },
             },
-        },
     ]);
 });
 
@@ -1158,7 +1167,7 @@ test("promptSession waits for a raw-client reply without message id and reads st
                         url: string;
                     };
 
-                    if (request.url === "/session/{sessionID}/message") {
+                    if (request.url === "/session/{id}/message") {
                         messageListCallCount += 1;
 
                         if (messageListCallCount < 3) {
@@ -1262,9 +1271,9 @@ test("promptSession waits for a raw-client reply without message id and reads st
         options: {
             responseStyle: "data",
             throwOnError: true,
-            url: "/session/{sessionID}/message",
+            url: "/session/{id}/message",
             path: {
-                sessionID: "session-1",
+                id: "session-1",
             },
             query: {
                 limit: 20,
@@ -1279,9 +1288,9 @@ test("promptSession waits for a raw-client reply without message id and reads st
         options: {
             responseStyle: "data",
             throwOnError: true,
-            url: "/session/{sessionID}/message",
+            url: "/session/{id}/message",
             path: {
-                sessionID: "session-1",
+                id: "session-1",
             },
             body: {
                 format: {
@@ -1311,30 +1320,27 @@ test("promptSession waits for a raw-client reply without message id and reads st
     assertOptionsIncludeSignal(calls[1]?.options);
 });
 
-test("promptSession prefers async prompt submission when the SDK exposes promptAsync", async () => {
+test("promptSession prefers synchronous prompt submission when the SDK exposes prompt and promptAsync", async () => {
     const calls: Array<{
         input?: unknown;
         kind: "messages" | "prompt" | "promptAsync" | "status";
         options: unknown;
     }> = [];
-    let messageListCallCount = 0;
-    let statusCallCount = 0;
     const client = new OpenCodeClient(
         { baseUrl: "http://127.0.0.1:4096" },
         {
             session: {
                 messages: async (input: unknown, options: unknown) => {
                     calls.push({ kind: "messages", input, options });
-                    messageListCallCount += 1;
-
-                    if (messageListCallCount < 3) {
-                        return {
-                            data: [],
-                        };
-                    }
+                    return {
+                        data: [],
+                    };
+                },
+                prompt: async (input: unknown, options: unknown) => {
+                    calls.push({ kind: "prompt", input, options });
 
                     return {
-                        data: [{
+                        data: {
                             info: {
                                 id: "assistant-final",
                                 role: "assistant",
@@ -1353,17 +1359,12 @@ test("promptSession prefers async prompt submission when the SDK exposes promptA
                                     },
                                 },
                                 structured: {
-                                    body_md: "## Async Reply",
+                                    body_md: "## Sync Reply",
                                 },
                             } as never,
-                            parts: [{ type: "text", text: "Async Reply" }] as never,
-                        }],
+                            parts: [{ type: "text", text: "Sync Reply" }] as never,
+                        },
                     };
-                },
-                prompt: async (input: unknown, options: unknown) => {
-                    calls.push({ kind: "prompt", input, options });
-
-                    return await new Promise<never>(() => undefined);
                 },
                 promptAsync: async (input: unknown, options: unknown) => {
                     calls.push({ kind: "promptAsync", input, options });
@@ -1371,15 +1372,7 @@ test("promptSession prefers async prompt submission when the SDK exposes promptA
                 },
                 status: async (_input: unknown, options: unknown) => {
                     calls.push({ kind: "status", options });
-                    statusCallCount += 1;
-
-                    return {
-                        data: {
-                            "session-1": statusCallCount === 1
-                                ? { type: "busy" }
-                                : { type: "idle" },
-                        },
-                    };
+                    return { data: {} };
                 },
             },
             app: {
@@ -1387,11 +1380,6 @@ test("promptSession prefers async prompt submission when the SDK exposes promptA
             },
         } as never,
     );
-    setPromptRequestTimeouts(client, {
-        pollRequestMs: 5,
-        sendMs: 20,
-        totalPollMs: 50,
-    });
 
     const result = await client.promptSession({
         sessionId: "session-1",
@@ -1399,13 +1387,12 @@ test("promptSession prefers async prompt submission when the SDK exposes promptA
         structured: true,
     });
 
-    assert.equal(result.bodyMd, "## Async Reply");
-    assert.equal(result.fallbackText, "Async Reply");
-    assert.deepEqual(result.parts, [{ type: "text", text: "Async Reply" }]);
-    assert.equal(statusCallCount, 1);
+    assert.equal(result.bodyMd, "## Sync Reply");
+    assert.equal(result.fallbackText, "Sync Reply");
+    assert.deepEqual(result.parts, [{ type: "text", text: "Sync Reply" }]);
     assert.deepEqual(
         calls.map((call) => call.kind),
-        ["messages", "promptAsync", "messages", "status", "messages"],
+        ["messages", "prompt"],
     );
     assert.deepEqual(calls[1]?.input, {
         sessionID: "session-1",
@@ -1449,7 +1436,7 @@ test("promptSession keeps polling recent messages after the session turns idle a
                         url: string;
                     };
 
-                    if (request.url === "/session/{sessionID}/message") {
+                    if (request.url === "/session/{id}/message") {
                         messageListCallCount += 1;
 
                         if (messageListCallCount < 3) {
@@ -1706,7 +1693,7 @@ test("promptSession polls the created message when the initial reply is still em
     assertOptionsIncludeSignal(calls[1]?.options);
 });
 
-test("promptSession keeps polling when the placeholder message is already marked completed but still empty", async () => {
+test("promptSession returns the empty response text when the placeholder message is already marked completed but still empty", async () => {
     const calls: Array<{ input: unknown; kind: "prompt" | "message"; options: unknown }> = [];
     let messageCallCount = 0;
     const client = new OpenCodeClient(
@@ -1801,44 +1788,7 @@ test("promptSession keeps polling when the placeholder message is already marked
                             },
                         };
                     }
-
-                    return {
-                        data: {
-                            info: {
-                                id: "assistant-1",
-                                role: "assistant",
-                                sessionID: "session-1",
-                                parentID: "user-1",
-                                modelID: "gpt-5",
-                                providerID: "openai",
-                                mode: "chat",
-                                agent: "build",
-                                path: {
-                                    cwd: "E:/repo-1",
-                                    root: "E:/repo-1",
-                                },
-                                cost: 0.01,
-                                time: {
-                                    created: 100,
-                                    completed: 220,
-                                },
-                                tokens: {
-                                    total: 8,
-                                    input: 3,
-                                    output: 5,
-                                    reasoning: 0,
-                                    cache: {
-                                        read: 0,
-                                        write: 0,
-                                    },
-                                },
-                                structured: {
-                                    body_md: "## Hello Later",
-                                },
-                            } as never,
-                            parts: [{ type: "text", text: "Hello Later" }] as never,
-                        },
-                    };
+                    return await new Promise<never>(() => undefined);
                 },
             },
         } as never,
@@ -1850,12 +1800,12 @@ test("promptSession keeps polling when the placeholder message is already marked
         structured: true,
     });
 
-    assert.equal(result.bodyMd, "## Hello Later");
-    assert.equal(result.fallbackText, "Hello Later");
-    assert.deepEqual(result.parts, [{ type: "text", text: "Hello Later" }]);
+    assert.equal(result.bodyMd, null);
+    assert.equal(result.fallbackText, "OpenCode returned empty response.");
+    assert.deepEqual(result.parts, []);
     assert.deepEqual(
         calls.map((call) => call.kind),
-        ["prompt", "message", "message"],
+        ["prompt", "message"],
     );
 });
 
@@ -2351,7 +2301,7 @@ test("promptSession continues when capturing known messages times out before sen
                     calls.push({ kind: "get", options });
                     const request = options as { url: string };
 
-                    if (request.url === "/session/{sessionID}/message") {
+                    if (request.url === "/session/{id}/message") {
                         messageListCallCount += 1;
 
                         if (messageListCallCount === 1) {
@@ -2434,7 +2384,7 @@ test("promptSession times out when the initial prompt request never resolves", a
                 get: async (options: unknown) => {
                     const request = options as { url: string };
 
-                    if (request.url === "/session/{sessionID}/message") {
+                    if (request.url === "/session/{id}/message") {
                         return {
                             data: [],
                         };
@@ -2579,11 +2529,11 @@ test("promptSession throws a timeout error when the recovery budget expires with
                 get: async (options: unknown) => {
                     const request = options as { url: string };
 
-                    if (request.url === "/session/{sessionID}/message/{messageID}") {
+                    if (request.url === "/session/{id}/message/{messageID}") {
                         return await new Promise<never>(() => undefined);
                     }
 
-                    if (request.url === "/session/{sessionID}/message") {
+                    if (request.url === "/session/{id}/message") {
                         return await new Promise<never>(() => undefined);
                     }
 
@@ -2637,6 +2587,123 @@ test("promptSession throws a timeout error when the recovery budget expires with
         (error: unknown) => error instanceof OpenCodePromptTimeoutError
             && error.data.stage === "final-scan",
     );
+});
+
+test("promptSession does not time out while the session keeps making progress", async () => {
+    let messageListCallCount = 0;
+    let statusCallCount = 0;
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            config: {
+                get: async () => ({ provider: {} }),
+                providers: async () => ({ providers: [], default: {} }),
+            },
+            path: {
+                get: async () => createPath(),
+            },
+            project: {
+                list: async () => [],
+                current: async () => createProject("project-1", "E:/repo-1"),
+            },
+            session: {
+                create: async () => createSession("session-1", "project-1", "E:/repo-1"),
+                messages: async () => {
+                    messageListCallCount += 1;
+
+                    if (messageListCallCount < 4) {
+                        return {
+                            data: [],
+                        };
+                    }
+
+                    return {
+                        data: [{
+                            info: {
+                                id: "assistant-final",
+                                role: "assistant",
+                                sessionID: "session-1",
+                                parentID: "user-1",
+                                modelID: "gpt-5",
+                                providerID: "openai",
+                                time: {
+                                    created: 100,
+                                    completed: 260,
+                                },
+                                tokens: {
+                                    input: 2,
+                                    output: 4,
+                                    reasoning: 0,
+                                    cache: {
+                                        read: 0,
+                                        write: 0,
+                                    },
+                                },
+                                structured: {
+                                    body_md: "## Recovered After Progress",
+                                },
+                            } as never,
+                            parts: [{ type: "text", text: "Recovered After Progress" }] as never,
+                        }],
+                    };
+                },
+                prompt: async () => ({
+                    data: {
+                        info: {
+                            id: "assistant-placeholder",
+                            role: "assistant",
+                            sessionID: "session-1",
+                            parentID: "user-1",
+                            modelID: "gpt-5",
+                            providerID: "openai",
+                            time: {
+                                created: 100,
+                            },
+                            tokens: {
+                                input: 0,
+                                output: 0,
+                                reasoning: 0,
+                                cache: {
+                                    read: 0,
+                                    write: 0,
+                                },
+                            },
+                        } as never,
+                        parts: [],
+                    },
+                }),
+                status: async () => {
+                    statusCallCount += 1;
+                    return {
+                        data: {
+                            "session-1": statusCallCount < 3
+                                ? { type: "busy" }
+                                : { type: "idle" },
+                        },
+                    };
+                },
+            },
+            app: {
+                log: async () => true,
+            },
+        } as never,
+    );
+    setPromptRequestTimeouts(client, {
+        pollRequestMs: 5,
+        recoveryInactivityTimeoutMs: 10,
+        waitTimeoutMs: 50,
+    });
+
+    const result = await client.promptSession({
+        sessionId: "session-1",
+        prompt: "hello from telegram",
+        structured: true,
+    });
+
+    assert.equal(result.bodyMd, "## Recovered After Progress");
+    assert.equal(result.fallbackText, "Recovered After Progress");
+    assert.equal(statusCallCount, 2);
+    assert.equal(messageListCallCount, 4);
 });
 
 test("listModels returns configured models, connected-provider models, and available custom-provider models", async () => {
@@ -3043,4 +3110,35 @@ test("permission helpers forward list and reply calls to the SDK", async () => {
         always: [],
     }]);
     assert.equal(await client.replyToPermission("request-1", "once", "approved"), true);
+});
+
+test("replyToPermission uses the legacy session permission endpoint when a session id is provided", async () => {
+    const calls: unknown[] = [];
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            _client: {
+                post: async (options: unknown) => {
+                    calls.push(options);
+                    return {
+                        data: true,
+                    };
+                },
+            },
+        } as never,
+    );
+
+    assert.equal(await client.replyToPermission("request-1", "once", "approved", "session-1"), true);
+    assert.deepEqual(calls, [{
+        body: {
+            response: "once",
+        },
+        path: {
+            id: "session-1",
+            permissionID: "request-1",
+        },
+        responseStyle: "data",
+        throwOnError: true,
+        url: "/session/{id}/permissions/{permissionID}",
+    }]);
 });

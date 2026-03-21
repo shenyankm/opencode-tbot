@@ -86,6 +86,7 @@ export function mergePluginConfigSources(
         const normalized = source;
         const previousTelegram = merged.telegram;
         const previousState = merged.state;
+        const previousPrompt = merged.prompt;
 
         Object.assign(merged, normalized);
 
@@ -100,6 +101,13 @@ export function mergePluginConfigSources(
             merged.state = {
                 ...(previousState ?? {}),
                 ...normalized.state,
+            };
+        }
+
+        if (normalized.prompt) {
+            merged.prompt = {
+                ...(previousPrompt ?? {}),
+                ...normalized.prompt,
             };
         }
     }
@@ -151,6 +159,7 @@ function orderPluginConfig(config: PluginConfigSource): PluginConfigSource {
     const prioritizedKeys = new Set([
         "telegram",
         "state",
+        "prompt",
         "logLevel",
     ]);
     const ordered: PluginConfigSource = {};
@@ -161,6 +170,10 @@ function orderPluginConfig(config: PluginConfigSource): PluginConfigSource {
 
     if (config.state) {
         ordered.state = config.state;
+    }
+
+    if (config.prompt) {
+        ordered.prompt = config.prompt;
     }
 
     if (config.logLevel !== undefined) {

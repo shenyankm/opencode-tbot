@@ -81,6 +81,11 @@ Legacy `openrouter` voice-transcription settings are ignored at runtime. When th
   "state": {
     "path": "./data/opencode-tbot.state.json"
   },
+  "prompt": {
+    "waitTimeoutMs": 1800000,
+    "pollRequestTimeoutMs": 15000,
+    "recoveryInactivityTimeoutMs": 120000
+  },
   "logLevel": "info"
 }
 ```
@@ -93,11 +98,15 @@ Legacy `openrouter` voice-transcription settings are ignored at runtime. When th
 | `telegram.allowedChatIds` | No | `[]` | Allowed Telegram chat IDs. If empty, the bot accepts messages from any chat. |
 | `telegram.apiRoot` | No | `https://api.telegram.org` | Telegram Bot API base URL. Useful for tests or self-hosted gateways. |
 | `state.path` | No | `./data/opencode-tbot.state.json` | JSON state file path, resolved relative to the current OpenCode worktree. |
+| `prompt.waitTimeoutMs` | No | `1800000` | Maximum total wait for a synchronous prompt before the plugin stops waiting. |
+| `prompt.pollRequestTimeoutMs` | No | `15000` | Timeout for each individual recovery poll request to OpenCode. |
+| `prompt.recoveryInactivityTimeoutMs` | No | `120000` | Recovery timeout that only applies when prompt progress stops advancing. |
 | `logLevel` | No | `info` | Plugin log level. Logs are emitted through `client.app.log()`. |
 
 ### Notes
 
 - `state.path` is resolved relative to the current OpenCode worktree.
+- `prompt.waitTimeoutMs` is the total safety cap; `prompt.recoveryInactivityTimeoutMs` only applies when OpenCode stops making progress.
 - If `telegram.allowedChatIds` is left empty, the bot accepts messages from any chat. Restrict it in production.
 - Permission approvals and session notifications are handled through plugin hooks.
 - `/language` currently supports English, Simplified Chinese, and Japanese.

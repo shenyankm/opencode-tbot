@@ -1,5 +1,12 @@
+import type {
+    Event as OpenCodeEvent,
+    EventPermissionAsked,
+    EventPermissionReplied,
+    EventSessionError,
+    EventSessionIdle,
+    EventSessionStatus,
+} from "@opencode-ai/sdk/v2/client";
 import type { PendingPermissionApproval, PermissionApprovalReply } from "../domain/permission/approval.entity.js";
-import type { OpenCodePermissionRequest } from "../services/opencode/opencode.client.js";
 import {
     buildPermissionApprovalKeyboard,
     buildPermissionApprovalMessage,
@@ -7,54 +14,25 @@ import {
 } from "../services/permission/telegram-approval.js";
 import type { TelegramBotRuntime } from "./runtime.js";
 
-type TelegramBotPluginEvent =
-    | {
-        type: "permission.asked";
-        properties: OpenCodePermissionRequest;
-    }
-    | {
-        type: "permission.replied";
-        properties: {
-            sessionID: string;
-            requestID: string;
-            reply: PermissionApprovalReply;
-        };
-    }
-    | {
-        type: "session.error";
-        properties: {
-            sessionID?: string;
-            error?: {
-                name?: string;
-                data?: {
-                    message?: string;
-                };
-            };
-        };
-    }
-    | {
-        type: "session.idle";
-        properties: {
-            sessionID: string;
-        };
-    };
-
 export async function handleTelegramBotPluginEvent(
     runtime: TelegramBotRuntime,
-    event: TelegramBotPluginEvent,
+    event: OpenCodeEvent,
 ): Promise<void> {
     switch (event.type) {
         case "permission.asked":
-            await handlePermissionAsked(runtime, event.properties);
+            await handlePermissionAsked(runtime, event);
             return;
         case "permission.replied":
-            await handlePermissionReplied(runtime, event.properties.requestID, event.properties.reply);
+            await handlePermissionReplied(runtime, event);
             return;
         case "session.error":
-            await handleSessionError(runtime, event.properties.sessionID, event.properties.error);
+            await handleSessionError(runtime, event);
             return;
         case "session.idle":
-            await handleSessionIdle(runtime, event.properties.sessionID);
+            await handleSessionIdle(runtime, event);
+            return;
+        case "session.status":
+            await handleSessionStatus(runtime, event);
             return;
         default:
             return;
@@ -63,8 +41,9 @@ export async function handleTelegramBotPluginEvent(
 
 async function handlePermissionAsked(
     runtime: TelegramBotRuntime,
-    request: OpenCodePermissionRequest,
+    event: EventPermissionAsked,
 ): Promise<void> {
+    const request = event.properties;
     const bindings = await runtime.container.sessionRepo.listBySessionId(request.sessionID);
     const chatIds = new Set([
         ...bindings.map((binding) => binding.chatId),
@@ -111,9 +90,10 @@ async function handlePermissionAsked(
 
 async function handlePermissionReplied(
     runtime: TelegramBotRuntime,
-    requestId: string,
-    reply: PermissionApprovalReply,
+    event: EventPermissionReplied,
 ): Promise<void> {
+    const requestId = event.properties.requestID;
+    const reply = event.properties.reply as PermissionApprovalReply;
     const approvals = await runtime.container.permissionApprovalRepo.listByRequestId(requestId);
 
     await Promise.all(
@@ -142,20 +122,17 @@ async function handlePermissionReplied(
 
 async function handleSessionError(
     runtime: TelegramBotRuntime,
-    sessionId: string | undefined,
-    error: {
-        name?: string;
-        data?: {
-            message?: string;
-        };
-    } | undefined,
+    event: EventSessionError,
 ): Promise<void> {
+    const sessionId = event.properties.sessionID;
+    const error = event.properties.error;
+
     if (!sessionId) {
         runtime.container.logger.error({ error }, "session error received without a session id");
         return;
     }
 
-    const wasForeground = runtime.container.foregroundSessionTracker.clear(sessionId);
+    const wasForeground = runtime.container.foregroundSessionTracker.fail(sessionId, error ?? new Error("Unknown session error."));
 
     if (wasForeground) {
         runtime.container.logger.warn({ error, sessionId }, "session error suppressed for foreground Telegram session");
@@ -171,8 +148,9 @@ async function handleSessionError(
 
 async function handleSessionIdle(
     runtime: TelegramBotRuntime,
-    sessionId: string,
+    event: EventSessionIdle,
 ): Promise<void> {
+    const sessionId = event.properties.sessionID;
     const wasForeground = runtime.container.foregroundSessionTracker.clear(sessionId);
 
     if (wasForeground) {
@@ -181,6 +159,22 @@ async function handleSessionIdle(
     }
 
     await notifyBoundChats(runtime, sessionId, `Session finished.\n\nSession: ${sessionId}`);
+}
+
+async function handleSessionStatus(
+    runtime: TelegramBotRuntime,
+    event: EventSessionStatus,
+): Promise<void> {
+    if (event.properties.status.type !== "idle") {
+        return;
+    }
+
+    await handleSessionIdle(runtime, {
+        type: "session.idle",
+        properties: {
+            sessionID: event.properties.sessionID,
+        },
+    });
 }
 
 async function notifyBoundChats(

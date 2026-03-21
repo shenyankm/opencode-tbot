@@ -3,6 +3,9 @@ import { z } from "zod";
 
 export const DEFAULT_STATE_FILE_PATH = "./data/opencode-tbot.state.json";
 export const DEFAULT_TELEGRAM_API_ROOT = "https://api.telegram.org";
+export const DEFAULT_PROMPT_WAIT_TIMEOUT_MS = 1_800_000;
+export const DEFAULT_PROMPT_POLL_REQUEST_TIMEOUT_MS = 15_000;
+export const DEFAULT_PROMPT_RECOVERY_INACTIVITY_TIMEOUT_MS = 120_000;
 
 const AllowedChatIdSchema = z.union([
     z.number().int(),
@@ -25,9 +28,19 @@ const StateConfigSchema = z.preprocess(
     }),
 );
 
+const PromptConfigSchema = z.preprocess(
+    (value) => value ?? {},
+    z.object({
+        waitTimeoutMs: z.number().int().positive().default(DEFAULT_PROMPT_WAIT_TIMEOUT_MS),
+        pollRequestTimeoutMs: z.number().int().positive().default(DEFAULT_PROMPT_POLL_REQUEST_TIMEOUT_MS),
+        recoveryInactivityTimeoutMs: z.number().int().positive().default(DEFAULT_PROMPT_RECOVERY_INACTIVITY_TIMEOUT_MS),
+    }),
+);
+
 const AppConfigSchema = z.object({
     telegram: TelegramConfigSchema,
     state: StateConfigSchema,
+    prompt: PromptConfigSchema,
     logLevel: z.string().default("info"),
 });
 
@@ -42,6 +55,12 @@ export interface PluginConfigSource {
         path?: string;
         [key: string]: unknown;
     };
+    prompt?: {
+        waitTimeoutMs?: number;
+        pollRequestTimeoutMs?: number;
+        recoveryInactivityTimeoutMs?: number;
+        [key: string]: unknown;
+    };
     logLevel?: string;
     [key: string]: unknown;
 }
@@ -51,6 +70,9 @@ export interface AppConfig {
     telegramAllowedChatIds: number[];
     telegramApiRoot: string;
     logLevel: string;
+    promptWaitTimeoutMs: number;
+    promptPollRequestTimeoutMs: number;
+    promptRecoveryInactivityTimeoutMs: number;
     stateFilePath: string;
 }
 
@@ -78,6 +100,9 @@ function buildAppConfig(
         telegramAllowedChatIds: data.telegram.allowedChatIds,
         telegramApiRoot: normalizeApiRoot(data.telegram.apiRoot),
         logLevel: data.logLevel,
+        promptWaitTimeoutMs: data.prompt.waitTimeoutMs,
+        promptPollRequestTimeoutMs: data.prompt.pollRequestTimeoutMs,
+        promptRecoveryInactivityTimeoutMs: data.prompt.recoveryInactivityTimeoutMs,
         stateFilePath: resolveStatePath(data, options.cwd ?? process.cwd()),
     };
 }

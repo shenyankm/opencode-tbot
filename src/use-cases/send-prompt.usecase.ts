@@ -5,10 +5,6 @@ import type {
     OpenCodeClientLike,
     PromptSessionFilePartInput,
 } from "../services/opencode/opencode.client.js";
-import {
-    NOOP_FOREGROUND_SESSION_TRACKER,
-    type ForegroundSessionTrackerLike,
-} from "../services/session-activity/foreground-session-tracker.js";
 import { resolveSelectedAgent } from "./agent-selection.js";
 import {
     clearStoredAgentSelection,
@@ -29,10 +25,15 @@ export class SendPromptUseCase {
         private readonly sessionRepo: SessionRepository,
         private readonly opencodeClient: OpenCodeClientLike,
         private readonly logger: AppLogger,
-        private readonly foregroundSessionTracker: ForegroundSessionTrackerLike = NOOP_FOREGROUND_SESSION_TRACKER,
     ) { }
 
-    async execute(input: { chatId: number; text?: string | null; files?: PromptSessionFilePartInput[] }) {
+    async execute(input: {
+        chatId: number;
+        files?: PromptSessionFilePartInput[];
+        onExecutionSession?: (sessionId: string) => void;
+        signal?: AbortSignal;
+        text?: string | null;
+    }) {
         const files = input.files ?? [];
         const promptText = buildPromptText(input.text, files);
 
@@ -149,7 +150,8 @@ export class SendPromptUseCase {
             ? await this.createTemporaryImageSession(input.chatId, activeBinding.sessionId)
             : null;
         const executionSessionId = temporarySessionId ?? activeBinding.sessionId;
-        const endForegroundSession = this.foregroundSessionTracker.begin(input.chatId, executionSessionId);
+
+        input.onExecutionSession?.(executionSessionId);
         let result;
 
         try {
@@ -160,11 +162,10 @@ export class SendPromptUseCase {
                 ...(selectedAgent ? { agent: selectedAgent.name } : {}),
                 structured: true,
                 ...(model ? { model } : {}),
+                ...(input.signal ? { signal: input.signal } : {}),
                 ...(activeBinding.modelVariant ? { variant: activeBinding.modelVariant } : {}),
             });
         } finally {
-            endForegroundSession();
-
             if (temporarySessionId) {
                 await this.cleanupTemporaryImageSession(
                     input.chatId,

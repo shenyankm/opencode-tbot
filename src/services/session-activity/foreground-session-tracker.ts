@@ -1,141 +1,212 @@
+import { createMessageAbortedError } from "../opencode/opencode.client.js";
+
+export interface ForegroundSessionLease {
+    readonly signal: AbortSignal;
+    attachSession(sessionId: string): void;
+    dispose(): void;
+}
+
 export interface ForegroundSessionTrackerLike {
+    acquire(chatId: number): ForegroundSessionLease | null;
+    abort(chatId: number, reason?: unknown): boolean;
     begin(chatId: number, sessionId: string): () => void;
     clear(sessionId: string): boolean;
+    fail(sessionId: string, error: unknown): boolean;
     getActiveSessionId(chatId: number): string | null;
+    hasActiveRequest(chatId: number): boolean;
     isForeground(sessionId: string): boolean;
     listChatIds(sessionId: string): number[];
 }
 
+interface ForegroundRequestState {
+    chatId: number;
+    controller: AbortController;
+    sessionId: string | null;
+}
+
 export class ForegroundSessionTracker implements ForegroundSessionTrackerLike {
-    private readonly chatStacks = new Map<number, string[]>();
-    private readonly counts = new Map<string, number>();
-    private readonly sessionChats = new Map<string, Map<number, number>>();
+    private readonly requests = new Map<number, ForegroundRequestState>();
+    private readonly sessionChats = new Map<string, Set<number>>();
+
+    acquire(chatId: number): ForegroundSessionLease | null {
+        if (this.requests.has(chatId)) {
+            return null;
+        }
+
+        const state: ForegroundRequestState = {
+            chatId,
+            controller: new AbortController(),
+            sessionId: null,
+        };
+
+        this.requests.set(chatId, state);
+
+        return {
+            signal: state.controller.signal,
+            attachSession: (sessionId: string) => {
+                this.attachSession(chatId, sessionId);
+            },
+            dispose: () => {
+                this.release(chatId);
+            },
+        };
+    }
+
+    abort(chatId: number, reason: unknown = createMessageAbortedError()): boolean {
+        const state = this.requests.get(chatId);
+
+        if (!state) {
+            return false;
+        }
+
+        if (!state.controller.signal.aborted) {
+            state.controller.abort(reason);
+        }
+
+        return true;
+    }
 
     begin(chatId: number, sessionId: string): () => void {
-        const currentCount = this.counts.get(sessionId) ?? 0;
+        const lease = this.acquire(chatId);
 
-        this.counts.set(sessionId, currentCount + 1);
-        this.incrementChat(chatId, sessionId);
+        if (!lease) {
+            return () => undefined;
+        }
 
+        lease.attachSession(sessionId);
         return () => {
-            this.decrement(chatId, sessionId);
+            lease.dispose();
         };
     }
 
     clear(sessionId: string): boolean {
-        const wasForeground = this.counts.has(sessionId);
-        const chatCounts = this.sessionChats.get(sessionId);
+        const chatIds = this.listChatIds(sessionId);
 
-        this.counts.delete(sessionId);
-        this.sessionChats.delete(sessionId);
-
-        for (const chatId of chatCounts?.keys() ?? []) {
-            const stack = this.chatStacks.get(chatId);
-
-            if (!stack) {
-                continue;
-            }
-
-            const nextStack = stack.filter((trackedSessionId) => trackedSessionId !== sessionId);
-
-            if (nextStack.length === 0) {
-                this.chatStacks.delete(chatId);
-                continue;
-            }
-
-            this.chatStacks.set(chatId, nextStack);
+        if (chatIds.length === 0) {
+            return false;
         }
 
-        return wasForeground;
+        for (const chatId of chatIds) {
+            const state = this.requests.get(chatId);
+
+            if (state?.sessionId === sessionId) {
+                state.sessionId = null;
+            }
+        }
+
+        this.sessionChats.delete(sessionId);
+        return true;
+    }
+
+    fail(sessionId: string, error: unknown): boolean {
+        const chatIds = this.listChatIds(sessionId);
+
+        if (chatIds.length === 0) {
+            return false;
+        }
+
+        this.clear(sessionId);
+
+        for (const chatId of chatIds) {
+            this.abort(chatId, error);
+        }
+
+        return true;
     }
 
     getActiveSessionId(chatId: number): string | null {
-        const stack = this.chatStacks.get(chatId);
+        return this.requests.get(chatId)?.sessionId ?? null;
+    }
 
-        return stack?.at(-1) ?? null;
+    hasActiveRequest(chatId: number): boolean {
+        return this.requests.has(chatId);
     }
 
     isForeground(sessionId: string): boolean {
-        return this.counts.has(sessionId);
+        return this.sessionChats.has(sessionId);
     }
 
     listChatIds(sessionId: string): number[] {
-        return [...(this.sessionChats.get(sessionId)?.keys() ?? [])];
+        return [...(this.sessionChats.get(sessionId) ?? new Set<number>())];
     }
 
-    private decrement(chatId: number, sessionId: string) {
-        const currentCount = this.counts.get(sessionId);
+    private attachSession(chatId: number, sessionId: string): void {
+        const normalizedSessionId = sessionId.trim();
+        const state = this.requests.get(chatId);
 
-        if (!currentCount || currentCount <= 1) {
-            this.counts.delete(sessionId);
-        } else {
-            this.counts.set(sessionId, currentCount - 1);
-        }
-
-        this.decrementChat(chatId, sessionId);
-    }
-
-    private incrementChat(chatId: number, sessionId: string) {
-        const stack = this.chatStacks.get(chatId) ?? [];
-
-        stack.push(sessionId);
-        this.chatStacks.set(chatId, stack);
-
-        const chatCounts = this.sessionChats.get(sessionId) ?? new Map<number, number>();
-        const currentCount = chatCounts.get(chatId) ?? 0;
-
-        chatCounts.set(chatId, currentCount + 1);
-        this.sessionChats.set(sessionId, chatCounts);
-    }
-
-    private decrementChat(chatId: number, sessionId: string) {
-        const stack = this.chatStacks.get(chatId);
-
-        if (stack) {
-            const index = stack.lastIndexOf(sessionId);
-
-            if (index >= 0) {
-                stack.splice(index, 1);
-            }
-
-            if (stack.length === 0) {
-                this.chatStacks.delete(chatId);
-            } else {
-                this.chatStacks.set(chatId, stack);
-            }
-        }
-
-        const chatCounts = this.sessionChats.get(sessionId);
-
-        if (!chatCounts) {
+        if (!state || normalizedSessionId.length === 0) {
             return;
         }
 
-        const currentCount = chatCounts.get(chatId) ?? 0;
-
-        if (currentCount <= 1) {
-            chatCounts.delete(chatId);
-        } else {
-            chatCounts.set(chatId, currentCount - 1);
+        if (state.sessionId === normalizedSessionId) {
+            return;
         }
 
-        if (chatCounts.size === 0) {
+        if (state.sessionId) {
+            this.detachChatFromSession(chatId, state.sessionId);
+        }
+
+        state.sessionId = normalizedSessionId;
+
+        const chatIds = this.sessionChats.get(normalizedSessionId) ?? new Set<number>();
+
+        chatIds.add(chatId);
+        this.sessionChats.set(normalizedSessionId, chatIds);
+    }
+
+    private release(chatId: number): void {
+        const state = this.requests.get(chatId);
+
+        if (!state) {
+            return;
+        }
+
+        if (state.sessionId) {
+            this.detachChatFromSession(chatId, state.sessionId);
+        }
+
+        this.requests.delete(chatId);
+    }
+
+    private detachChatFromSession(chatId: number, sessionId: string): void {
+        const chatIds = this.sessionChats.get(sessionId);
+
+        if (!chatIds) {
+            return;
+        }
+
+        chatIds.delete(chatId);
+
+        if (chatIds.size === 0) {
             this.sessionChats.delete(sessionId);
-        } else {
-            this.sessionChats.set(sessionId, chatCounts);
+            return;
         }
+
+        this.sessionChats.set(sessionId, chatIds);
     }
 }
 
 export const NOOP_FOREGROUND_SESSION_TRACKER: ForegroundSessionTrackerLike = {
+    acquire() {
+        return null;
+    },
+    abort() {
+        return false;
+    },
     begin() {
         return () => undefined;
     },
     clear() {
         return false;
     },
+    fail() {
+        return false;
+    },
     getActiveSessionId() {
         return null;
+    },
+    hasActiveRequest() {
+        return false;
     },
     isForeground() {
         return false;
