@@ -14,6 +14,7 @@ import {
     PLUGIN_CONFIG_FILE_NAME,
     preparePluginConfiguration,
     serializePluginConfig,
+    type PreparedPluginConfiguration,
 } from "../src/app/plugin-config.js";
 import {
     ensureTelegramBotPluginRuntime,
@@ -102,13 +103,19 @@ function createSdkClientStub(): OpenCodeSdkClientLike {
 function createContainerStub(cwd = "E:/workspace") {
     const calls = {
         dispose: 0,
+        info: [] as Array<{ input: unknown; message: string | undefined }>,
+        warn: [] as Array<{ input: unknown; message: string | undefined }>,
     };
     const container = {
         __cwd: cwd,
         logger: {
             error() { },
-            info() { },
-            warn() { },
+            info(input?: unknown, message?: string) {
+                calls.info.push({ input, message });
+            },
+            warn(input?: unknown, message?: string) {
+                calls.warn.push({ input, message });
+            },
         },
         dispose() {
             calls.dispose += 1;
@@ -116,6 +123,27 @@ function createContainerStub(cwd = "E:/workspace") {
     } as AppContainer & { __cwd: string };
 
     return { calls, container };
+}
+
+type ContainerStubCalls = ReturnType<typeof createContainerStub>["calls"];
+
+function createPreparedConfiguration(
+    cwd: string,
+    config: PluginConfigSource | undefined,
+    fallbackConfig: PluginConfigSource,
+    overrides: Partial<PreparedPluginConfiguration> = {},
+): PreparedPluginConfiguration {
+    const globalConfigFilePath = join("E:/Users/demo", ".config", "opencode", "opencode-tbot", "config.json");
+    const projectConfigFilePath = join(cwd, PLUGIN_CONFIG_FILE_NAME);
+
+    return {
+        cwd,
+        config: config ?? fallbackConfig,
+        globalConfigFilePath,
+        projectConfigFilePath,
+        configFilePath: globalConfigFilePath,
+        ...overrides,
+    };
 }
 
 test("loadAppConfig resolves plugin configuration from the config file shape", () => {
@@ -137,28 +165,45 @@ test("loadAppConfig ignores legacy openrouter configuration", () => {
     assert.equal("openrouter" in config, false);
 });
 
-test("preparePluginConfiguration loads telegram.botToken from cwd config file", async () => {
+test("preparePluginConfiguration loads telegram.botToken from the global config file", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-plugin-config-"));
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-home-config-"));
+    const globalConfigFilePath = join(homeDir, ".config", "opencode", "opencode-tbot", "config.json");
+
+    mkdirSync(join(homeDir, ".config", "opencode", "opencode-tbot"), { recursive: true });
+    writeFileSync(
+        globalConfigFilePath,
+        serializePluginConfig({
+            telegram: {
+                botToken: "global-token",
+            },
+            logLevel: "debug",
+        }),
+        "utf8",
+    );
     writeFileSync(
         join(cwd, PLUGIN_CONFIG_FILE_NAME),
         serializePluginConfig({
             telegram: {
                 botToken: "file-token",
             },
-            logLevel: "debug",
+            logLevel: "error",
         }),
         "utf8",
     );
 
     const prepared = await preparePluginConfiguration({
         cwd,
+        homeDir,
     });
 
-    assert.equal(prepared.config.telegram?.botToken, "file-token");
+    assert.equal(prepared.config.telegram?.botToken, "global-token");
     assert.equal(prepared.config.logLevel, "debug");
+    assert.equal(prepared.configFilePath, globalConfigFilePath);
+    assert.equal(prepared.ignoredProjectConfigFilePath, join(cwd, PLUGIN_CONFIG_FILE_NAME));
 });
 
-test("preparePluginConfiguration merges global defaults with project overrides", async () => {
+test("preparePluginConfiguration ignores worktree overrides and preserves global defaults", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-plugin-merge-"));
     const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-home-"));
     const globalConfigFilePath = join(homeDir, ".config", "opencode", "opencode-tbot", "config.json");
@@ -186,6 +231,7 @@ test("preparePluginConfiguration merges global defaults with project overrides",
             state: {
                 path: "./project-state.json",
             },
+            logLevel: "error",
             openrouter: {
                 model: "openai/gpt-audio-mini",
             },
@@ -200,18 +246,22 @@ test("preparePluginConfiguration merges global defaults with project overrides",
 
     assert.equal(prepared.config.telegram?.botToken, "global-token");
     assert.equal(prepared.config.logLevel, "debug");
-    assert.equal(prepared.config.state?.path, "./project-state.json");
+    assert.equal(prepared.config.state?.path, "./global-state.json");
     assert.equal("openrouter" in prepared.config, false);
     assert.equal(prepared.globalConfigFilePath, globalConfigFilePath);
+    assert.equal(prepared.configFilePath, globalConfigFilePath);
+    assert.equal(prepared.projectConfigFilePath, join(cwd, PLUGIN_CONFIG_FILE_NAME));
+    assert.equal(prepared.ignoredProjectConfigFilePath, join(cwd, PLUGIN_CONFIG_FILE_NAME));
 });
 
-test("preparePluginConfiguration strips legacy openrouter config from global and project files", async () => {
+test("preparePluginConfiguration strips legacy openrouter config from global config and ignores worktree config", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-plugin-global-key-"));
     const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-home-global-key-"));
+    const globalConfigFilePath = join(homeDir, ".config", "opencode", "opencode-tbot", "config.json");
 
     mkdirSync(join(homeDir, ".config", "opencode", "opencode-tbot"), { recursive: true });
     writeFileSync(
-        join(homeDir, ".config", "opencode", "opencode-tbot", "config.json"),
+        globalConfigFilePath,
         serializePluginConfig({
             telegram: {
                 botToken: "global-token",
@@ -240,11 +290,24 @@ test("preparePluginConfiguration strips legacy openrouter config from global and
     });
 
     assert.equal("openrouter" in prepared.config, false);
+    assert.equal(prepared.config.telegram?.botToken, "global-token");
+    assert.equal(prepared.configFilePath, globalConfigFilePath);
+    assert.equal(prepared.ignoredProjectConfigFilePath, join(cwd, PLUGIN_CONFIG_FILE_NAME));
 });
 
 test("preparePluginConfiguration keeps missing tokens unresolved for the installer flow", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-plugin-no-tty-"));
     const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-home-empty-"));
+    writeFileSync(
+        join(cwd, PLUGIN_CONFIG_FILE_NAME),
+        serializePluginConfig({
+            telegram: {
+                botToken: "file-token",
+            },
+        }),
+        "utf8",
+    );
+
     const prepared = await preparePluginConfiguration({
         cwd,
         homeDir,
@@ -255,6 +318,7 @@ test("preparePluginConfiguration keeps missing tokens unresolved for the install
 
     assert.equal(prepared.config.telegram?.botToken, undefined);
     assert.equal(prepared.config.logLevel, "info");
+    assert.equal(prepared.ignoredProjectConfigFilePath, join(cwd, PLUGIN_CONFIG_FILE_NAME));
 });
 
 test("ensureTelegramBotPluginRuntime starts the Telegram runtime only once per worktree", async () => {
@@ -264,6 +328,7 @@ test("ensureTelegramBotPluginRuntime starts the Telegram runtime only once per w
         const starts: Array<{ cwd: string; token: string }> = [];
         const sdkClient = createSdkClientStub();
         const configSource = createConfig();
+        let containerCalls: ContainerStubCalls | undefined;
         const bootstrapApp = (
             client: OpenCodeSdkClientLike,
             runtimeConfig: PluginConfigSource | undefined,
@@ -271,11 +336,12 @@ test("ensureTelegramBotPluginRuntime starts the Telegram runtime only once per w
         ) => {
             assert.equal(client, sdkClient);
             assert.equal(options.cwd, "E:/workspace");
-            const { container } = createContainerStub(options.cwd);
+            const stub = createContainerStub(options.cwd);
+            containerCalls = stub.calls;
 
             return {
                 config: loadAppConfig(runtimeConfig, options),
-                container,
+                container: stub.container,
             };
         };
         const startRuntime = async (input: { config: AppConfig; container: AppContainer }) => {
@@ -301,11 +367,7 @@ test("ensureTelegramBotPluginRuntime starts the Telegram runtime only once per w
             },
             config: configSource,
             bootstrapApp,
-            prepareConfiguration: async ({ cwd, config }) => ({
-                cwd,
-                config: config ?? configSource,
-                configFilePath: join(cwd, PLUGIN_CONFIG_FILE_NAME),
-            }),
+            prepareConfiguration: async ({ cwd, config }) => createPreparedConfiguration(cwd, config, configSource),
             startRuntime,
         });
         const second = await ensureTelegramBotPluginRuntime({
@@ -315,11 +377,7 @@ test("ensureTelegramBotPluginRuntime starts the Telegram runtime only once per w
             },
             config: configSource,
             bootstrapApp,
-            prepareConfiguration: async ({ cwd, config }) => ({
-                cwd,
-                config: config ?? configSource,
-                configFilePath: join(cwd, PLUGIN_CONFIG_FILE_NAME),
-            }),
+            prepareConfiguration: async ({ cwd, config }) => createPreparedConfiguration(cwd, config, configSource),
             startRuntime,
         });
 
@@ -328,6 +386,68 @@ test("ensureTelegramBotPluginRuntime starts the Telegram runtime only once per w
             cwd: "E:/workspace",
             token: "telegram-token",
         }]);
+        assert.equal(containerCalls?.warn.length, 0);
+    } finally {
+        await resetTelegramBotPluginRuntimeForTests();
+    }
+});
+
+test("ensureTelegramBotPluginRuntime warns when a legacy worktree config exists", async () => {
+    await resetTelegramBotPluginRuntimeForTests();
+
+    try {
+        const sdkClient = createSdkClientStub();
+        const configSource = createConfig();
+        let containerCalls: ContainerStubCalls | undefined;
+        const bootstrapApp = (
+            _client: OpenCodeSdkClientLike,
+            runtimeConfig: PluginConfigSource | undefined,
+            options: { cwd?: string } = {},
+        ) => {
+            const stub = createContainerStub(String(options.cwd));
+            containerCalls = stub.calls;
+
+            return {
+                config: loadAppConfig(runtimeConfig, options),
+                container: stub.container,
+            };
+        };
+
+        await ensureTelegramBotPluginRuntime({
+            context: {
+                client: sdkClient,
+                worktree: "E:/workspace",
+            },
+            config: configSource,
+            bootstrapApp,
+            prepareConfiguration: async ({ cwd, config }) => createPreparedConfiguration(
+                cwd,
+                config,
+                configSource,
+                {
+                    ignoredProjectConfigFilePath: join(cwd, PLUGIN_CONFIG_FILE_NAME),
+                },
+            ),
+            startRuntime: async (input) => ({
+                bot: {} as never,
+                container: input.container,
+                stop() { },
+                dispose() {
+                    input.container.dispose();
+                },
+            }),
+        });
+
+        assert.equal(containerCalls?.warn.length, 1);
+        assert.match(
+            containerCalls?.warn[0]?.message ?? "",
+            /legacy worktree plugin config is ignored/u,
+        );
+        assert.deepEqual(containerCalls?.warn[0]?.input, {
+            cwd: "E:/workspace",
+            ignoredProjectConfigFilePath: join("E:/workspace", PLUGIN_CONFIG_FILE_NAME),
+            globalConfigFilePath: join("E:/Users/demo", ".config", "opencode", "opencode-tbot", "config.json"),
+        });
     } finally {
         await resetTelegramBotPluginRuntimeForTests();
     }
@@ -339,7 +459,7 @@ test("ensureTelegramBotPluginRuntime clears the singleton and disposes the conta
     try {
         const sdkClient = createSdkClientStub();
         const configSource = createConfig();
-        const containerCalls: Array<{ dispose: number }> = [];
+        const containerCalls: ContainerStubCalls[] = [];
         const bootstrapApp = (
             _client: OpenCodeSdkClientLike,
             runtimeConfig: PluginConfigSource | undefined,
@@ -363,11 +483,7 @@ test("ensureTelegramBotPluginRuntime clears the singleton and disposes the conta
                 },
                 config: configSource,
                 bootstrapApp,
-                prepareConfiguration: async ({ cwd, config }) => ({
-                    cwd,
-                    config: config ?? configSource,
-                    configFilePath: join(cwd, PLUGIN_CONFIG_FILE_NAME),
-                }),
+                prepareConfiguration: async ({ cwd, config }) => createPreparedConfiguration(cwd, config, configSource),
                 startRuntime: async () => {
                     attempts += 1;
                     throw new Error("startup failed");
@@ -383,11 +499,7 @@ test("ensureTelegramBotPluginRuntime clears the singleton and disposes the conta
             },
             config: configSource,
             bootstrapApp,
-            prepareConfiguration: async ({ cwd, config }) => ({
-                cwd,
-                config: config ?? configSource,
-                configFilePath: join(cwd, PLUGIN_CONFIG_FILE_NAME),
-            }),
+            prepareConfiguration: async ({ cwd, config }) => createPreparedConfiguration(cwd, config, configSource),
             startRuntime: async (input) => {
                 attempts += 1;
 
@@ -417,7 +529,7 @@ test("ensureTelegramBotPluginRuntime rebuilds the runtime when the worktree chan
         const sdkClient = createSdkClientStub();
         const configSource = createConfig();
         const runtimeRecords = new Map<string, { dispose: number; stop: number }>();
-        const containerRecords = new Map<string, { dispose: number }>();
+        const containerRecords = new Map<string, ContainerStubCalls>();
         const bootstrapApp = (
             _client: OpenCodeSdkClientLike,
             runtimeConfig: PluginConfigSource | undefined,
@@ -458,11 +570,7 @@ test("ensureTelegramBotPluginRuntime rebuilds the runtime when the worktree chan
             },
             config: configSource,
             bootstrapApp,
-            prepareConfiguration: async ({ cwd, config }) => ({
-                cwd,
-                config: config ?? configSource,
-                configFilePath: join(cwd, PLUGIN_CONFIG_FILE_NAME),
-            }),
+            prepareConfiguration: async ({ cwd, config }) => createPreparedConfiguration(cwd, config, configSource),
             startRuntime,
         });
         const second = await ensureTelegramBotPluginRuntime({
@@ -472,11 +580,7 @@ test("ensureTelegramBotPluginRuntime rebuilds the runtime when the worktree chan
             },
             config: configSource,
             bootstrapApp,
-            prepareConfiguration: async ({ cwd, config }) => ({
-                cwd,
-                config: config ?? configSource,
-                configFilePath: join(cwd, PLUGIN_CONFIG_FILE_NAME),
-            }),
+            prepareConfiguration: async ({ cwd, config }) => createPreparedConfiguration(cwd, config, configSource),
             startRuntime,
         });
 
@@ -512,11 +616,7 @@ test("resetTelegramBotPluginRuntimeForTests disposes the active runtime", async 
             config: loadAppConfig(runtimeConfig, options),
             container: createContainerStub(String(options.cwd)).container,
         }),
-        prepareConfiguration: async ({ cwd, config }) => ({
-            cwd,
-            config: config ?? configSource,
-            configFilePath: join(cwd, PLUGIN_CONFIG_FILE_NAME),
-        }),
+        prepareConfiguration: async ({ cwd, config }) => createPreparedConfiguration(cwd, config, configSource),
         startRuntime: async (input) => ({
             bot: {} as never,
             container: input.container,

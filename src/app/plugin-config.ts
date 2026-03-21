@@ -13,6 +13,7 @@ export interface PreparedPluginConfiguration {
     config: PluginConfigSource;
     globalConfigFilePath: string;
     projectConfigFilePath: string;
+    ignoredProjectConfigFilePath?: string;
     configFilePath: string;
 }
 
@@ -28,20 +29,22 @@ export async function preparePluginConfiguration(
     const homeDir = options.homeDir ?? homedir();
     const globalConfigFilePath = getGlobalPluginConfigFilePath(homeDir);
     const projectConfigFilePath = await resolveProjectPluginConfigFilePath(options.cwd);
-    const [globalConfig, projectConfig] = await Promise.all([
+    const [globalConfig, hasIgnoredProjectConfig] = await Promise.all([
         loadPluginConfigFile(globalConfigFilePath),
-        loadPluginConfigFile(projectConfigFilePath),
+        pathExists(projectConfigFilePath),
     ]);
-    const config = stripLegacyVoiceConfig(mergePluginConfigSources(globalConfig, projectConfig, options.config));
-    const configFilePath = await pathExists(projectConfigFilePath)
+    const config = stripLegacyVoiceConfig(mergePluginConfigSources(globalConfig, options.config));
+    const ignoredProjectConfigFilePath = hasIgnoredProjectConfig
         ? projectConfigFilePath
-        : globalConfigFilePath;
+        : undefined;
+    const configFilePath = globalConfigFilePath;
 
     return {
         cwd: options.cwd,
         config,
         globalConfigFilePath,
         projectConfigFilePath,
+        ...(ignoredProjectConfigFilePath ? { ignoredProjectConfigFilePath } : {}),
         configFilePath,
     };
 }

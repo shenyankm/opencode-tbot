@@ -114,13 +114,24 @@ async function startPluginRuntime(
     );
 
     try {
+        if (preparedConfiguration.ignoredProjectConfigFilePath) {
+            container.logger.warn(
+                {
+                    cwd: preparedConfiguration.cwd,
+                    ignoredProjectConfigFilePath: preparedConfiguration.ignoredProjectConfigFilePath,
+                    globalConfigFilePath: preparedConfiguration.globalConfigFilePath,
+                },
+                "legacy worktree plugin config is ignored; migrate settings to the global opencode-tbot config",
+            );
+        }
+
         const runtime = await startRuntime({ config, container });
 
         container.logger.info(
             {
                 cwd: preparedConfiguration.cwd,
                 globalConfigFilePath: preparedConfiguration.globalConfigFilePath,
-                projectConfigFilePath: preparedConfiguration.projectConfigFilePath,
+                ignoredProjectConfigFilePath: preparedConfiguration.ignoredProjectConfigFilePath,
                 configFilePath: preparedConfiguration.configFilePath,
                 mode: "plugin",
             },

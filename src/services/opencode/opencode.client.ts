@@ -264,10 +264,10 @@ export class OpenCodeClient implements OpenCodeClientLike {
         promise: Promise<OpenCodeConfiguredModel[]> | null;
         value: OpenCodeConfiguredModel[] | null;
     } = {
-        expiresAt: 0,
-        promise: null,
-        value: null,
-    };
+            expiresAt: 0,
+            promise: null,
+            value: null,
+        };
 
     constructor(
         options?: OpenCodeClientOptions,
@@ -619,25 +619,28 @@ export class OpenCodeClient implements OpenCodeClientLike {
 
     private async resolvePromptResponse(
         input: PromptSessionInput,
-        data: OpenCodePromptResponse,
+        data: OpenCodePromptResponse | null,
         knownMessageIds: Set<string>,
         startedAt: number,
     ): Promise<OpenCodePromptResponse> {
         const structured = input.structured ?? false;
 
-        if (!shouldPollPromptMessage(data, structured)) {
+        if (data && !shouldPollPromptMessage(data, structured)) {
             return data;
         }
 
-        const messageId = extractMessageId(data.info);
+        const messageId = data ? extractMessageId(data.info) : null;
         const candidateOptions: PromptResponseCandidateOptions = {
             initialMessageId: messageId,
-            initialParentId: toAssistantMessage(data.info)?.parentID ?? null,
+            initialParentId: data ? toAssistantMessage(data.info)?.parentID ?? null : null,
             knownMessageIds,
             requestStartedAt: resolvePromptCandidateStartTime(startedAt, data),
             structured,
         };
-        let bestCandidate = selectPromptResponseCandidate([data], candidateOptions) ?? data;
+        let bestCandidate = selectPromptResponseCandidate(
+            data ? [data] : [],
+            candidateOptions,
+        );
         const deadlineAt = Date.now() + this.promptRequestTimeouts.totalPollMs;
         let idleStatusSeen = false;
         let attempt = 0;
@@ -660,12 +663,16 @@ export class OpenCodeClient implements OpenCodeClientLike {
                 const next = await this.fetchPromptMessage(input.sessionId, messageId);
 
                 if (next) {
-                    bestCandidate = selectPromptResponseCandidate(
+                    const nextCandidate = selectPromptResponseCandidate(
                         [bestCandidate, next],
                         candidateOptions,
-                    ) ?? bestCandidate;
+                    );
 
-                    if (!shouldPollPromptMessage(next, structured)) {
+                    if (nextCandidate) {
+                        bestCandidate = nextCandidate;
+                    }
+
+                    if (bestCandidate && !shouldPollPromptMessage(bestCandidate, structured)) {
                         return bestCandidate;
                     }
                 }
@@ -678,12 +685,16 @@ export class OpenCodeClient implements OpenCodeClientLike {
             );
 
             if (latest) {
-                bestCandidate = selectPromptResponseCandidate(
+                const nextCandidate = selectPromptResponseCandidate(
                     [bestCandidate, latest],
                     candidateOptions,
-                ) ?? bestCandidate;
+                );
 
-                if (!shouldPollPromptMessage(bestCandidate, structured)) {
+                if (nextCandidate) {
+                    bestCandidate = nextCandidate;
+                }
+
+                if (bestCandidate && !shouldPollPromptMessage(bestCandidate, structured)) {
                     return bestCandidate;
                 }
             }
@@ -712,9 +723,9 @@ export class OpenCodeClient implements OpenCodeClientLike {
         const resolved = selectPromptResponseCandidate(
             [bestCandidate, latest],
             candidateOptions,
-        ) ?? bestCandidate;
+        );
 
-        if (shouldPollPromptMessage(resolved, structured)) {
+        if (!resolved || shouldPollPromptMessage(resolved, structured)) {
             const error = createOpenCodePromptTimeoutError({
                 sessionId: input.sessionId,
                 stage: "final-scan",
@@ -956,8 +967,38 @@ export class OpenCodeClient implements OpenCodeClientLike {
             | { type: "text"; text: string }
             | { type: "file"; filename?: string; mime: string; url: string }
         >,
-    ): Promise<OpenCodePromptResponse> {
+    ): Promise<OpenCodePromptResponse | null> {
+        const requestBody = {
+            ...(input.agent ? { agent: input.agent } : {}),
+            ...(input.structured ? { format: STRUCTURED_REPLY_SCHEMA } : {}),
+            ...(input.model ? { model: input.model } : {}),
+            ...(input.variant ? { variant: input.variant } : {}),
+            parts,
+        };
+        const requestParameters = {
+            sessionID: input.sessionId,
+            ...requestBody,
+        };
+
         try {
+            if (typeof this.client.session?.promptAsync === "function") {
+                await this.runPromptRequestWithTimeout(
+                    {
+                        sessionId: input.sessionId,
+                        stage: "send-prompt",
+                        timeoutMs: this.promptRequestTimeouts.sendMs,
+                    },
+                    async (signal) => {
+                        await this.client.session.promptAsync(requestParameters, {
+                            ...SDK_OPTIONS,
+                            signal,
+                        });
+                    },
+                );
+
+                return null;
+            }
+
             return await this.runPromptRequestWithTimeout(
                 {
                     sessionId: input.sessionId,
@@ -973,26 +1014,13 @@ export class OpenCodeClient implements OpenCodeClientLike {
                                 path: {
                                     sessionID: input.sessionId,
                                 },
-                                body: {
-                                    ...(input.agent ? { agent: input.agent } : {}),
-                                    ...(input.structured ? { format: STRUCTURED_REPLY_SCHEMA } : {}),
-                                    ...(input.model ? { model: input.model } : {}),
-                                    ...(input.variant ? { variant: input.variant } : {}),
-                                    parts,
-                                },
+                                body: requestBody,
                                 signal,
                             },
                         ));
                     }
 
-                    const response = await this.client.session.prompt({
-                        sessionID: input.sessionId,
-                        ...(input.agent ? { agent: input.agent } : {}),
-                        ...(input.structured ? { format: STRUCTURED_REPLY_SCHEMA } : {}),
-                        ...(input.model ? { model: input.model } : {}),
-                        ...(input.variant ? { variant: input.variant } : {}),
-                        parts,
-                    }, {
+                    const response = await this.client.session.prompt(requestParameters, {
                         ...SDK_OPTIONS,
                         signal,
                     }) as MaybeWrappedResponse<OpenCodePromptResponse>;
@@ -1757,8 +1785,12 @@ function getPromptResponseCandidateRank(
 
 function resolvePromptCandidateStartTime(
     startedAt: number,
-    initialMessage: OpenCodePromptResponse,
+    initialMessage: OpenCodePromptResponse | null,
 ): number | null {
+    if (!initialMessage) {
+        return null;
+    }
+
     const initialCreatedAt = coerceFiniteNumber(toAssistantMessage(initialMessage.info)?.time?.created);
 
     if (initialCreatedAt === null) {

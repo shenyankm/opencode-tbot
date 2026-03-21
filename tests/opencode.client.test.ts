@@ -1206,6 +1206,129 @@ test("promptSession waits for a raw-client reply without message id and reads st
     assertOptionsIncludeSignal(calls[1]?.options);
 });
 
+test("promptSession prefers async prompt submission when the SDK exposes promptAsync", async () => {
+    const calls: Array<{
+        input?: unknown;
+        kind: "messages" | "prompt" | "promptAsync" | "status";
+        options: unknown;
+    }> = [];
+    let messageListCallCount = 0;
+    let statusCallCount = 0;
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            session: {
+                messages: async (input: unknown, options: unknown) => {
+                    calls.push({ kind: "messages", input, options });
+                    messageListCallCount += 1;
+
+                    if (messageListCallCount < 3) {
+                        return {
+                            data: [],
+                        };
+                    }
+
+                    return {
+                        data: [{
+                            info: {
+                                id: "assistant-final",
+                                role: "assistant",
+                                sessionID: "session-1",
+                                time: {
+                                    created: 120,
+                                    completed: 420,
+                                },
+                                tokens: {
+                                    input: 2,
+                                    output: 6,
+                                    reasoning: 0,
+                                    cache: {
+                                        read: 0,
+                                        write: 0,
+                                    },
+                                },
+                                structured: {
+                                    body_md: "## Async Reply",
+                                },
+                            } as never,
+                            parts: [{ type: "text", text: "Async Reply" }] as never,
+                        }],
+                    };
+                },
+                prompt: async (input: unknown, options: unknown) => {
+                    calls.push({ kind: "prompt", input, options });
+
+                    return await new Promise<never>(() => undefined);
+                },
+                promptAsync: async (input: unknown, options: unknown) => {
+                    calls.push({ kind: "promptAsync", input, options });
+                    return undefined as never;
+                },
+                status: async (_input: unknown, options: unknown) => {
+                    calls.push({ kind: "status", options });
+                    statusCallCount += 1;
+
+                    return {
+                        data: {
+                            "session-1": statusCallCount === 1
+                                ? { type: "busy" }
+                                : { type: "idle" },
+                        },
+                    };
+                },
+            },
+            app: {
+                log: async () => true,
+            },
+        } as never,
+    );
+    setPromptRequestTimeouts(client, {
+        pollRequestMs: 5,
+        sendMs: 20,
+        totalPollMs: 50,
+    });
+
+    const result = await client.promptSession({
+        sessionId: "session-1",
+        prompt: "hello from telegram",
+        structured: true,
+    });
+
+    assert.equal(result.bodyMd, "## Async Reply");
+    assert.equal(result.fallbackText, "Async Reply");
+    assert.deepEqual(result.parts, [{ type: "text", text: "Async Reply" }]);
+    assert.equal(statusCallCount, 1);
+    assert.deepEqual(
+        calls.map((call) => call.kind),
+        ["messages", "promptAsync", "messages", "status", "messages"],
+    );
+    assert.deepEqual(calls[1]?.input, {
+        sessionID: "session-1",
+        format: {
+            type: "json_schema",
+            retryCount: 2,
+            schema: {
+                type: "object",
+                additionalProperties: false,
+                required: ["body_md"],
+                properties: {
+                    body_md: {
+                        type: "string",
+                        description: "Markdown body only. Do not include duration, token usage, or any footer. Do not wrap the whole answer in ```md or ```markdown fences. Use Markdown formatting directly unless the user explicitly asks for raw Markdown source.",
+                    },
+                },
+            },
+        },
+        parts: [
+            {
+                type: "text",
+                text: "hello from telegram",
+            },
+        ],
+    });
+    assertOptionsIncludeSignal(calls[1]?.options);
+});
+
 test("promptSession keeps polling recent messages after the session turns idle and does not resend the prompt", async () => {
     const calls: Array<{ kind: "get" | "post"; options: unknown }> = [];
     let messageListCallCount = 0;

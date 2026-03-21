@@ -62,18 +62,13 @@ npm exec --package opencode-tbot@latest opencode-tbot -- update
 
 ## 設定
 
-ランタイム設定は次の順序で読み込まれます。
+ランタイム設定は `~/.config/opencode/opencode-tbot/config.json` からのみ読み込まれます。
 
-1. `~/.config/opencode/opencode-tbot/config.json` のグローバルデフォルト
-2. `<worktree>/tbot.config.json` のプロジェクト上書き設定
-
-プロジェクト設定はグローバル設定に上書きマージされます。`telegram` と `state` はセクション単位でディープマージされます。
+古い `<worktree>/tbot.config.json` はランタイムでは無視されます。検出された場合は、値をグローバル設定へ移行できるように警告ログを出します。
 
 古い `openrouter` 音声転写設定はランタイムでは無視され、インストーラーが設定を書き直す際にも削除されます。
 
-リポジトリには最小構成の参考として [tbot.config.example.json](./tbot.config.example.json) も含まれています。
-
-### `tbot.config.json` の例
+### グローバル `config.json` の例
 
 ```json
 {
@@ -109,7 +104,7 @@ npm exec --package opencode-tbot@latest opencode-tbot -- update
 ## クイックスタート
 
 1. `npm exec --package opencode-tbot@latest opencode-tbot -- install` でプラグインをインストールします。
-2. 特定の chat のみ許可したい場合は、`tbot.config.json` で `telegram.allowedChatIds` を設定します。
+2. 特定の chat のみ許可したい場合は、`~/.config/opencode/opencode-tbot/config.json` で `telegram.allowedChatIds` を設定します。
 3. 対象の worktree で OpenCode を起動し、プラグインランタイムを読み込ませます。
 4. Telegram で `/status` を実行し、接続を確認します。
 5. `/new [title]` を実行するか、テキストメッセージを直接送信して使い始めます。

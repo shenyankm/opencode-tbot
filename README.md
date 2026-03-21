@@ -62,18 +62,13 @@ npm exec --package opencode-tbot@latest opencode-tbot -- update
 
 ## Configuration
 
-Runtime config is loaded in this order:
+Runtime config is loaded from `~/.config/opencode/opencode-tbot/config.json`.
 
-1. Global defaults from `~/.config/opencode/opencode-tbot/config.json`
-2. Project overrides from `<worktree>/tbot.config.json`
-
-Project config is merged on top of the global config. `telegram` and `state` are deep-merged by section.
+Legacy `<worktree>/tbot.config.json` files are ignored at runtime. If one is present, the plugin logs a warning so you can migrate its values into the global config.
 
 Legacy `openrouter` voice-transcription settings are ignored at runtime. When the installer rewrites the config, it removes them.
 
-The repository also includes [tbot.config.example.json](./tbot.config.example.json) as a minimal reference.
-
-### Example `tbot.config.json`
+### Example Global `config.json`
 
 ```json
 {
@@ -109,7 +104,7 @@ The repository also includes [tbot.config.example.json](./tbot.config.example.js
 ## Quick Start
 
 1. Install the plugin with `npm exec --package opencode-tbot@latest opencode-tbot -- install`.
-2. Set `telegram.allowedChatIds` in `tbot.config.json` if you want to restrict the bot to specific chats.
+2. Set `telegram.allowedChatIds` in `~/.config/opencode/opencode-tbot/config.json` if you want to restrict the bot to specific chats.
 3. Start OpenCode in the target worktree so the plugin runtime can load.
 4. In Telegram, run `/status` to verify the connection.
 5. Run `/new [title]` or send a text message directly to start working.

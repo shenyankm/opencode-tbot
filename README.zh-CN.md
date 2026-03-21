@@ -62,18 +62,13 @@ npm exec --package opencode-tbot@latest opencode-tbot -- update
 
 ## 配置
 
-运行时配置按以下优先级加载：
+运行时配置只会从 `~/.config/opencode/opencode-tbot/config.json` 加载。
 
-1. 全局默认配置 `~/.config/opencode/opencode-tbot/config.json`
-2. 项目覆盖配置 `<worktree>/tbot.config.json`
-
-项目配置会覆盖全局默认值；`telegram` 和 `state` 会按分段进行深合并。
+遗留的 `<worktree>/tbot.config.json` 会在运行时被忽略；如果检测到该文件，插件会记录一条警告，提示你把其中的值迁移到全局配置。
 
 遗留的 `openrouter` 语音转写配置在运行时会被忽略；安装器重写配置时也会自动移除这些字段。
 
-仓库内还提供了 [tbot.config.example.json](./tbot.config.example.json) 作为最小配置参考。
-
-### `tbot.config.json` 示例
+### 全局 `config.json` 示例
 
 ```json
 {
@@ -109,7 +104,7 @@ npm exec --package opencode-tbot@latest opencode-tbot -- update
 ## 快速开始
 
 1. 使用 `npm exec --package opencode-tbot@latest opencode-tbot -- install` 安装插件。
-2. 如果你只想允许特定聊天使用 bot，请在 `tbot.config.json` 中设置 `telegram.allowedChatIds`。
+2. 如果你只想允许特定聊天使用 bot，请在 `~/.config/opencode/opencode-tbot/config.json` 中设置 `telegram.allowedChatIds`。
 3. 在目标 worktree 中启动 OpenCode，让插件运行时被加载。
 4. 在 Telegram 中执行 `/status` 验证连接是否正常。
 5. 执行 `/new [title]`，或者直接发送文本消息开始使用。

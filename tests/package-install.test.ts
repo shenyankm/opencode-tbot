@@ -39,7 +39,6 @@ test("package.json exposes publishable plugin entrypoints", () => {
         "README.md",
         "README.ja.md",
         "README.zh-CN.md",
-        "tbot.config.example.json",
         "LICENSE",
     ]);
     assert.equal(
