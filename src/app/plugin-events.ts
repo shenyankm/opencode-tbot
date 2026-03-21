@@ -66,17 +66,21 @@ async function handlePermissionAsked(
     request: OpenCodePermissionRequest,
 ): Promise<void> {
     const bindings = await runtime.container.sessionRepo.listBySessionId(request.sessionID);
+    const chatIds = new Set([
+        ...bindings.map((binding) => binding.chatId),
+        ...runtime.container.foregroundSessionTracker.listChatIds(request.sessionID),
+    ]);
     const approvals = await runtime.container.permissionApprovalRepo.listByRequestId(request.id);
     const approvedChatIds = new Set(approvals.map((approval) => approval.chatId));
 
-    for (const binding of bindings) {
-        if (approvedChatIds.has(binding.chatId)) {
+    for (const chatId of chatIds) {
+        if (approvedChatIds.has(chatId)) {
             continue;
         }
 
         try {
             const message = await runtime.bot.api.sendMessage(
-                binding.chatId,
+                chatId,
                 buildPermissionApprovalMessage(request),
                 {
                     parse_mode: "MarkdownV2",
@@ -87,7 +91,7 @@ async function handlePermissionAsked(
             await runtime.container.permissionApprovalRepo.set({
                 requestId: request.id,
                 sessionId: request.sessionID,
-                chatId: binding.chatId,
+                chatId,
                 messageId: message.message_id,
                 status: "pending",
                 updatedAt: new Date().toISOString(),
@@ -96,7 +100,7 @@ async function handlePermissionAsked(
             runtime.container.logger.error(
                 {
                     error,
-                    chatId: binding.chatId,
+                    chatId,
                     requestId: request.id,
                 },
                 "failed to deliver permission request to Telegram",
@@ -151,7 +155,9 @@ async function handleSessionError(
         return;
     }
 
-    if (runtime.container.foregroundSessionTracker.isForeground(sessionId)) {
+    const wasForeground = runtime.container.foregroundSessionTracker.clear(sessionId);
+
+    if (wasForeground) {
         runtime.container.logger.warn({ error, sessionId }, "session error suppressed for foreground Telegram session");
         return;
     }

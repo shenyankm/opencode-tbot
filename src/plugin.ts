@@ -164,8 +164,9 @@ function createHooks(runtime: TelegramBotRuntime): Hooks {
         },
         async "permission.ask"(input, output) {
             const bindings = await runtime.container.sessionRepo.listBySessionId(input.sessionID);
+            const foregroundChatIds = runtime.container.foregroundSessionTracker.listChatIds(input.sessionID);
 
-            if (bindings.length > 0) {
+            if (bindings.length > 0 || foregroundChatIds.length > 0) {
                 output.status = "ask";
             }
         },

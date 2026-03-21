@@ -4,6 +4,7 @@ import { handleCancelCommand } from "../src/bot/commands/cancel.js";
 import type { AppLogger } from "../src/infra/logger/index.js";
 import { InMemoryPendingActionRepository } from "../src/repositories/pending-action.repo.js";
 import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
+import { ForegroundSessionTracker } from "../src/services/session-activity/foreground-session-tracker.js";
 import { AbortPromptUseCase } from "../src/use-cases/abort-prompt.usecase.js";
 
 const logger = {
@@ -103,6 +104,49 @@ test("AbortPromptUseCase aborts busy sessions", async () => {
         status: "aborted",
     });
     assert.deepEqual(abortedSessionIds, ["session-9"]);
+});
+
+test("AbortPromptUseCase aborts the active foreground child session before the bound main session", async () => {
+    const repo = new InMemorySessionRepository();
+    const foregroundSessionTracker = new ForegroundSessionTracker();
+    await repo.setCurrent({
+        chatId: 4,
+        sessionId: "session-main",
+        projectId: "project-1",
+        directory: "E:/repo-1",
+        agentName: null,
+        modelProviderId: null,
+        modelId: null,
+        modelVariant: null,
+        language: null,
+        updatedAt: new Date(0).toISOString(),
+    });
+    const stopTracking = foregroundSessionTracker.begin(4, "session-child");
+    const abortedSessionIds: string[] = [];
+    const useCase = new AbortPromptUseCase(
+        repo,
+        {
+            async abortSession(sessionId) {
+                abortedSessionIds.push(sessionId);
+                return true;
+            },
+            async getSessionStatuses() {
+                return {
+                    "session-child": { type: "busy" },
+                    "session-main": { type: "busy" },
+                };
+            },
+        } as never,
+        foregroundSessionTracker,
+    );
+
+    assert.deepEqual(await useCase.execute({ chatId: 4 }), {
+        sessionId: "session-child",
+        sessionStatus: { type: "busy" },
+        status: "aborted",
+    });
+    assert.deepEqual(abortedSessionIds, ["session-child"]);
+    stopTracking();
 });
 
 test("handleCancelCommand maps abort statuses and presents normalized errors", async () => {

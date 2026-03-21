@@ -67,7 +67,11 @@ function createContainer(
         apiRoot: config.telegramApiRoot,
     });
     const uploadFileUseCase = new UploadFileUseCase(telegramFileClient);
-    const abortPromptUseCase = new AbortPromptUseCase(sessionRepo, opencodeClient);
+    const abortPromptUseCase = new AbortPromptUseCase(
+        sessionRepo,
+        opencodeClient,
+        foregroundSessionTracker,
+    );
     const createSessionUseCase = new CreateSessionUseCase(sessionRepo, opencodeClient, logger);
     const getHealthUseCase = new GetHealthUseCase(opencodeClient);
     const getPathUseCase = new GetPathUseCase(opencodeClient);

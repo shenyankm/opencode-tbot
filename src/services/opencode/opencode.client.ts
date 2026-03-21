@@ -234,6 +234,8 @@ const StructuredReplySchema = z.object({
 export interface OpenCodeClientLike {
     readonly client?: OpenCodeSdkClientLike;
     abortSession(sessionId: string): Promise<boolean>;
+    deleteSession(sessionId: string): Promise<boolean>;
+    forkSession(sessionId: string, messageId?: string): Promise<OpenCodeSession>;
     getHealth(): Promise<OpenCodeHealth>;
     getPath(): Promise<OpenCodePath>;
     listLspStatuses(directory?: string): Promise<OpenCodeLspStatus[]>;
@@ -332,6 +334,60 @@ export class OpenCodeClient implements OpenCodeClientLike {
             { sessionID: sessionId },
             SDK_OPTIONS,
         ) as MaybeWrappedResponse<boolean>;
+
+        return unwrapSdkData(response);
+    }
+
+    async deleteSession(sessionId: string): Promise<boolean> {
+        if (hasRawSdkMethod(this.client, "delete")) {
+            return this.requestRaw<boolean>(
+                "delete",
+                {
+                    url: "/session/{sessionID}",
+                    path: {
+                        sessionID: sessionId,
+                    },
+                },
+            );
+        }
+
+        const response = await this.client.session.delete(
+            { sessionID: sessionId },
+            SDK_OPTIONS,
+        ) as MaybeWrappedResponse<boolean>;
+
+        return unwrapSdkData(response);
+    }
+
+    async forkSession(sessionId: string, messageId?: string): Promise<OpenCodeSession> {
+        if (hasRawSdkMethod(this.client, "post")) {
+            return this.requestRaw<OpenCodeSession>(
+                "post",
+                {
+                    url: "/session/{sessionID}/fork",
+                    path: {
+                        sessionID: sessionId,
+                    },
+                    ...(messageId?.trim()
+                        ? {
+                            body: {
+                                messageID: messageId.trim(),
+                            },
+                        }
+                        : {}),
+                },
+            );
+        }
+
+        const response = await this.client.session.fork(
+            {
+                sessionID: sessionId,
+                ...(messageId?.trim()
+                    ? { messageID: messageId.trim() }
+                    : {}),
+            },
+            SDK_OPTIONS,
+        ) as MaybeWrappedResponse<OpenCodeSession>;
 
         return unwrapSdkData(response);
     }

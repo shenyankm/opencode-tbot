@@ -125,6 +125,7 @@ export class SendPromptUseCase {
         }
 
         let activeBinding = binding as ActiveChatBinding;
+        const shouldIsolateImageTurn = hasImageFiles(files);
         const model = activeBinding.modelProviderId && activeBinding.modelId
             ? {
                 providerID: activeBinding.modelProviderId,
@@ -144,12 +145,16 @@ export class SendPromptUseCase {
             );
         }
 
-        const endForegroundSession = this.foregroundSessionTracker.begin(activeBinding.sessionId);
+        const temporarySessionId = shouldIsolateImageTurn
+            ? await this.createTemporaryImageSession(input.chatId, activeBinding.sessionId)
+            : null;
+        const executionSessionId = temporarySessionId ?? activeBinding.sessionId;
+        const endForegroundSession = this.foregroundSessionTracker.begin(input.chatId, executionSessionId);
         let result;
 
         try {
             result = await this.opencodeClient.promptSession({
-                sessionId: activeBinding.sessionId,
+                sessionId: executionSessionId,
                 prompt: promptText,
                 ...(files.length > 0 ? { files } : {}),
                 ...(selectedAgent ? { agent: selectedAgent.name } : {}),
@@ -159,6 +164,14 @@ export class SendPromptUseCase {
             });
         } finally {
             endForegroundSession();
+
+            if (temporarySessionId) {
+                await this.cleanupTemporaryImageSession(
+                    input.chatId,
+                    activeBinding.sessionId,
+                    temporarySessionId,
+                );
+            }
         }
 
         await this.sessionRepo.touch(input.chatId);
@@ -184,6 +197,56 @@ export class SendPromptUseCase {
         );
 
         return nextBinding;
+    }
+
+    private async createTemporaryImageSession(chatId: number, sessionId: string): Promise<string> {
+        const temporarySession = await this.opencodeClient.forkSession(sessionId);
+
+        if (!temporarySession.id || temporarySession.id === sessionId) {
+            throw new Error("OpenCode did not return a distinct temporary session for the image turn.");
+        }
+
+        this.logger.info?.(
+            {
+                chatId,
+                parentSessionId: sessionId,
+                sessionId: temporarySession.id,
+            },
+            "created temporary image session",
+        );
+
+        return temporarySession.id;
+    }
+
+    private async cleanupTemporaryImageSession(
+        chatId: number,
+        parentSessionId: string,
+        sessionId: string,
+    ): Promise<void> {
+        try {
+            const deleted = await this.opencodeClient.deleteSession(sessionId);
+
+            if (!deleted) {
+                this.logger.warn?.(
+                    {
+                        chatId,
+                        parentSessionId,
+                        sessionId,
+                    },
+                    "failed to delete temporary image session",
+                );
+            }
+        } catch (error) {
+            this.logger.warn?.(
+                {
+                    error,
+                    chatId,
+                    parentSessionId,
+                    sessionId,
+                },
+                "failed to delete temporary image session",
+            );
+        }
     }
 }
 
@@ -215,4 +278,8 @@ function buildPromptText(
 
 function isImageFile(file: PromptSessionFilePartInput): boolean {
     return file.mime.trim().toLowerCase().startsWith("image/");
+}
+
+function hasImageFiles(files: PromptSessionFilePartInput[]): boolean {
+    return files.some(isImageFile);
 }

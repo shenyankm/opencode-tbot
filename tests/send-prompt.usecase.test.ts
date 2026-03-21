@@ -91,6 +91,14 @@ function withImageTurnGuidance(text?: string): string {
     return sections.join("\n\n");
 }
 
+function createImageFile(): PromptSessionFilePartInput {
+    return {
+        filename: "telegram.jpg",
+        mime: "image/jpeg",
+        url: "data:image/jpeg;base64,/9j/",
+    };
+}
+
 test("SendPromptUseCase creates a session in the current project when the chat is unbound", async () => {
     const repo = new InMemorySessionRepository();
     const calls: Array<{
@@ -614,7 +622,7 @@ test("SendPromptUseCase clears selected subagents before prompting", async () =>
     assert.equal(binding?.agentName, null);
 });
 
-test("SendPromptUseCase forwards image file parts alongside the prompt text", async () => {
+test("SendPromptUseCase forks a temporary child session for image prompts and keeps the main binding", async () => {
     const repo = new InMemorySessionRepository();
     await repo.setCurrent({
         chatId: 99,
@@ -629,10 +637,190 @@ test("SendPromptUseCase forwards image file parts alongside the prompt text", as
         updatedAt: new Date(0).toISOString(),
     });
 
-    const promptCalls: unknown[] = [];
+    const calls: Array<{ kind: "delete" | "fork" | "prompt"; value: unknown }> = [];
     const client: OpenCodeClientLike = {
         async abortSession() {
             return true;
+        },
+        async deleteSession(sessionId) {
+            calls.push({ kind: "delete", value: sessionId });
+            return true;
+        },
+        async forkSession(sessionId) {
+            calls.push({ kind: "fork", value: sessionId });
+            return createSession("session-1-image", "project-1", "E:/repo-1");
+        },
+        async createSessionForDirectory(directory) {
+            return createSession("session-1", "project-1", directory);
+        },
+        async getCurrentProject() {
+            return createProject("project-1", "E:/repo-1");
+        },
+        async getSessionStatuses() {
+            return {};
+        },
+        async listModels() {
+            return [];
+        },
+        async listAgents() {
+            return [createAgent("build")];
+        },
+        async listProjects() {
+            return [createProject("project-1", "E:/repo-1")];
+        },
+        async listSessions() {
+            return [createSession("session-1", "project-1", "E:/repo-1")];
+        },
+        async getPath() {
+            throw new Error("unused");
+        },
+        async promptSession(input) {
+            calls.push({ kind: "prompt", value: input });
+            return createPromptReply("reply with image");
+        },
+    };
+    const files = [createImageFile()];
+
+    const useCase = new SendPromptUseCase(repo, client, logger);
+    const result = await useCase.execute({
+        chatId: 99,
+        text: "analyze this image",
+        files,
+    });
+    const binding = await repo.getByChatId(99);
+
+    assert.equal(result.sessionId, "session-1");
+    assert.deepEqual(binding?.sessionId, "session-1");
+    assert.deepEqual(calls, [
+        { kind: "fork", value: "session-1" },
+        {
+            kind: "prompt",
+            value: {
+                sessionId: "session-1-image",
+                prompt: withImageTurnGuidance("analyze this image"),
+                files,
+                structured: true,
+                agent: "build",
+            },
+        },
+        { kind: "delete", value: "session-1-image" },
+    ]);
+});
+
+test("SendPromptUseCase creates and keeps a main session when the first prompt is an image", async () => {
+    const repo = new InMemorySessionRepository();
+    const currentProject = createProject("project-1", "E:/repo-1");
+    const calls: Array<{ kind: "create" | "delete" | "fork" | "prompt"; value: unknown }> = [];
+    const client: OpenCodeClientLike = {
+        async abortSession() {
+            return true;
+        },
+        async deleteSession(sessionId) {
+            calls.push({ kind: "delete", value: sessionId });
+            return true;
+        },
+        async forkSession(sessionId) {
+            calls.push({ kind: "fork", value: sessionId });
+            return createSession("session-1-image", "project-1", "E:/repo-1");
+        },
+        async createSessionForDirectory(directory) {
+            calls.push({ kind: "create", value: directory });
+            return createSession("session-1", "project-1", directory);
+        },
+        async getCurrentProject() {
+            return currentProject;
+        },
+        async getSessionStatuses() {
+            return {};
+        },
+        async listModels() {
+            return [];
+        },
+        async listAgents() {
+            return [createAgent("build")];
+        },
+        async listProjects() {
+            return [currentProject];
+        },
+        async listSessions() {
+            return [createSession("session-1", "project-1", "E:/repo-1")];
+        },
+        async getPath() {
+            throw new Error("unused");
+        },
+        async promptSession(input) {
+            calls.push({ kind: "prompt", value: input });
+            return createPromptReply("reply with image only");
+        },
+    };
+    const files = [createImageFile()];
+
+    const useCase = new SendPromptUseCase(repo, client, logger);
+    const result = await useCase.execute({
+        chatId: 109,
+        files,
+    });
+    const binding = await repo.getByChatId(109);
+
+    assert.equal(result.sessionId, "session-1");
+    assert.deepEqual(binding, {
+        chatId: 109,
+        sessionId: "session-1",
+        projectId: "project-1",
+        directory: "E:/repo-1",
+        agentName: null,
+        modelProviderId: null,
+        modelId: null,
+        modelVariant: null,
+        language: null,
+        updatedAt: binding?.updatedAt,
+    });
+    assert.deepEqual(calls, [
+        { kind: "create", value: "E:/repo-1" },
+        { kind: "fork", value: "session-1" },
+        {
+            kind: "prompt",
+            value: {
+                sessionId: "session-1-image",
+                prompt: withImageTurnGuidance(),
+                files,
+                structured: true,
+                agent: "build",
+            },
+        },
+        { kind: "delete", value: "session-1-image" },
+    ]);
+});
+
+test("SendPromptUseCase returns to the main session after an image turn", async () => {
+    const repo = new InMemorySessionRepository();
+    await repo.setCurrent({
+        chatId: 119,
+        sessionId: "session-1",
+        projectId: "project-1",
+        directory: "E:/repo-1",
+        agentName: null,
+        modelProviderId: null,
+        modelId: null,
+        modelVariant: null,
+        language: null,
+        updatedAt: new Date(0).toISOString(),
+    });
+
+    const promptCalls: unknown[] = [];
+    const forkCalls: string[] = [];
+    const deleteCalls: string[] = [];
+    const client: OpenCodeClientLike = {
+        async abortSession() {
+            return true;
+        },
+        async deleteSession(sessionId) {
+            deleteCalls.push(sessionId);
+            return true;
+        },
+        async forkSession(sessionId) {
+            forkCalls.push(sessionId);
+            return createSession("session-1-image", "project-1", "E:/repo-1");
         },
         async createSessionForDirectory(directory) {
             return createSession("session-1", "project-1", directory);
@@ -660,37 +848,44 @@ test("SendPromptUseCase forwards image file parts alongside the prompt text", as
         },
         async promptSession(input) {
             promptCalls.push(input);
-            return createPromptReply("reply with image");
+            return createPromptReply("reply");
         },
     };
-    const files: PromptSessionFilePartInput[] = [{
-        filename: "telegram.jpg",
-        mime: "image/jpeg",
-        url: "data:image/jpeg;base64,/9j/",
-    }];
 
     const useCase = new SendPromptUseCase(repo, client, logger);
     await useCase.execute({
-        chatId: 99,
+        chatId: 119,
         text: "analyze this image",
-        files,
+        files: [createImageFile()],
+    });
+    await useCase.execute({
+        chatId: 119,
+        text: "who are you",
     });
 
+    assert.deepEqual(forkCalls, ["session-1"]);
+    assert.deepEqual(deleteCalls, ["session-1-image"]);
     assert.deepEqual(promptCalls, [
         {
-            sessionId: "session-1",
+            sessionId: "session-1-image",
             prompt: withImageTurnGuidance("analyze this image"),
-            files,
+            files: [createImageFile()],
+            structured: true,
+            agent: "build",
+        },
+        {
+            sessionId: "session-1",
+            prompt: "who are you",
             structured: true,
             agent: "build",
         },
     ]);
 });
 
-test("SendPromptUseCase adds image guidance even when the user sends only an image", async () => {
+test("SendPromptUseCase deletes the temporary image session even when the prompt fails", async () => {
     const repo = new InMemorySessionRepository();
     await repo.setCurrent({
-        chatId: 109,
+        chatId: 129,
         sessionId: "session-1",
         projectId: "project-1",
         directory: "E:/repo-1",
@@ -702,10 +897,18 @@ test("SendPromptUseCase adds image guidance even when the user sends only an ima
         updatedAt: new Date(0).toISOString(),
     });
 
-    const promptCalls: unknown[] = [];
+    const deleteCalls: string[] = [];
+    const expectedError = new Error("child prompt failed");
     const client: OpenCodeClientLike = {
         async abortSession() {
             return true;
+        },
+        async deleteSession(sessionId) {
+            deleteCalls.push(sessionId);
+            return true;
+        },
+        async forkSession() {
+            return createSession("session-1-image", "project-1", "E:/repo-1");
         },
         async createSessionForDirectory(directory) {
             return createSession("session-1", "project-1", directory);
@@ -731,38 +934,102 @@ test("SendPromptUseCase adds image guidance even when the user sends only an ima
         async getPath() {
             throw new Error("unused");
         },
-        async promptSession(input) {
-            promptCalls.push(input);
-            return createPromptReply("reply with image only");
+        async promptSession() {
+            throw expectedError;
         },
     };
-    const files: PromptSessionFilePartInput[] = [{
-        filename: "telegram.jpg",
-        mime: "image/jpeg",
-        url: "data:image/jpeg;base64,/9j/",
-    }];
 
     const useCase = new SendPromptUseCase(repo, client, logger);
-    await useCase.execute({
-        chatId: 109,
-        files,
+
+    await assert.rejects(
+        useCase.execute({
+            chatId: 129,
+            text: "analyze this image",
+            files: [createImageFile()],
+        }),
+        (error: unknown) => error === expectedError,
+    );
+    assert.deepEqual(deleteCalls, ["session-1-image"]);
+});
+
+test("SendPromptUseCase logs a warning when temporary image session cleanup fails", async () => {
+    const repo = new InMemorySessionRepository();
+    await repo.setCurrent({
+        chatId: 139,
+        sessionId: "session-1",
+        projectId: "project-1",
+        directory: "E:/repo-1",
+        agentName: null,
+        modelProviderId: null,
+        modelId: null,
+        modelVariant: null,
+        language: null,
+        updatedAt: new Date(0).toISOString(),
     });
 
-    assert.deepEqual(promptCalls, [
-        {
-            sessionId: "session-1",
-            prompt: withImageTurnGuidance(),
-            files,
-            structured: true,
-            agent: "build",
+    const warnings: Array<{ input: unknown; message?: string }> = [];
+    const localLogger = {
+        error() { },
+        info() { },
+        warn(input: unknown, message?: string) {
+            warnings.push({ input, message });
         },
-    ]);
+    } as unknown as AppLogger;
+    const client: OpenCodeClientLike = {
+        async abortSession() {
+            return true;
+        },
+        async deleteSession() {
+            return false;
+        },
+        async forkSession() {
+            return createSession("session-1-image", "project-1", "E:/repo-1");
+        },
+        async createSessionForDirectory(directory) {
+            return createSession("session-1", "project-1", directory);
+        },
+        async getCurrentProject() {
+            return createProject("project-1", "E:/repo-1");
+        },
+        async getSessionStatuses() {
+            return {};
+        },
+        async listModels() {
+            return [];
+        },
+        async listAgents() {
+            return [createAgent("build")];
+        },
+        async listProjects() {
+            return [createProject("project-1", "E:/repo-1")];
+        },
+        async listSessions() {
+            return [createSession("session-1", "project-1", "E:/repo-1")];
+        },
+        async getPath() {
+            throw new Error("unused");
+        },
+        async promptSession() {
+            return createPromptReply("reply with image");
+        },
+    };
+
+    const useCase = new SendPromptUseCase(repo, client, localLogger);
+    const result = await useCase.execute({
+        chatId: 139,
+        text: "analyze this image",
+        files: [createImageFile()],
+    });
+
+    assert.equal(result.assistantReply.fallbackText, "reply with image");
+    assert.equal(warnings.length, 1);
+    assert.equal(warnings[0]?.message, "failed to delete temporary image session");
 });
 
 test("SendPromptUseCase ends the foreground session when promptSession times out", async () => {
     const repo = new InMemorySessionRepository();
     const trackerCalls = {
-        began: [] as string[],
+        began: [] as Array<{ chatId: number; sessionId: string }>,
         ended: 0,
     };
     const timeoutError = new OpenCodePromptTimeoutError({
@@ -809,8 +1076,8 @@ test("SendPromptUseCase ends the foreground session when promptSession times out
         client,
         logger,
         {
-            begin(sessionId: string) {
-                trackerCalls.began.push(sessionId);
+            begin(chatId: number, sessionId: string) {
+                trackerCalls.began.push({ chatId, sessionId });
 
                 return () => {
                     trackerCalls.ended += 1;
@@ -819,8 +1086,14 @@ test("SendPromptUseCase ends the foreground session when promptSession times out
             clear() {
                 return false;
             },
+            getActiveSessionId() {
+                return null;
+            },
             isForeground() {
                 return false;
+            },
+            listChatIds() {
+                return [];
             },
         },
     );
@@ -845,6 +1118,6 @@ test("SendPromptUseCase ends the foreground session when promptSession times out
         }),
         (error: unknown) => error === timeoutError,
     );
-    assert.deepEqual(trackerCalls.began, ["session-1"]);
+    assert.deepEqual(trackerCalls.began, [{ chatId: 500, sessionId: "session-1" }]);
     assert.equal(trackerCalls.ended, 1);
 });

@@ -617,12 +617,84 @@ test("abortSession forwards the session id to the SDK abort endpoint", async () 
     ]);
 });
 
+test("forkSession and deleteSession forward to the SDK session endpoints", async () => {
+    const calls: Array<{ input: unknown; kind: "delete" | "fork"; options: unknown }> = [];
+    const client = new OpenCodeClient(
+        { baseUrl: "http://127.0.0.1:4096" },
+        {
+            config: {
+                get: async () => ({ provider: {} }),
+                providers: async () => ({ providers: [], default: {} }),
+            },
+            path: {
+                get: async () => createPath(),
+            },
+            project: {
+                list: async () => [],
+                current: async () => createProject("project-1", "E:/repo-1"),
+            },
+            session: {
+                async delete(input: unknown, options: unknown) {
+                    calls.push({ kind: "delete", input, options });
+                    return { data: true };
+                },
+                async fork(input: unknown, options: unknown) {
+                    calls.push({ kind: "fork", input, options });
+                    return { data: createSession("session-child", "project-1", "E:/repo-1") };
+                },
+                create: async () => createSession("session-1", "project-1", "E:/repo-1"),
+                prompt: async () => ({
+                    data: {
+                        info: {} as never,
+                        parts: [],
+                    },
+                }),
+            },
+        } as never,
+    );
+
+    assert.deepEqual(await client.forkSession("session-1", "message-9"), createSession("session-child", "project-1", "E:/repo-1"));
+    assert.equal(await client.deleteSession("session-child"), true);
+    assert.deepEqual(calls.map((call) => ({
+        ...call,
+        options: omitSignal(call.options),
+    })), [
+        {
+            kind: "fork",
+            input: {
+                sessionID: "session-1",
+                messageID: "message-9",
+            },
+            options: {
+                responseStyle: "data",
+                throwOnError: true,
+            },
+        },
+        {
+            kind: "delete",
+            input: {
+                sessionID: "session-child",
+            },
+            options: {
+                responseStyle: "data",
+                throwOnError: true,
+            },
+        },
+    ]);
+});
+
 test("session mutation helpers use the raw client when available", async () => {
-    const calls: Array<{ kind: "patch" | "post"; options: unknown }> = [];
+    const calls: Array<{ kind: "delete" | "patch" | "post"; options: unknown }> = [];
     const client = new OpenCodeClient(
         { baseUrl: "http://127.0.0.1:4096" },
         {
             _client: {
+                delete: async (options: unknown) => {
+                    calls.push({ kind: "delete", options });
+                    return {
+                        data: true,
+                    };
+                },
                 post: async (options: unknown) => {
                     calls.push({ kind: "post", options });
 
@@ -645,6 +717,12 @@ test("session mutation helpers use the raw client when available", async () => {
                         };
                     }
 
+                    if (request.url === "/session/{sessionID}/fork") {
+                        return {
+                            data: createSession("session-child", "project-1", "E:/repo-1"),
+                        };
+                    }
+
                     throw new Error(`Unexpected raw POST ${request.url}`);
                 },
                 patch: async (options: unknown) => {
@@ -660,6 +738,8 @@ test("session mutation helpers use the raw client when available", async () => {
     assert.equal((await client.createSessionForDirectory("E:/repo-1", "Raw session")).id, "session-1");
     assert.equal((await client.renameSession("session-1", "Renamed session")).id, "session-1");
     assert.equal(await client.abortSession("session-1"), true);
+    assert.equal((await client.forkSession("session-1", "message-1")).id, "session-child");
+    assert.equal(await client.deleteSession("session-child"), true);
     assert.deepEqual(calls, [
         {
             kind: "post",
@@ -697,6 +777,31 @@ test("session mutation helpers use the raw client when available", async () => {
                 url: "/session/{sessionID}/abort",
                 path: {
                     sessionID: "session-1",
+                },
+            },
+        },
+        {
+            kind: "post",
+            options: {
+                responseStyle: "data",
+                throwOnError: true,
+                url: "/session/{sessionID}/fork",
+                path: {
+                    sessionID: "session-1",
+                },
+                body: {
+                    messageID: "message-1",
+                },
+            },
+        },
+        {
+            kind: "delete",
+            options: {
+                responseStyle: "data",
+                throwOnError: true,
+                url: "/session/{sessionID}",
+                path: {
+                    sessionID: "session-child",
                 },
             },
         },

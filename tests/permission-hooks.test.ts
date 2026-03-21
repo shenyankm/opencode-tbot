@@ -109,6 +109,38 @@ test("permission.asked sends Telegram approval messages and persists them", asyn
     }]);
 });
 
+test("permission.asked also routes foreground child-session approvals back to the active Telegram chat", async () => {
+    const { runtime, permissionApprovalRepo, messages } = createRuntime();
+
+    const stopTracking = runtime.container.foregroundSessionTracker.begin(202, "session-child");
+
+    await handleTelegramBotPluginEvent(runtime, {
+        type: "permission.asked",
+        properties: {
+            id: "request-child",
+            sessionID: "session-child",
+            permission: "write",
+            patterns: ["README.md"],
+            metadata: {},
+            always: [],
+        },
+    });
+
+    const approvals = await permissionApprovalRepo.listByRequestId("request-child");
+
+    assert.equal(messages.length, 1);
+    assert.equal(messages[0]?.chatId, 202);
+    assert.deepEqual(approvals, [{
+        requestId: "request-child",
+        sessionId: "session-child",
+        chatId: 202,
+        messageId: 1,
+        status: "pending",
+        updatedAt: approvals[0]?.updatedAt,
+    }]);
+    stopTracking();
+});
+
 test("permission.replied updates existing Telegram approval messages", async () => {
     const { runtime, permissionApprovalRepo, edits } = createRuntime();
 
@@ -185,4 +217,42 @@ test("permission callback replies through the OpenCode client and updates local 
     }]);
     assert.equal(editedText, "Permission request resolved.\n\nRequest: request-1\nReply: once");
     assert.equal(approvals[0]?.status, "once");
+});
+
+test("session.error suppresses foreground child-session notifications and clears tracking", async () => {
+    const { runtime, messages } = createRuntime();
+
+    runtime.container.foregroundSessionTracker.begin(303, "session-child");
+
+    await handleTelegramBotPluginEvent(runtime, {
+        type: "session.error",
+        properties: {
+            sessionID: "session-child",
+            error: {
+                name: "PromptFailed",
+                data: {
+                    message: "boom",
+                },
+            },
+        },
+    });
+
+    assert.deepEqual(messages, []);
+    assert.equal(runtime.container.foregroundSessionTracker.isForeground("session-child"), false);
+});
+
+test("session.idle suppresses foreground child-session notifications and clears tracking", async () => {
+    const { runtime, messages } = createRuntime();
+
+    runtime.container.foregroundSessionTracker.begin(404, "session-child");
+
+    await handleTelegramBotPluginEvent(runtime, {
+        type: "session.idle",
+        properties: {
+            sessionID: "session-child",
+        },
+    });
+
+    assert.deepEqual(messages, []);
+    assert.equal(runtime.container.foregroundSessionTracker.isForeground("session-child"), false);
 });

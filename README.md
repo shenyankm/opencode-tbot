@@ -12,6 +12,7 @@ A Telegram plugin for driving [OpenCode](https://opencode.ai) from chat.
 
 - Text messages are forwarded to the active OpenCode session.
 - Telegram photos and image documents are uploaded as OpenCode file parts.
+- Image turns run in a temporary forked session, so later text-only prompts do not inherit image context.
 - Telegram voice messages are explicitly rejected with a localized reply.
 - Permission requests raised by OpenCode can be approved or rejected from Telegram inline buttons.
 - Session completion and error events can be reported back to the bound Telegram chat.
@@ -124,6 +125,7 @@ Message handling:
 
 - Non-command text is treated as a prompt and sent to OpenCode.
 - Telegram photos and image documents are forwarded as OpenCode file parts.
+- Image attachments are processed in a temporary fork of the active session so later text-only prompts stay clean.
 - Telegram voice messages are not supported and receive a localized rejection reply.
 
 ## Development
