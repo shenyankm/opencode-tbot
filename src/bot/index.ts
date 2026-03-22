@@ -16,6 +16,11 @@ import { registerMessageHandler } from "./handlers/message.handler.js";
 import { registerVoiceHandler } from "./handlers/voice.handler.js";
 import { createAuthMiddleware } from "./middlewares/auth.js";
 import { createLoggingMiddleware } from "./middlewares/logging.js";
+import {
+    extractTelegramUpdateContext,
+    replyWithDefaultTelegramError,
+} from "./error-boundary.js";
+import { scopeLoggerToTelegramContext } from "./logger-context.js";
 
 export interface RegisterBotOptions {
     telegramAllowedChatIds: number[];
@@ -32,16 +37,30 @@ export function registerBot(
     bot.use(createLoggingMiddleware(container.logger));
     bot.use(createAuthMiddleware(options.telegramAllowedChatIds));
 
-    registerStartCommand(bot, container);
-    registerStatusCommand(bot, container);
-    registerNewCommand(bot, container);
-    registerAgentsCommand(bot, container);
-    registerSessionsCommand(bot, container);
-    registerCancelCommand(bot, container);
-    registerModelsCommand(bot, container);
-    registerLanguageCommand(bot, container);
-    registerCallbackHandler(bot, container);
-    registerFileHandler(bot, container);
-    registerMessageHandler(bot, container);
-    registerVoiceHandler(bot, container);
+    const safeBot = bot.errorBoundary(async (error) => {
+        const scopedLogger = scopeLoggerToTelegramContext(container.logger, error.ctx, "telegram");
+
+        scopedLogger.error(
+            {
+                ...extractTelegramUpdateContext(error.ctx),
+                event: "telegram.middleware.failed",
+                error: error.error,
+            },
+            "telegram middleware failed",
+        );
+        await replyWithDefaultTelegramError(error.ctx, scopedLogger, error.error);
+    });
+
+    registerStartCommand(safeBot, container);
+    registerStatusCommand(safeBot, container);
+    registerNewCommand(safeBot, container);
+    registerAgentsCommand(safeBot, container);
+    registerSessionsCommand(safeBot, container);
+    registerCancelCommand(safeBot, container);
+    registerModelsCommand(safeBot, container);
+    registerLanguageCommand(safeBot, container);
+    registerCallbackHandler(safeBot, container);
+    registerFileHandler(safeBot, container);
+    registerMessageHandler(safeBot, container);
+    registerVoiceHandler(safeBot, container);
 }

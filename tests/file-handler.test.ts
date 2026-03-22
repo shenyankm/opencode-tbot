@@ -4,6 +4,7 @@ import type { PromptSessionFilePartInput, PromptSessionResult } from "../src/ser
 import { handleImageMessage } from "../src/bot/handlers/file.handler.js";
 import { InMemoryPendingActionRepository } from "../src/repositories/pending-action.repo.js";
 import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
+import { ForegroundSessionTracker } from "../src/services/session-activity/foreground-session-tracker.js";
 import { ImageMessageUnsupportedError } from "../src/use-cases/upload-file.usecase.js";
 
 function createPromptReply(overrides: Partial<PromptSessionResult> = {}): PromptSessionResult {
@@ -51,11 +52,16 @@ function createDependencies(options: {
     return {
         dependencies: {
             logger: {
+                child() {
+                    return this;
+                },
                 error(error: unknown) {
                     errors.push(error);
                 },
+                async flush() { },
                 warn() { },
             },
+            foregroundSessionTracker: new ForegroundSessionTracker(),
             pendingActionRepo,
             sessionRepo,
             sendPromptUseCase: {

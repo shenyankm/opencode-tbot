@@ -1,12 +1,7 @@
-import type {
-    Event as OpenCodeEvent,
-    EventPermissionAsked,
-    EventPermissionReplied,
-    EventSessionError,
-    EventSessionIdle,
-    EventSessionStatus,
-} from "@opencode-ai/sdk/v2/client";
+import type { Event as OpenCodeEvent } from "@opencode-ai/sdk";
 import type { PendingPermissionApproval, PermissionApprovalReply } from "../domain/permission/approval.entity.js";
+import { logPluginEvent } from "../infra/logger/index.js";
+import type { OpenCodePermissionRequest } from "../services/opencode/opencode.client.js";
 import {
     buildPermissionApprovalKeyboard,
     buildPermissionApprovalMessage,
@@ -14,26 +9,76 @@ import {
 } from "../services/permission/telegram-approval.js";
 import type { TelegramBotRuntime } from "./runtime.js";
 
+type OpenCodePluginEvent = OpenCodeEvent | {
+    properties?: unknown;
+    type: string;
+};
+
+interface NormalizedPermissionReplyEvent {
+    reply: PermissionApprovalReply;
+    requestId: string;
+    sessionId: string;
+}
+
+interface NormalizedSessionErrorEvent {
+    error: unknown;
+    sessionId: string;
+}
+
+interface NormalizedSessionIdleEvent {
+    sessionId: string;
+}
+
+interface NormalizedSessionStatusEvent extends NormalizedSessionIdleEvent {
+    statusType: string;
+}
+
 export async function handleTelegramBotPluginEvent(
     runtime: TelegramBotRuntime,
-    event: OpenCodeEvent,
+    event: OpenCodePluginEvent,
 ): Promise<void> {
     switch (event.type) {
         case "permission.asked":
-            await handlePermissionAsked(runtime, event);
+        case "permission.updated": {
+            const request = normalizePermissionRequestEvent(event.properties);
+
+            if (request) {
+                await handlePermissionAsked(runtime, request);
+            }
             return;
-        case "permission.replied":
-            await handlePermissionReplied(runtime, event);
+        }
+        case "permission.replied": {
+            const replyEvent = normalizePermissionReplyEvent(event.properties);
+
+            if (replyEvent) {
+                await handlePermissionReplied(runtime, replyEvent);
+            }
             return;
-        case "session.error":
-            await handleSessionError(runtime, event);
+        }
+        case "session.error": {
+            const sessionError = normalizeSessionErrorEvent(event.properties);
+
+            if (sessionError) {
+                await handleSessionError(runtime, sessionError);
+            }
             return;
-        case "session.idle":
-            await handleSessionIdle(runtime, event);
+        }
+        case "session.idle": {
+            const sessionIdle = normalizeSessionIdleEvent(event.properties);
+
+            if (sessionIdle) {
+                await handleSessionIdle(runtime, sessionIdle);
+            }
             return;
-        case "session.status":
-            await handleSessionStatus(runtime, event);
+        }
+        case "session.status": {
+            const sessionStatus = normalizeSessionStatusEvent(event.properties);
+
+            if (sessionStatus) {
+                await handleSessionStatus(runtime, sessionStatus);
+            }
             return;
+        }
         default:
             return;
     }
@@ -41,9 +86,13 @@ export async function handleTelegramBotPluginEvent(
 
 async function handlePermissionAsked(
     runtime: TelegramBotRuntime,
-    event: EventPermissionAsked,
+    request: OpenCodePermissionRequest,
 ): Promise<void> {
-    const request = event.properties;
+    const logger = runtime.container.logger.child({
+        component: "plugin-event",
+        requestId: request.id,
+        sessionId: request.sessionID,
+    });
     const bindings = await runtime.container.sessionRepo.listBySessionId(request.sessionID);
     const chatIds = new Set([
         ...bindings.map((binding) => binding.chatId),
@@ -76,10 +125,11 @@ async function handlePermissionAsked(
                 updatedAt: new Date().toISOString(),
             });
         } catch (error) {
-            runtime.container.logger.error(
+            logger.error(
                 {
                     error,
                     chatId,
+                    event: "plugin-event.permission.ask.delivery_failed",
                     requestId: request.id,
                 },
                 "failed to deliver permission request to Telegram",
@@ -90,11 +140,15 @@ async function handlePermissionAsked(
 
 async function handlePermissionReplied(
     runtime: TelegramBotRuntime,
-    event: EventPermissionReplied,
+    event: NormalizedPermissionReplyEvent,
 ): Promise<void> {
-    const requestId = event.properties.requestID;
-    const reply = event.properties.reply as PermissionApprovalReply;
-    const approvals = await runtime.container.permissionApprovalRepo.listByRequestId(requestId);
+    const logger = runtime.container.logger.child({
+        component: "plugin-event",
+        event: "plugin-event.permission.replied",
+        requestId: event.requestId,
+        sessionId: event.sessionId,
+    });
+    const approvals = await runtime.container.permissionApprovalRepo.listByRequestId(event.requestId);
 
     await Promise.all(
         approvals.map(async (approval) => {
@@ -102,79 +156,86 @@ async function handlePermissionReplied(
                 await runtime.bot.api.editMessageText(
                     approval.chatId,
                     approval.messageId,
-                    buildPermissionApprovalResolvedMessage(requestId, reply),
+                    buildPermissionApprovalResolvedMessage(event.requestId, event.reply),
                 );
             } catch (error) {
-                runtime.container.logger.warn(
+                logger.warn(
                     {
                         error,
                         chatId: approval.chatId,
-                        requestId,
+                        event: "plugin-event.permission.reply_message_failed",
                     },
                     "failed to update Telegram permission message",
                 );
             }
 
-            await runtime.container.permissionApprovalRepo.set(toResolvedApproval(approval, reply));
+            await runtime.container.permissionApprovalRepo.set(toResolvedApproval(approval, event.reply));
         }),
     );
 }
 
 async function handleSessionError(
     runtime: TelegramBotRuntime,
-    event: EventSessionError,
+    event: NormalizedSessionErrorEvent,
 ): Promise<void> {
-    const sessionId = event.properties.sessionID;
-    const error = event.properties.error;
-
-    if (!sessionId) {
-        runtime.container.logger.error({ error }, "session error received without a session id");
-        return;
-    }
-
-    const wasForeground = runtime.container.foregroundSessionTracker.fail(sessionId, error ?? new Error("Unknown session error."));
+    const logger = runtime.container.logger.child({
+        component: "plugin-event",
+        sessionId: event.sessionId,
+    });
+    const wasForeground = runtime.container.foregroundSessionTracker.fail(
+        event.sessionId,
+        event.error instanceof Error ? event.error : new Error("Unknown session error."),
+    );
 
     if (wasForeground) {
-        runtime.container.logger.warn({ error, sessionId }, "session error suppressed for foreground Telegram session");
+        logger.warn(
+            {
+                error: event.error,
+                event: "plugin-event.session.error.foreground_suppressed",
+            },
+            "session error suppressed for foreground Telegram session",
+        );
         return;
     }
 
-    const message = error?.data?.message?.trim()
-        || error?.name?.trim()
-        || "Unknown session error.";
+    const message = extractSessionErrorMessage(event.error) ?? "Unknown session error.";
 
-    await notifyBoundChats(runtime, sessionId, `Session failed.\n\nSession: ${sessionId}\nError: ${message}`);
+    await notifyBoundChats(runtime, event.sessionId, `Session failed.\n\nSession: ${event.sessionId}\nError: ${message}`);
 }
 
 async function handleSessionIdle(
     runtime: TelegramBotRuntime,
-    event: EventSessionIdle,
+    event: NormalizedSessionIdleEvent,
 ): Promise<void> {
-    const sessionId = event.properties.sessionID;
-    const wasForeground = runtime.container.foregroundSessionTracker.clear(sessionId);
+    const logger = runtime.container.logger.child({
+        component: "plugin-event",
+        sessionId: event.sessionId,
+    });
+    const wasForeground = runtime.container.foregroundSessionTracker.clear(event.sessionId);
 
     if (wasForeground) {
-        runtime.container.logger.info({ sessionId }, "session idle notification suppressed for foreground Telegram session");
+        logPluginEvent(
+            logger,
+            {
+                event: "plugin-event.session.idle.foreground_suppressed",
+            },
+            "session idle notification suppressed for foreground Telegram session",
+        );
         return;
     }
 
-    await notifyBoundChats(runtime, sessionId, `Session finished.\n\nSession: ${sessionId}`);
+    await notifyBoundChats(runtime, event.sessionId, `Session finished.\n\nSession: ${event.sessionId}`);
 }
 
 async function handleSessionStatus(
     runtime: TelegramBotRuntime,
-    event: EventSessionStatus,
+    event: NormalizedSessionStatusEvent,
 ): Promise<void> {
-    if (event.properties.status.type !== "idle") {
+    if (event.statusType !== "idle") {
         return;
     }
 
-    await handleSessionIdle(runtime, {
-        type: "session.idle",
-        properties: {
-            sessionID: event.properties.sessionID,
-        },
-    });
+    await handleSessionIdle(runtime, event);
 }
 
 async function notifyBoundChats(
@@ -182,6 +243,10 @@ async function notifyBoundChats(
     sessionId: string,
     text: string,
 ): Promise<void> {
+    const logger = runtime.container.logger.child({
+        component: "plugin-event",
+        sessionId,
+    });
     const bindings = await runtime.container.sessionRepo.listBySessionId(sessionId);
     const chatIds = [...new Set(bindings.map((binding) => binding.chatId))];
 
@@ -190,8 +255,12 @@ async function notifyBoundChats(
             try {
                 await runtime.bot.api.sendMessage(chatId, text);
             } catch (error) {
-                runtime.container.logger.warn(
-                    { error, chatId, sessionId },
+                logger.warn(
+                    {
+                        error,
+                        chatId,
+                        event: "plugin-event.session.notify_failed",
+                    },
                     "failed to notify Telegram chat about session event",
                 );
             }
@@ -208,4 +277,150 @@ function toResolvedApproval(
         status: reply,
         updatedAt: new Date().toISOString(),
     };
+}
+
+function normalizePermissionRequestEvent(properties: unknown): OpenCodePermissionRequest | null {
+    if (!isPlainRecord(properties)) {
+        return null;
+    }
+
+    const id = asNonEmptyString(properties.id);
+    const sessionID = asNonEmptyString(properties.sessionID);
+    const permission = asNonEmptyString(properties.permission) ?? asNonEmptyString(properties.type);
+
+    if (!id || !sessionID || !permission) {
+        return null;
+    }
+
+    return {
+        always: Array.isArray(properties.always)
+            ? properties.always.filter((value): value is string => typeof value === "string")
+            : [],
+        id,
+        metadata: isPlainRecord(properties.metadata)
+            ? properties.metadata
+            : {},
+        patterns: normalizePermissionPatterns(properties),
+        permission,
+        sessionID,
+    };
+}
+
+function normalizePermissionReplyEvent(properties: unknown): NormalizedPermissionReplyEvent | null {
+    if (!isPlainRecord(properties)) {
+        return null;
+    }
+
+    const requestId = asNonEmptyString(properties.requestID) ?? asNonEmptyString(properties.permissionID);
+    const reply = normalizePermissionReply(
+        asNonEmptyString(properties.reply) ?? asNonEmptyString(properties.response),
+    );
+    const sessionId = asNonEmptyString(properties.sessionID);
+
+    if (!requestId || !reply || !sessionId) {
+        return null;
+    }
+
+    return {
+        reply,
+        requestId,
+        sessionId,
+    };
+}
+
+function normalizeSessionErrorEvent(properties: unknown): NormalizedSessionErrorEvent | null {
+    if (!isPlainRecord(properties)) {
+        return null;
+    }
+
+    const sessionId = asNonEmptyString(properties.sessionID);
+
+    if (!sessionId) {
+        return null;
+    }
+
+    return {
+        error: properties.error,
+        sessionId,
+    };
+}
+
+function normalizeSessionIdleEvent(properties: unknown): NormalizedSessionIdleEvent | null {
+    if (!isPlainRecord(properties)) {
+        return null;
+    }
+
+    const sessionId = asNonEmptyString(properties.sessionID);
+
+    return sessionId
+        ? { sessionId }
+        : null;
+}
+
+function normalizeSessionStatusEvent(properties: unknown): NormalizedSessionStatusEvent | null {
+    if (!isPlainRecord(properties) || !isPlainRecord(properties.status)) {
+        return null;
+    }
+
+    const sessionId = asNonEmptyString(properties.sessionID);
+    const statusType = asNonEmptyString(properties.status.type);
+
+    if (!sessionId || !statusType) {
+        return null;
+    }
+
+    return {
+        sessionId,
+        statusType,
+    };
+}
+
+function normalizePermissionPatterns(properties: Record<string, unknown>): string[] {
+    if (Array.isArray(properties.patterns)) {
+        return properties.patterns.filter((value): value is string => typeof value === "string");
+    }
+
+    if (typeof properties.pattern === "string" && properties.pattern.trim().length > 0) {
+        return [properties.pattern];
+    }
+
+    if (Array.isArray(properties.pattern)) {
+        return properties.pattern.filter((value): value is string => typeof value === "string");
+    }
+
+    return [];
+}
+
+function normalizePermissionReply(value: string | null): PermissionApprovalReply | null {
+    if (value === "once" || value === "always" || value === "reject") {
+        return value;
+    }
+
+    return null;
+}
+
+function extractSessionErrorMessage(error: unknown): string | null {
+    if (error instanceof Error && error.message.trim().length > 0) {
+        return error.message.trim();
+    }
+
+    if (!isPlainRecord(error)) {
+        return null;
+    }
+
+    if (isPlainRecord(error.data) && typeof error.data.message === "string" && error.data.message.trim().length > 0) {
+        return error.data.message.trim();
+    }
+
+    return asNonEmptyString(error.name);
+}
+
+function asNonEmptyString(value: unknown): string | null {
+    return typeof value === "string" && value.trim().length > 0
+        ? value.trim()
+        : null;
+}
+
+function isPlainRecord(value: unknown): value is Record<string, any> {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
 }

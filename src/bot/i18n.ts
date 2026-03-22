@@ -1,5 +1,7 @@
 import type { SessionRepository } from "../domain/session/session.repository.js";
+import type { AppLogger } from "../infra/logger/index.js";
 import {
+    BOT_COPY,
     DEFAULT_BOT_LANGUAGE,
     getBotCopy,
     normalizeBotLanguage,
@@ -25,6 +27,44 @@ export async function getChatCopy(
     chatId: number | null | undefined,
 ): Promise<BotCopy> {
     return getBotCopy(await getChatLanguage(sessionRepo, chatId));
+}
+
+export async function getSafeChatLanguage(
+    sessionRepo: SessionRepository,
+    chatId: number | null | undefined,
+    logger?: Pick<AppLogger, "warn">,
+): Promise<BotLanguage> {
+    try {
+        return await getChatLanguage(sessionRepo, chatId);
+    } catch (error) {
+        logger?.warn?.(
+            {
+                error,
+                chatId: chatId ?? undefined,
+            },
+            "failed to resolve Telegram chat language; falling back to the default locale",
+        );
+        return DEFAULT_BOT_LANGUAGE;
+    }
+}
+
+export async function getSafeChatCopy(
+    sessionRepo: SessionRepository,
+    chatId: number | null | undefined,
+    logger?: Pick<AppLogger, "warn">,
+): Promise<BotCopy> {
+    try {
+        return getBotCopy(await getSafeChatLanguage(sessionRepo, chatId, logger));
+    } catch (error) {
+        logger?.warn?.(
+            {
+                error,
+                chatId: chatId ?? undefined,
+            },
+            "failed to resolve Telegram copy; falling back to the default locale",
+        );
+        return BOT_COPY;
+    }
 }
 
 export async function setChatLanguage(

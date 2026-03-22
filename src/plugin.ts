@@ -1,5 +1,4 @@
 import type { Hooks, Plugin, PluginInput } from "@opencode-ai/plugin";
-import type { Event as OpenCodeEvent } from "@opencode-ai/sdk/v2/client";
 import { bootstrapPluginApp } from "./app/bootstrap.js";
 import { handleTelegramBotPluginEvent } from "./app/plugin-events.js";
 import {
@@ -37,44 +36,47 @@ interface TelegramBotPluginRuntimeState {
     runtimePromise: Promise<TelegramBotRuntime>;
 }
 
-let runtimeState: TelegramBotPluginRuntimeState | null = null;
+interface TelegramBotPluginRuntimeStateHolder {
+    state: TelegramBotPluginRuntimeState | null;
+}
 
 export async function ensureTelegramBotPluginRuntime(
     options: EnsureTelegramBotPluginRuntimeOptions,
 ): Promise<TelegramBotRuntime> {
+    const runtimeStateHolder = getTelegramBotPluginRuntimeStateHolder();
     const cwd = resolvePluginRuntimeCwd(options.context);
 
-    if (runtimeState && runtimeState.cwd !== cwd) {
-        const activeState = runtimeState;
-        runtimeState = null;
+    if (runtimeStateHolder.state && runtimeStateHolder.state.cwd !== cwd) {
+        const activeState = runtimeStateHolder.state;
+        runtimeStateHolder.state = null;
         await disposeTelegramBotPluginRuntimeState(activeState);
     }
 
-    if (!runtimeState) {
+    if (!runtimeStateHolder.state) {
         const runtimePromise = startPluginRuntime(options, cwd)
             .then((runtime) => {
-                if (runtimeState?.runtimePromise === runtimePromise) {
-                    runtimeState.runtime = runtime;
+                if (runtimeStateHolder.state?.runtimePromise === runtimePromise) {
+                    runtimeStateHolder.state.runtime = runtime;
                 }
 
                 return runtime;
             })
             .catch((error) => {
-                if (runtimeState?.runtimePromise === runtimePromise) {
-                    runtimeState = null;
+                if (runtimeStateHolder.state?.runtimePromise === runtimePromise) {
+                    runtimeStateHolder.state = null;
                 }
 
                 throw error;
             });
 
-        runtimeState = {
+        runtimeStateHolder.state = {
             cwd,
             runtime: null,
             runtimePromise,
         };
     }
 
-    return runtimeState.runtimePromise;
+    return runtimeStateHolder.state.runtimePromise;
 }
 
 export const TelegramBotPlugin: Plugin = async (context) => {
@@ -86,12 +88,14 @@ export const TelegramBotPlugin: Plugin = async (context) => {
 };
 
 export async function resetTelegramBotPluginRuntimeForTests() {
-    if (!runtimeState) {
+    const runtimeStateHolder = getTelegramBotPluginRuntimeStateHolder();
+
+    if (!runtimeStateHolder.state) {
         return;
     }
 
-    const activeState = runtimeState;
-    runtimeState = null;
+    const activeState = runtimeStateHolder.state;
+    runtimeStateHolder.state = null;
     await disposeTelegramBotPluginRuntimeState(activeState);
 }
 
@@ -116,9 +120,10 @@ async function startPluginRuntime(
 
     try {
         if (preparedConfiguration.ignoredProjectConfigFilePath) {
-            container.logger.warn(
+            container.logger.child({ component: "runtime" }).warn(
                 {
                     cwd: preparedConfiguration.cwd,
+                    event: "runtime.config.legacy_worktree_ignored",
                     ignoredProjectConfigFilePath: preparedConfiguration.ignoredProjectConfigFilePath,
                     globalConfigFilePath: preparedConfiguration.globalConfigFilePath,
                 },
@@ -128,9 +133,10 @@ async function startPluginRuntime(
 
         const runtime = await startRuntime({ config, container });
 
-        container.logger.info(
+        container.logger.child({ component: "runtime" }).info(
             {
                 cwd: preparedConfiguration.cwd,
+                event: "runtime.plugin.started",
                 globalConfigFilePath: preparedConfiguration.globalConfigFilePath,
                 ignoredProjectConfigFilePath: preparedConfiguration.ignoredProjectConfigFilePath,
                 configFilePath: preparedConfiguration.configFilePath,
@@ -161,7 +167,7 @@ async function disposeTelegramBotPluginRuntimeState(
 function createHooks(runtime: TelegramBotRuntime): Hooks {
     return {
         async event({ event }) {
-            await handleTelegramBotPluginEvent(runtime, event as OpenCodeEvent);
+            await handleTelegramBotPluginEvent(runtime, event);
         },
         async "permission.ask"(input, output) {
             const bindings = await runtime.container.sessionRepo.listBySessionId(input.sessionID);
@@ -172,4 +178,16 @@ function createHooks(runtime: TelegramBotRuntime): Hooks {
             }
         },
     };
+}
+
+function getTelegramBotPluginRuntimeStateHolder(): TelegramBotPluginRuntimeStateHolder {
+    const globalScope = globalThis as typeof globalThis & {
+        __opencodeTbotPluginRuntimeState__?: TelegramBotPluginRuntimeStateHolder;
+    };
+
+    globalScope.__opencodeTbotPluginRuntimeState__ ??= {
+        state: null,
+    };
+
+    return globalScope.__opencodeTbotPluginRuntimeState__;
 }

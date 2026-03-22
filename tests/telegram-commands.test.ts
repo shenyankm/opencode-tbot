@@ -9,7 +9,12 @@ import {
 } from "../src/bot/commands/sync-commands.js";
 
 const logger = {
+    child() {
+        return this;
+    },
+    async flush() { },
     info() { },
+    warn() { },
 } as unknown as AppLogger;
 
 test("TELEGRAM_COMMANDS only advertises implemented commands", () => {

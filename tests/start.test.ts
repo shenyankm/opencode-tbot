@@ -9,8 +9,13 @@ import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
 import { buildTelegramStaticReply } from "../src/services/telegram/telegram-format.js";
 
 const logger = {
+    child() {
+        return this;
+    },
     error() { },
+    async flush() { },
     info() { },
+    warn() { },
 } as unknown as AppLogger;
 
 function createDependencies() {
@@ -77,4 +82,38 @@ test("/start falls back to plain text when the markdown reply cannot be sent", a
     assert.match(replies[0]?.text ?? "", /Run \/new \[title\] to create a fresh session\./);
     assert.match(replies[0]?.text ?? "", /Send a text or image message directly\./);
     assert.doesNotMatch(replies[0]?.text ?? "", /Use \/help/);
+});
+
+test("/start falls back to the default copy when chat localization state cannot be loaded", async () => {
+    const replies: Array<{ other?: { parse_mode: "MarkdownV2" }; text: string }> = [];
+
+    await handleStartCommand(
+        {
+            chat: { id: 3 },
+            async reply(text, other) {
+                replies.push({ text, other });
+                return {};
+            },
+        },
+        {
+            logger: {
+                child() {
+                    return this;
+                },
+                error() { },
+                async flush() { },
+                info() { },
+                warn() { },
+            },
+            sessionRepo: {
+                async getByChatId() {
+                    throw new Error("state boom");
+                },
+            },
+        } as never as BotDependencies,
+    );
+
+    assert.equal(replies.length, 1);
+    assert.deepEqual(replies[0]?.other, { parse_mode: "MarkdownV2" });
+    assert.match(replies[0]?.text ?? "", /\*Welcome to opencode\\-tbot\*/);
 });

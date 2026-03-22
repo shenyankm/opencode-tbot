@@ -1,6 +1,9 @@
 import type { Bot } from "grammy";
 import type { PermissionApprovalRepository } from "../../domain/permission/approval.repository.js";
-import { getChatCopy, getChatLanguage } from "../i18n.js";
+import {
+    getSafeChatCopy,
+    getSafeChatLanguage,
+} from "../i18n.js";
 import { presentLanguageSwitchForChat } from "../commands/language.js";
 import type {
     AgentsCallbackData,
@@ -37,6 +40,7 @@ import {
     buildPermissionApprovalResolvedMessage,
     parsePermissionApprovalCallbackData,
 } from "../../services/permission/telegram-approval.js";
+import { scopeDependenciesToTelegramContext } from "../logger-context.js";
 
 const AGENTS_PAGE_PREFIX = "agents:page:";
 const AGENTS_SELECT_PREFIX = "agents:select:";
@@ -77,7 +81,7 @@ export async function handleAgentsCallback(ctx: CallbackContext, dependencies: B
         return;
     }
 
-    const copy = await getChatCopy(dependencies.sessionRepo, ctx.chat.id);
+    const copy = await getSafeChatCopy(dependencies.sessionRepo, ctx.chat.id, dependencies.logger);
 
     try {
         if (data.startsWith(AGENTS_PAGE_PREFIX)) {
@@ -150,7 +154,7 @@ export async function handleModelsCallback(ctx: CallbackContext, dependencies: B
         return;
     }
 
-    const copy = await getChatCopy(dependencies.sessionRepo, ctx.chat.id);
+    const copy = await getSafeChatCopy(dependencies.sessionRepo, ctx.chat.id, dependencies.logger);
 
     try {
         if (data.startsWith(MODEL_PAGE_PREFIX)) {
@@ -278,7 +282,7 @@ export async function handleSessionsCallback(ctx: CallbackContext, dependencies:
         return;
     }
 
-    const copy = await getChatCopy(dependencies.sessionRepo, ctx.chat.id);
+    const copy = await getSafeChatCopy(dependencies.sessionRepo, ctx.chat.id, dependencies.logger);
 
     try {
         if (data.startsWith(SESSIONS_PAGE_PREFIX)) {
@@ -403,15 +407,18 @@ export async function handleLanguageCallback(ctx: CallbackContext, dependencies:
         return;
     }
 
-    const currentCopy = await getChatCopy(dependencies.sessionRepo, ctx.chat.id);
+    const currentCopy = await getSafeChatCopy(dependencies.sessionRepo, ctx.chat.id, dependencies.logger);
 
     try {
         if (!data.startsWith(LANGUAGE_SELECT_PREFIX)) {
             await ctx.editMessageText(
-                presentLanguageMessage(await getChatLanguage(dependencies.sessionRepo, ctx.chat.id), currentCopy),
+                presentLanguageMessage(
+                    await getSafeChatLanguage(dependencies.sessionRepo, ctx.chat.id, dependencies.logger),
+                    currentCopy,
+                ),
                 {
                     reply_markup: buildLanguageKeyboard(
-                        await getChatLanguage(dependencies.sessionRepo, ctx.chat.id),
+                        await getSafeChatLanguage(dependencies.sessionRepo, ctx.chat.id, dependencies.logger),
                         currentCopy,
                     ),
                 },
@@ -479,25 +486,25 @@ export async function handlePermissionApprovalCallback(
     }
 }
 
-export function registerCallbackHandler(bot: Bot, dependencies: PermissionApprovalDependencies) {
+export function registerCallbackHandler(bot: Pick<Bot, "callbackQuery">, dependencies: PermissionApprovalDependencies) {
     bot.callbackQuery(/^agents:/, async (ctx) => {
-        await handleAgentsCallback(ctx, dependencies);
+        await handleAgentsCallback(ctx, scopeDependenciesToTelegramContext(dependencies, ctx, "telegram"));
     });
 
     bot.callbackQuery(/^sessions:/, async (ctx) => {
-        await handleSessionsCallback(ctx, dependencies);
+        await handleSessionsCallback(ctx, scopeDependenciesToTelegramContext(dependencies, ctx, "telegram"));
     });
 
     bot.callbackQuery(/^model:/, async (ctx) => {
-        await handleModelsCallback(ctx, dependencies);
+        await handleModelsCallback(ctx, scopeDependenciesToTelegramContext(dependencies, ctx, "telegram"));
     });
 
     bot.callbackQuery(/^language:/, async (ctx) => {
-        await handleLanguageCallback(ctx, dependencies);
+        await handleLanguageCallback(ctx, scopeDependenciesToTelegramContext(dependencies, ctx, "telegram"));
     });
 
     bot.callbackQuery(/^permission:/, async (ctx) => {
-        await handlePermissionApprovalCallback(ctx, dependencies);
+        await handlePermissionApprovalCallback(ctx, scopeDependenciesToTelegramContext(dependencies, ctx, "telegram"));
     });
 }
 

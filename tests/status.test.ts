@@ -22,8 +22,13 @@ import { ListMcpUseCase } from "../src/use-cases/list-mcp.usecase.js";
 import { ListSessionsUseCase } from "../src/use-cases/list-sessions.usecase.js";
 
 const logger = {
+    child() {
+        return this;
+    },
     error() { },
+    async flush() { },
     info() { },
+    warn() { },
 } as unknown as AppLogger;
 
 interface StatusReply {
@@ -368,4 +373,36 @@ test("/status uses the selected chat language", async () => {
     assert.doesNotMatch(markdown, /\u5DF2\u7981\u7528/u);
     assert.doesNotMatch(markdown, /\u670D\u52A1\u72B6\u6001/u);
     assert.doesNotMatch(markdown, /\u6700\u540E\u66F4\u65B0/u);
+});
+
+test("/status returns a default-language error instead of going silent when chat state lookup fails", async () => {
+    const replies: StatusReply[] = [];
+
+    await handleStatusCommand(
+        {
+            chat: { id: 99 },
+            async reply(text, options) {
+                replies.push({ text, options });
+                return {};
+            },
+        },
+        {
+            getStatusUseCase: {
+                async execute() {
+                    throw new Error("state boom");
+                },
+            },
+            logger,
+            sessionRepo: {
+                async getByChatId() {
+                    throw new Error("state boom");
+                },
+            },
+        } as never,
+    );
+
+    assert.equal(replies.length, 1);
+    assert.equal(replies[0]?.options, undefined);
+    assert.match(replies[0]?.text ?? "", /Unexpected error\./);
+    assert.match(replies[0]?.text ?? "", /Cause: state boom/);
 });

@@ -1,5 +1,6 @@
 import type { Bot } from "grammy";
-import { getChatCopy } from "../i18n.js";
+import { getSafeChatCopy } from "../i18n.js";
+import { scopeDependenciesToTelegramContext } from "../logger-context.js";
 import { presentError } from "../presenters/error.presenter.js";
 import { cancelPendingSessionRename } from "../session-rename.js";
 import type { BotDependencies } from "../types.js";
@@ -18,7 +19,7 @@ interface CancelCommandContext {
 }
 
 export async function handleCancelCommand(ctx: CancelCommandContext, dependencies: BotDependencies) {
-    const copy = await getChatCopy(dependencies.sessionRepo, ctx.chat.id);
+    const copy = await getSafeChatCopy(dependencies.sessionRepo, ctx.chat.id, dependencies.logger);
 
     try {
         if (await cancelPendingSessionRename(ctx, dependencies)) {
@@ -46,8 +47,8 @@ export async function handleCancelCommand(ctx: CancelCommandContext, dependencie
     }
 }
 
-export function registerCancelCommand(bot: Bot, dependencies: BotDependencies) {
+export function registerCancelCommand(bot: Pick<Bot, "command">, dependencies: BotDependencies) {
     bot.command("cancel", async (ctx) => {
-        await handleCancelCommand(ctx, dependencies);
+        await handleCancelCommand(ctx, scopeDependenciesToTelegramContext(dependencies, ctx, "telegram"));
     });
 }

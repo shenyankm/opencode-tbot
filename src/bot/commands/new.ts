@@ -1,5 +1,6 @@
 import type { Bot } from "grammy";
-import { getChatCopy } from "../i18n.js";
+import { getSafeChatCopy } from "../i18n.js";
+import { scopeDependenciesToTelegramContext } from "../logger-context.js";
 import { presentError } from "../presenters/error.presenter.js";
 import { presentSessionCreatedMessage } from "../presenters/message.presenter.js";
 import type { BotDependencies } from "../types.js";
@@ -12,7 +13,7 @@ interface NewCommandContext {
 }
 
 export async function handleNewCommand(ctx: NewCommandContext, dependencies: BotDependencies) {
-    const copy = await getChatCopy(dependencies.sessionRepo, ctx.chat.id);
+    const copy = await getSafeChatCopy(dependencies.sessionRepo, ctx.chat.id, dependencies.logger);
 
     try {
         const title = extractSessionTitle(ctx);
@@ -28,9 +29,9 @@ export async function handleNewCommand(ctx: NewCommandContext, dependencies: Bot
     }
 }
 
-export function registerNewCommand(bot: Bot, dependencies: BotDependencies) {
+export function registerNewCommand(bot: Pick<Bot, "command">, dependencies: BotDependencies) {
     bot.command("new", async (ctx) => {
-        await handleNewCommand(ctx, dependencies);
+        await handleNewCommand(ctx, scopeDependenciesToTelegramContext(dependencies, ctx, "telegram"));
     });
 }
 

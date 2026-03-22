@@ -16,8 +16,13 @@ import { RenameSessionUseCase } from "../src/use-cases/rename-session.usecase.js
 import { SwitchSessionUseCase } from "../src/use-cases/switch-session.usecase.js";
 
 const logger = {
+    child() {
+        return this;
+    },
     error() { },
+    async flush() { },
     info() { },
+    warn() { },
 } as unknown as AppLogger;
 
 function createProject(id: string, worktree: string): OpenCodeProject {

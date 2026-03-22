@@ -1,5 +1,5 @@
 import type { PendingChatAction, SessionRenamePendingAction } from "../domain/pending-action/pending-action.entity.js";
-import { getChatCopy } from "./i18n.js";
+import { getSafeChatCopy } from "./i18n.js";
 import { restoreSessionsListMessage } from "./sessions-menu.js";
 import { presentError } from "./presenters/error.presenter.js";
 import { presentSessionRenamedMessage } from "./presenters/message.presenter.js";
@@ -43,7 +43,7 @@ export async function replyIfSessionRenamePending(
         return false;
     }
 
-    const copy = await getChatCopy(dependencies.sessionRepo, ctx.chat.id);
+    const copy = await getSafeChatCopy(dependencies.sessionRepo, ctx.chat.id, dependencies.logger);
     await ctx.reply(copy.sessions.renamePendingInput);
 
     return true;
@@ -59,7 +59,7 @@ export async function handlePendingSessionRenameText(
         return false;
     }
 
-    const copy = await getChatCopy(dependencies.sessionRepo, ctx.chat.id);
+    const copy = await getSafeChatCopy(dependencies.sessionRepo, ctx.chat.id, dependencies.logger);
     const title = ctx.message.text?.trim() ?? "";
 
     if (title.startsWith("/")) {
@@ -107,7 +107,7 @@ export async function cancelPendingSessionRename(
         return false;
     }
 
-    const copy = await getChatCopy(dependencies.sessionRepo, ctx.chat.id);
+    const copy = await getSafeChatCopy(dependencies.sessionRepo, ctx.chat.id, dependencies.logger);
     await dependencies.pendingActionRepo.clear(ctx.chat.id);
     await bestEffortRestoreSessionsList(ctx.api, pendingAction, dependencies);
     await ctx.reply(copy.sessions.renameCancelled);

@@ -1,6 +1,7 @@
 import type { Bot } from "grammy";
 import { buildTelegramStaticReply } from "../../services/telegram/telegram-format.js";
-import { getChatCopy } from "../i18n.js";
+import { getSafeChatCopy } from "../i18n.js";
+import { scopeDependenciesToTelegramContext } from "../logger-context.js";
 import { presentError } from "../presenters/error.presenter.js";
 import { presentStartMarkdownMessage } from "../presenters/static.presenter.js";
 import type { BotDependencies } from "../types.js";
@@ -16,7 +17,7 @@ interface StartCommandContext {
 }
 
 export async function handleStartCommand(ctx: StartCommandContext, dependencies: BotDependencies) {
-    const copy = await getChatCopy(dependencies.sessionRepo, ctx.chat?.id);
+    const copy = await getSafeChatCopy(dependencies.sessionRepo, ctx.chat?.id, dependencies.logger);
     const reply = buildTelegramStaticReply(presentStartMarkdownMessage(copy));
 
     try {
@@ -33,8 +34,8 @@ export async function handleStartCommand(ctx: StartCommandContext, dependencies:
     }
 }
 
-export function registerStartCommand(bot: Bot, dependencies: BotDependencies) {
+export function registerStartCommand(bot: Pick<Bot, "command">, dependencies: BotDependencies) {
     bot.command("start", async (ctx) => {
-        await handleStartCommand(ctx, dependencies);
+        await handleStartCommand(ctx, scopeDependenciesToTelegramContext(dependencies, ctx, "telegram"));
     });
 }

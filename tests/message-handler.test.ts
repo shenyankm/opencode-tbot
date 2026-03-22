@@ -7,6 +7,7 @@ import {
 import { handleTextMessage } from "../src/bot/handlers/message.handler.js";
 import { InMemoryPendingActionRepository } from "../src/repositories/pending-action.repo.js";
 import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
+import { ForegroundSessionTracker } from "../src/services/session-activity/foreground-session-tracker.js";
 
 function createPromptReply(overrides: Partial<PromptSessionResult> = {}): PromptSessionResult {
     return {
@@ -81,10 +82,15 @@ function createDependencies(options: {
                     sessions: [],
                 })),
             },
+            foregroundSessionTracker: new ForegroundSessionTracker(),
             logger: {
+                child() {
+                    return this;
+                },
                 error(error: unknown) {
                     errors.push(error);
                 },
+                async flush() { },
                 warn(warning: unknown) {
                     warnings.push(warning);
                 },
@@ -819,4 +825,49 @@ test("handleTextMessage keeps pending session rename mode on empty titles", asyn
         },
     ]);
     assert.notEqual(await pendingActionRepo.getByChatId(32), null);
+});
+
+test("handleTextMessage falls back to the default locale when chat state lookup fails before prompting", async () => {
+    const replies: Array<{ text: string; other?: unknown }> = [];
+    const deleted: Array<{ chatId: number; messageId: number }> = [];
+    let nextMessageId = 500;
+    const { dependencies } = createDependencies({
+        sendPrompt: async () => ({
+            assistantReply: createPromptReply(),
+        }),
+    });
+
+    dependencies.sessionRepo = {
+        async getByChatId() {
+            throw new Error("state boom");
+        },
+    } as never;
+
+    await handleTextMessage(
+        {
+            chat: { id: 42 },
+            message: { text: "hello" },
+            api: {
+                async deleteMessage(chatId, messageId) {
+                    deleted.push({ chatId, messageId });
+                    return true;
+                },
+                async editMessageText() {
+                    return true;
+                },
+            },
+            async reply(text, other) {
+                replies.push({ text, other });
+                return { message_id: nextMessageId++ };
+            },
+        },
+        dependencies,
+    );
+
+    assert.equal(replies[0]?.text, "Processing...");
+    assert.match(replies[1]?.text ?? "", /Hello/);
+    assert.deepEqual(deleted, [{
+        chatId: 42,
+        messageId: 500,
+    }]);
 });

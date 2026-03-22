@@ -10,6 +10,9 @@ import type { TelegramBotRuntime } from "../src/app/runtime.js";
 import type { AppLogger } from "../src/infra/logger/index.js";
 
 const logger = {
+    child() {
+        return this;
+    },
     debug() { },
     error() { },
     info() { },
@@ -107,6 +110,47 @@ test("permission.asked sends Telegram approval messages and persists them", asyn
         status: "pending",
         updatedAt: approvals[0]?.updatedAt,
     }]);
+});
+
+test("permission.updated from the root SDK event stream is normalized into Telegram approval messages", async () => {
+    const { runtime, sessionRepo, permissionApprovalRepo, messages } = createRuntime();
+
+    await sessionRepo.setCurrent({
+        chatId: 111,
+        sessionId: "session-root",
+        projectId: "project-1",
+        directory: "E:/repo",
+        agentName: null,
+        modelProviderId: null,
+        modelId: null,
+        modelVariant: null,
+        language: "en",
+        updatedAt: new Date(0).toISOString(),
+    });
+
+    await handleTelegramBotPluginEvent(runtime, {
+        type: "permission.updated",
+        properties: {
+            id: "permission-1",
+            sessionID: "session-root",
+            type: "write",
+            pattern: ["README.md"],
+            metadata: {},
+            time: {
+                created: 1,
+            },
+            title: "Write README.md",
+            messageID: "message-1",
+        },
+    });
+
+    const approvals = await permissionApprovalRepo.listByRequestId("permission-1");
+
+    assert.equal(messages.length, 1);
+    assert.equal(messages[0]?.chatId, 111);
+    assert.match(messages[0]?.text ?? "", /Permission Request/);
+    assert.match(messages[0]?.text ?? "", /README\.md/);
+    assert.equal(approvals[0]?.requestId, "permission-1");
 });
 
 test("permission.asked also routes foreground child-session approvals back to the active Telegram chat", async () => {

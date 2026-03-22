@@ -32,7 +32,7 @@ Recommended install:
 npm exec --package opencode-tbot@latest opencode-tbot -- install
 ```
 
-The installer registers the plugin globally and writes the default runtime config.
+The installer registers the plugin globally, writes the default runtime config, and prints both the config path and the default plugin log directory.
 
 Check the installed CLI version:
 
@@ -86,6 +86,20 @@ Legacy `openrouter` voice-transcription settings are ignored at runtime. When th
     "pollRequestTimeoutMs": 15000,
     "recoveryInactivityTimeoutMs": 120000
   },
+  "logging": {
+    "level": "info",
+    "sinks": {
+      "host": true,
+      "file": true
+    },
+    "file": {
+      "dir": "C:/Users/your-user/.local/share/opencode/log/plugins/opencode-tbot",
+      "retention": {
+        "maxFiles": 30,
+        "maxTotalBytes": 314572800
+      }
+    }
+  },
   "logLevel": "info"
 }
 ```
@@ -98,18 +112,38 @@ Legacy `openrouter` voice-transcription settings are ignored at runtime. When th
 | `telegram.allowedChatIds` | No | `[]` | Allowed Telegram chat IDs. If empty, the bot accepts messages from any chat. |
 | `telegram.apiRoot` | No | `https://api.telegram.org` | Telegram Bot API base URL. Useful for tests or self-hosted gateways. |
 | `state.path` | No | `./data/opencode-tbot.state.json` | JSON state file path, resolved relative to the current OpenCode worktree. |
-| `prompt.waitTimeoutMs` | No | `1800000` | Maximum total wait for a synchronous prompt before the plugin stops waiting. |
+| `prompt.waitTimeoutMs` | No | `1800000` | Maximum total wait for one async prompt lifecycle before the plugin stops waiting for OpenCode recovery. |
 | `prompt.pollRequestTimeoutMs` | No | `15000` | Timeout for each individual recovery poll request to OpenCode. |
 | `prompt.recoveryInactivityTimeoutMs` | No | `120000` | Recovery timeout that only applies when prompt progress stops advancing. |
-| `logLevel` | No | `info` | Plugin log level. Logs are emitted through `client.app.log()`. |
+| `logging.level` | No | `info` | Structured log level for both host and file sinks. |
+| `logging.sinks.host` | No | `true` | Enable OpenCode host logging through `client.app.log({ body: ... })`. |
+| `logging.sinks.file` | No | `true` | Enable plugin-owned JSONL file logs. |
+| `logging.file.dir` | No | `%USERPROFILE%/.local/share/opencode/log/plugins/opencode-tbot` | Plugin JSONL log directory. |
+| `logging.file.retention.maxFiles` | No | `30` | Maximum number of retained plugin log files. |
+| `logging.file.retention.maxTotalBytes` | No | `314572800` | Maximum total size of retained plugin log files. |
+| `logLevel` | No | `info` | Legacy alias for `logging.level`. Still accepted for compatibility. |
 
 ### Notes
 
 - `state.path` is resolved relative to the current OpenCode worktree.
+- Telegram prompt handling is async-first: the plugin submits `session.promptAsync()` and then recovers the reply from session messages and session status.
 - `prompt.waitTimeoutMs` is the total safety cap; `prompt.recoveryInactivityTimeoutMs` only applies when OpenCode stops making progress.
 - If `telegram.allowedChatIds` is left empty, the bot accepts messages from any chat. Restrict it in production.
 - Permission approvals and session notifications are handled through plugin hooks.
 - `/language` currently supports English, Simplified Chinese, and Japanese.
+- Plugin logs are dual-written by default: OpenCode host logs through `client.app.log({ body: ... })`, plus plugin JSONL files.
+- OpenCode host logs live under `%USERPROFILE%/.local/share/opencode/log`.
+- The default plugin JSONL log directory is `%USERPROFILE%/.local/share/opencode/log/plugins/opencode-tbot`.
+- File logs are metadata-only by default. Prompt bodies, attachment contents, raw URLs, and secrets are not written.
+
+## Logging
+
+- Host log directory: `%USERPROFILE%/.local/share/opencode/log`
+- Plugin log directory: `%USERPROFILE%/.local/share/opencode/log/plugins/opencode-tbot`
+- File format: append-only JSONL, one structured event per line
+- Correlation fields: `runtimeId`, `operationId`, `correlationId`, `updateId`, `chatId`, `sessionId`, `projectId`
+- Common components: `runtime`, `telegram`, `opencode`, `prompt`, `plugin-event`, `storage`
+- Retention: keep the newest 30 files and at most 300 MB by default
 
 ## Quick Start
 
@@ -126,7 +160,7 @@ Legacy `openrouter` voice-transcription settings are ignored at runtime. When th
 - `/new [title]` create a new OpenCode session
 - `/agents` or `/agent` list available agents and switch the active one
 - `/sessions` list available sessions and switch the active one
-- `/cancel` cancel session rename or abort the running request for the current session
+- `/cancel` cancel session rename or abort the running request for the current session, including the local Telegram wait state
 - `/model` or `/models` list available models and switch the active one
 - `/language` switch the bot display language
 
@@ -135,6 +169,7 @@ Message handling:
 - Non-command text is treated as a prompt and sent to OpenCode.
 - Telegram photos and image documents are forwarded as OpenCode file parts.
 - Image attachments are processed in a temporary fork of the active session so later text-only prompts stay clean.
+- `/cancel` aborts both the OpenCode session and the local Telegram wait, so the next prompt can start immediately.
 - Telegram voice messages are not supported and receive a localized rejection reply.
 
 ## Development
@@ -158,6 +193,8 @@ pnpm test
 ```
 
 For local source-based loading in this repository, OpenCode can use [.opencode/plugins/opencode-tbot.ts](./.opencode/plugins/opencode-tbot.ts), which re-exports `src/plugin.ts`.
+
+OpenCode may load both the local `.opencode/plugins/` bridge and an installed npm plugin such as `opencode-tbot@latest` in the same process. This repository now guards against duplicate Telegram runners, but local development is still clearer if you keep only one loading path enabled at a time.
 
 ## FAQ
 

@@ -1,6 +1,10 @@
 import type { ChatSessionBinding } from "../domain/session/session.entity.js";
 import type { SessionRepository } from "../domain/session/session.repository.js";
-import type { AppLogger } from "../infra/logger/index.js";
+import {
+    logOpenCodeRequest,
+    logPromptLifecycle,
+    type AppLogger,
+} from "../infra/logger/index.js";
 import type {
     OpenCodeClientLike,
     PromptSessionFilePartInput,
@@ -83,11 +87,13 @@ export class SendPromptUseCase {
                 },
             );
             binding = createdSession.binding;
-            this.logger.info(
+            logPromptLifecycle(
+                this.logger,
                 {
                     chatId: input.chatId,
-                    sessionId: createdSession.session.id,
+                    event: "prompt.session.created",
                     projectId: createdSession.session.projectID,
+                    sessionId: createdSession.session.id,
                     directory: createdSession.session.directory,
                 },
                 "session created",
@@ -105,6 +111,7 @@ export class SendPromptUseCase {
                 this.logger.warn?.(
                     {
                         chatId: input.chatId,
+                        event: "prompt.model.unavailable",
                     },
                     "selected model is no longer available, falling back to OpenCode default",
                 );
@@ -113,6 +120,7 @@ export class SendPromptUseCase {
                 this.logger.warn?.(
                     {
                         chatId: input.chatId,
+                        event: "prompt.model.variant_unavailable",
                         providerId: selectedModel.providerID,
                         modelId: selectedModel.id,
                     },
@@ -141,6 +149,7 @@ export class SendPromptUseCase {
             this.logger.warn?.(
                 {
                     chatId: input.chatId,
+                    event: "prompt.agent.unavailable",
                 },
                 "selected agent is no longer available, falling back to OpenCode default",
             );
@@ -155,6 +164,14 @@ export class SendPromptUseCase {
         let result;
 
         try {
+            logOpenCodeRequest(this.logger, {
+                chatId: input.chatId,
+                event: "opencode.prompt.submit",
+                projectId: activeBinding.projectId,
+                sessionId: executionSessionId,
+                fileCount: files.length,
+                status: "started",
+            }, "submitting OpenCode prompt");
             result = await this.opencodeClient.promptSession({
                 sessionId: executionSessionId,
                 prompt: promptText,
@@ -165,6 +182,13 @@ export class SendPromptUseCase {
                 ...(input.signal ? { signal: input.signal } : {}),
                 ...(activeBinding.modelVariant ? { variant: activeBinding.modelVariant } : {}),
             });
+            logPromptLifecycle(this.logger, {
+                chatId: input.chatId,
+                event: "prompt.completed",
+                projectId: activeBinding.projectId,
+                sessionId: executionSessionId,
+                status: "completed",
+            }, "prompt completed");
         } finally {
             if (temporarySessionId) {
                 await this.cleanupTemporaryImageSession(
@@ -193,6 +217,7 @@ export class SendPromptUseCase {
         this.logger.warn?.(
             {
                 chatId,
+                event: "prompt.session.invalid_context",
             },
             `${reason}, falling back to the current OpenCode project`,
         );
@@ -207,9 +232,11 @@ export class SendPromptUseCase {
             throw new Error("OpenCode did not return a distinct temporary session for the image turn.");
         }
 
-        this.logger.info?.(
+        logPromptLifecycle(
+            this.logger,
             {
                 chatId,
+                event: "prompt.temporary_session.created",
                 parentSessionId: sessionId,
                 sessionId: temporarySession.id,
             },
@@ -231,6 +258,7 @@ export class SendPromptUseCase {
                 this.logger.warn?.(
                     {
                         chatId,
+                        event: "prompt.temporary_session.cleanup_failed",
                         parentSessionId,
                         sessionId,
                     },
@@ -242,6 +270,7 @@ export class SendPromptUseCase {
                 {
                     error,
                     chatId,
+                    event: "prompt.temporary_session.cleanup_failed",
                     parentSessionId,
                     sessionId,
                 },

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { BotDependencies } from "../bot/types.js";
 import type { PermissionApprovalRepository } from "../domain/permission/approval.repository.js";
 import { createOpenCodeAppLogger } from "../infra/logger/index.js";
@@ -42,8 +43,22 @@ export function createAppContainer(
     config: AppConfig,
     client: OpenCodeSdkClientLike,
 ): AppContainer {
+    const runtimeId = randomUUID();
     const logger = createOpenCodeAppLogger(client, {
-        level: config.logLevel,
+        file: {
+            dir: config.loggingFileDir,
+            retention: {
+                maxFiles: config.loggingRetentionMaxFiles,
+                maxTotalBytes: config.loggingRetentionMaxTotalBytes,
+            },
+        },
+        level: config.loggingLevel,
+        runtimeId,
+        sinks: {
+            file: config.loggingFileSinkEnabled,
+            host: config.loggingHostSinkEnabled,
+        },
+        worktree: config.worktreePath,
     });
 
     return createContainer(
@@ -66,6 +81,9 @@ function createContainer(
     opencodeClient: OpenCodeClientLike,
     logger: BotDependencies["logger"],
 ): AppContainer {
+    const storageLogger = logger.child({ component: "storage" });
+    const opencodeLogger = logger.child({ component: "opencode" });
+    const promptLogger = logger.child({ component: "prompt" });
     const stateStore = new JsonStateStore({
         filePath: config.stateFilePath,
         createDefaultState: createDefaultOpencodeTbotState,
@@ -84,7 +102,7 @@ function createContainer(
         opencodeClient,
         foregroundSessionTracker,
     );
-    const createSessionUseCase = new CreateSessionUseCase(sessionRepo, opencodeClient, logger);
+    const createSessionUseCase = new CreateSessionUseCase(sessionRepo, opencodeClient, opencodeLogger);
     const getHealthUseCase = new GetHealthUseCase(opencodeClient);
     const getPathUseCase = new GetPathUseCase(opencodeClient);
     const listAgentsUseCase = new ListAgentsUseCase(sessionRepo, opencodeClient);
@@ -100,15 +118,15 @@ function createContainer(
         sessionRepo,
     );
     const listModelsUseCase = new ListModelsUseCase(sessionRepo, opencodeClient);
-    const renameSessionUseCase = new RenameSessionUseCase(sessionRepo, opencodeClient, logger);
+    const renameSessionUseCase = new RenameSessionUseCase(sessionRepo, opencodeClient, opencodeLogger);
     const sendPromptUseCase = new SendPromptUseCase(
         sessionRepo,
         opencodeClient,
-        logger,
+        promptLogger,
     );
-    const switchAgentUseCase = new SwitchAgentUseCase(sessionRepo, opencodeClient, logger);
-    const switchModelUseCase = new SwitchModelUseCase(sessionRepo, opencodeClient, logger);
-    const switchSessionUseCase = new SwitchSessionUseCase(sessionRepo, opencodeClient, logger);
+    const switchAgentUseCase = new SwitchAgentUseCase(sessionRepo, opencodeClient, opencodeLogger);
+    const switchModelUseCase = new SwitchModelUseCase(sessionRepo, opencodeClient, opencodeLogger);
+    const switchSessionUseCase = new SwitchSessionUseCase(sessionRepo, opencodeClient, opencodeLogger);
     let disposed = false;
 
     return {
@@ -141,7 +159,13 @@ function createContainer(
             }
 
             disposed = true;
-            logger.info({ filePath: config.stateFilePath }, "disposing telegram bot container");
+            storageLogger.info(
+                {
+                    event: "storage.container.disposed",
+                    filePath: config.stateFilePath,
+                },
+                "disposing telegram bot container",
+            );
             await logger.flush();
         },
     };

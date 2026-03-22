@@ -10,8 +10,13 @@ import { ListAgentsUseCase } from "../src/use-cases/list-agents.usecase.js";
 import { SwitchAgentUseCase } from "../src/use-cases/switch-agent.usecase.js";
 
 const logger = {
+    child() {
+        return this;
+    },
     error() { },
+    async flush() { },
     info() { },
+    warn() { },
 } as unknown as AppLogger;
 
 function createAgent(
@@ -242,4 +247,48 @@ test("agent selection callbacks use the filtered index and show plain agent name
         "Agent switched.\nCurrent agent: plan",
     ]);
     assert.equal(binding?.agentName, "plan");
+});
+
+test("handleAgentsCallback falls back to the default locale when chat state lookup fails", async () => {
+    let answered = 0;
+    let editedText = "";
+    const { dependencies } = createDependencies({
+        async listAgents() {
+            return [createAgent("planner")];
+        },
+    } as never);
+
+    dependencies.sessionRepo = {
+        async getByChatId() {
+            throw new Error("state boom");
+        },
+    } as never;
+    dependencies.listAgentsUseCase = {
+        async execute() {
+            return {
+                agents: [createAgent("planner")],
+                currentAgentName: null,
+            };
+        },
+    } as never;
+
+    await handleAgentsCallback(
+        {
+            chat: { id: 55 },
+            callbackQuery: { data: "agents:page:0" },
+            async answerCallbackQuery() {
+                answered += 1;
+                return {};
+            },
+            async editMessageText(text) {
+                editedText = text;
+                return {};
+            },
+        },
+        dependencies,
+    );
+
+    assert.equal(answered, 1);
+    assert.match(editedText, /Agent List/);
+    assert.match(editedText, /planner/);
 });

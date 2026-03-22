@@ -11,7 +11,11 @@ function createDependencies() {
     return {
         dependencies: {
             logger: {
+                child() {
+                    return this;
+                },
                 error() { },
+                async flush() { },
                 warn() { },
             },
             pendingActionRepo,

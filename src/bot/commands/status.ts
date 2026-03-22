@@ -1,5 +1,6 @@
 import type { Bot } from "grammy";
-import { getChatCopy } from "../i18n.js";
+import { getSafeChatCopy } from "../i18n.js";
+import { scopeDependenciesToTelegramContext } from "../logger-context.js";
 import { presentError } from "../presenters/error.presenter.js";
 import {
     presentStatusMarkdownMessage,
@@ -19,7 +20,7 @@ interface StatusCommandContext {
 }
 
 export async function handleStatusCommand(ctx: StatusCommandContext, dependencies: BotDependencies) {
-    const copy = await getChatCopy(dependencies.sessionRepo, ctx.chat?.id);
+    const copy = await getSafeChatCopy(dependencies.sessionRepo, ctx.chat?.id, dependencies.logger);
 
     try {
         const result = await dependencies.getStatusUseCase.execute({
@@ -40,8 +41,8 @@ export async function handleStatusCommand(ctx: StatusCommandContext, dependencie
     }
 }
 
-export function registerStatusCommand(bot: Bot, dependencies: BotDependencies) {
+export function registerStatusCommand(bot: Pick<Bot, "command">, dependencies: BotDependencies) {
     bot.command("status", async (ctx) => {
-        await handleStatusCommand(ctx, dependencies);
+        await handleStatusCommand(ctx, scopeDependenciesToTelegramContext(dependencies, ctx, "telegram"));
     });
 }

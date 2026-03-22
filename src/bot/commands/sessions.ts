@@ -1,5 +1,6 @@
 import type { Bot } from "grammy";
-import { getChatCopy } from "../i18n.js";
+import { getSafeChatCopy } from "../i18n.js";
+import { scopeDependenciesToTelegramContext } from "../logger-context.js";
 import type { BotDependencies } from "../types.js";
 import { presentError } from "../presenters/error.presenter.js";
 import { buildSessionsListView } from "../sessions-menu.js";
@@ -10,7 +11,7 @@ interface SessionsCommandContext {
 }
 
 export async function handleSessionsCommand(ctx: SessionsCommandContext, dependencies: BotDependencies) {
-    const copy = await getChatCopy(dependencies.sessionRepo, ctx.chat.id);
+    const copy = await getSafeChatCopy(dependencies.sessionRepo, ctx.chat.id, dependencies.logger);
 
     try {
         await dependencies.pendingActionRepo.clear(ctx.chat.id);
@@ -23,8 +24,8 @@ export async function handleSessionsCommand(ctx: SessionsCommandContext, depende
     }
 }
 
-export function registerSessionsCommand(bot: Bot, dependencies: BotDependencies) {
+export function registerSessionsCommand(bot: Pick<Bot, "command">, dependencies: BotDependencies) {
     bot.command("sessions", async (ctx) => {
-        await handleSessionsCommand(ctx, dependencies);
+        await handleSessionsCommand(ctx, scopeDependenciesToTelegramContext(dependencies, ctx, "telegram"));
     });
 }

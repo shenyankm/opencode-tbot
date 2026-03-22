@@ -1,5 +1,6 @@
 import type { Bot } from "grammy";
-import { getChatCopy } from "../i18n.js";
+import { getSafeChatCopy } from "../i18n.js";
+import { scopeDependenciesToTelegramContext } from "../logger-context.js";
 import type { BotDependencies } from "../types.js";
 import { replyIfSessionRenamePending } from "../session-rename.js";
 
@@ -18,12 +19,12 @@ export async function handleVoiceMessage(ctx: VoiceContext, dependencies: BotDep
         return;
     }
 
-    const copy = await getChatCopy(dependencies.sessionRepo, ctx.chat.id);
+    const copy = await getSafeChatCopy(dependencies.sessionRepo, ctx.chat.id, dependencies.logger);
     await ctx.reply(copy.errors.voiceUnsupported);
 }
 
-export function registerVoiceHandler(bot: Bot, dependencies: BotDependencies) {
+export function registerVoiceHandler(bot: Pick<Bot, "on">, dependencies: BotDependencies) {
     bot.on("message:voice", async (ctx) => {
-        await handleVoiceMessage(ctx, dependencies);
+        await handleVoiceMessage(ctx, scopeDependenciesToTelegramContext(dependencies, ctx, "telegram"));
     });
 }

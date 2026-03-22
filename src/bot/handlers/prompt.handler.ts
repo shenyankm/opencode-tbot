@@ -1,4 +1,4 @@
-import { getChatCopy } from "../i18n.js";
+import { getSafeChatCopy } from "../i18n.js";
 import { presentError } from "../presenters/error.presenter.js";
 import { buildTelegramPromptReply } from "../../services/telegram/telegram-format.js";
 import type { BotDependencies } from "../types.js";
@@ -26,7 +26,7 @@ export async function executePromptRequest(
     dependencies: BotDependencies,
     resolvePrompt: () => Promise<PromptExecutionInput>,
 ) {
-    const copy = await getChatCopy(dependencies.sessionRepo, ctx.chat.id);
+    const copy = await getSafeChatCopy(dependencies.sessionRepo, ctx.chat.id, dependencies.logger);
     const foregroundRequest = dependencies.foregroundSessionTracker.acquire(ctx.chat.id);
 
     if (!foregroundRequest) {
@@ -81,7 +81,7 @@ export async function executePromptRequest(
 
 function normalizePromptReplyForDisplay(
     promptReply: Awaited<ReturnType<BotDependencies["sendPromptUseCase"]["execute"]>>["assistantReply"],
-    copy: Awaited<ReturnType<typeof getChatCopy>>,
+    copy: Awaited<ReturnType<typeof getSafeChatCopy>>,
     dependencies: BotDependencies,
 ) {
     if (!promptReply.assistantError) {

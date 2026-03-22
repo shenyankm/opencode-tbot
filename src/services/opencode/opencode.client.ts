@@ -1,18 +1,19 @@
 import {
-    type Agent,
     createOpencodeClient,
-    type Config,
-    type LspStatus,
-    type McpStatus,
-    type Model,
     type OpencodeClient,
-    type Part,
-    type PermissionRequest,
-    type Path,
-    type Provider,
-    type Project,
-    type Session,
-    type SessionStatus,
+} from "@opencode-ai/sdk";
+import type {
+    Agent,
+    Config,
+    LspStatus,
+    McpStatus,
+    Model,
+    Part,
+    Path,
+    Provider,
+    Project,
+    Session,
+    SessionStatus,
 } from "@opencode-ai/sdk/v2/client";
 import { z } from "zod";
 
@@ -41,6 +42,7 @@ export interface PromptSessionInput {
     prompt?: string | null;
     agent?: string | null;
     structured?: boolean;
+    signal?: AbortSignal;
     model?: {
         providerID: string;
         modelID: string;
@@ -89,7 +91,14 @@ export type OpenCodeLspStatus = LspStatus;
 export type OpenCodePath = Path;
 export type OpenCodeMcpStatus = McpStatus;
 export type OpenCodeSessionStatus = SessionStatus;
-export type OpenCodePermissionRequest = PermissionRequest;
+export interface OpenCodePermissionRequest {
+    always: string[];
+    id: string;
+    metadata: Record<string, unknown>;
+    patterns: string[];
+    permission: string;
+    sessionID: string;
+}
 export interface OpenCodeHealth {
     healthy: boolean;
     version: string;
@@ -106,26 +115,42 @@ export interface OpenCodeConfiguredModel {
 }
 
 type RawSdkRequestOptions = {
-    body?: unknown;
-    path?: Record<string, unknown>;
-    query?: Record<string, unknown>;
     responseStyle?: "data" | "fields";
     signal?: AbortSignal;
     throwOnError?: boolean;
     url: string;
 };
 
-type RawSdkHttpClient = {
-    delete?(options: RawSdkRequestOptions): Promise<unknown>;
+type RawSdkRequestClient = {
     get?(options: RawSdkRequestOptions): Promise<unknown>;
-    patch?(options: RawSdkRequestOptions): Promise<unknown>;
-    post?(options: RawSdkRequestOptions): Promise<unknown>;
 };
 
-export type OpenCodeSdkClientLike = Pick<OpencodeClient, "app" | "config" | "global" | "lsp" | "mcp" | "path" | "permission" | "project" | "session"> & {
-    _client?: RawSdkHttpClient;
+type OpenCodeSdkPermissionScopeLike = {
+    list?(parameters?: unknown, options?: Record<string, unknown>): Promise<unknown>;
+    reply?(parameters?: unknown, options?: Record<string, unknown>): Promise<unknown>;
+};
+
+type OpenCodeSdkScopedClientLike = Pick<OpencodeClient, "app" | "config" | "global" | "lsp" | "mcp" | "path" | "project" | "session"> & {
+    permission?: OpenCodeSdkPermissionScopeLike;
+};
+
+type OpenCodeSdkPermissionReplyClientLike = {
+    postSessionIdPermissionsPermissionId?(options: Record<string, unknown>): Promise<unknown>;
+};
+
+export type OpenCodeSdkClientLike = OpenCodeSdkScopedClientLike & OpenCodeSdkPermissionReplyClientLike;
+
+type OpenCodeSdkClientWithRawRequestClient = OpenCodeSdkClientLike & {
+    _client?: RawSdkRequestClient;
+    client?: RawSdkRequestClient;
 };
 type MaybeWrappedResponse<T> = T | { data: T };
+type ScopedSdkScope = "app" | "config" | "global" | "lsp" | "mcp" | "path" | "permission" | "project" | "session";
+type ScopedSdkInvocationInput = {
+    legacyParameters?: unknown;
+    parameters?: Record<string, unknown>;
+    signal?: AbortSignal;
+};
 type OpenCodeProviderCatalog = {
     providers: OpenCodeProvider[];
     default: Record<string, string>;
@@ -137,7 +162,6 @@ type OpenCodePromptResponse = {
     info: unknown;
     parts?: Part[] | null;
 };
-type SdkFlavor = "legacy" | "v2";
 
 export type OpenCodePromptTimeoutStage =
     | "capture-known-messages"
@@ -164,6 +188,24 @@ export class OpenCodePromptTimeoutError extends Error {
         this.name = "OpenCodePromptTimeoutError";
         this.data = data;
     }
+}
+
+export class OpenCodeMessageAbortedError extends Error {
+    readonly data?: {
+        message?: string;
+    };
+
+    constructor(message = "Request was aborted.") {
+        super(message);
+        this.name = "MessageAbortedError";
+        this.data = {
+            message,
+        };
+    }
+}
+
+export function createMessageAbortedError(message = "Request was aborted."): OpenCodeMessageAbortedError {
+    return new OpenCodeMessageAbortedError(message);
 }
 
 export interface OpenCodeAssistantError {
@@ -270,7 +312,6 @@ export interface OpenCodeClientLike {
 export class OpenCodeClient implements OpenCodeClientLike {
     readonly client: OpenCodeSdkClientLike;
     private readonly fetchFn: typeof fetch;
-    private readonly sdkFlavor: SdkFlavor;
     private promptTimeoutPolicy: OpenCodePromptTimeoutPolicy;
     private modelCache: {
         expiresAt: number;
@@ -294,7 +335,6 @@ export class OpenCodeClient implements OpenCodeClientLike {
 
         this.client = client ?? createOpencodeClient(buildOpenCodeSdkConfig(options as OpenCodeClientOptions));
         this.fetchFn = fetchFn;
-        this.sdkFlavor = detectSdkFlavor(this.client);
         this.promptTimeoutPolicy = resolvePromptTimeoutPolicy(promptTimeoutPolicy);
     }
 
@@ -308,13 +348,9 @@ export class OpenCodeClient implements OpenCodeClientLike {
     }
 
     private async callScopedSdkMethod<T>(
-        scope: "app" | "config" | "global" | "lsp" | "mcp" | "path" | "permission" | "project" | "session",
+        scope: ScopedSdkScope,
         method: string,
-        input: {
-            legacyOptions?: Record<string, unknown>;
-            signal?: AbortSignal;
-            v2Parameters?: unknown;
-        },
+        input: ScopedSdkInvocationInput,
     ): Promise<T> {
         const target = this.client[scope] as unknown as Record<string, unknown> | undefined;
         const handler = target?.[method];
@@ -323,202 +359,122 @@ export class OpenCodeClient implements OpenCodeClientLike {
             throw new Error(`OpenCode SDK client does not expose a compatible ${scope}.${method} method.`);
         }
 
-        if (this.sdkFlavor === "legacy") {
-            const response = await (handler as (options: Record<string, unknown>) => Promise<MaybeWrappedResponse<T>>).call(
+        const options = {
+            ...SDK_OPTIONS,
+            ...(input.signal ? { signal: input.signal } : {}),
+        };
+        const response = handler.length >= 2
+            ? await (handler as (parameters: unknown, requestOptions: Record<string, unknown>) => Promise<MaybeWrappedResponse<T>>).call(
                 target,
-                {
-                    ...SDK_OPTIONS,
-                    ...(input.signal ? { signal: input.signal } : {}),
-                    ...(input.legacyOptions ?? {}),
-                },
+                input.legacyParameters,
+                options,
+            )
+            : await (handler as (requestOptions: Record<string, unknown>) => Promise<MaybeWrappedResponse<T>>).call(
+                target,
+                input.parameters === undefined
+                    ? options
+                    : {
+                        ...input.parameters,
+                        ...options,
+                    },
             );
-
-            return unwrapSdkData(response);
-        }
-
-        const response = await (handler as (parameters: unknown, options: Record<string, unknown>) => Promise<MaybeWrappedResponse<T>>).call(
-            target,
-            input.v2Parameters,
-            {
-                ...SDK_OPTIONS,
-                ...(input.signal ? { signal: input.signal } : {}),
-            },
-        );
 
         return unwrapSdkData(response);
     }
 
     async getHealth(): Promise<OpenCodeHealth> {
-        const rawClient = getRawSdkClient(this.client);
+        try {
+            return await this.callScopedSdkMethod<OpenCodeHealth>("global", "health", {});
+        } catch (error) {
+            if (!isMissingScopedSdkMethodError(error, "global", "health")) {
+                throw error;
+            }
 
-        if (rawClient?.get) {
-            const response = await this.requestRaw<OpenCodeHealth>(
-                "get",
-                { url: "/global/health" },
-            );
-
-            return response;
+            return this.callRawSdkGet<OpenCodeHealth>("/global/health");
         }
-
-        const healthEndpoint = this.client.global?.health;
-
-        if (typeof healthEndpoint === "function") {
-            const response = await healthEndpoint.call(
-                this.client.global,
-                SDK_OPTIONS,
-            ) as MaybeWrappedResponse<OpenCodeHealth>;
-
-            return unwrapSdkData(response);
-        }
-
-        if (!rawClient?.get) {
-            throw new Error("OpenCode SDK client does not expose a compatible health endpoint.");
-        }
-
-        return this.requestRaw<OpenCodeHealth>(
-            "get",
-            { url: "/global/health" },
-        );
     }
 
     async abortSession(sessionId: string): Promise<boolean> {
-        if (hasRawSdkMethod(this.client, "post")) {
-            return this.requestRaw<boolean>(
-                "post",
-                buildRawSessionRequest(this.sdkFlavor, sessionId, "/abort"),
-            );
-        }
-
         return this.callScopedSdkMethod<boolean>("session", "abort", {
-            legacyOptions: {
+            legacyParameters: {
+                sessionID: sessionId,
+            },
+            parameters: {
                 path: {
                     id: sessionId,
                 },
-            },
-            v2Parameters: {
-                sessionID: sessionId,
             },
         });
     }
 
     async deleteSession(sessionId: string): Promise<boolean> {
-        if (hasRawSdkMethod(this.client, "delete")) {
-            return this.requestRaw<boolean>(
-                "delete",
-                buildRawSessionRequest(this.sdkFlavor, sessionId),
-            );
-        }
-
         return this.callScopedSdkMethod<boolean>("session", "delete", {
-            legacyOptions: {
+            legacyParameters: {
+                sessionID: sessionId,
+            },
+            parameters: {
                 path: {
                     id: sessionId,
                 },
-            },
-            v2Parameters: {
-                sessionID: sessionId,
             },
         });
     }
 
     async forkSession(sessionId: string, messageId?: string): Promise<OpenCodeSession> {
-        if (hasRawSdkMethod(this.client, "post")) {
-            return this.requestRaw<OpenCodeSession>(
-                "post",
-                buildRawSessionRequest(
-                    this.sdkFlavor,
-                    sessionId,
-                    "/fork",
+        return this.callScopedSdkMethod<OpenCodeSession>("session", "fork", {
+            legacyParameters: {
+                sessionID: sessionId,
+                ...(messageId?.trim()
+                    ? { messageID: messageId.trim() }
+                    : {}),
+            },
+            parameters: {
+                path: {
+                    id: sessionId,
+                },
+                ...(
                     messageId?.trim()
                         ? {
                             body: {
                                 messageID: messageId.trim(),
                             },
                         }
-                        : {},
+                        : {}
                 ),
-            );
-        }
-
-        return this.callScopedSdkMethod<OpenCodeSession>("session", "fork", {
-            legacyOptions: {
-                path: {
-                    id: sessionId,
-                },
-                ...(messageId?.trim()
-                    ? {
-                        body: {
-                            messageID: messageId.trim(),
-                        },
-                    }
-                    : {}),
-            },
-            v2Parameters: {
-                sessionID: sessionId,
-                ...(messageId?.trim()
-                    ? { messageID: messageId.trim() }
-                    : {}),
             },
         });
     }
 
     async getPath(): Promise<OpenCodePath> {
-        if (hasRawSdkMethod(this.client, "get")) {
-            return this.requestRaw<OpenCodePath>(
-                "get",
-                { url: "/path" },
-            );
-        }
-
         return this.callScopedSdkMethod<OpenCodePath>("path", "get", {});
     }
 
     async listLspStatuses(directory?: string): Promise<OpenCodeLspStatus[]> {
-        if (hasRawSdkMethod(this.client, "get")) {
-            return this.requestRaw<OpenCodeLspStatus[]>(
-                "get",
-                {
-                    url: "/lsp",
-                    ...(directory ? { query: { directory } } : {}),
-                },
-            );
-        }
-
         return this.callScopedSdkMethod<OpenCodeLspStatus[]>("lsp", "status", {
-            legacyOptions: directory
+            legacyParameters: directory
+                ? { directory }
+                : undefined,
+            parameters: directory
                 ? {
                     query: {
                         directory,
                     },
                 }
-                : undefined,
-            v2Parameters: directory
-                ? { directory }
                 : undefined,
         });
     }
 
     async listMcpStatuses(directory?: string): Promise<Record<string, OpenCodeMcpStatus>> {
-        if (hasRawSdkMethod(this.client, "get")) {
-            return this.requestRaw<Record<string, OpenCodeMcpStatus>>(
-                "get",
-                {
-                    url: "/mcp",
-                    ...(directory ? { query: { directory } } : {}),
-                },
-            );
-        }
-
         return this.callScopedSdkMethod<Record<string, OpenCodeMcpStatus>>("mcp", "status", {
-            legacyOptions: directory
+            legacyParameters: directory
+                ? { directory }
+                : undefined,
+            parameters: directory
                 ? {
                     query: {
                         directory,
                     },
                 }
-                : undefined,
-            v2Parameters: directory
-                ? { directory }
                 : undefined,
         });
     }
@@ -528,58 +484,21 @@ export class OpenCodeClient implements OpenCodeClientLike {
     }
 
     async listProjects(): Promise<OpenCodeProject[]> {
-        if (hasRawSdkMethod(this.client, "get")) {
-            return this.requestRaw<OpenCodeProject[]>(
-                "get",
-                { url: "/project" },
-            );
-        }
-
         return this.callScopedSdkMethod<OpenCodeProject[]>("project", "list", {});
     }
 
     async listSessions(): Promise<OpenCodeSession[]> {
-        if (hasRawSdkMethod(this.client, "get")) {
-            return this.requestRaw<OpenCodeSession[]>(
-                "get",
-                { url: "/session" },
-            );
-        }
-
         return this.callScopedSdkMethod<OpenCodeSession[]>("session", "list", {});
     }
 
     async getCurrentProject(): Promise<OpenCodeProject> {
-        if (hasRawSdkMethod(this.client, "get")) {
-            return this.requestRaw<OpenCodeProject>(
-                "get",
-                { url: "/project/current" },
-            );
-        }
-
         return this.callScopedSdkMethod<OpenCodeProject>("project", "current", {});
     }
 
     async createSessionForDirectory(directory: string, title?: string): Promise<OpenCodeSession> {
-        if (hasRawSdkMethod(this.client, "post")) {
-            return this.requestRaw<OpenCodeSession>(
-                "post",
-                {
-                    url: "/session",
-                    query: { directory },
-                    ...(title
-                        ? {
-                            body: {
-                                title,
-                            },
-                        }
-                        : {}),
-                },
-            );
-        }
-
         return this.callScopedSdkMethod<OpenCodeSession>("session", "create", {
-            legacyOptions: {
+            legacyParameters: title ? { directory, title } : { directory },
+            parameters: {
                 query: {
                     directory,
                 },
@@ -591,24 +510,16 @@ export class OpenCodeClient implements OpenCodeClientLike {
                     }
                     : {}),
             },
-            v2Parameters: title ? { directory, title } : { directory },
         });
     }
 
     async renameSession(sessionId: string, title: string): Promise<OpenCodeSession> {
-        if (hasRawSdkMethod(this.client, "patch")) {
-            return this.requestRaw<OpenCodeSession>(
-                "patch",
-                buildRawSessionRequest(this.sdkFlavor, sessionId, "", {
-                    body: {
-                        title,
-                    },
-                }),
-            );
-        }
-
         return this.callScopedSdkMethod<OpenCodeSession>("session", "update", {
-            legacyOptions: {
+            legacyParameters: {
+                sessionID: sessionId,
+                title,
+            },
+            parameters: {
                 path: {
                     id: sessionId,
                 },
@@ -616,47 +527,28 @@ export class OpenCodeClient implements OpenCodeClientLike {
                     title,
                 },
             },
-            v2Parameters: {
-                sessionID: sessionId,
-                title,
-            },
         });
     }
 
     async listAgents(): Promise<OpenCodeAgent[]> {
-        if (hasRawSdkMethod(this.client, "get")) {
-            return this.requestRaw<OpenCodeAgent[]>(
-                "get",
-                { url: "/agent" },
-            );
-        }
-
         return this.callScopedSdkMethod<OpenCodeAgent[]>("app", "agents", {});
     }
 
     async listPendingPermissions(directory?: string): Promise<OpenCodePermissionRequest[]> {
-        if (this.sdkFlavor === "v2" && hasRawSdkMethod(this.client, "get")) {
-            return this.requestRaw<OpenCodePermissionRequest[]>(
-                "get",
-                {
-                    url: "/permission",
-                    ...(directory ? { query: { directory } } : {}),
-                },
-            );
-        }
-
-        return this.callScopedSdkMethod<OpenCodePermissionRequest[]>("permission", "list", {
-            legacyOptions: directory
+        const permissions = await this.callScopedSdkMethod<unknown[]>("permission", "list", {
+            legacyParameters: directory
+                ? { directory }
+                : undefined,
+            parameters: directory
                 ? {
                     query: {
                         directory,
                     },
                 }
                 : undefined,
-            v2Parameters: directory
-                ? { directory }
-                : undefined,
         });
+
+        return permissions.map(normalizePermissionRequest).filter((permission): permission is OpenCodePermissionRequest => !!permission);
     }
 
     async replyToPermission(
@@ -665,57 +557,40 @@ export class OpenCodeClient implements OpenCodeClientLike {
         message?: string,
         sessionId?: string,
     ): Promise<boolean> {
-        if (this.sdkFlavor === "legacy" && sessionId) {
-            if (hasRawSdkMethod(this.client, "post")) {
-                return this.requestRaw<boolean>(
-                    "post",
-                    buildRawLegacyPermissionReplyRequest(sessionId, requestId, reply),
-                );
-            }
+        const normalizedMessage = message?.trim();
+        const rootPermissionHandler = this.client.postSessionIdPermissionsPermissionId;
 
-            const legacyClient = this.client as OpenCodeSdkClientLike & {
-                postSessionIdPermissionsPermissionId?: (options: Record<string, unknown>) => Promise<MaybeWrappedResponse<boolean>>;
-            };
-
-            if (typeof legacyClient.postSessionIdPermissionsPermissionId === "function") {
-                const response = await legacyClient.postSessionIdPermissionsPermissionId({
-                    ...SDK_OPTIONS,
-                    body: {
-                        response: reply,
-                    },
-                    path: {
-                        id: sessionId,
-                        permissionID: requestId,
-                    },
-                });
-
-                return unwrapSdkData(response);
-            }
-        }
-
-        if (hasRawSdkMethod(this.client, "post")) {
-            return this.requestRaw<boolean>(
-                "post",
-                {
-                    url: "/permission/{requestID}/reply",
-                    path: {
-                        requestID: requestId,
-                    },
-                    body: {
-                        reply,
-                        ...(message?.trim()
-                            ? { message: message.trim() }
-                            : {}),
-                    },
+        if (sessionId && typeof rootPermissionHandler === "function") {
+            return unwrapSdkData(await rootPermissionHandler.call(this.client, {
+                ...SDK_OPTIONS,
+                body: {
+                    response: reply,
+                    ...(normalizedMessage
+                        ? { message: normalizedMessage }
+                        : {}),
                 },
-            );
+                path: {
+                    id: sessionId,
+                    permissionID: requestId,
+                },
+            }) as MaybeWrappedResponse<boolean>);
         }
 
         return this.callScopedSdkMethod<boolean>("permission", "reply", {
-            legacyOptions: sessionId
+            legacyParameters: {
+                requestID: requestId,
+                reply,
+                ...(normalizedMessage
+                    ? { message: normalizedMessage }
+                    : {}),
+            },
+            parameters: sessionId
                 ? {
                     body: {
                         response: reply,
+                        ...(normalizedMessage
+                            ? { message: normalizedMessage }
+                            : {}),
                     },
                     path: {
                         id: sessionId,
@@ -723,13 +598,6 @@ export class OpenCodeClient implements OpenCodeClientLike {
                     },
                 }
                 : undefined,
-            v2Parameters: {
-                requestID: requestId,
-                reply,
-                ...(message?.trim()
-                    ? { message: message.trim() }
-                    : {}),
-            },
         });
     }
 
@@ -777,11 +645,13 @@ export class OpenCodeClient implements OpenCodeClientLike {
             throw new Error("Prompt requires text or file attachments.");
         }
 
-        const knownMessageIds = await this.captureKnownMessageIds(input.sessionId);
-        const initialData = await this.sendPromptRequest(input, parts);
+        throwIfAborted(input.signal);
+
+        const knownMessageIds = await this.captureKnownMessageIds(input.sessionId, input.signal);
+        await this.sendPromptRequest(input, parts);
         const resolvedData = await this.resolvePromptResponse(
             input,
-            initialData,
+            null,
             knownMessageIds,
             startedAt,
         );
@@ -820,11 +690,14 @@ export class OpenCodeClient implements OpenCodeClientLike {
             candidateOptions,
         );
         let lastProgressAt = Date.now();
+        let lastStatus: OpenCodeSessionStatus | null = null;
         const deadlineAt = startedAt + this.promptTimeoutPolicy.waitTimeoutMs;
         let idleStatusSeen = false;
         let attempt = 0;
 
         while (true) {
+            throwIfAborted(input.signal);
+
             const remainingWaitMs = deadlineAt - Date.now();
             const remainingInactivityMs = this.promptTimeoutPolicy.recoveryInactivityTimeoutMs - (Date.now() - lastProgressAt);
 
@@ -842,11 +715,11 @@ export class OpenCodeClient implements OpenCodeClientLike {
                     break;
                 }
 
-                await delay(Math.min(delayMs, remainingMs));
+                await delay(Math.min(delayMs, remainingMs), input.signal);
             }
 
             if (messageId) {
-                const next = await this.fetchPromptMessage(input.sessionId, messageId);
+                const next = await this.fetchPromptMessage(input.sessionId, messageId, input.signal);
 
                 if (next) {
                     const nextCandidate = selectPromptResponseCandidate(
@@ -863,7 +736,11 @@ export class OpenCodeClient implements OpenCodeClientLike {
                         bestCandidate = nextCandidate;
                     }
 
-                    if (bestCandidate && shouldReturnPromptResponseImmediately(bestCandidate, structured)) {
+                    if (
+                        bestCandidate
+                        && isPromptResponseForCurrentRequest(bestCandidate, candidateOptions)
+                        && shouldReturnPromptResponseImmediately(bestCandidate, structured)
+                    ) {
                         return bestCandidate;
                     }
                 }
@@ -873,6 +750,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
                 input.sessionId,
                 candidateOptions,
                 "poll-messages",
+                input.signal,
             );
 
             if (latest) {
@@ -890,12 +768,18 @@ export class OpenCodeClient implements OpenCodeClientLike {
                     bestCandidate = nextCandidate;
                 }
 
-                if (bestCandidate && shouldReturnPromptResponseImmediately(bestCandidate, structured)) {
+                if (
+                    bestCandidate
+                    && isPromptResponseForCurrentRequest(bestCandidate, candidateOptions)
+                    && shouldReturnPromptResponseImmediately(bestCandidate, structured)
+                ) {
                     return bestCandidate;
                 }
             }
 
-            const status = await this.fetchPromptSessionStatus(input.sessionId);
+            const status = await this.fetchPromptSessionStatus(input.sessionId, input.signal);
+
+            lastStatus = status;
 
             if (status?.type === "busy" || status?.type === "retry") {
                 lastProgressAt = Date.now();
@@ -910,6 +794,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
 
             if (
                 bestCandidate
+                && isPromptResponseForCurrentRequest(bestCandidate, candidateOptions)
                 && isCompletedEmptyPromptResponse(bestCandidate, structured)
                 && status?.type !== "busy"
                 && status?.type !== "retry"
@@ -926,14 +811,25 @@ export class OpenCodeClient implements OpenCodeClientLike {
             input.sessionId,
             candidateOptions,
             "final-scan",
+            input.signal,
         );
 
         const resolved = selectPromptResponseCandidate(
             [bestCandidate, latest],
             candidateOptions,
         );
+        const requestScopedResolved = resolved && isPromptResponseForCurrentRequest(resolved, candidateOptions)
+            ? resolved
+            : null;
 
-        if (!resolved || shouldPollPromptMessage(resolved, structured)) {
+        if (
+            lastStatus?.type === "idle"
+            && (!requestScopedResolved || shouldPollPromptMessage(requestScopedResolved, structured))
+        ) {
+            throw createMessageAbortedError();
+        }
+
+        if (!requestScopedResolved || shouldPollPromptMessage(requestScopedResolved, structured)) {
             const timeoutReason = Date.now() >= deadlineAt
                 ? "max-wait"
                 : "recovery-inactivity";
@@ -949,7 +845,6 @@ export class OpenCodeClient implements OpenCodeClientLike {
             this.logPromptRequest("warn", {
                 lastProgressAt,
                 messageId: messageId ?? undefined,
-                sdkFlavor: this.sdkFlavor,
                 sessionId: input.sessionId,
                 stage: "final-scan",
                 timeoutMs,
@@ -958,12 +853,13 @@ export class OpenCodeClient implements OpenCodeClientLike {
             throw error;
         }
 
-        return resolved;
+        return requestScopedResolved;
     }
 
     private async fetchPromptMessage(
         sessionId: string,
         messageId: string,
+        signal?: AbortSignal,
     ): Promise<OpenCodePromptResponse | null> {
         try {
             return await this.runPromptRequestWithTimeout(
@@ -973,34 +869,28 @@ export class OpenCodeClient implements OpenCodeClientLike {
                     timeoutMs: this.promptTimeoutPolicy.pollRequestTimeoutMs,
                     messageId,
                 },
-                async (signal) => {
-                    if (hasRawSdkMethod(this.client, "get")) {
-                        return normalizePromptResponse(await this.requestRaw<OpenCodePromptResponse>(
-                            "get",
-                            buildRawSessionMessageRequest(this.sdkFlavor, sessionId, messageId, { signal }),
-                        ));
-                    }
-
-                    if (typeof this.client.session.message !== "function") {
-                        return null;
-                    }
-
+                async (requestSignal) => {
                     return normalizePromptResponse(await this.callScopedSdkMethod<OpenCodePromptResponse>("session", "message", {
-                        legacyOptions: {
+                        legacyParameters: {
+                            sessionID: sessionId,
+                            messageID: messageId,
+                        },
+                        parameters: {
                             path: {
                                 id: sessionId,
                                 messageID: messageId,
                             },
                         },
-                        signal,
-                        v2Parameters: {
-                            sessionID: sessionId,
-                            messageID: messageId,
-                        },
+                        signal: requestSignal,
                     }));
                 },
+                signal,
             );
         } catch (error) {
+            if (isPromptRequestAbort(error)) {
+                throw error;
+            }
+
             this.logPromptRequestFailure(error, {
                 sessionId,
                 stage: "poll-message",
@@ -1011,8 +901,8 @@ export class OpenCodeClient implements OpenCodeClientLike {
         }
     }
 
-    private async captureKnownMessageIds(sessionId: string): Promise<Set<string>> {
-        const messages = await this.fetchRecentPromptMessages(sessionId, "capture-known-messages");
+    private async captureKnownMessageIds(sessionId: string, signal?: AbortSignal): Promise<Set<string>> {
+        const messages = await this.fetchRecentPromptMessages(sessionId, "capture-known-messages", signal);
 
         if (!messages) {
             return new Set();
@@ -1028,6 +918,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
     private async fetchRecentPromptMessages(
         sessionId: string,
         stage: Extract<OpenCodePromptTimeoutStage, "capture-known-messages" | "poll-messages" | "final-scan">,
+        signal?: AbortSignal,
     ): Promise<OpenCodePromptResponse[] | null> {
         try {
             return await this.runPromptRequestWithTimeout(
@@ -1036,27 +927,13 @@ export class OpenCodeClient implements OpenCodeClientLike {
                     stage,
                     timeoutMs: this.promptTimeoutPolicy.pollRequestTimeoutMs,
                 },
-                async (signal) => {
-                    if (hasRawSdkMethod(this.client, "get")) {
-                        const response = await this.requestRaw<OpenCodePromptResponse[]>(
-                            "get",
-                            buildRawSessionRequest(this.sdkFlavor, sessionId, "/message", {
-                                query: {
-                                    limit: PROMPT_MESSAGE_POLL_LIMIT,
-                                },
-                                signal,
-                            }),
-                        );
-
-                        return normalizePromptResponses(response);
-                    }
-
-                    if (typeof this.client.session.messages !== "function") {
-                        return null;
-                    }
-
+                async (requestSignal) => {
                     return normalizePromptResponses(await this.callScopedSdkMethod<OpenCodePromptResponse[]>("session", "messages", {
-                        legacyOptions: {
+                        legacyParameters: {
+                            sessionID: sessionId,
+                            limit: PROMPT_MESSAGE_POLL_LIMIT,
+                        },
+                        parameters: {
                             path: {
                                 id: sessionId,
                             },
@@ -1064,15 +941,16 @@ export class OpenCodeClient implements OpenCodeClientLike {
                                 limit: PROMPT_MESSAGE_POLL_LIMIT,
                             },
                         },
-                        signal,
-                        v2Parameters: {
-                            sessionID: sessionId,
-                            limit: PROMPT_MESSAGE_POLL_LIMIT,
-                        },
+                        signal: requestSignal,
                     }));
                 },
+                signal,
             );
         } catch (error) {
+            if (isPromptRequestAbort(error)) {
+                throw error;
+            }
+
             this.logPromptRequestFailure(error, {
                 sessionId,
                 stage,
@@ -1082,7 +960,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
         }
     }
 
-    private async fetchPromptSessionStatus(sessionId: string): Promise<OpenCodeSessionStatus | null> {
+    private async fetchPromptSessionStatus(sessionId: string, signal?: AbortSignal): Promise<OpenCodeSessionStatus | null> {
         try {
             const statuses = await this.runPromptRequestWithTimeout(
                 {
@@ -1090,11 +968,16 @@ export class OpenCodeClient implements OpenCodeClientLike {
                     stage: "poll-status",
                     timeoutMs: this.promptTimeoutPolicy.pollRequestTimeoutMs,
                 },
-                async (signal) => this.loadSessionStatuses(signal),
+                async (requestSignal) => this.loadSessionStatuses(requestSignal),
+                signal,
             );
 
             return statuses[sessionId] ?? null;
         } catch (error) {
+            if (isPromptRequestAbort(error)) {
+                throw error;
+            }
+
             this.logPromptRequestFailure(error, {
                 sessionId,
                 stage: "poll-status",
@@ -1108,8 +991,9 @@ export class OpenCodeClient implements OpenCodeClientLike {
         sessionId: string,
         options: PromptResponseCandidateOptions,
         stage: Extract<OpenCodePromptTimeoutStage, "poll-messages" | "final-scan">,
+        signal?: AbortSignal,
     ): Promise<OpenCodePromptResponse | null> {
-        const messages = await this.fetchRecentPromptMessages(sessionId, stage);
+        const messages = await this.fetchRecentPromptMessages(sessionId, stage, signal);
 
         if (!messages || messages.length === 0) {
             return null;
@@ -1140,24 +1024,10 @@ export class OpenCodeClient implements OpenCodeClientLike {
     }
 
     private async loadConfig(): Promise<OpenCodeConfig> {
-        if (hasRawSdkMethod(this.client, "get")) {
-            return this.requestRaw<OpenCodeConfig>(
-                "get",
-                { url: "/config" },
-            );
-        }
-
         return this.callScopedSdkMethod<OpenCodeConfig>("config", "get", {});
     }
 
     private async loadProviderCatalog(): Promise<OpenCodeProviderCatalog> {
-        if (hasRawSdkMethod(this.client, "get")) {
-            return this.requestRaw<OpenCodeProviderCatalog>(
-                "get",
-                { url: "/config/providers" },
-            );
-        }
-
         return this.callScopedSdkMethod<OpenCodeProviderCatalog>("config", "providers", {});
     }
 
@@ -1167,7 +1037,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
             | { type: "text"; text: string }
             | { type: "file"; filename?: string; mime: string; url: string }
         >,
-    ): Promise<OpenCodePromptResponse | null> {
+    ): Promise<void> {
         const requestBody = {
             ...(input.agent ? { agent: input.agent } : {}),
             ...(input.structured ? { format: STRUCTURED_REPLY_SCHEMA } : {}),
@@ -1175,49 +1045,18 @@ export class OpenCodeClient implements OpenCodeClientLike {
             ...(input.variant ? { variant: input.variant } : {}),
             parts,
         };
-        const requestParameters = {
+        const legacyRequestParameters = {
             sessionID: input.sessionId,
             ...requestBody,
         };
+        const requestParameters = {
+            body: requestBody,
+            path: {
+                id: input.sessionId,
+            },
+        };
 
         try {
-            if (hasRawSdkMethod(this.client, "post")) {
-                return await this.runPromptRequestWithTimeout(
-                    {
-                        sessionId: input.sessionId,
-                        stage: "send-prompt",
-                        timeoutMs: this.promptTimeoutPolicy.waitTimeoutMs,
-                    },
-                    async (signal) => normalizePromptResponse(await this.requestRaw<OpenCodePromptResponse>(
-                        "post",
-                        buildRawSessionRequest(this.sdkFlavor, input.sessionId, "/message", {
-                            body: requestBody,
-                            signal,
-                        }),
-                    )),
-                );
-            }
-
-            if (typeof this.client.session?.prompt === "function") {
-                return await this.runPromptRequestWithTimeout(
-                    {
-                        sessionId: input.sessionId,
-                        stage: "send-prompt",
-                        timeoutMs: this.promptTimeoutPolicy.waitTimeoutMs,
-                    },
-                    async (signal) => normalizePromptResponse(await this.callScopedSdkMethod<OpenCodePromptResponse>("session", "prompt", {
-                        legacyOptions: {
-                            body: requestBody,
-                            path: {
-                                id: input.sessionId,
-                            },
-                        },
-                        signal,
-                        v2Parameters: requestParameters,
-                    })),
-                );
-            }
-
             if (typeof this.client.session?.promptAsync === "function") {
                 await this.runPromptRequestWithTimeout(
                     {
@@ -1227,19 +1066,15 @@ export class OpenCodeClient implements OpenCodeClientLike {
                     },
                     async (signal) => {
                         await this.callScopedSdkMethod<void>("session", "promptAsync", {
-                            legacyOptions: {
-                                body: requestBody,
-                                path: {
-                                    id: input.sessionId,
-                                },
-                            },
+                            legacyParameters: legacyRequestParameters,
+                            parameters: requestParameters,
                             signal,
-                            v2Parameters: requestParameters,
                         });
                     },
+                    input.signal,
                 );
 
-                return null;
+                return;
             }
         } catch (error) {
             this.logPromptRequestFailure(error, {
@@ -1250,50 +1085,34 @@ export class OpenCodeClient implements OpenCodeClientLike {
             throw error;
         }
 
-        throw new Error("OpenCode SDK client does not expose a compatible prompt endpoint.");
-    }
-
-    private async requestRaw<T>(
-        method: keyof Pick<RawSdkHttpClient, "delete" | "get" | "patch" | "post">,
-        options: {
-            body?: unknown;
-            path?: Record<string, unknown>;
-            query?: Record<string, unknown>;
-            signal?: AbortSignal;
-            url: string;
-        },
-    ): Promise<T> {
-        const rawClient = getRawSdkClient(this.client);
-        const handler = rawClient?.[method];
-
-        if (typeof handler !== "function") {
-            throw new Error(`OpenCode SDK client does not expose a compatible raw ${method.toUpperCase()} method.`);
-        }
-
-        const response = await handler({
-            ...SDK_OPTIONS,
-            ...options,
-        }) as MaybeWrappedResponse<T>;
-
-        return unwrapSdkData(response);
+        throw new Error("OpenCode SDK client does not expose session.promptAsync().");
     }
 
     private async loadSessionStatuses(
         signal?: AbortSignal,
     ): Promise<Record<string, OpenCodeSessionStatus>> {
-        if (hasRawSdkMethod(this.client, "get")) {
-            return this.requestRaw<Record<string, OpenCodeSessionStatus>>(
-                "get",
-                {
-                    url: "/session/status",
-                    ...(signal ? { signal } : {}),
-                },
-            );
-        }
-
         return this.callScopedSdkMethod<Record<string, OpenCodeSessionStatus>>("session", "status", {
             signal,
         });
+    }
+
+    private async callRawSdkGet<T>(
+        url: string,
+        signal?: AbortSignal,
+    ): Promise<T> {
+        const rawClient = getRawSdkRequestClient(this.client);
+
+        if (typeof rawClient?.get !== "function") {
+            throw new Error(`OpenCode SDK client does not expose a compatible raw GET endpoint for ${url}.`);
+        }
+
+        const response = await rawClient.get({
+            ...SDK_OPTIONS,
+            ...(signal ? { signal } : {}),
+            url,
+        }) as MaybeWrappedResponse<T>;
+
+        return unwrapSdkData(response);
     }
 
     private async runPromptRequestWithTimeout<T>(
@@ -1304,11 +1123,33 @@ export class OpenCodeClient implements OpenCodeClientLike {
             timeoutMs: number;
         },
         operation: (signal: AbortSignal) => Promise<T>,
+        signal?: AbortSignal,
     ): Promise<T> {
         const startedAt = Date.now();
         const controller = new AbortController();
+        const requestSignal = signal
+            ? AbortSignal.any([signal, controller.signal])
+            : controller.signal;
         let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+        let removeAbortListener = () => undefined;
 
+        const abortPromise = signal
+            ? new Promise<never>((_, reject) => {
+                const onAbort = () => {
+                    reject(normalizeAbortReason(signal.reason));
+                };
+
+                if (signal.aborted) {
+                    onAbort();
+                    return;
+                }
+
+                signal.addEventListener("abort", onAbort, { once: true });
+                removeAbortListener = () => {
+                    signal.removeEventListener("abort", onAbort);
+                };
+            })
+            : null;
         const timeoutPromise = new Promise<never>((_, reject) => {
             timeoutHandle = setTimeout(() => {
                 reject(createOpenCodePromptTimeoutError({
@@ -1324,13 +1165,16 @@ export class OpenCodeClient implements OpenCodeClientLike {
 
         try {
             return await Promise.race([
-                operation(controller.signal),
+                operation(requestSignal),
                 timeoutPromise,
+                ...(abortPromise ? [abortPromise] : []),
             ]);
         } finally {
             if (timeoutHandle !== null) {
                 clearTimeout(timeoutHandle);
             }
+
+            removeAbortListener();
         }
     }
 
@@ -1348,7 +1192,6 @@ export class OpenCodeClient implements OpenCodeClientLike {
                 endpointKind: resolvePromptEndpointKind(error.data.stage),
                 elapsedMs: error.data.elapsedMs,
                 messageId: error.data.messageId,
-                sdkFlavor: this.sdkFlavor,
                 sessionId: error.data.sessionId,
                 stage: error.data.stage,
                 timeoutMs: error.data.timeoutMs,
@@ -1360,7 +1203,6 @@ export class OpenCodeClient implements OpenCodeClientLike {
             endpointKind: resolvePromptEndpointKind(input.stage),
             error,
             messageId: input.messageId ?? undefined,
-            sdkFlavor: this.sdkFlavor,
             sessionId: input.sessionId,
             stage: input.stage,
             timeoutMs: input.timeoutMs,
@@ -1378,12 +1220,24 @@ export class OpenCodeClient implements OpenCodeClientLike {
             return;
         }
 
-        void log.call(this.client.app, {
+        const payload = {
             service: PROMPT_LOG_SERVICE,
             level,
             message,
             extra,
-        }).catch(() => undefined);
+        };
+
+        void (log.length >= 2
+            ? (log as (body: Record<string, unknown>, options: Record<string, unknown>) => Promise<unknown>).call(
+                this.client.app,
+                payload,
+                SDK_OPTIONS,
+            )
+            : (log as (options: Record<string, unknown>) => Promise<unknown>).call(this.client.app, {
+                body: payload,
+                ...SDK_OPTIONS,
+            })
+        ).catch(() => undefined);
     }
 }
 
@@ -1788,8 +1642,25 @@ function extractMessageId(message: unknown): string | null {
         : null;
 }
 
-function delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+function delay(ms: number, signal?: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const handle = setTimeout(() => {
+            signal?.removeEventListener("abort", onAbort);
+            resolve();
+        }, ms);
+        const onAbort = () => {
+            clearTimeout(handle);
+            signal?.removeEventListener("abort", onAbort);
+            reject(normalizeAbortReason(signal?.reason));
+        };
+
+        if (signal?.aborted) {
+            onAbort();
+            return;
+        }
+
+        signal?.addEventListener("abort", onAbort, { once: true });
+    });
 }
 
 function didPromptResponseAdvance(
@@ -1922,6 +1793,72 @@ function unwrapSdkData<T>(response: MaybeWrappedResponse<T>): T {
     return response;
 }
 
+function normalizePermissionRequest(permission: unknown): OpenCodePermissionRequest | null {
+    if (!isPlainRecord(permission)) {
+        return null;
+    }
+
+    const id = typeof permission.id === "string" && permission.id.trim().length > 0
+        ? permission.id
+        : null;
+    const sessionID = typeof permission.sessionID === "string" && permission.sessionID.trim().length > 0
+        ? permission.sessionID
+        : null;
+    const permissionName = typeof permission.permission === "string" && permission.permission.trim().length > 0
+        ? permission.permission
+        : typeof permission.type === "string" && permission.type.trim().length > 0
+            ? permission.type
+            : null;
+
+    if (!id || !sessionID || !permissionName) {
+        return null;
+    }
+
+    return {
+        always: Array.isArray(permission.always)
+            ? permission.always.filter((value): value is string => typeof value === "string")
+            : [],
+        id,
+        metadata: isPlainRecord(permission.metadata)
+            ? permission.metadata
+            : {},
+        patterns: normalizePermissionPatterns(permission),
+        permission: permissionName,
+        sessionID,
+    };
+}
+
+function normalizePermissionPatterns(permission: Record<string, unknown>): string[] {
+    if (Array.isArray(permission.patterns)) {
+        return permission.patterns.filter((value): value is string => typeof value === "string");
+    }
+
+    if (typeof permission.pattern === "string" && permission.pattern.trim().length > 0) {
+        return [permission.pattern];
+    }
+
+    if (Array.isArray(permission.pattern)) {
+        return permission.pattern.filter((value): value is string => typeof value === "string");
+    }
+
+    return [];
+}
+
+function getRawSdkRequestClient(client: OpenCodeSdkClientLike): RawSdkRequestClient | null {
+    const compatibleClient = client as OpenCodeSdkClientWithRawRequestClient;
+
+    return compatibleClient.client ?? compatibleClient._client ?? null;
+}
+
+function isMissingScopedSdkMethodError(
+    error: unknown,
+    scope: string,
+    method: string,
+): error is Error {
+    return error instanceof Error
+        && error.message === `OpenCode SDK client does not expose a compatible ${scope}.${method} method.`;
+}
+
 function resolvePromptTimeoutPolicy(
     input: Partial<OpenCodePromptTimeoutPolicy>,
 ): OpenCodePromptTimeoutPolicy {
@@ -1930,95 +1867,6 @@ function resolvePromptTimeoutPolicy(
         recoveryInactivityTimeoutMs: input.recoveryInactivityTimeoutMs ?? DEFAULT_OPENCODE_PROMPT_TIMEOUT_POLICY.recoveryInactivityTimeoutMs,
         waitTimeoutMs: input.waitTimeoutMs ?? DEFAULT_OPENCODE_PROMPT_TIMEOUT_POLICY.waitTimeoutMs,
     };
-}
-
-function detectSdkFlavor(client: OpenCodeSdkClientLike): SdkFlavor {
-    if (typeof (client as {
-        global?: {
-            health?: unknown;
-        };
-        permission?: unknown;
-    }).global?.health === "function" || "permission" in client) {
-        return "v2";
-    }
-
-    return clientExposesTwoArgumentSdkMethod(client)
-        ? "v2"
-        : "legacy";
-}
-
-function buildRawSessionRequest(
-    sdkFlavor: SdkFlavor,
-    sessionId: string,
-    suffix = "",
-    extra: Omit<RawSdkRequestOptions, "path" | "responseStyle" | "throwOnError" | "url"> = {},
-): RawSdkRequestOptions {
-    return {
-        url: sdkFlavor === "legacy"
-            ? `/session/{id}${suffix}`
-            : `/session/{sessionID}${suffix}`,
-        path: sdkFlavor === "legacy"
-            ? { id: sessionId }
-            : { sessionID: sessionId },
-        ...extra,
-    };
-}
-
-function buildRawSessionMessageRequest(
-    sdkFlavor: SdkFlavor,
-    sessionId: string,
-    messageId: string,
-    extra: Omit<RawSdkRequestOptions, "path" | "responseStyle" | "throwOnError" | "url"> = {},
-): RawSdkRequestOptions {
-    return {
-        url: sdkFlavor === "legacy"
-            ? "/session/{id}/message/{messageID}"
-            : "/session/{sessionID}/message/{messageID}",
-        path: sdkFlavor === "legacy"
-            ? {
-                id: sessionId,
-                messageID: messageId,
-            }
-            : {
-                sessionID: sessionId,
-                messageID: messageId,
-            },
-        ...extra,
-    };
-}
-
-function buildRawLegacyPermissionReplyRequest(
-    sessionId: string,
-    requestId: string,
-    reply: "once" | "always" | "reject",
-): RawSdkRequestOptions {
-    return {
-        body: {
-            response: reply,
-        },
-        path: {
-            id: sessionId,
-            permissionID: requestId,
-        },
-        url: "/session/{id}/permissions/{permissionID}",
-    };
-}
-
-function getRawSdkClient(client: OpenCodeSdkClientLike): RawSdkHttpClient | null {
-    const withRawClient = client as OpenCodeSdkClientLike & {
-        client?: RawSdkHttpClient;
-    };
-
-    return withRawClient.client ?? client._client ?? null;
-}
-
-function hasRawSdkMethod(
-    client: OpenCodeSdkClientLike,
-    method: keyof Pick<RawSdkHttpClient, "delete" | "get" | "patch" | "post">,
-): boolean {
-    const rawClient = getRawSdkClient(client);
-
-    return typeof rawClient?.[method] === "function";
 }
 
 function normalizeAssistantError(value: unknown): OpenCodeAssistantError | undefined {
@@ -2056,20 +1904,6 @@ function isCompletedEmptyPromptResponse(
         && !assistantInfo?.error
         && !hasText
         && !bodyMd;
-}
-
-function clientExposesTwoArgumentSdkMethod(client: OpenCodeSdkClientLike): boolean {
-    const scopes = ["app", "config", "global", "lsp", "mcp", "path", "permission", "project", "session"] as const;
-
-    return scopes.some((scope) => {
-        const target = client[scope];
-
-        if (!target || typeof target !== "object") {
-            return false;
-        }
-
-        return Object.values(target).some((value) => typeof value === "function" && value.length >= 2);
-    });
 }
 
 function extractStructuredPayload(message: unknown): unknown | null {
@@ -2121,10 +1955,10 @@ function comparePromptResponseCandidates(
     const leftRank = getPromptResponseCandidateRank(left, options);
     const rightRank = getPromptResponseCandidateRank(right, options);
 
-    return Number(rightRank.isUsable) - Number(leftRank.isUsable)
-        || Number(rightRank.isInitial) - Number(leftRank.isInitial)
+    return Number(rightRank.isInitial) - Number(leftRank.isInitial)
         || Number(rightRank.sharesParent) - Number(leftRank.sharesParent)
         || Number(rightRank.isNewSinceRequestStart) - Number(leftRank.isNewSinceRequestStart)
+        || Number(rightRank.isUsable) - Number(leftRank.isUsable)
         || rightRank.createdAt - leftRank.createdAt;
 }
 
@@ -2163,7 +1997,7 @@ function resolvePromptCandidateStartTime(
     initialMessage: OpenCodePromptResponse | null,
 ): number | null {
     if (!initialMessage) {
-        return null;
+        return startedAt;
     }
 
     const initialCreatedAt = coerceFiniteNumber(toAssistantMessage(initialMessage.info)?.time?.created);
@@ -2216,10 +2050,48 @@ function isPromptResponseNewSinceRequestStart(
     return createdAt >= requestStartedAt;
 }
 
+function isPromptResponseForCurrentRequest(
+    response: OpenCodePromptResponse,
+    options: PromptResponseCandidateOptions,
+): boolean {
+    const rank = getPromptResponseCandidateRank(response, options);
+
+    return rank.isInitial || rank.sharesParent || rank.isNewSinceRequestStart;
+}
+
 function areComparablePromptTimestamps(left: number, right: number): boolean {
     const epochThresholdMs = 1_000_000_000_000;
 
     return left >= epochThresholdMs && right >= epochThresholdMs;
+}
+
+function isPromptRequestAbort(error: unknown): boolean {
+    return error instanceof OpenCodeMessageAbortedError
+        || (error instanceof Error && error.name === "AbortError")
+        || isNamedAbortError(error);
+}
+
+function isNamedAbortError(error: unknown): error is { name: "MessageAbortedError" } {
+    return !!error
+        && typeof error === "object"
+        && "name" in error
+        && (error as { name?: unknown }).name === "MessageAbortedError";
+}
+
+function normalizeAbortReason(reason: unknown): unknown {
+    if (reason instanceof Error || isNamedAbortError(reason)) {
+        return reason;
+    }
+
+    return createMessageAbortedError();
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+    if (!signal?.aborted) {
+        return;
+    }
+
+    throw normalizeAbortReason(signal.reason);
 }
 
 function isPlainRecord(value: unknown): value is Record<string, any> {

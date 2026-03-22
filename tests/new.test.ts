@@ -12,8 +12,13 @@ import type {
 import { CreateSessionUseCase } from "../src/use-cases/create-session.usecase.js";
 
 const logger = {
+    child() {
+        return this;
+    },
     error() { },
+    async flush() { },
     info() { },
+    warn() { },
 } as unknown as AppLogger;
 
 function createProject(id: string, worktree: string): OpenCodeProject {

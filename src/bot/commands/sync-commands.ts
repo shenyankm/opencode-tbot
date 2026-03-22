@@ -18,7 +18,9 @@ export async function syncTelegramCommands(bot: Bot, logger: AppLogger): Promise
 
     logger.info(
         {
+            component: "runtime",
             commands: TELEGRAM_COMMANDS.map((command) => command.command),
+            event: "runtime.commands.synced",
             scopes: TELEGRAM_COMMAND_SYNC_SCOPES.map((scope) => scope.type),
         },
         "telegram commands synced",

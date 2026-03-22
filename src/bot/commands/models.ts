@@ -1,5 +1,6 @@
 import type { Bot } from "grammy";
-import { getChatCopy } from "../i18n.js";
+import { getSafeChatCopy } from "../i18n.js";
+import { scopeDependenciesToTelegramContext } from "../logger-context.js";
 import type { BotDependencies } from "../types.js";
 import { buildModelsKeyboard } from "../presenters/keyboard.presenter.js";
 import { presentError } from "../presenters/error.presenter.js";
@@ -11,7 +12,7 @@ interface ModelsCommandContext {
 }
 
 export async function handleModelsCommand(ctx: ModelsCommandContext, dependencies: BotDependencies) {
-    const copy = await getChatCopy(dependencies.sessionRepo, ctx.chat.id);
+    const copy = await getSafeChatCopy(dependencies.sessionRepo, ctx.chat.id, dependencies.logger);
 
     try {
         const result = await dependencies.listModelsUseCase.execute({
@@ -43,8 +44,8 @@ export async function handleModelsCommand(ctx: ModelsCommandContext, dependencie
     }
 }
 
-export function registerModelsCommand(bot: Bot, dependencies: BotDependencies) {
+export function registerModelsCommand(bot: Pick<Bot, "command">, dependencies: BotDependencies) {
     bot.command(["model", "models"], async (ctx) => {
-        await handleModelsCommand(ctx, dependencies);
+        await handleModelsCommand(ctx, scopeDependenciesToTelegramContext(dependencies, ctx, "telegram"));
     });
 }

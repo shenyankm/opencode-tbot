@@ -1,5 +1,5 @@
 import type { OpenCodeSession } from "../services/opencode/opencode.client.js";
-import { getChatCopy } from "./i18n.js";
+import { getSafeChatCopy } from "./i18n.js";
 import {
     buildSessionActionKeyboard,
     buildSessionsKeyboard,
@@ -20,7 +20,7 @@ interface SessionsMessageApi {
 }
 
 interface SessionsListView {
-    copy: Awaited<ReturnType<typeof getChatCopy>>;
+    copy: Awaited<ReturnType<typeof getSafeChatCopy>>;
     currentDirectory: string;
     currentSessionId: string | null;
     keyboard?: unknown;
@@ -34,7 +34,7 @@ export async function buildSessionsListView(
     requestedPage: number,
     dependencies: BotDependencies,
 ): Promise<SessionsListView> {
-    const copy = await getChatCopy(dependencies.sessionRepo, chatId);
+    const copy = await getSafeChatCopy(dependencies.sessionRepo, chatId, dependencies.logger);
     const result = await dependencies.listSessionsUseCase.execute({
         chatId,
     });

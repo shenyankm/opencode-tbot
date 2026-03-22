@@ -1,6 +1,11 @@
 import type { Bot } from "grammy";
 import { isBotLanguage } from "../copy.js";
-import { getChatCopy, getChatLanguage, setChatLanguage } from "../i18n.js";
+import {
+    getSafeChatCopy,
+    getSafeChatLanguage,
+    setChatLanguage,
+} from "../i18n.js";
+import { scopeDependenciesToTelegramContext } from "../logger-context.js";
 import { buildLanguageKeyboard } from "../presenters/keyboard.presenter.js";
 import { presentError } from "../presenters/error.presenter.js";
 import {
@@ -17,8 +22,8 @@ interface LanguageCommandContext {
 }
 
 export async function handleLanguageCommand(ctx: LanguageCommandContext, dependencies: BotDependencies) {
-    const language = await getChatLanguage(dependencies.sessionRepo, ctx.chat.id);
-    const copy = await getChatCopy(dependencies.sessionRepo, ctx.chat.id);
+    const language = await getSafeChatLanguage(dependencies.sessionRepo, ctx.chat.id, dependencies.logger);
+    const copy = await getSafeChatCopy(dependencies.sessionRepo, ctx.chat.id, dependencies.logger);
 
     try {
         await syncTelegramCommandsForChat(ctx.api, ctx.chat.id, language);
@@ -40,14 +45,14 @@ export async function switchLanguageForChat(
     language: string,
     dependencies: BotDependencies,
 ): Promise<
-    | { found: false; copy: Awaited<ReturnType<typeof getChatCopy>> }
+    | { found: false; copy: Awaited<ReturnType<typeof getSafeChatCopy>> }
     | {
         found: true;
-        copy: Awaited<ReturnType<typeof getChatCopy>>;
-        language: Awaited<ReturnType<typeof getChatLanguage>>;
+        copy: Awaited<ReturnType<typeof getSafeChatCopy>>;
+        language: Awaited<ReturnType<typeof getSafeChatLanguage>>;
     }
 > {
-    const currentCopy = await getChatCopy(dependencies.sessionRepo, chatId);
+    const currentCopy = await getSafeChatCopy(dependencies.sessionRepo, chatId, dependencies.logger);
 
     if (!isBotLanguage(language)) {
         return {
@@ -61,7 +66,7 @@ export async function switchLanguageForChat(
 
     return {
         found: true,
-        copy: await getChatCopy(dependencies.sessionRepo, chatId),
+        copy: await getSafeChatCopy(dependencies.sessionRepo, chatId, dependencies.logger),
         language,
     };
 }
@@ -79,7 +84,10 @@ export async function presentLanguageSwitchForChat(
             found: false as const,
             copy: result.copy,
             text: result.copy.language.expired,
-            keyboard: buildLanguageKeyboard(await getChatLanguage(dependencies.sessionRepo, chatId), result.copy),
+            keyboard: buildLanguageKeyboard(
+                await getSafeChatLanguage(dependencies.sessionRepo, chatId, dependencies.logger),
+                result.copy,
+            ),
         };
     }
 
@@ -91,8 +99,8 @@ export async function presentLanguageSwitchForChat(
     };
 }
 
-export function registerLanguageCommand(bot: Bot, dependencies: BotDependencies) {
+export function registerLanguageCommand(bot: Pick<Bot, "command">, dependencies: BotDependencies) {
     bot.command("language", async (ctx) => {
-        await handleLanguageCommand(ctx, dependencies);
+        await handleLanguageCommand(ctx, scopeDependenciesToTelegramContext(dependencies, ctx, "telegram"));
     });
 }

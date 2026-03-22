@@ -8,7 +8,11 @@ import { ForegroundSessionTracker } from "../src/services/session-activity/foreg
 import { AbortPromptUseCase } from "../src/use-cases/abort-prompt.usecase.js";
 
 const logger = {
+    child() {
+        return this;
+    },
     error() { },
+    async flush() { },
     warn() { },
 } as unknown as AppLogger;
 
@@ -86,7 +90,7 @@ test("AbortPromptUseCase aborts busy sessions", async () => {
     const useCase = new AbortPromptUseCase(
         repo,
         {
-            async abortSession(sessionId) {
+            async abortSession(sessionId: string) {
                 abortedSessionIds.push(sessionId);
                 return true;
             },
@@ -126,7 +130,7 @@ test("AbortPromptUseCase aborts the active foreground child session before the b
     const useCase = new AbortPromptUseCase(
         repo,
         {
-            async abortSession(sessionId) {
+            async abortSession(sessionId: string) {
                 abortedSessionIds.push(sessionId);
                 return true;
             },
@@ -176,9 +180,13 @@ test("handleCancelCommand maps abort statuses and presents normalized errors", a
             },
         },
         logger: {
+            child() {
+                return this;
+            },
             error(error: unknown) {
                 errors.push(error);
             },
+            async flush() { },
         },
         pendingActionRepo: new InMemoryPendingActionRepository(),
         sessionRepo: repo,

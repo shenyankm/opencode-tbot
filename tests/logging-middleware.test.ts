@@ -13,16 +13,19 @@ test("buildIncomingUpdateLogFields redacts sensitive values and keeps only a pre
     });
 
     assert.deepEqual(fields, {
+        component: "telegram",
+        correlationId: "1",
+        event: "telegram.update.received",
         updateId: 1,
         chatId: 2,
         fromId: 3,
         hasText: true,
         textLength: 88,
-        textPreview: "token=[REDACTED] secret: [REDACTED] Bearer [REDACTED]",
+        operationId: "telegram-1",
     });
 });
 
-test("buildIncomingUpdateLogFields omits preview fields when no text exists", () => {
+test("buildIncomingUpdateLogFields omits text content fields when no text exists", () => {
     const fields = buildIncomingUpdateLogFields({
         update: { update_id: 9 },
         chat: { id: 10 },
@@ -31,11 +34,14 @@ test("buildIncomingUpdateLogFields omits preview fields when no text exists", ()
     });
 
     assert.deepEqual(fields, {
+        component: "telegram",
+        correlationId: "9",
+        event: "telegram.update.received",
         updateId: 9,
         chatId: 10,
         fromId: 11,
         hasText: false,
         textLength: 0,
-        textPreview: undefined,
+        operationId: "telegram-9",
     });
 });

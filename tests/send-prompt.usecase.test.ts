@@ -15,8 +15,13 @@ import { OpenCodePromptTimeoutError } from "../src/services/opencode/opencode.cl
 import { SendPromptUseCase } from "../src/use-cases/send-prompt.usecase.js";
 
 const logger = {
+    child() {
+        return this;
+    },
     error() { },
+    async flush() { },
     info() { },
+    warn() { },
 } as unknown as AppLogger;
 
 function createProject(id: string, worktree: string): OpenCodeProject {
@@ -1026,12 +1031,9 @@ test("SendPromptUseCase logs a warning when temporary image session cleanup fail
     assert.equal(warnings[0]?.message, "failed to delete temporary image session");
 });
 
-test("SendPromptUseCase ends the foreground session when promptSession times out", async () => {
+test("SendPromptUseCase forwards the execution session id when promptSession times out", async () => {
     const repo = new InMemorySessionRepository();
-    const trackerCalls = {
-        began: [] as Array<{ chatId: number; sessionId: string }>,
-        ended: 0,
-    };
+    const executionSessionIds: string[] = [];
     const timeoutError = new OpenCodePromptTimeoutError({
         elapsedMs: 5,
         sessionId: "session-1",
@@ -1071,32 +1073,7 @@ test("SendPromptUseCase ends the foreground session when promptSession times out
         },
     };
 
-    const useCase = new SendPromptUseCase(
-        repo,
-        client,
-        logger,
-        {
-            begin(chatId: number, sessionId: string) {
-                trackerCalls.began.push({ chatId, sessionId });
-
-                return () => {
-                    trackerCalls.ended += 1;
-                };
-            },
-            clear() {
-                return false;
-            },
-            getActiveSessionId() {
-                return null;
-            },
-            isForeground() {
-                return false;
-            },
-            listChatIds() {
-                return [];
-            },
-        },
-    );
+    const useCase = new SendPromptUseCase(repo, client, logger);
 
     await repo.setCurrent({
         chatId: 500,
@@ -1114,10 +1091,12 @@ test("SendPromptUseCase ends the foreground session when promptSession times out
     await assert.rejects(
         useCase.execute({
             chatId: 500,
+            onExecutionSession(sessionId: string) {
+                executionSessionIds.push(sessionId);
+            },
             text: "hello",
         }),
         (error: unknown) => error === timeoutError,
     );
-    assert.deepEqual(trackerCalls.began, [{ chatId: 500, sessionId: "session-1" }]);
-    assert.equal(trackerCalls.ended, 1);
+    assert.deepEqual(executionSessionIds, ["session-1"]);
 });

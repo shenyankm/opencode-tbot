@@ -1,4 +1,5 @@
 import type { Bot } from "grammy";
+import { scopeDependenciesToTelegramContext } from "../logger-context.js";
 import type { BotDependencies } from "../types.js";
 import { executePromptRequest, type PromptExecutionContext } from "./prompt.handler.js";
 import { handlePendingSessionRenameText } from "../session-rename.js";
@@ -24,8 +25,8 @@ export async function handleTextMessage(ctx: MessageContext, dependencies: BotDe
     await executePromptRequest(ctx, dependencies, async () => ({ text }));
 }
 
-export function registerMessageHandler(bot: Bot, dependencies: BotDependencies) {
+export function registerMessageHandler(bot: Pick<Bot, "on">, dependencies: BotDependencies) {
     bot.on("message:text", async (ctx) => {
-        await handleTextMessage(ctx, dependencies);
+        await handleTextMessage(ctx, scopeDependenciesToTelegramContext(dependencies, ctx, "telegram"));
     });
 }

@@ -70,10 +70,19 @@ export class AbortPromptUseCase {
             };
         }
 
-        const aborted = await this.opencodeClient.abortSession(sessionId);
+        if (!sessionId) {
+            return {
+                sessionId: null,
+                status: "not_running",
+                sessionStatus,
+            };
+        }
+
+        const runningSessionId = sessionId;
+        const aborted = await this.opencodeClient.abortSession(runningSessionId);
 
         return {
-            sessionId,
+            sessionId: runningSessionId,
             status: aborted ? "aborted" : "not_running",
             sessionStatus,
         };

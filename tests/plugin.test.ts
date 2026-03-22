@@ -20,6 +20,7 @@ import {
     ensureTelegramBotPluginRuntime,
     resetTelegramBotPluginRuntimeForTests,
 } from "../src/plugin.js";
+import { getDefaultPluginLogDirectory } from "../src/app/opencode-paths.js";
 import type { OpenCodeSdkClientLike } from "../src/services/opencode/opencode.client.js";
 
 function createConfig(overrides: PluginConfigSource = {}): PluginConfigSource {
@@ -173,7 +174,11 @@ function createContainerStub(cwd = "E:/workspace") {
     const container = {
         __cwd: cwd,
         logger: {
+            child() {
+                return this;
+            },
             error() { },
+            async flush() { },
             info(input?: unknown, message?: string) {
                 calls.info.push({ input, message });
             },
@@ -242,6 +247,32 @@ test("loadAppConfig applies prompt timeout defaults and overrides", () => {
     assert.equal(config.promptRecoveryInactivityTimeoutMs, 120_000);
 });
 
+test("loadAppConfig maps the structured logging section and keeps legacy logLevel compatibility", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-logging-config-"));
+    const config = loadAppConfig(createConfig({
+        logLevel: "debug",
+        logging: {
+            file: {
+                retention: {
+                    maxFiles: 7,
+                    maxTotalBytes: 2048,
+                },
+            },
+            sinks: {
+                file: false,
+                host: true,
+            },
+        },
+    }), { cwd });
+
+    assert.equal(config.loggingLevel, "debug");
+    assert.equal(config.loggingHostSinkEnabled, true);
+    assert.equal(config.loggingFileSinkEnabled, false);
+    assert.equal(config.loggingRetentionMaxFiles, 7);
+    assert.equal(config.loggingRetentionMaxTotalBytes, 2048);
+    assert.equal(config.loggingFileDir, getDefaultPluginLogDirectory());
+});
+
 test("mergePluginConfigSources merges prompt configuration by key", () => {
     const merged = mergePluginConfigSources(
         {
@@ -261,6 +292,44 @@ test("mergePluginConfigSources merges prompt configuration by key", () => {
         waitTimeoutMs: 10,
         pollRequestTimeoutMs: 20,
         recoveryInactivityTimeoutMs: 30,
+    });
+});
+
+test("mergePluginConfigSources merges logging configuration by key", () => {
+    const merged = mergePluginConfigSources(
+        {
+            logging: {
+                level: "warn",
+                sinks: {
+                    host: false,
+                },
+            },
+        },
+        {
+            logging: {
+                file: {
+                    retention: {
+                        maxFiles: 5,
+                    },
+                },
+                sinks: {
+                    file: true,
+                },
+            },
+        },
+    );
+
+    assert.deepEqual(merged.logging, {
+        level: "warn",
+        sinks: {
+            host: false,
+            file: true,
+        },
+        file: {
+            retention: {
+                maxFiles: 5,
+            },
+        },
     });
 });
 
@@ -592,6 +661,7 @@ test("ensureTelegramBotPluginRuntime warns when a legacy worktree config exists"
         );
         assert.deepEqual(containerCalls?.warn[0]?.input, {
             cwd: "E:/workspace",
+            event: "runtime.config.legacy_worktree_ignored",
             ignoredProjectConfigFilePath: join("E:/workspace", PLUGIN_CONFIG_FILE_NAME),
             globalConfigFilePath: join("E:/Users/demo", ".config", "opencode", "opencode-tbot", "config.json"),
         });

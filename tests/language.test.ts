@@ -8,8 +8,13 @@ import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
 import { getTelegramCommands } from "../src/bot/commands/command-list.js";
 
 const logger = {
+    child() {
+        return this;
+    },
     error() { },
+    async flush() { },
     info() { },
+    warn() { },
 } as unknown as AppLogger;
 
 function createDependencies() {

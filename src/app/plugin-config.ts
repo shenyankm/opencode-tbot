@@ -2,11 +2,17 @@ import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { PluginConfigSource } from "./config.js";
+import {
+    getDefaultPluginLogDirectory,
+    getGlobalPluginConfigFilePath,
+    getOpenCodeConfigDirectory,
+    getOpenCodeConfigFilePath,
+    GLOBAL_PLUGIN_CONFIG_FILE_NAME,
+    GLOBAL_PLUGIN_DIRECTORY_NAME,
+    OPENCODE_CONFIG_FILE_NAME,
+} from "./opencode-paths.js";
 
 export const PLUGIN_CONFIG_FILE_NAME = "tbot.config.json";
-export const GLOBAL_PLUGIN_DIRECTORY_NAME = "opencode-tbot";
-export const GLOBAL_PLUGIN_CONFIG_FILE_NAME = "config.json";
-export const OPENCODE_CONFIG_FILE_NAME = "opencode.json";
 
 export interface PreparedPluginConfiguration {
     cwd: string;
@@ -49,21 +55,15 @@ export async function preparePluginConfiguration(
     };
 }
 
-export function getOpenCodeConfigDirectory(homeDir: string = homedir()): string {
-    return join(homeDir, ".config", "opencode");
-}
-
-export function getOpenCodeConfigFilePath(homeDir: string = homedir()): string {
-    return join(getOpenCodeConfigDirectory(homeDir), OPENCODE_CONFIG_FILE_NAME);
-}
-
-export function getGlobalPluginConfigFilePath(homeDir: string = homedir()): string {
-    return join(
-        getOpenCodeConfigDirectory(homeDir),
-        GLOBAL_PLUGIN_DIRECTORY_NAME,
-        GLOBAL_PLUGIN_CONFIG_FILE_NAME,
-    );
-}
+export {
+    getDefaultPluginLogDirectory,
+    getGlobalPluginConfigFilePath,
+    getOpenCodeConfigDirectory,
+    getOpenCodeConfigFilePath,
+    GLOBAL_PLUGIN_CONFIG_FILE_NAME,
+    GLOBAL_PLUGIN_DIRECTORY_NAME,
+    OPENCODE_CONFIG_FILE_NAME,
+};
 
 export async function writePluginConfigFile(
     configFilePath: string,
@@ -87,6 +87,7 @@ export function mergePluginConfigSources(
         const previousTelegram = merged.telegram;
         const previousState = merged.state;
         const previousPrompt = merged.prompt;
+        const previousLogging = merged.logging;
 
         Object.assign(merged, normalized);
 
@@ -108,6 +109,41 @@ export function mergePluginConfigSources(
             merged.prompt = {
                 ...(previousPrompt ?? {}),
                 ...normalized.prompt,
+            };
+        }
+
+        if (normalized.logging) {
+            const previousLoggingSinks = previousLogging?.sinks;
+            const previousLoggingFile = previousLogging?.file;
+            const previousRetention = previousLoggingFile?.retention;
+
+            merged.logging = {
+                ...(previousLogging ?? {}),
+                ...normalized.logging,
+                ...(normalized.logging.sinks || previousLoggingSinks
+                    ? {
+                        sinks: {
+                            ...(previousLoggingSinks ?? {}),
+                            ...(normalized.logging.sinks ?? {}),
+                        },
+                    }
+                    : {}),
+                ...(normalized.logging.file || previousLoggingFile
+                    ? {
+                        file: {
+                            ...(previousLoggingFile ?? {}),
+                            ...(normalized.logging.file ?? {}),
+                            ...(normalized.logging.file?.retention || previousRetention
+                                ? {
+                                    retention: {
+                                        ...(previousRetention ?? {}),
+                                        ...(normalized.logging.file?.retention ?? {}),
+                                    },
+                                }
+                                : {}),
+                        },
+                    }
+                    : {}),
             };
         }
     }
@@ -160,6 +196,7 @@ function orderPluginConfig(config: PluginConfigSource): PluginConfigSource {
         "telegram",
         "state",
         "prompt",
+        "logging",
         "logLevel",
     ]);
     const ordered: PluginConfigSource = {};
@@ -174,6 +211,10 @@ function orderPluginConfig(config: PluginConfigSource): PluginConfigSource {
 
     if (config.prompt) {
         ordered.prompt = config.prompt;
+    }
+
+    if (config.logging) {
+        ordered.logging = config.logging;
     }
 
     if (config.logLevel !== undefined) {

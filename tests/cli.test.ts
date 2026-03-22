@@ -7,6 +7,7 @@ import test from "node:test";
 import { createPromptSession, installPlugin, runCli } from "../src/cli.js";
 import { OPENCODE_TBOT_VERSION } from "../src/app/package-info.js";
 import { getGlobalPluginConfigFilePath, getOpenCodeConfigFilePath } from "../src/app/plugin-config.js";
+import { getDefaultPluginLogDirectory } from "../src/app/opencode-paths.js";
 
 test("installPlugin registers the npm plugin and writes the global runtime config", async () => {
     const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-"));
@@ -73,7 +74,7 @@ test("installPlugin can skip plugin registration for local integration tests", a
     assert.equal(existsSync(getGlobalPluginConfigFilePath(homeDir)), true);
 });
 
-test("installPlugin prints a single success line on normal completion", async () => {
+test("installPlugin prints config and log directories on normal completion", async () => {
     const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-success-"));
     const originalCwd = process.cwd();
     const originalWrite = process.stdout.write.bind(process.stdout);
@@ -96,8 +97,8 @@ test("installPlugin prints a single success line on normal completion", async ()
     }
 
     assert.match(output, /Success\.\n/u);
-    assert.doesNotMatch(output, /Registered .* in /u);
-    assert.doesNotMatch(output, /Wrote plugin defaults to /u);
+    assert.match(output, new RegExp(`Plugin config: ${escapeRegExp(getGlobalPluginConfigFilePath(homeDir))}`));
+    assert.match(output, new RegExp(`Plugin logs: ${escapeRegExp(getDefaultPluginLogDirectory(homeDir))}`));
 });
 
 test("runCli defaults to install mode", async () => {
@@ -167,7 +168,7 @@ test("updatePlugin replaces stale opencode-tbot plugin specs and keeps unrelated
     );
 });
 
-test("runCli update prints a single success line on normal completion", async () => {
+test("runCli update prints config and log directories on normal completion", async () => {
     const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-update-output-"));
     const openCodeConfigPath = getOpenCodeConfigFilePath(homeDir);
     const originalCwd = process.cwd();
@@ -198,7 +199,8 @@ test("runCli update prints a single success line on normal completion", async ()
     }
 
     assert.match(output, /Success\.\n/u);
-    assert.doesNotMatch(output, /Updated plugin registration to /u);
+    assert.match(output, new RegExp(`Plugin config: ${escapeRegExp(getGlobalPluginConfigFilePath(homeDir))}`));
+    assert.match(output, new RegExp(`Plugin logs: ${escapeRegExp(getDefaultPluginLogDirectory(homeDir))}`));
 });
 
 test("createPromptSession masks secret input with stars and supports backspace", async () => {
@@ -290,3 +292,7 @@ test("installPlugin warns when a legacy local npm install can affect the plugin 
     assert.match(output, /npm uninstall opencode-tbot/u);
     assert.match(output, /npm exec --package opencode-tbot@latest opencode-tbot -- install/u);
 });
+
+function escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}

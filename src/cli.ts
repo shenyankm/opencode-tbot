@@ -10,11 +10,14 @@ import {
 } from "./app/config.js";
 import { OPENCODE_TBOT_VERSION } from "./app/package-info.js";
 import {
-    getGlobalPluginConfigFilePath,
-    getOpenCodeConfigFilePath,
     mergePluginConfigSources,
     writePluginConfigFile,
 } from "./app/plugin-config.js";
+import {
+    getDefaultPluginLogDirectory,
+    getGlobalPluginConfigFilePath,
+    getOpenCodeConfigFilePath,
+} from "./app/opencode-paths.js";
 
 export interface InstallCommandOptions {
     botToken?: string;
@@ -116,6 +119,8 @@ export async function installPlugin(options: InstallCommandOptions = {}): Promis
         await writePluginConfigFile(globalPluginConfigFilePath, nextPluginConfig);
 
         stdout.write("Success.\n");
+        stdout.write(`Plugin config: ${globalPluginConfigFilePath}\n`);
+        stdout.write(`Plugin logs: ${getDefaultPluginLogDirectory(homeDir)}\n`);
         await warnAboutLegacyLocalInstallations(homeDir);
     } finally {
         prompt.close();
@@ -131,6 +136,8 @@ export async function updatePlugin(options: Pick<InstallCommandOptions, "homeDir
 
     await writeJsonFile(openCodeConfigFilePath, nextOpenCodeConfig);
     stdout.write("Success.\n");
+    stdout.write(`Plugin config: ${getGlobalPluginConfigFilePath(homeDir)}\n`);
+    stdout.write(`Plugin logs: ${getDefaultPluginLogDirectory(homeDir)}\n`);
     await warnAboutLegacyLocalInstallations(homeDir);
 }
 

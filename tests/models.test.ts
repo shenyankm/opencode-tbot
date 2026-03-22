@@ -17,8 +17,13 @@ import { SendPromptUseCase } from "../src/use-cases/send-prompt.usecase.js";
 import { SwitchModelUseCase } from "../src/use-cases/switch-model.usecase.js";
 
 const logger = {
+    child() {
+        return this;
+    },
     error() { },
+    async flush() { },
     info() { },
+    warn() { },
 } as unknown as AppLogger;
 
 function createProject(id: string, worktree: string): OpenCodeProject {

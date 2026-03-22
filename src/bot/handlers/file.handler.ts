@@ -1,4 +1,5 @@
 import type { Bot } from "grammy";
+import { scopeDependenciesToTelegramContext } from "../logger-context.js";
 import type { BotDependencies } from "../types.js";
 import { executePromptRequest, type PromptExecutionContext } from "./prompt.handler.js";
 import { replyIfSessionRenamePending } from "../session-rename.js";
@@ -66,13 +67,13 @@ export async function handleImageMessage(ctx: FileContext, dependencies: BotDepe
     });
 }
 
-export function registerFileHandler(bot: Bot, dependencies: BotDependencies) {
+export function registerFileHandler(bot: Pick<Bot, "on">, dependencies: BotDependencies) {
     bot.on("message:photo", async (ctx) => {
-        await handleImageMessage(ctx, dependencies);
+        await handleImageMessage(ctx, scopeDependenciesToTelegramContext(dependencies, ctx, "telegram"));
     });
 
     bot.on("message:document", async (ctx) => {
-        await handleImageMessage(ctx, dependencies);
+        await handleImageMessage(ctx, scopeDependenciesToTelegramContext(dependencies, ctx, "telegram"));
     });
 }
 
