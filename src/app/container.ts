@@ -116,6 +116,9 @@ function createContainer(
         listMcpUseCase,
         listSessionsUseCase,
         sessionRepo,
+        opencodeClient as {
+            listConfiguredPlugins(): Promise<string[]>;
+        },
     );
     const listModelsUseCase = new ListModelsUseCase(sessionRepo, opencodeClient);
     const renameSessionUseCase = new RenameSessionUseCase(sessionRepo, opencodeClient, opencodeLogger);

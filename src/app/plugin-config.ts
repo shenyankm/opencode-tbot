@@ -7,9 +7,12 @@ import {
     getGlobalPluginConfigFilePath,
     getOpenCodeConfigDirectory,
     getOpenCodeConfigFilePath,
+    getOpenCodeJsoncConfigFilePath,
     GLOBAL_PLUGIN_CONFIG_FILE_NAME,
     GLOBAL_PLUGIN_DIRECTORY_NAME,
     OPENCODE_CONFIG_FILE_NAME,
+    OPENCODE_CONFIG_JSONC_FILE_NAME,
+    resolveWritableOpenCodeConfigFilePath,
 } from "./opencode-paths.js";
 
 export const PLUGIN_CONFIG_FILE_NAME = "tbot.config.json";
@@ -60,9 +63,12 @@ export {
     getGlobalPluginConfigFilePath,
     getOpenCodeConfigDirectory,
     getOpenCodeConfigFilePath,
+    getOpenCodeJsoncConfigFilePath,
     GLOBAL_PLUGIN_CONFIG_FILE_NAME,
     GLOBAL_PLUGIN_DIRECTORY_NAME,
     OPENCODE_CONFIG_FILE_NAME,
+    OPENCODE_CONFIG_JSONC_FILE_NAME,
+    resolveWritableOpenCodeConfigFilePath,
 };
 
 export async function writePluginConfigFile(

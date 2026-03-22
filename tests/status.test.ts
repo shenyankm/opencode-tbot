@@ -1,7 +1,4 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
 import test from "node:test";
 import { OPENCODE_TBOT_VERSION } from "../src/app/package-info.js";
 import { getChatCopy } from "../src/bot/i18n.js";
@@ -47,9 +44,7 @@ function createProject(id: string, worktree: string): OpenCodeProject {
     } as OpenCodeProject;
 }
 
-function createDependencies(
-    client: OpenCodeClientLike,
-) {
+function createDependencies(client: OpenCodeClientLike) {
     const sessionRepo = new InMemorySessionRepository();
     const getHealthUseCase = new GetHealthUseCase(client);
     const getPathUseCase = new GetPathUseCase(client);
@@ -63,6 +58,9 @@ function createDependencies(
         listMcpUseCase,
         listSessionsUseCase,
         sessionRepo,
+        client as {
+            listConfiguredPlugins(): Promise<string[]>;
+        },
     );
 
     return {
@@ -94,21 +92,8 @@ function renderExpectedStatusMarkdown(
     return rendered;
 }
 
-function createOpenCodeConfigFile(config: Record<string, unknown>): string {
-    const directory = mkdtempSync(join(tmpdir(), "opencode-tbot-status-"));
-    const filePath = join(directory, "opencode.json");
-
-    writeFileSync(filePath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
-
-    return filePath;
-}
-
-function createOpenCodeConfigDirectory(config: Record<string, unknown>): string {
-    return dirname(createOpenCodeConfigFile(config));
-}
-
 function escapeRegExp(value: string): string {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }
 
 function expectLine(markdown: string, line: string) {
@@ -117,12 +102,6 @@ function expectLine(markdown: string, line: string) {
 
 test("/status aggregates health, path, plugins, LSP, and MCP into one reply", async () => {
     const project = createProject("project-1", "E:/repo-1");
-    const configDirectoryPath = createOpenCodeConfigDirectory({
-        plugin: [
-            "opencode-tbot@latest",
-            "workspace-tools",
-        ],
-    });
     const replies: StatusReply[] = [];
     const { dependencies, getStatusUseCase, sessionRepo } = createDependencies(
         {
@@ -139,10 +118,17 @@ test("/status aggregates health, path, plugins, LSP, and MCP into one reply", as
                 return {
                     home: "E:/Users/demo",
                     state: "E:/Users/demo/.opencode",
-                    config: configDirectoryPath,
+                    config: "E:/Users/demo/.config/opencode",
                     worktree: "E:/repo",
                     directory: "E:/repo-1",
                 };
+            },
+            async listConfiguredPlugins() {
+                return [
+                    "opencode-tbot@latest",
+                    "oh-my-opencode@latest",
+                    "file:///E:/repo-1/.opencode/plugins/workspace-tools.ts",
+                ];
             },
             async listSessions() {
                 return [
@@ -222,7 +208,9 @@ test("/status aggregates health, path, plugins, LSP, and MCP into one reply", as
     expectLine(markdown, "- **Current Project:** `E:/repo-1`");
     expectLine(markdown, "- **Current Session:** Build status (build-status)");
     expectLine(markdown, "- `opencode-tbot@latest`");
-    expectLine(markdown, "- `workspace-tools`");
+    expectLine(markdown, "- `oh-my-opencode@latest`");
+    expectLine(markdown, "- `workspace-tools (local plugin)`");
+    assert.doesNotMatch(markdown, /file:\/\/\/E:\/repo-1\/\.opencode\/plugins\/workspace-tools\.ts/u);
     assert.match(markdown, /- `alpha`\n  - \*\*Status:\*\* \uD83D\uDFE2\n- `beta`/u);
     assert.match(markdown, /- `beta`\n  - \*\*Status:\*\* \u26AA/u);
     assert.match(markdown, /- \*\*Go\*\*\n  - \*\*Status:\*\* \uD83D\uDD34/u);
@@ -255,10 +243,13 @@ test("/status keeps successful sections when one section fails", async () => {
             return {
                 home: "E:/Users/demo",
                 state: "E:/Users/demo/.opencode",
-                config: "E:/repo/opencode.json",
+                config: "E:/Users/demo/.config/opencode",
                 worktree: "E:/repo",
                 directory: "E:/repo/src",
             };
+        },
+        async listConfiguredPlugins() {
+            return [];
         },
         async listLspStatuses() {
             return [];
@@ -290,7 +281,7 @@ test("/status keeps successful sections when one section fails", async () => {
     assert.match(markdown, /- \*\*Details:\*\* Unexpected error\./u);
     assert.match(markdown, /- \*\*Details:\*\* Cause: health boom/u);
     assert.match(markdown, /- \*\*Details:\*\* Cause: mcp boom/u);
-    assert.match(markdown, /No plugins configured in the OpenCode config\./u);
+    assert.match(markdown, /No plugins detected in the current OpenCode setup\./u);
     assert.match(markdown, /No LSP servers detected for the current project\./u);
     assert.equal(await sessionRepo.getByChatId(2), null);
 });
@@ -312,10 +303,13 @@ test("/status uses the selected chat language", async () => {
             return {
                 home: "E:/Users/demo",
                 state: "E:/Users/demo/.opencode",
-                config: "E:/repo/opencode.json",
+                config: "E:/Users/demo/.config/opencode",
                 worktree: "E:/repo",
                 directory: "E:/repo/src",
             };
+        },
+        async listConfiguredPlugins() {
+            return [];
         },
         async listSessions() {
             return [] as never;
@@ -369,6 +363,7 @@ test("/status uses the selected chat language", async () => {
     expectLine(markdown, `- **opencode-tbot\u7248\u672C:** ${OPENCODE_TBOT_VERSION}`);
     expectLine(markdown, "- **\u5F53\u524D\u9879\u76EE:** `E:/repo`");
     expectLine(markdown, "- **\u5F53\u524D\u4F1A\u8BDD:** OpenCode \u9ED8\u8BA4");
+    assert.match(markdown, /\u5F53\u524D OpenCode \u73AF\u5883\u4E2D\u672A\u68C0\u6D4B\u5230\u63D2\u4EF6\u3002/u);
     assert.doesNotMatch(markdown, /\u5DF2\u914D\u7F6E\u63D2\u4EF6/u);
     assert.doesNotMatch(markdown, /\u5DF2\u7981\u7528/u);
     assert.doesNotMatch(markdown, /\u670D\u52A1\u72B6\u6001/u);
@@ -403,6 +398,6 @@ test("/status returns a default-language error instead of going silent when chat
 
     assert.equal(replies.length, 1);
     assert.equal(replies[0]?.options, undefined);
-    assert.match(replies[0]?.text ?? "", /Unexpected error\./);
-    assert.match(replies[0]?.text ?? "", /Cause: state boom/);
+    assert.match(replies[0]?.text ?? "", /Unexpected error\./u);
+    assert.match(replies[0]?.text ?? "", /Cause: state boom/u);
 });

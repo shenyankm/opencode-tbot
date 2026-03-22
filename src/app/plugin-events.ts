@@ -221,10 +221,7 @@ async function handleSessionIdle(
             },
             "session idle notification suppressed for foreground Telegram session",
         );
-        return;
     }
-
-    await notifyBoundChats(runtime, event.sessionId, `Session finished.\n\nSession: ${event.sessionId}`);
 }
 
 async function handleSessionStatus(

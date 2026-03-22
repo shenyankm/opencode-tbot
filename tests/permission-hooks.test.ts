@@ -305,3 +305,94 @@ test("session.idle suppresses foreground child-session notifications and clears 
     assert.deepEqual(messages, []);
     assert.equal(runtime.container.foregroundSessionTracker.isForeground("session-child"), false);
 });
+
+test("session.idle does not send a completion message to bound chats", async () => {
+    const { runtime, sessionRepo, messages } = createRuntime();
+
+    await sessionRepo.setCurrent({
+        chatId: 505,
+        sessionId: "session-bound",
+        projectId: "project-1",
+        directory: "E:/repo",
+        agentName: null,
+        modelProviderId: null,
+        modelId: null,
+        modelVariant: null,
+        language: "en",
+        updatedAt: new Date(0).toISOString(),
+    });
+
+    await handleTelegramBotPluginEvent(runtime, {
+        type: "session.idle",
+        properties: {
+            sessionID: "session-bound",
+        },
+    });
+
+    assert.deepEqual(messages, []);
+});
+
+test("session.status idle does not send a completion message to bound chats", async () => {
+    const { runtime, sessionRepo, messages } = createRuntime();
+
+    await sessionRepo.setCurrent({
+        chatId: 606,
+        sessionId: "session-bound",
+        projectId: "project-1",
+        directory: "E:/repo",
+        agentName: null,
+        modelProviderId: null,
+        modelId: null,
+        modelVariant: null,
+        language: "en",
+        updatedAt: new Date(0).toISOString(),
+    });
+
+    await handleTelegramBotPluginEvent(runtime, {
+        type: "session.status",
+        properties: {
+            sessionID: "session-bound",
+            status: {
+                type: "idle",
+            },
+        },
+    });
+
+    assert.deepEqual(messages, []);
+});
+
+test("session.error still notifies bound chats when the session is not foreground", async () => {
+    const { runtime, sessionRepo, messages } = createRuntime();
+
+    await sessionRepo.setCurrent({
+        chatId: 707,
+        sessionId: "session-bound",
+        projectId: "project-1",
+        directory: "E:/repo",
+        agentName: null,
+        modelProviderId: null,
+        modelId: null,
+        modelVariant: null,
+        language: "en",
+        updatedAt: new Date(0).toISOString(),
+    });
+
+    await handleTelegramBotPluginEvent(runtime, {
+        type: "session.error",
+        properties: {
+            sessionID: "session-bound",
+            error: {
+                name: "APIError",
+                data: {
+                    message: "boom",
+                },
+            },
+        },
+    });
+
+    assert.deepEqual(messages, [{
+        chatId: 707,
+        text: "Session failed.\n\nSession: session-bound\nError: boom",
+        options: undefined,
+    }]);
+});

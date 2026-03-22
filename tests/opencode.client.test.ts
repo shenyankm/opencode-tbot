@@ -226,6 +226,49 @@ test("getHealth falls back to the raw /global/health endpoint for legacy injecte
     }]);
 });
 
+test("listConfiguredPlugins returns the resolved OpenCode plugin specs from config.get", async () => {
+    const calls: unknown[][] = [];
+    const client = createClient({
+        config: {
+            async get(...args: unknown[]) {
+                calls.push(args);
+
+                return {
+                    data: {
+                        plugin: [
+                            "oh-my-opencode@latest",
+                            "  opencode-tbot@latest  ",
+                            "",
+                            123,
+                            "oh-my-opencode@latest",
+                            "file:///E:/repo/.opencode/plugins/local-dev.ts",
+                        ],
+                        provider: {},
+                    },
+                };
+            },
+            async providers() {
+                return {
+                    data: {
+                        providers: [],
+                        default: {},
+                    },
+                };
+            },
+        },
+    });
+
+    assert.deepEqual(await client.listConfiguredPlugins(), [
+        "oh-my-opencode@latest",
+        "opencode-tbot@latest",
+        "file:///E:/repo/.opencode/plugins/local-dev.ts",
+    ]);
+    assert.deepEqual(calls, [[{
+        responseStyle: "data",
+        throwOnError: true,
+    }]]);
+});
+
 test("typed SDK helpers forward session, project, path, and permission operations", async () => {
     const calls: Array<{ args: unknown[]; method: string }> = [];
     const project = createProject("project-1", "E:/repo-1");

@@ -291,6 +291,7 @@ export interface OpenCodeClientLike {
         message?: string,
         sessionId?: string,
     ): Promise<boolean>;
+    listConfiguredPlugins?(): Promise<string[]>;
     listModels(): Promise<OpenCodeConfiguredModel[]>;
     promptSession(input: PromptSessionInput): Promise<PromptSessionResult>;
 }
@@ -607,6 +608,12 @@ export class OpenCodeClient implements OpenCodeClientLike {
         this.modelCache.promise = refreshPromise;
 
         return refreshPromise;
+    }
+
+    async listConfiguredPlugins(): Promise<string[]> {
+        const config = await this.loadConfig();
+
+        return normalizeConfiguredPluginSpecs(config.plugin);
     }
 
     async promptSession(input: PromptSessionInput): Promise<PromptSessionResult> {
@@ -1786,6 +1793,32 @@ function normalizePermissionRequest(permission: unknown): OpenCodePermissionRequ
         permission: permissionName,
         sessionID,
     };
+}
+
+function normalizeConfiguredPluginSpecs(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    const normalizedPlugins: string[] = [];
+    const seenPlugins = new Set<string>();
+
+    for (const item of value) {
+        if (typeof item !== "string") {
+            continue;
+        }
+
+        const normalizedItem = item.trim();
+
+        if (normalizedItem.length === 0 || seenPlugins.has(normalizedItem)) {
+            continue;
+        }
+
+        seenPlugins.add(normalizedItem);
+        normalizedPlugins.push(normalizedItem);
+    }
+
+    return normalizedPlugins;
 }
 
 function normalizePermissionPatterns(permission: Record<string, unknown>): string[] {

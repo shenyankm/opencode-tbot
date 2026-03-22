@@ -1,6 +1,4 @@
-import { readFile, stat } from "node:fs/promises";
-import { isAbsolute, join } from "node:path";
-import { parse, printParseErrorCode, type ParseError } from "jsonc-parser";
+import { isAbsolute } from "node:path";
 import type { SessionRepository } from "../domain/session/session.repository.js";
 import type {
     OpenCodeHealth,
@@ -26,8 +24,11 @@ export interface StatusSectionError {
 export type StatusSectionResult<TData> = StatusSectionOk<TData> | StatusSectionError;
 
 export interface ConfiguredPluginsResult {
-    configFilePath: string;
     plugins: string[];
+}
+
+interface ConfiguredPluginReader {
+    listConfiguredPlugins(): Promise<string[]>;
 }
 
 export interface WorkspaceStatusResult {
@@ -52,30 +53,30 @@ export class GetStatusUseCase {
         private readonly listMcpUseCase: ListMcpUseCase,
         private readonly listSessionsUseCase: ListSessionsUseCase,
         private readonly sessionRepo: SessionRepository,
+        private readonly configuredPluginReader: ConfiguredPluginReader,
     ) { }
 
     async execute(input: { chatId: number }): Promise<GetStatusResult> {
-        const [health, path, lsp, mcp] = await Promise.allSettled([
+        const [health, path, lsp, mcp, plugins] = await Promise.allSettled([
             this.getHealthUseCase.execute(),
             this.getPathUseCase.execute(),
             this.listLspUseCase.execute({ chatId: input.chatId }),
             this.listMcpUseCase.execute({ chatId: input.chatId }),
+            this.configuredPluginReader.listConfiguredPlugins(),
         ]);
         const pathResult = mapSettledResult(path);
-        const [plugins, workspace] = await Promise.all([
-            loadConfiguredPluginsResult(pathResult),
-            loadWorkspaceStatusResult(
-                input.chatId,
-                pathResult,
-                this.listSessionsUseCase,
-                this.sessionRepo,
-            ),
-        ]);
+        const pluginResult = loadConfiguredPluginsResult(plugins);
+        const workspace = await loadWorkspaceStatusResult(
+            input.chatId,
+            pathResult,
+            this.listSessionsUseCase,
+            this.sessionRepo,
+        );
 
         return {
             health: mapSettledResult(health),
             path: pathResult,
-            plugins,
+            plugins: pluginResult,
             workspace,
             lsp: mapSettledResult(lsp),
             mcp: mapSettledResult(mcp),
@@ -97,79 +98,21 @@ function mapSettledResult<TData>(result: PromiseSettledResult<TData>): StatusSec
     };
 }
 
-async function loadConfiguredPluginsResult(
-    path: StatusSectionResult<OpenCodePath>,
-): Promise<StatusSectionResult<ConfiguredPluginsResult>> {
-    if (path.status === "error") {
+function loadConfiguredPluginsResult(
+    result: PromiseSettledResult<string[]>,
+): StatusSectionResult<ConfiguredPluginsResult> {
+    if (result.status === "rejected") {
         return {
-            error: path.error,
+            error: result.reason,
             status: "error",
         };
     }
-
-    try {
-        return {
-            data: await loadConfiguredPlugins(path.data.config),
-            status: "ok",
-        };
-    } catch (error) {
-        return {
-            error,
-            status: "error",
-        };
-    }
-}
-
-async function loadConfiguredPlugins(configFilePath: string): Promise<ConfiguredPluginsResult> {
-    const resolvedConfigFilePath = await resolveOpenCodeConfigFilePath(configFilePath);
-    let content: string;
-
-    try {
-        content = await readFile(resolvedConfigFilePath, "utf8");
-    } catch (error) {
-        if (isMissingFileError(error)) {
-            return {
-                configFilePath: resolvedConfigFilePath,
-                plugins: [],
-            };
-        }
-
-        throw error;
-    }
-
-    const parseErrors: ParseError[] = [];
-    const parsed = parse(content, parseErrors, {
-        allowTrailingComma: true,
-    });
-
-    if (parseErrors.length > 0) {
-        const errorSummary = parseErrors
-            .map((error) => printParseErrorCode(error.error))
-            .join(", ");
-
-        throw new Error(`Failed to parse ${resolvedConfigFilePath}: ${errorSummary}`);
-    }
-
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        return {
-            configFilePath: resolvedConfigFilePath,
-            plugins: [],
-        };
-    }
-
-    const pluginSpecs = Array.isArray((parsed as { plugin?: unknown }).plugin)
-        ? (parsed as { plugin: unknown[] }).plugin
-        : [];
-    const plugins = [...new Set(
-        pluginSpecs
-            .filter((value): value is string => typeof value === "string")
-            .map((value) => value.trim())
-            .filter((value) => value.length > 0),
-    )];
 
     return {
-        configFilePath: resolvedConfigFilePath,
-        plugins,
+        data: {
+            plugins: normalizeConfiguredPluginLabels(result.value),
+        },
+        status: "ok",
     };
 }
 
@@ -254,22 +197,75 @@ function isUsableWorkspacePath(value: string | null | undefined): value is strin
         && isAbsolute(normalized);
 }
 
-async function resolveOpenCodeConfigFilePath(configPath: string): Promise<string> {
-    try {
-        const info = await stat(configPath);
+function normalizeConfiguredPluginLabels(plugins: string[]): string[] {
+    const normalizedPlugins: string[] = [];
+    const seenPlugins = new Set<string>();
 
-        return info.isDirectory()
-            ? join(configPath, "opencode.json")
-            : configPath;
-    } catch (error) {
-        if (isMissingFileError(error)) {
-            return configPath;
+    for (const plugin of plugins) {
+        const normalizedPlugin = normalizeConfiguredPluginLabel(plugin);
+
+        if (normalizedPlugin.length === 0 || seenPlugins.has(normalizedPlugin)) {
+            continue;
         }
 
-        throw error;
+        seenPlugins.add(normalizedPlugin);
+        normalizedPlugins.push(normalizedPlugin);
     }
+
+    return normalizedPlugins;
 }
 
-function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
-    return error instanceof Error && "code" in error && error.code === "ENOENT";
+function normalizeConfiguredPluginLabel(plugin: string): string {
+    const normalizedPlugin = plugin.trim();
+    const localPluginName = extractLocalPluginName(normalizedPlugin);
+
+    return localPluginName
+        ? `${localPluginName} (local plugin)`
+        : normalizedPlugin;
+}
+
+function extractLocalPluginName(plugin: string): string | null {
+    const filePath = parseFilePluginPath(plugin);
+
+    if (!filePath) {
+        return null;
+    }
+
+    const pathSegments = filePath.split("/").filter((segment) => segment.length > 0);
+    const fileName = pathSegments.at(-1);
+    const parentDirectoryName = pathSegments.at(-2);
+
+    if (!fileName || parentDirectoryName !== "plugins") {
+        return null;
+    }
+
+    const pluginName = fileName.replace(/\.(?:[cm]?js|[cm]?ts)$/iu, "");
+
+    return pluginName.trim().length > 0
+        ? pluginName.trim()
+        : null;
+}
+
+function parseFilePluginPath(plugin: string): string | null {
+    if (!plugin.startsWith("file://")) {
+        return null;
+    }
+
+    try {
+        const fileUrl = new URL(plugin);
+
+        if (fileUrl.protocol !== "file:") {
+            return null;
+        }
+
+        const normalizedPath = decodeURIComponent(fileUrl.pathname)
+            .replace(/^\/([A-Za-z]:)/u, "$1")
+            .replace(/\\/gu, "/");
+
+        return normalizedPath.length > 0
+            ? normalizedPath
+            : null;
+    } catch {
+        return null;
+    }
 }

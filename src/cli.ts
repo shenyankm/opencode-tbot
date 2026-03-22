@@ -16,7 +16,7 @@ import {
 import {
     getDefaultPluginLogDirectory,
     getGlobalPluginConfigFilePath,
-    getOpenCodeConfigFilePath,
+    resolveWritableOpenCodeConfigFilePath,
 } from "./app/opencode-paths.js";
 
 export interface InstallCommandOptions {
@@ -89,7 +89,7 @@ export async function runCli(argv: string[]): Promise<number> {
 
 export async function installPlugin(options: InstallCommandOptions = {}): Promise<void> {
     const homeDir = options.homeDir ?? homedir();
-    const openCodeConfigFilePath = getOpenCodeConfigFilePath(homeDir);
+    const openCodeConfigFilePath = await resolveWritableOpenCodeConfigFilePath(homeDir);
     const globalPluginConfigFilePath = getGlobalPluginConfigFilePath(homeDir);
     const openCodeConfig = await readJsoncObject<OpenCodeGlobalConfig>(openCodeConfigFilePath);
     const existingPluginConfig = await readPluginConfigFile(globalPluginConfigFilePath);
@@ -119,6 +119,7 @@ export async function installPlugin(options: InstallCommandOptions = {}): Promis
         await writePluginConfigFile(globalPluginConfigFilePath, nextPluginConfig);
 
         stdout.write("Success.\n");
+        stdout.write(`OpenCode config: ${openCodeConfigFilePath}\n`);
         stdout.write(`Plugin config: ${globalPluginConfigFilePath}\n`);
         stdout.write(`Plugin logs: ${getDefaultPluginLogDirectory(homeDir)}\n`);
         await warnAboutLegacyLocalInstallations(homeDir);
@@ -129,13 +130,14 @@ export async function installPlugin(options: InstallCommandOptions = {}): Promis
 
 export async function updatePlugin(options: Pick<InstallCommandOptions, "homeDir" | "pluginSpec"> = {}): Promise<void> {
     const homeDir = options.homeDir ?? homedir();
-    const openCodeConfigFilePath = getOpenCodeConfigFilePath(homeDir);
+    const openCodeConfigFilePath = await resolveWritableOpenCodeConfigFilePath(homeDir);
     const openCodeConfig = await readJsoncObject<OpenCodeGlobalConfig>(openCodeConfigFilePath);
     const pluginSpec = normalizeOptionalString(options.pluginSpec) ?? DEFAULT_PLUGIN_SPEC;
     const nextOpenCodeConfig = replacePluginRegistration(openCodeConfig, pluginSpec);
 
     await writeJsonFile(openCodeConfigFilePath, nextOpenCodeConfig);
     stdout.write("Success.\n");
+    stdout.write(`OpenCode config: ${openCodeConfigFilePath}\n`);
     stdout.write(`Plugin config: ${getGlobalPluginConfigFilePath(homeDir)}\n`);
     stdout.write(`Plugin logs: ${getDefaultPluginLogDirectory(homeDir)}\n`);
     await warnAboutLegacyLocalInstallations(homeDir);
