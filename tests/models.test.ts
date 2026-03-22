@@ -417,7 +417,9 @@ test("variant selection updates the binding and later prompts use the selected m
         {
             sessionId: "session-1",
             prompt: "continue",
-            structured: true,
+            format: {
+                type: "text",
+            },
             agent: "build",
             model: {
                 providerID: "openai",

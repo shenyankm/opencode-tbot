@@ -134,7 +134,7 @@ test("renderMarkdownToTelegramMarkdownV2 renders markdown tables as preformatted
 test("buildTelegramPromptReply falls back to plain text when markdown is unsupported", () => {
     const result = buildTelegramPromptReply(createPromptReply({
         bodyMd: "<b>bad</b>",
-        fallbackText: "plain fallback",
+        fallbackText: "<b>bad</b>",
         metrics: {
             durationMs: null,
             tokens: {
@@ -153,10 +153,10 @@ test("buildTelegramPromptReply falls back to plain text when markdown is unsuppo
 
     assert.deepEqual(result, {
         preferred: {
-            text: "plain fallback\n\nDuration: n/a | Tokens: n/a",
+            text: "bad\n\nDuration: n/a | Tokens: n/a",
         },
         fallback: {
-            text: "plain fallback\n\nDuration: n/a | Tokens: n/a",
+            text: "bad\n\nDuration: n/a | Tokens: n/a",
         },
     });
 });
@@ -248,10 +248,10 @@ test("buildTelegramStaticReply falls back to plain text when markdown is unsuppo
 
     assert.deepEqual(result, {
         preferred: {
-            text: "<b>bad</b>",
+            text: "bad",
         },
         fallback: {
-            text: "<b>bad</b>",
+            text: "bad",
         },
     });
 });

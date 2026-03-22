@@ -160,9 +160,9 @@ test("handleTextMessage sends MarkdownV2 replies with metrics and deletes the pr
     return;
 
     assert.deepEqual(replies, [
-        { text: "处理中...", other: undefined },
+        { text: "澶勭悊涓?..", other: undefined },
         {
-            text: "*Hello*\n\n耗时: 120 ms \\| 令牌数: 42",
+            text: "*Hello*\n\n鑰楁椂: 120 ms \\| 浠ょ墝鏁? 42",
             other: { parse_mode: "MarkdownV2" },
         },
     ]);
@@ -517,7 +517,7 @@ test("handleTextMessage renders assistant-side prompt errors with metrics and de
     assert.deepEqual(deleted, [{ chatId: 15, messageId: 700 }]);
 });
 
-test("handleTextMessage falls back to assistant text when structured output validation fails but text was produced", async () => {
+test("handleTextMessage shows assistant-side prompt errors even when text parts were present", async () => {
     const replies: Array<{ text: string; other?: unknown }> = [];
     const deleted: Array<{ chatId: number; messageId: number }> = [];
     let nextMessageId = 800;
@@ -532,8 +532,8 @@ test("handleTextMessage falls back to assistant text when structured output vali
                     },
                 } as never,
                 bodyMd: null,
-                fallbackText: "杩欐槸椤圭洰绠€浠?",
-                parts: [{ type: "text", text: "杩欐槸椤圭洰绠€浠?" }] as never,
+                fallbackText: "This text should not be shown.",
+                parts: [{ type: "text", text: "This text should not be shown." }] as never,
             }),
         }),
     });
@@ -541,7 +541,7 @@ test("handleTextMessage falls back to assistant text when structured output vali
     await handleTextMessage(
         {
             chat: { id: 18 },
-            message: { text: "浠嬬粛杩欎釜椤圭洰" },
+            message: { text: "hello" },
             api: {
                 async deleteMessage(chatId, messageId) {
                     deleted.push({ chatId, messageId });
@@ -562,11 +562,16 @@ test("handleTextMessage falls back to assistant text when structured output vali
     assert.deepEqual(replies, [
         { text: "Processing...", other: undefined },
         {
-            text: "杩欐槸椤圭洰绠€浠?\n\nDuration: 120 ms | Tokens: 42",
+            text: [
+                "Structured output validation failed.",
+                "Cause: Model did not produce structured output | retries: 0",
+                "",
+                "Duration: 120 ms | Tokens: 42",
+            ].join("\n"),
             other: undefined,
         },
     ]);
-    assert.equal(warnings.length, 1);
+    assert.equal(warnings.length, 0);
     assert.deepEqual(deleted, [{ chatId: 18, messageId: 800 }]);
 });
 
@@ -618,16 +623,6 @@ test("handleTextMessage localizes bot-generated status text and metrics footer f
         { text: "处理中...", other: undefined },
         {
             text: "*Hello*\n\n耗时: 120 ms \\| 令牌数: 42",
-            other: { parse_mode: "MarkdownV2" },
-        },
-    ]);
-    assert.deepEqual(deleted, [{ chatId: 21, messageId: 900 }]);
-    return;
-
-    assert.deepEqual(replies, [
-        { text: "澶勭悊涓?..", other: undefined },
-        {
-            text: "*Hello*\n\n鑰楁椂: 120 ms \\| 浠ょ墝鏁? 42",
             other: { parse_mode: "MarkdownV2" },
         },
     ]);
@@ -871,3 +866,5 @@ test("handleTextMessage falls back to the default locale when chat state lookup 
         messageId: 500,
     }]);
 });
+
+

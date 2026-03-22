@@ -1,4 +1,5 @@
 import { BOT_COPY, type BotCopy } from "../../bot/copy.js";
+import { stripMarkdownToPlainText } from "../../infra/utils/markdown-text.js";
 import type {
     PromptSessionMetrics,
     PromptSessionResult,
@@ -7,6 +8,7 @@ import type {
 const MAX_TELEGRAM_MESSAGE_LENGTH = 4096;
 const TRUNCATED_SUFFIX = "...";
 const MARKDOWN_SPECIAL_CHARACTERS = /([_*\[\]()~`>#+\-=|{}.!\\])/g;
+export { stripMarkdownToPlainText } from "../../infra/utils/markdown-text.js";
 
 export interface TelegramReplyPayload {
     options?: {
@@ -31,7 +33,7 @@ export function buildTelegramPromptReply(
 ): TelegramPromptReply {
     const renderedMarkdown = result.bodyMd ? renderMarkdownToTelegramMarkdownV2(result.bodyMd) : null;
     const footerPlain = formatPlainMetricsFooter(result.metrics, copy);
-    const plainBody = normalizePlainBody(result, renderedMarkdown !== null, copy);
+    const plainBody = normalizePlainBody(result, copy);
     const fallback = {
         text: joinBodyAndFooter(
             truncatePlainBody(plainBody, footerPlain),
@@ -210,48 +212,13 @@ export function renderMarkdownToTelegramMarkdownV2(markdown: string): string | n
     return rendered.join("\n");
 }
 
-export function stripMarkdownToPlainText(markdown: string): string {
-    const normalizedMarkdown = preprocessMarkdownForTelegram(markdown);
-    const lines = normalizedMarkdown.split("\n");
-    const rendered: string[] = [];
-
-    for (let index = 0; index < lines.length; index += 1) {
-        const tableBlock = consumeMarkdownTable(lines, index);
-
-        if (tableBlock) {
-            rendered.push(renderTableAsPlainText(tableBlock.rows));
-            index = tableBlock.nextIndex - 1;
-            continue;
-        }
-
-        rendered.push(lines[index]);
-    }
-
-    return rendered
-        .join("\n")
-        .replace(/```[A-Za-z0-9_-]*\n?/g, "")
-        .replace(/```/g, "")
-        .replace(/^#{1,6}\s+/gm, "")
-        .replace(/^\s*>\s?/gm, "")
-        .replace(/^(\s*)[-+*]\s+/gm, "$1- ")
-        .replace(/^(\s*)(\d+)[.)]\s+/gm, "$1$2. ")
-        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1 ($2)")
-        .replace(/(\*\*|__)(.*?)\1/g, "$2")
-        .replace(/(\*|_)(.*?)\1/g, "$2")
-        .replace(/`([^`]+)`/g, "$1")
-        .trim();
-}
-
 function normalizePlainBody(
     result: PromptSessionResult,
-    preferStructured: boolean,
     copy: BotCopy,
 ): string {
     const fromStructured = result.bodyMd ? stripMarkdownToPlainText(result.bodyMd) : "";
     const fromFallback = result.fallbackText.trim();
-    const body = preferStructured
-        ? fromStructured || fromFallback
-        : fromFallback || fromStructured;
+    const body = fromStructured || fromFallback;
 
     return body.trim() || result.fallbackText || copy.prompt.emptyResponse;
 }
@@ -458,10 +425,6 @@ function renderTableAsTelegramCodeBlock(rows: string[][]): string {
         ...buildAlignedTableLines(rows).map((line) => escapeCodeContent(line)),
         "```",
     ].join("\n");
-}
-
-function renderTableAsPlainText(rows: string[][]): string {
-    return buildAlignedTableLines(rows).join("\n");
 }
 
 function buildAlignedTableLines(rows: string[][]): string[] {

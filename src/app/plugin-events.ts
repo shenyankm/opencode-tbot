@@ -184,7 +184,7 @@ async function handleSessionError(
     });
     const wasForeground = runtime.container.foregroundSessionTracker.fail(
         event.sessionId,
-        event.error instanceof Error ? event.error : new Error("Unknown session error."),
+        normalizeForegroundSessionError(event.error),
     );
 
     if (wasForeground) {
@@ -413,6 +413,28 @@ function extractSessionErrorMessage(error: unknown): string | null {
     }
 
     return asNonEmptyString(error.name);
+}
+
+function normalizeForegroundSessionError(error: unknown): Error {
+    if (error instanceof Error) {
+        return error;
+    }
+
+    if (isPlainRecord(error) && typeof error.name === "string" && error.name.trim().length > 0) {
+        const normalized = new Error(extractSessionErrorMessage(error) ?? "Unknown session error.") as Error & {
+            data?: Record<string, unknown>;
+        };
+
+        normalized.name = error.name.trim();
+
+        if (isPlainRecord(error.data)) {
+            normalized.data = error.data;
+        }
+
+        return normalized;
+    }
+
+    return new Error("Unknown session error.");
 }
 
 function asNonEmptyString(value: unknown): string | null {

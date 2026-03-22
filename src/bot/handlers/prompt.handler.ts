@@ -50,7 +50,7 @@ export async function executePromptRequest(
             signal: foregroundRequest.signal,
             text: promptInput.text,
         });
-        const promptReply = normalizePromptReplyForDisplay(result.assistantReply, copy, dependencies);
+        const promptReply = normalizePromptReplyForDisplay(result.assistantReply, copy);
         const telegramReply = buildTelegramPromptReply(promptReply, copy);
 
         try {
@@ -82,24 +82,9 @@ export async function executePromptRequest(
 function normalizePromptReplyForDisplay(
     promptReply: Awaited<ReturnType<BotDependencies["sendPromptUseCase"]["execute"]>>["assistantReply"],
     copy: Awaited<ReturnType<typeof getSafeChatCopy>>,
-    dependencies: BotDependencies,
 ) {
     if (!promptReply.assistantError) {
         return promptReply;
-    }
-
-    if (isRecoverableStructuredOutputError(promptReply)) {
-        dependencies.logger.warn?.(
-            {
-                error: promptReply.assistantError,
-            },
-            "structured output validation failed, falling back to assistant text reply",
-        );
-
-        return {
-            ...promptReply,
-            assistantError: null,
-        };
     }
 
     return {
@@ -107,20 +92,4 @@ function normalizePromptReplyForDisplay(
         bodyMd: null,
         fallbackText: presentError(promptReply.assistantError, copy),
     };
-}
-
-function isRecoverableStructuredOutputError(
-    promptReply: Awaited<ReturnType<BotDependencies["sendPromptUseCase"]["execute"]>>["assistantReply"],
-): boolean {
-    if (promptReply.assistantError?.name !== "StructuredOutputError") {
-        return false;
-    }
-
-    if (promptReply.bodyMd?.trim()) {
-        return true;
-    }
-
-    return promptReply.parts.some((part) =>
-        part.type === "text" && typeof part.text === "string" && part.text.trim().length > 0
-    );
 }

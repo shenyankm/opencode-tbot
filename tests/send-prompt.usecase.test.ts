@@ -110,9 +110,11 @@ test("SendPromptUseCase creates a session in the current project when the chat i
         type: string;
         agent?: string;
         directory?: string;
+        format?: {
+            type: "text";
+        };
         prompt?: string;
         sessionId?: string;
-        structured?: boolean;
     }> = [];
     const currentProject = createProject("project-1", "E:/repo-1");
     const client: OpenCodeClientLike = {
@@ -165,7 +167,7 @@ test("SendPromptUseCase creates a session in the current project when the chat i
                 sessionId: input.sessionId,
                 prompt: input.prompt,
                 agent: input.agent ?? undefined,
-                structured: input.structured,
+                format: input.format,
             });
             return createPromptReply("assistant reply");
         },
@@ -203,7 +205,9 @@ test("SendPromptUseCase creates a session in the current project when the chat i
             sessionId: "session-1",
             prompt: "hello",
             agent: "build",
-            structured: true,
+            format: {
+                type: "text",
+            },
         },
     ]);
 });
@@ -290,7 +294,9 @@ test("SendPromptUseCase preserves a selected model when it needs to create a ses
         {
             sessionId: "session-1",
             prompt: "continue",
-            structured: true,
+            format: {
+                type: "text",
+            },
             agent: "build",
             model: {
                 providerID: "openai",
@@ -386,7 +392,9 @@ test("SendPromptUseCase clears a stale model selection before prompting", async 
         {
             sessionId: "session-1",
             prompt: "hello",
-            structured: true,
+            format: {
+                type: "text",
+            },
             agent: "build",
         },
     ]);
@@ -466,7 +474,9 @@ test("SendPromptUseCase recreates the session when the saved session context is 
         {
             sessionId: "session-new",
             prompt: "continue",
-            structured: true,
+            format: {
+                type: "text",
+            },
             agent: "build",
         },
     ]);
@@ -546,7 +556,9 @@ test("SendPromptUseCase clears stale selected agents before prompting", async ()
         {
             sessionId: "session-1",
             prompt: "continue",
-            structured: true,
+            format: {
+                type: "text",
+            },
             agent: "build",
         },
     ]);
@@ -620,7 +632,9 @@ test("SendPromptUseCase clears selected subagents before prompting", async () =>
         {
             sessionId: "session-1",
             prompt: "continue",
-            structured: true,
+            format: {
+                type: "text",
+            },
             agent: "build",
         },
     ]);
@@ -704,7 +718,9 @@ test("SendPromptUseCase forks a temporary child session for image prompts and ke
                 sessionId: "session-1-image",
                 prompt: withImageTurnGuidance("analyze this image"),
                 files,
-                structured: true,
+                format: {
+                    type: "text",
+                },
                 agent: "build",
             },
         },
@@ -789,7 +805,9 @@ test("SendPromptUseCase creates and keeps a main session when the first prompt i
                 sessionId: "session-1-image",
                 prompt: withImageTurnGuidance(),
                 files,
-                structured: true,
+                format: {
+                    type: "text",
+                },
                 agent: "build",
             },
         },
@@ -875,13 +893,17 @@ test("SendPromptUseCase returns to the main session after an image turn", async 
             sessionId: "session-1-image",
             prompt: withImageTurnGuidance("analyze this image"),
             files: [createImageFile()],
-            structured: true,
+            format: {
+                type: "text",
+            },
             agent: "build",
         },
         {
             sessionId: "session-1",
             prompt: "who are you",
-            structured: true,
+            format: {
+                type: "text",
+            },
             agent: "build",
         },
     ]);

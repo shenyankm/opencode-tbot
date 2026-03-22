@@ -63,6 +63,7 @@ function createAssistantResponse(input: {
     withCompletion?: boolean;
 } = {}) {
     const createdAt = input.createdAt ?? Date.now();
+    const text = input.bodyMd ?? input.text;
     const withCompletion = input.withCompletion ?? true;
 
     return {
@@ -73,11 +74,6 @@ function createAssistantResponse(input: {
             parentID: input.parentID ?? "user-1",
             modelID: "gpt-5.4",
             providerID: "openai",
-            structured: input.bodyMd
-                ? {
-                    body_md: input.bodyMd,
-                }
-                : undefined,
             time: {
                 created: createdAt,
                 ...(withCompletion
@@ -94,10 +90,10 @@ function createAssistantResponse(input: {
                 },
             },
         },
-        parts: input.text
+        parts: text
             ? [{
                 type: "text",
-                text: input.text,
+                text,
             }]
             : [],
     } as const;
@@ -625,7 +621,6 @@ test("promptSession prefers promptAsync, forwards the typed async payload, and r
         bodyMd: "## Hello",
         createdAt: Date.now() + 10,
         id: "assistant-final",
-        text: "Hello from async",
     });
     const client = createClient({
         session: {
@@ -658,7 +653,9 @@ test("promptSession prefers promptAsync, forwards the typed async payload, and r
     const result = await client.promptSession({
         sessionId: "session-1",
         prompt: "hello from telegram",
-        structured: true,
+        format: {
+            type: "text",
+        },
         agent: "planner",
         model: {
             providerID: "openai",
@@ -675,7 +672,7 @@ test("promptSession prefers promptAsync, forwards the typed async payload, and r
     assert.equal(promptCalls, 0);
     assert.equal(messageCalls, 2);
     assert.equal(result.bodyMd, "## Hello");
-    assert.equal(result.fallbackText, "Hello from async");
+    assert.equal(result.fallbackText, "Hello");
     assert.deepEqual(promptAsyncCalls.length, 1);
     assert.deepEqual(promptAsyncCalls[0]?.[0], {
         path: {
@@ -684,19 +681,7 @@ test("promptSession prefers promptAsync, forwards the typed async payload, and r
         body: {
             agent: "planner",
             format: {
-                type: "json_schema",
-                retryCount: 2,
-                schema: {
-                    type: "object",
-                    additionalProperties: false,
-                    required: ["body_md"],
-                    properties: {
-                        body_md: {
-                            type: "string",
-                            description: "Markdown body only. Do not include duration, token usage, or any footer. Do not wrap the whole answer in ```md or ```markdown fences. Use Markdown formatting directly unless the user explicitly asks for raw Markdown source.",
-                        },
-                    },
-                },
+                type: "text",
             },
             model: {
                 providerID: "openai",
@@ -728,13 +713,11 @@ test("promptSession polls messages and status until a new assistant reply appear
         bodyMd: "## Old",
         createdAt: now - 5_000,
         id: "assistant-old",
-        text: "old reply",
     });
     const newResponse = createAssistantResponse({
         bodyMd: "## Recovered",
         createdAt: now + 20,
         id: "assistant-new",
-        text: "new reply",
     });
     let messageCalls = 0;
     let statusCalls = 0;
@@ -775,11 +758,13 @@ test("promptSession polls messages and status until a new assistant reply appear
     const result = await client.promptSession({
         sessionId: "session-1",
         prompt: "recover response",
-        structured: true,
+        format: {
+            type: "text",
+        },
     });
 
     assert.equal(result.bodyMd, "## Recovered");
-    assert.equal(result.fallbackText, "new reply");
+    assert.equal(result.fallbackText, "Recovered");
     assert.equal(messageCalls, 3);
     assert.equal(statusCalls, 1);
 });
@@ -789,7 +774,6 @@ test("promptSession maps idle status with no new assistant reply to MessageAbort
         bodyMd: "## Old",
         createdAt: Date.now() - 5_000,
         id: "assistant-old",
-        text: "old reply",
     });
     let messageCalls = 0;
     let statusCalls = 0;
@@ -827,7 +811,9 @@ test("promptSession maps idle status with no new assistant reply to MessageAbort
         client.promptSession({
             sessionId: "session-1",
             prompt: "hello",
-            structured: true,
+            format: {
+                type: "text",
+            },
         }),
         (error: unknown) => error instanceof OpenCodeMessageAbortedError
             && error.message === "Request was aborted.",

@@ -177,7 +177,9 @@ export class SendPromptUseCase {
                 prompt: promptText,
                 ...(files.length > 0 ? { files } : {}),
                 ...(selectedAgent ? { agent: selectedAgent.name } : {}),
-                structured: true,
+                format: {
+                    type: "text",
+                },
                 ...(model ? { model } : {}),
                 ...(input.signal ? { signal: input.signal } : {}),
                 ...(activeBinding.modelVariant ? { variant: activeBinding.modelVariant } : {}),

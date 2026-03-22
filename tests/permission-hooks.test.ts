@@ -266,16 +266,18 @@ test("permission callback replies through the OpenCode client and updates local 
 test("session.error suppresses foreground child-session notifications and clears tracking", async () => {
     const { runtime, messages } = createRuntime();
 
-    runtime.container.foregroundSessionTracker.begin(303, "session-child");
+    const foregroundRequest = runtime.container.foregroundSessionTracker.acquire(303);
+    foregroundRequest?.attachSession("session-child");
 
     await handleTelegramBotPluginEvent(runtime, {
         type: "session.error",
         properties: {
             sessionID: "session-child",
             error: {
-                name: "PromptFailed",
+                name: "APIError",
                 data: {
                     message: "boom",
+                    statusCode: 400,
                 },
             },
         },
@@ -283,6 +285,9 @@ test("session.error suppresses foreground child-session notifications and clears
 
     assert.deepEqual(messages, []);
     assert.equal(runtime.container.foregroundSessionTracker.isForeground("session-child"), false);
+    assert.equal(foregroundRequest?.signal.aborted, true);
+    assert.equal((foregroundRequest?.signal.reason as { name?: string })?.name, "APIError");
+    assert.equal((foregroundRequest?.signal.reason as { data?: { message?: string } })?.data?.message, "boom");
 });
 
 test("session.idle suppresses foreground child-session notifications and clears tracking", async () => {

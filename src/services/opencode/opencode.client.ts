@@ -8,6 +8,7 @@ import type {
     LspStatus,
     McpStatus,
     Model,
+    OutputFormat,
     Part,
     Path,
     Provider,
@@ -15,7 +16,7 @@ import type {
     Session,
     SessionStatus,
 } from "@opencode-ai/sdk/v2/client";
-import { z } from "zod";
+import { stripMarkdownToPlainText } from "../../infra/utils/markdown-text.js";
 
 export interface OpenCodeClientOptions {
     baseUrl: string;
@@ -41,7 +42,7 @@ export interface PromptSessionInput {
     sessionId: string;
     prompt?: string | null;
     agent?: string | null;
-    structured?: boolean;
+    format?: OpenCodeTextOutputFormat;
     signal?: AbortSignal;
     model?: {
         providerID: string;
@@ -113,6 +114,7 @@ export interface OpenCodeConfiguredModel {
     reasoning: boolean;
     variants: Record<string, Record<string, unknown>>;
 }
+export type OpenCodeTextOutputFormat = Extract<OutputFormat, { type: "text" }>;
 
 type RawSdkRequestOptions = {
     responseStyle?: "data" | "fields";
@@ -230,7 +232,6 @@ export interface OpenCodeAssistantMessage {
     providerID?: string;
     role?: "assistant";
     sessionID?: string;
-    structured?: unknown;
     summary?: boolean;
     time?: {
         completed?: number;
@@ -259,28 +260,13 @@ const DEFAULT_OPENCODE_PROMPT_TIMEOUT_POLICY: OpenCodePromptTimeoutPolicy = {
     recoveryInactivityTimeoutMs: 120_000,
     waitTimeoutMs: 1_800_000,
 };
-const STRUCTURED_REPLY_SCHEMA = {
-    type: "json_schema" as const,
-    retryCount: 2,
-    schema: {
-        type: "object",
-        additionalProperties: false,
-        required: ["body_md"],
-        properties: {
-            body_md: {
-                type: "string",
-                description: "Markdown body only. Do not include duration, token usage, or any footer. Do not wrap the whole answer in ```md or ```markdown fences. Use Markdown formatting directly unless the user explicitly asks for raw Markdown source.",
-            },
-        },
-    },
-};
 const SDK_OPTIONS = {
     responseStyle: "data" as const,
     throwOnError: true as const,
 };
-const StructuredReplySchema = z.object({
-    body_md: z.string(),
-});
+const TEXT_OUTPUT_FORMAT: OpenCodeTextOutputFormat = {
+    type: "text",
+};
 
 export interface OpenCodeClientLike {
     readonly client?: OpenCodeSdkClientLike;
@@ -661,7 +647,6 @@ export class OpenCodeClient implements OpenCodeClientLike {
             emptyResponseText: EMPTY_RESPONSE_TEXT,
             finishedAt,
             startedAt,
-            structured: input.structured ?? false,
         });
     }
 
@@ -671,9 +656,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
         knownMessageIds: Set<string>,
         startedAt: number,
     ): Promise<OpenCodePromptResponse> {
-        const structured = input.structured ?? false;
-
-        if (data && shouldReturnPromptResponseImmediately(data, structured)) {
+        if (data && shouldReturnPromptResponseImmediately(data)) {
             return data;
         }
 
@@ -683,7 +666,6 @@ export class OpenCodeClient implements OpenCodeClientLike {
             initialParentId: data ? toAssistantMessage(data.info)?.parentID ?? null : null,
             knownMessageIds,
             requestStartedAt: resolvePromptCandidateStartTime(startedAt, data),
-            structured,
         };
         let bestCandidate = selectPromptResponseCandidate(
             data ? [data] : [],
@@ -728,7 +710,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
                     );
 
                     if (nextCandidate) {
-                        if (didPromptResponseAdvance(bestCandidate, nextCandidate, structured)) {
+                        if (didPromptResponseAdvance(bestCandidate, nextCandidate)) {
                             lastProgressAt = Date.now();
                             idleStatusSeen = false;
                         }
@@ -739,7 +721,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
                     if (
                         bestCandidate
                         && isPromptResponseForCurrentRequest(bestCandidate, candidateOptions)
-                        && shouldReturnPromptResponseImmediately(bestCandidate, structured)
+                        && shouldReturnPromptResponseImmediately(bestCandidate)
                     ) {
                         return bestCandidate;
                     }
@@ -760,7 +742,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
                 );
 
                 if (nextCandidate) {
-                    if (didPromptResponseAdvance(bestCandidate, nextCandidate, structured)) {
+                    if (didPromptResponseAdvance(bestCandidate, nextCandidate)) {
                         lastProgressAt = Date.now();
                         idleStatusSeen = false;
                     }
@@ -771,7 +753,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
                 if (
                     bestCandidate
                     && isPromptResponseForCurrentRequest(bestCandidate, candidateOptions)
-                    && shouldReturnPromptResponseImmediately(bestCandidate, structured)
+                    && shouldReturnPromptResponseImmediately(bestCandidate)
                 ) {
                     return bestCandidate;
                 }
@@ -795,7 +777,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
             if (
                 bestCandidate
                 && isPromptResponseForCurrentRequest(bestCandidate, candidateOptions)
-                && isCompletedEmptyPromptResponse(bestCandidate, structured)
+                && isCompletedEmptyPromptResponse(bestCandidate)
                 && status?.type !== "busy"
                 && status?.type !== "retry"
             ) {
@@ -824,12 +806,12 @@ export class OpenCodeClient implements OpenCodeClientLike {
 
         if (
             lastStatus?.type === "idle"
-            && (!requestScopedResolved || shouldPollPromptMessage(requestScopedResolved, structured))
+            && (!requestScopedResolved || shouldPollPromptMessage(requestScopedResolved))
         ) {
             throw createMessageAbortedError();
         }
 
-        if (!requestScopedResolved || shouldPollPromptMessage(requestScopedResolved, structured)) {
+        if (!requestScopedResolved || shouldPollPromptMessage(requestScopedResolved)) {
             const timeoutReason = Date.now() >= deadlineAt
                 ? "max-wait"
                 : "recovery-inactivity";
@@ -1038,9 +1020,10 @@ export class OpenCodeClient implements OpenCodeClientLike {
             | { type: "file"; filename?: string; mime: string; url: string }
         >,
     ): Promise<void> {
+        const format = input.format ?? TEXT_OUTPUT_FORMAT;
         const requestBody = {
             ...(input.agent ? { agent: input.agent } : {}),
-            ...(input.structured ? { format: STRUCTURED_REPLY_SCHEMA } : {}),
+            format,
             ...(input.model ? { model: input.model } : {}),
             ...(input.variant ? { variant: input.variant } : {}),
             parts,
@@ -1436,14 +1419,14 @@ function buildPromptSessionResult(
         emptyResponseText: string;
         finishedAt: number;
         startedAt: number;
-        structured: boolean;
     },
 ): PromptSessionResult {
     const assistantInfo = toAssistantMessage(data.info);
-    const structuredPayload = extractStructuredPayload(assistantInfo);
-    const bodyMd = options.structured ? extractStructuredMarkdown(structuredPayload) : null;
     const responseParts = Array.isArray(data.parts) ? data.parts : [];
-    const fallbackText = extractTextFromParts(responseParts) || bodyMd || options.emptyResponseText;
+    const bodyMd = extractTextFromParts(responseParts) || null;
+    const fallbackText = bodyMd
+        ? stripMarkdownToPlainText(bodyMd) || bodyMd
+        : options.emptyResponseText;
 
     return {
         assistantError: assistantInfo?.error ?? null,
@@ -1452,38 +1435,34 @@ function buildPromptSessionResult(
         info: assistantInfo,
         metrics: extractPromptMetrics(assistantInfo, options.startedAt, options.finishedAt),
         parts: responseParts,
-        structured: structuredPayload ?? null,
+        structured: null,
     };
 }
 
 function shouldPollPromptMessage(
     data: OpenCodePromptResponse,
-    structured: boolean,
 ): boolean {
     const assistantInfo = toAssistantMessage(data.info);
-    const bodyMd = structured ? extractStructuredMarkdown(extractStructuredPayload(assistantInfo)) : null;
     const responseParts = Array.isArray(data.parts) ? data.parts : [];
     const hasText = extractTextFromParts(responseParts).length > 0;
     const hasAssistantError = !!assistantInfo?.error;
     const isCompleted = isAssistantMessageCompleted(assistantInfo);
 
-    return !hasText && !bodyMd && !hasAssistantError && !isCompleted;
+    return !hasText && !hasAssistantError && !isCompleted;
 }
 
 function shouldReturnPromptResponseImmediately(
     data: OpenCodePromptResponse,
-    structured: boolean,
 ): boolean {
-    return !shouldPollPromptMessage(data, structured)
-        && !isCompletedEmptyPromptResponse(data, structured);
+    return !shouldPollPromptMessage(data)
+        && !isCompletedEmptyPromptResponse(data);
 }
 
 function isPromptResponseUsable(
     data: OpenCodePromptResponse,
-    structured: boolean,
 ): boolean {
-    return !shouldPollPromptMessage(data, structured)
-        && !isCompletedEmptyPromptResponse(data, structured);
+    return !shouldPollPromptMessage(data)
+        && !isCompletedEmptyPromptResponse(data);
 }
 
 function normalizePromptResponse(response: OpenCodePromptResponse | null | undefined): OpenCodePromptResponse {
@@ -1575,12 +1554,6 @@ function toAssistantMessage(message: unknown): OpenCodeAssistantMessage | null {
         normalized.sessionID = message.sessionID;
     }
 
-    const structuredPayload = extractStructuredPayload(message);
-
-    if (structuredPayload !== null) {
-        normalized.structured = structuredPayload;
-    }
-
     if ("summary" in message && typeof message.summary === "boolean") {
         normalized.summary = message.summary;
     }
@@ -1666,10 +1639,9 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
 function didPromptResponseAdvance(
     previous: OpenCodePromptResponse | null,
     next: OpenCodePromptResponse,
-    structured: boolean,
 ): boolean {
-    return getPromptResponseProgressSignature(previous, structured)
-        !== getPromptResponseProgressSignature(next, structured);
+    return getPromptResponseProgressSignature(previous)
+        !== getPromptResponseProgressSignature(next);
 }
 
 function createOpenCodePromptTimeoutError(
@@ -1703,18 +1675,6 @@ function resolvePromptEndpointKind(stage: OpenCodePromptTimeoutStage): "message"
 
 function getPromptMessagePollDelayMs(attempt: number): number {
     return PROMPT_MESSAGE_POLL_INITIAL_DELAYS_MS[attempt] ?? PROMPT_MESSAGE_POLL_INTERVAL_MS;
-}
-
-function extractStructuredMarkdown(structured: unknown): string | null {
-    const parsed = StructuredReplySchema.safeParse(structured);
-
-    if (!parsed.success) {
-        return null;
-    }
-
-    const bodyMd = parsed.data.body_md.replace(/\r\n?/g, "\n").trim();
-
-    return bodyMd.length > 0 ? bodyMd : null;
 }
 
 function extractPromptMetrics(
@@ -1893,33 +1853,14 @@ function isAssistantMessageCompleted(
 
 function isCompletedEmptyPromptResponse(
     data: OpenCodePromptResponse,
-    structured: boolean,
 ): boolean {
     const assistantInfo = toAssistantMessage(data.info);
-    const bodyMd = structured ? extractStructuredMarkdown(extractStructuredPayload(assistantInfo)) : null;
     const responseParts = Array.isArray(data.parts) ? data.parts : [];
     const hasText = extractTextFromParts(responseParts).length > 0;
 
     return isAssistantMessageCompleted(assistantInfo)
         && !assistantInfo?.error
-        && !hasText
-        && !bodyMd;
-}
-
-function extractStructuredPayload(message: unknown): unknown | null {
-    if (!isPlainRecord(message)) {
-        return null;
-    }
-
-    if ("structured" in message && message.structured !== undefined) {
-        return message.structured;
-    }
-
-    if ("structured_output" in message && message.structured_output !== undefined) {
-        return message.structured_output;
-    }
-
-    return null;
+        && !hasText;
 }
 
 type PromptResponseCandidateOptions = {
@@ -1927,7 +1868,6 @@ type PromptResponseCandidateOptions = {
     initialParentId: string | null;
     knownMessageIds: Set<string>;
     requestStartedAt: number | null;
-    structured: boolean;
 };
 
 function selectPromptResponseCandidate(
@@ -1987,7 +1927,7 @@ function getPromptResponseCandidateRank(
             options.knownMessageIds,
             options.requestStartedAt,
         ),
-        isUsable: isPromptResponseUsable(message, options.structured),
+        isUsable: isPromptResponseUsable(message),
         sharesParent: !!assistant?.parentID && assistant.parentID === options.initialParentId,
     };
 }
@@ -2013,7 +1953,6 @@ function resolvePromptCandidateStartTime(
 
 function getPromptResponseProgressSignature(
     response: OpenCodePromptResponse | null,
-    structured: boolean,
 ): string {
     if (!response) {
         return "null";
@@ -2024,7 +1963,7 @@ function getPromptResponseProgressSignature(
 
     return JSON.stringify({
         assistantError: assistant?.error?.name ?? null,
-        bodyMd: structured ? extractStructuredMarkdown(extractStructuredPayload(assistant)) : null,
+        bodyMd: extractTextFromParts(responseParts) || null,
         completedAt: assistant?.time?.completed ?? null,
         finish: assistant?.finish ?? null,
         id: assistant?.id ?? null,
