@@ -460,16 +460,21 @@ export async function handlePermissionApprovalCallback(
         return;
     }
 
+    const copy = await getSafeChatCopy(dependencies.sessionRepo, ctx.chat.id, dependencies.logger);
+
     try {
         const approvals = await dependencies.permissionApprovalRepo.listByRequestId(parsed.requestId);
         const approval = approvals.find((item) => item.chatId === ctx.chat?.id);
-
-        await dependencies.opencodeClient.replyToPermission(
+        const accepted = await dependencies.opencodeClient.replyToPermission(
             parsed.requestId,
             parsed.reply,
             undefined,
-            approval?.sessionId,
         );
+
+        if (!accepted) {
+            await ctx.editMessageText(copy.permission.replyFailed);
+            return;
+        }
 
         if (approval) {
             await dependencies.permissionApprovalRepo.set({
@@ -479,10 +484,10 @@ export async function handlePermissionApprovalCallback(
             });
         }
 
-        await ctx.editMessageText(buildPermissionApprovalResolvedMessage(parsed.requestId, parsed.reply));
+        await ctx.editMessageText(buildPermissionApprovalResolvedMessage(parsed.requestId, parsed.reply, copy));
     } catch (error) {
         dependencies.logger.error({ error, requestId: parsed.requestId }, "failed to reply to permission request");
-        await ctx.editMessageText("Failed to reply to the permission request.");
+        await ctx.editMessageText(copy.permission.replyFailed);
     }
 }
 

@@ -1,5 +1,6 @@
-import type { Event as OpenCodeEvent } from "@opencode-ai/sdk";
+import { getSafeChatCopy } from "../bot/i18n.js";
 import type { PendingPermissionApproval, PermissionApprovalReply } from "../domain/permission/approval.entity.js";
+import type { AppLogger } from "../infra/logger/index.js";
 import { logPluginEvent } from "../infra/logger/index.js";
 import type { OpenCodePermissionRequest } from "../services/opencode/opencode.client.js";
 import {
@@ -9,7 +10,7 @@ import {
 } from "../services/permission/telegram-approval.js";
 import type { TelegramBotRuntime } from "./runtime.js";
 
-type OpenCodePluginEvent = OpenCodeEvent | {
+type OpenCodePluginEvent = {
     properties?: unknown;
     type: string;
 };
@@ -38,8 +39,7 @@ export async function handleTelegramBotPluginEvent(
     event: OpenCodePluginEvent,
 ): Promise<void> {
     switch (event.type) {
-        case "permission.asked":
-        case "permission.updated": {
+        case "permission.asked": {
             const request = normalizePermissionRequestEvent(event.properties);
 
             if (request) {
@@ -107,13 +107,13 @@ async function handlePermissionAsked(
         }
 
         try {
-            const message = await runtime.bot.api.sendMessage(
+            const copy = await getSafeChatCopy(runtime.container.sessionRepo, chatId, logger);
+            const message = await sendPermissionApprovalMessage(
+                runtime,
                 chatId,
-                buildPermissionApprovalMessage(request),
-                {
-                    parse_mode: "MarkdownV2",
-                    reply_markup: buildPermissionApprovalKeyboard(request.id),
-                },
+                request,
+                copy,
+                logger,
             );
 
             await runtime.container.permissionApprovalRepo.set({
@@ -153,10 +153,12 @@ async function handlePermissionReplied(
     await Promise.all(
         approvals.map(async (approval) => {
             try {
+                const copy = await getSafeChatCopy(runtime.container.sessionRepo, approval.chatId, logger);
+
                 await runtime.bot.api.editMessageText(
                     approval.chatId,
                     approval.messageId,
-                    buildPermissionApprovalResolvedMessage(event.requestId, event.reply),
+                    buildPermissionApprovalResolvedMessage(event.requestId, event.reply, copy),
                 );
             } catch (error) {
                 logger.warn(
@@ -198,9 +200,12 @@ async function handleSessionError(
         return;
     }
 
-    const message = extractSessionErrorMessage(event.error) ?? "Unknown session error.";
+    await notifyBoundChats(runtime, event.sessionId, async (chatId) => {
+        const copy = await getSafeChatCopy(runtime.container.sessionRepo, chatId, logger);
+        const message = extractSessionErrorMessage(event.error) ?? copy.sessionEvents.unknownError;
 
-    await notifyBoundChats(runtime, event.sessionId, `Session failed.\n\nSession: ${event.sessionId}\nError: ${message}`);
+        return copy.sessionEvents.failed(event.sessionId, message);
+    });
 }
 
 async function handleSessionIdle(
@@ -238,7 +243,7 @@ async function handleSessionStatus(
 async function notifyBoundChats(
     runtime: TelegramBotRuntime,
     sessionId: string,
-    text: string,
+    getText: (chatId: number) => Promise<string>,
 ): Promise<void> {
     const logger = runtime.container.logger.child({
         component: "plugin-event",
@@ -250,7 +255,7 @@ async function notifyBoundChats(
     await Promise.all(
         chatIds.map(async (chatId) => {
             try {
-                await runtime.bot.api.sendMessage(chatId, text);
+                await runtime.bot.api.sendMessage(chatId, await getText(chatId));
             } catch (error) {
                 logger.warn(
                     {
@@ -263,6 +268,46 @@ async function notifyBoundChats(
             }
         }),
     );
+}
+
+async function sendPermissionApprovalMessage(
+    runtime: TelegramBotRuntime,
+    chatId: number,
+    request: OpenCodePermissionRequest,
+    copy: Awaited<ReturnType<typeof getSafeChatCopy>>,
+    logger: AppLogger,
+) {
+    const message = buildPermissionApprovalMessage(request, copy);
+    const replyMarkup = buildPermissionApprovalKeyboard(request.id, copy);
+
+    try {
+        return await runtime.bot.api.sendMessage(
+            chatId,
+            message.preferred.text,
+            {
+                ...message.preferred.options,
+                reply_markup: replyMarkup,
+            },
+        );
+    } catch (error) {
+        logger.warn(
+            {
+                error,
+                chatId,
+                event: "plugin-event.permission.ask.markdown_delivery_failed",
+                requestId: request.id,
+            },
+            "failed to deliver MarkdownV2 permission request; retrying with plain text",
+        );
+
+        return runtime.bot.api.sendMessage(
+            chatId,
+            message.fallback.text,
+            {
+                reply_markup: replyMarkup,
+            },
+        );
+    }
 }
 
 function toResolvedApproval(
@@ -405,6 +450,10 @@ function extractSessionErrorMessage(error: unknown): string | null {
         return null;
     }
 
+    if (typeof error.message === "string" && error.message.trim().length > 0) {
+        return error.message.trim();
+    }
+
     if (isPlainRecord(error.data) && typeof error.data.message === "string" && error.data.message.trim().length > 0) {
         return error.data.message.trim();
     }
@@ -417,12 +466,16 @@ function normalizeForegroundSessionError(error: unknown): Error {
         return error;
     }
 
-    if (isPlainRecord(error) && typeof error.name === "string" && error.name.trim().length > 0) {
+    if (isPlainRecord(error)) {
         const normalized = new Error(extractSessionErrorMessage(error) ?? "Unknown session error.") as Error & {
             data?: Record<string, unknown>;
         };
 
-        normalized.name = error.name.trim();
+        const normalizedName = asNonEmptyString(error.name);
+
+        if (normalizedName) {
+            normalized.name = normalizedName;
+        }
 
         if (isPlainRecord(error.data)) {
             normalized.data = error.data;

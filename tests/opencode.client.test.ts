@@ -198,34 +198,6 @@ test("getHealth forwards SDK options to global.health without raw fallback argum
     }]]);
 });
 
-test("getHealth falls back to the raw /global/health endpoint for legacy injected SDK clients", async () => {
-    const calls: unknown[] = [];
-    const client = createClient({
-        _client: {
-            async get(options: unknown) {
-                calls.push(options);
-
-                return {
-                    data: {
-                        healthy: true,
-                        version: "1.2.27",
-                    },
-                };
-            },
-        },
-    });
-
-    assert.deepEqual(await client.getHealth(), {
-        healthy: true,
-        version: "1.2.27",
-    });
-    assert.deepEqual(calls, [{
-        responseStyle: "data",
-        throwOnError: true,
-        url: "/global/health",
-    }]);
-});
-
 test("listConfiguredPlugins returns the resolved OpenCode plugin specs from config.get", async () => {
     const calls: unknown[][] = [];
     const client = createClient({
@@ -263,7 +235,7 @@ test("listConfiguredPlugins returns the resolved OpenCode plugin specs from conf
         "opencode-tbot@latest",
         "file:///E:/repo/.opencode/plugins/local-dev.ts",
     ]);
-    assert.deepEqual(calls, [[{
+    assert.deepEqual(calls, [[undefined, {
         responseStyle: "data",
         throwOnError: true,
     }]]);
@@ -452,19 +424,19 @@ test("typed SDK helpers forward session, project, path, and permission operation
         metadata: {},
         always: [],
     }]);
-    assert.equal(await client.replyToPermission("request-1", "always", " approved ", "session-1"), true);
+    assert.equal(await client.replyToPermission("request-1", "always", " approved "), true);
 
     assert.deepEqual(calls, [
         {
             method: "project.list",
-            args: [{
+            args: [undefined, {
                 responseStyle: "data",
                 throwOnError: true,
             }],
         },
         {
             method: "project.current",
-            args: [{
+            args: [undefined, {
                 responseStyle: "data",
                 throwOnError: true,
             }],
@@ -472,12 +444,9 @@ test("typed SDK helpers forward session, project, path, and permission operation
         {
             method: "session.create",
             args: [{
-                query: {
-                    directory: "E:/repo-1",
-                },
-                body: {
-                    title: "My session",
-                },
+                directory: "E:/repo-1",
+                title: "My session",
+            }, {
                 responseStyle: "data",
                 throwOnError: true,
             }],
@@ -485,33 +454,30 @@ test("typed SDK helpers forward session, project, path, and permission operation
         {
             method: "session.update",
             args: [{
-                path: {
-                    id: "session-1",
-                },
-                body: {
-                    title: "Renamed",
-                },
+                sessionID: "session-1",
+                title: "Renamed",
+            }, {
                 responseStyle: "data",
                 throwOnError: true,
             }],
         },
         {
             method: "session.list",
-            args: [{
+            args: [undefined, {
                 responseStyle: "data",
                 throwOnError: true,
             }],
         },
         {
             method: "session.status",
-            args: [{
+            args: [undefined, {
                 responseStyle: "data",
                 throwOnError: true,
             }],
         },
         {
             method: "path.get",
-            args: [{
+            args: [undefined, {
                 responseStyle: "data",
                 throwOnError: true,
             }],
@@ -519,9 +485,8 @@ test("typed SDK helpers forward session, project, path, and permission operation
         {
             method: "lsp.status",
             args: [{
-                query: {
-                    directory: "E:/repo-1",
-                },
+                directory: "E:/repo-1",
+            }, {
                 responseStyle: "data",
                 throwOnError: true,
             }],
@@ -529,16 +494,15 @@ test("typed SDK helpers forward session, project, path, and permission operation
         {
             method: "mcp.status",
             args: [{
-                query: {
-                    directory: "E:/repo-1",
-                },
+                directory: "E:/repo-1",
+            }, {
                 responseStyle: "data",
                 throwOnError: true,
             }],
         },
         {
             method: "app.agents",
-            args: [{
+            args: [undefined, {
                 responseStyle: "data",
                 throwOnError: true,
             }],
@@ -546,9 +510,8 @@ test("typed SDK helpers forward session, project, path, and permission operation
         {
             method: "session.abort",
             args: [{
-                path: {
-                    id: "session-1",
-                },
+                sessionID: "session-1",
+            }, {
                 responseStyle: "data",
                 throwOnError: true,
             }],
@@ -556,12 +519,9 @@ test("typed SDK helpers forward session, project, path, and permission operation
         {
             method: "session.fork",
             args: [{
-                path: {
-                    id: "session-1",
-                },
-                body: {
-                    messageID: "message-9",
-                },
+                sessionID: "session-1",
+                messageID: "message-9",
+            }, {
                 responseStyle: "data",
                 throwOnError: true,
             }],
@@ -569,9 +529,8 @@ test("typed SDK helpers forward session, project, path, and permission operation
         {
             method: "session.delete",
             args: [{
-                path: {
-                    id: "session-2",
-                },
+                sessionID: "session-2",
+            }, {
                 responseStyle: "data",
                 throwOnError: true,
             }],
@@ -579,64 +538,7 @@ test("typed SDK helpers forward session, project, path, and permission operation
         {
             method: "permission.list",
             args: [{
-                query: {
-                    directory: "E:/repo-1",
-                },
-                responseStyle: "data",
-                throwOnError: true,
-            }],
-        },
-        {
-            method: "permission.reply",
-            args: [{
-                path: {
-                    id: "session-1",
-                    permissionID: "request-1",
-                },
-                body: {
-                    response: "always",
-                    message: "approved",
-                },
-                responseStyle: "data",
-                throwOnError: true,
-            }],
-        },
-    ]);
-});
-
-test("typed SDK helpers keep supporting legacy two-argument client methods when the runtime injects them", async () => {
-    const calls: Array<{ args: unknown[]; method: string }> = [];
-    const session = createSession("session-legacy", "project-1", "E:/repo-1");
-    const client = createClient({
-        permission: {
-            async reply(parameters: unknown, options: unknown) {
-                calls.push({ args: [parameters, options], method: "permission.reply" });
-
-                return {
-                    data: true,
-                };
-            },
-        },
-        session: {
-            async create(parameters: unknown, options: unknown) {
-                calls.push({ args: [parameters, options], method: "session.create" });
-
-                return {
-                    data: session,
-                };
-            },
-        },
-    });
-
-    assert.equal((await client.createSessionForDirectory("E:/repo-1", "Legacy")).id, "session-legacy");
-    assert.equal(await client.replyToPermission("request-legacy", "once", " okay ", undefined), true);
-
-    assert.deepEqual(calls, [
-        {
-            method: "session.create",
-            args: [{
                 directory: "E:/repo-1",
-                title: "Legacy",
             }, {
                 responseStyle: "data",
                 throwOnError: true,
@@ -645,9 +547,9 @@ test("typed SDK helpers keep supporting legacy two-argument client methods when 
         {
             method: "permission.reply",
             args: [{
-                requestID: "request-legacy",
-                reply: "once",
-                message: "okay",
+                requestID: "request-1",
+                reply: "always",
+                message: "approved",
             }, {
                 responseStyle: "data",
                 throwOnError: true,
@@ -718,36 +620,34 @@ test("promptSession prefers promptAsync, forwards the typed async payload, and r
     assert.equal(result.fallbackText, "Hello");
     assert.deepEqual(promptAsyncCalls.length, 1);
     assert.deepEqual(promptAsyncCalls[0]?.[0], {
-        path: {
-            id: "session-1",
+        sessionID: "session-1",
+        agent: "planner",
+        format: {
+            type: "text",
         },
-        body: {
-            agent: "planner",
-            format: {
-                type: "text",
-            },
-            model: {
-                providerID: "openai",
-                modelID: "gpt-5.4",
-            },
-            variant: "high",
-            parts: [{
-                type: "text",
-                text: "hello from telegram",
-            }, {
-                type: "file",
-                filename: "diagram.png",
-                mime: "image/png",
-                url: "https://example.com/diagram.png",
-            }],
+        model: {
+            providerID: "openai",
+            modelID: "gpt-5.4",
         },
+        variant: "high",
+        parts: [{
+            type: "text",
+            text: "hello from telegram",
+        }, {
+            type: "file",
+            filename: "diagram.png",
+            mime: "image/png",
+            url: "https://example.com/diagram.png",
+        }],
+    });
+    assert.deepEqual(promptAsyncCalls[0]?.[1], {
         responseStyle: "data",
         throwOnError: true,
-        signal: promptAsyncCalls[0]?.[0] && typeof promptAsyncCalls[0][0] === "object"
-            ? (promptAsyncCalls[0][0] as { signal?: AbortSignal }).signal
+        signal: promptAsyncCalls[0]?.[1] && typeof promptAsyncCalls[0][1] === "object"
+            ? (promptAsyncCalls[0][1] as { signal?: AbortSignal }).signal
             : undefined,
     });
-    assert.ok((promptAsyncCalls[0]?.[0] as { signal?: unknown }).signal instanceof AbortSignal);
+    assert.ok((promptAsyncCalls[0]?.[1] as { signal?: unknown }).signal instanceof AbortSignal);
 });
 
 test("promptSession polls messages and status until a new assistant reply appears", async () => {

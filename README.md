@@ -8,7 +8,7 @@ A Telegram plugin for driving [OpenCode](https://opencode.ai) from chat.
 
 ## Overview
 
-`opencode-tbot` lets you operate OpenCode from Telegram with a single bot binding per chat.
+`opencode-tbot` lets you operate OpenCode from Telegram with one binding per chat.
 
 - Plain text messages are forwarded to the current OpenCode session.
 - Telegram photos and image documents are uploaded as OpenCode file parts.
@@ -35,12 +35,22 @@ npm exec --package opencode-tbot@latest opencode-tbot -- install
 
 The installer:
 
-- registers `opencode-tbot@latest` in the global OpenCode plugin list
-- updates the resolved OpenCode config file
-- writes or merges the global plugin runtime config
-- prints the OpenCode config path, plugin config path, and default plugin log directory
+- writes `~/.config/opencode/plugins/opencode-tbot.js`
+- creates missing parent directories automatically
+- writes or merges `~/.config/opencode/opencode-tbot/config.json`
+- prints the plugin bridge path, plugin config path, and default plugin log directory
 
-If `~/.config/opencode/opencode.jsonc` already exists, the installer updates that file. Otherwise it uses `~/.config/opencode/opencode.json`.
+`install` is the default command. This also works for a non-interactive install:
+
+```bash
+npm exec --package opencode-tbot@latest opencode-tbot -- --bot-token <token>
+```
+
+Refresh the global plugin bridge without changing your bot token:
+
+```bash
+npm exec --package opencode-tbot@latest opencode-tbot -- update
+```
 
 Check the installed CLI version:
 
@@ -48,17 +58,7 @@ Check the installed CLI version:
 npm exec --package opencode-tbot@latest opencode-tbot -- --version
 ```
 
-Update the registered npm plugin spec in OpenCode without touching your bot token:
-
-```bash
-npm exec --package opencode-tbot@latest opencode-tbot -- update
-```
-
-`install` is the default command. For example, this also works for a non-interactive install:
-
-```bash
-npm exec --package opencode-tbot@latest opencode-tbot -- --bot-token <token>
-```
+`install` and `update` only manage the global bridge and plugin config. They do not rewrite `opencode.json` or `opencode.jsonc`.
 
 ### CLI Options
 
@@ -66,32 +66,26 @@ npm exec --package opencode-tbot@latest opencode-tbot -- --bot-token <token>
 
 - `--bot-token <token>` set the Telegram bot token non-interactively
 - `--telegram-api-root <url>` override the Telegram Bot API root
-- `--plugin-spec <spec>` register a custom npm plugin spec
-- `--skip-register` only rewrite plugin config without touching OpenCode plugin registration
+- `--skip-register` only rewrite plugin config without touching the global plugin bridge
 - `--home-dir <path>` use a custom home directory
 
 `update` supports:
 
-- `--plugin-spec <spec>`
 - `--home-dir <path>`
 
 ## Configuration
 
-Runtime config is loaded only from:
+Runtime config is loaded from:
 
 - `~/.config/opencode/opencode-tbot/config.json`
 
-OpenCode plugin registration is stored in the global OpenCode config:
+Programmatic callers may also inject config explicitly. When present, injected values override file values.
 
-- `~/.config/opencode/opencode.jsonc` when present
-- otherwise `~/.config/opencode/opencode.json`
+OpenCode loads the global plugin bridge from:
 
-This plugin does not read runtime settings from `.env`. Use the global JSON config instead.
+- `~/.config/opencode/plugins/opencode-tbot.js`
 
-Legacy behavior:
-
-- `<worktree>/tbot.config.json` is ignored at runtime. If one is present, the plugin logs a warning so you can migrate it.
-- legacy `openrouter` voice-transcription settings are ignored at runtime and removed when the installer rewrites the config
+This plugin does not read runtime settings from `.env`.
 
 ### Example `config.json`
 
@@ -123,8 +117,7 @@ Legacy behavior:
         "maxTotalBytes": 314572800
       }
     }
-  },
-  "logLevel": "info"
+  }
 }
 ```
 
@@ -140,21 +133,20 @@ Legacy behavior:
 | `prompt.pollRequestTimeoutMs` | No | `15000` | Timeout for each individual recovery poll request to OpenCode. |
 | `prompt.recoveryInactivityTimeoutMs` | No | `120000` | Recovery timeout that only applies when prompt progress stops advancing. |
 | `logging.level` | No | `info` | Structured log level for host and file sinks. Accepted values normalize to `debug`, `info`, `warn`, or `error`. |
-| `logging.sinks.host` | No | `true` | Enable OpenCode host logging through `client.app.log({ body: ... })`. |
+| `logging.sinks.host` | No | `true` | Enable OpenCode host logging through `client.app.log(...)`. |
 | `logging.sinks.file` | No | `true` | Enable plugin-owned JSONL file logs. |
 | `logging.file.dir` | No | `%USERPROFILE%/.local/share/opencode/log/plugins/opencode-tbot` | Plugin JSONL log directory. Relative paths are resolved from the current OpenCode worktree. |
 | `logging.file.retention.maxFiles` | No | `30` | Maximum number of retained plugin log files. |
 | `logging.file.retention.maxTotalBytes` | No | `314572800` | Maximum total size of retained plugin log files. |
-| `logLevel` | No | `info` | Legacy alias for `logging.level`. Still accepted for compatibility. |
 
 ### Notes
 
 - `state.path` is resolved relative to the current OpenCode worktree.
-- Relative `logging.file.dir` values are also resolved from the current worktree.
+- Relative `logging.file.dir` values are also resolved from the current OpenCode worktree.
 - Telegram prompt handling is async-first: the plugin submits `session.promptAsync()` and then recovers the reply from session messages and session status.
 - If `telegram.allowedChatIds` is left empty, the bot accepts messages from any chat. Restrict it in production.
 - Permission approvals and session error notifications are handled through plugin hooks.
-- `/language` currently supports English, Simplified Chinese, and Japanese, and syncs localized Telegram command descriptions for that chat.
+- `/language` supports English, Simplified Chinese, and Japanese, and syncs localized Telegram command descriptions for that chat.
 - File logs are metadata-only by default. Prompt bodies, attachment contents, raw URLs, and secrets are not written.
 
 ## Quick Start
@@ -235,7 +227,7 @@ npm install -g opencode-ai
 $env:OPENCODE_HOST_E2E="1"; pnpm test
 ```
 
-Normal usage should rely on the globally installed npm plugin plus the global OpenCode config. This repository does not ship a default `.opencode/plugins` bridge.
+Normal usage should rely on the generated global bridge at `~/.config/opencode/plugins/opencode-tbot.js` plus the global plugin config. This repository does not ship a default project-local `.opencode/plugins` bridge.
 
 If you need source-based local loading while developing in this repository, create `.opencode/plugins/opencode-tbot.ts` manually:
 
@@ -243,7 +235,7 @@ If you need source-based local loading while developing in this repository, crea
 export { default } from "../../src/plugin.ts";
 ```
 
-Keep only one loading path enabled at a time: either the manual local bridge or the globally installed `opencode-tbot@latest` plugin.
+Keep only one loading path enabled at a time: either the manual local bridge or the generated global bridge in `~/.config/opencode/plugins/`.
 
 ## FAQ
 
@@ -251,9 +243,9 @@ Keep only one loading path enabled at a time: either the manual local bridge or 
 
 Yes. This repository provides a Telegram integration layer and depends on the OpenCode host process that loads the plugin.
 
-### Why does OpenCode show the plugin as `file:///.../node_modules/...`?
+### Why can the generated bridge point to `file:///.../node_modules/...`?
 
-That usually means a local project has `opencode-tbot` installed in its own `node_modules`. The CLI warns when it detects that layout. Remove the local package with `npm uninstall opencode-tbot` in that project and use the recommended `npm exec --package ...` install flow instead.
+That usually means the installer was run from a local project that has `opencode-tbot` in its own `node_modules`, so the generated bridge points at that package location. Re-run the recommended `npm exec --package ...` install flow if you want the bridge to target the published package directly.
 
 ### Is this an official OpenCode project?
 

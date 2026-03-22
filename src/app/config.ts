@@ -74,7 +74,6 @@ const AppConfigSchema = z.object({
     state: StateConfigSchema,
     prompt: PromptConfigSchema,
     logging: LoggingConfigSchema.default({}),
-    logLevel: z.string().trim().min(1).optional(),
 });
 
 export interface PluginConfigSource {
@@ -112,7 +111,6 @@ export interface PluginConfigSource {
         };
         [key: string]: unknown;
     };
-    logLevel?: string;
     [key: string]: unknown;
 }
 
@@ -120,7 +118,6 @@ export interface AppConfig {
     telegramBotToken: string;
     telegramAllowedChatIds: number[];
     telegramApiRoot: string;
-    logLevel: string;
     loggingLevel: string;
     loggingHostSinkEnabled: boolean;
     loggingFileSinkEnabled: boolean;
@@ -154,13 +151,12 @@ function buildAppConfig(
     options: LoadAppConfigOptions,
 ): AppConfig {
     const cwd = options.cwd ?? process.cwd();
-    const loggingLevel = normalizeLogLevelValue(data.logging.level ?? data.logLevel);
+    const loggingLevel = normalizeLogLevelValue(data.logging.level);
 
     return {
         telegramBotToken: data.telegram.botToken,
         telegramAllowedChatIds: data.telegram.allowedChatIds,
         telegramApiRoot: normalizeApiRoot(data.telegram.apiRoot),
-        logLevel: loggingLevel,
         loggingLevel,
         loggingHostSinkEnabled: data.logging.sinks.host,
         loggingFileSinkEnabled: data.logging.sinks.file,

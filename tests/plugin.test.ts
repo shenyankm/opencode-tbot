@@ -11,7 +11,6 @@ import {
 } from "../src/app/config.js";
 import {
     mergePluginConfigSources,
-    PLUGIN_CONFIG_FILE_NAME,
     preparePluginConfiguration,
     serializePluginConfig,
     type PreparedPluginConfiguration,
@@ -31,7 +30,6 @@ function createConfig(overrides: PluginConfigSource = {}): PluginConfigSource {
         state: {
             path: "./data/opencode-tbot.state.json",
         },
-        logLevel: "info",
     }, overrides);
 }
 
@@ -101,70 +99,6 @@ function createSdkClientStub(): OpenCodeSdkClientLike {
     } as never;
 }
 
-function createLegacySdkClientStub(): OpenCodeSdkClientLike {
-    return {
-        app: {
-            agents: async () => [],
-        },
-        config: {
-            get: async () => ({ provider: {} }),
-            providers: async () => ({ providers: [], default: {} }),
-        },
-        lsp: {
-            status: async () => [],
-        },
-        mcp: {
-            status: async () => ({}),
-        },
-        path: {
-            get: async () => ({
-                home: "E:/Users/demo",
-                state: "E:/Users/demo/.opencode",
-                config: "E:/repo/opencode.json",
-                worktree: "E:/repo",
-                directory: "E:/repo",
-            }),
-        },
-        project: {
-            current: async () => ({
-                id: "project-1",
-                worktree: "E:/repo",
-                time: { created: 1, updated: 1 },
-                sandboxes: [],
-            }),
-            list: async () => [],
-        },
-        session: {
-            abort: async () => false,
-            create: async () => ({
-                id: "session-1",
-                slug: "session-1",
-                projectID: "project-1",
-                directory: "E:/repo",
-                title: "Session",
-                version: "1",
-                time: { created: 1, updated: 1 },
-            }),
-            list: async () => [],
-            prompt: async () => ({
-                info: {} as never,
-                parts: [],
-            }),
-            status: async () => ({}),
-            update: async () => ({
-                id: "session-1",
-                slug: "session-1",
-                projectID: "project-1",
-                directory: "E:/repo",
-                title: "Session",
-                version: "1",
-                time: { created: 1, updated: 1 },
-            }),
-        },
-        postSessionIdPermissionsPermissionId: async () => ({ data: true }),
-    } as never;
-}
-
 function createContainerStub(cwd = "E:/workspace") {
     const calls = {
         dispose: 0,
@@ -202,15 +136,12 @@ function createPreparedConfiguration(
     fallbackConfig: PluginConfigSource,
     overrides: Partial<PreparedPluginConfiguration> = {},
 ): PreparedPluginConfiguration {
-    const globalConfigFilePath = join("E:/Users/demo", ".config", "opencode", "opencode-tbot", "config.json");
-    const projectConfigFilePath = join(cwd, PLUGIN_CONFIG_FILE_NAME);
+    const configFilePath = join("E:/Users/demo", ".config", "opencode", "opencode-tbot", "config.json");
 
     return {
         cwd,
         config: config ?? fallbackConfig,
-        globalConfigFilePath,
-        projectConfigFilePath,
-        configFilePath: globalConfigFilePath,
+        configFilePath,
         ...overrides,
     };
 }
@@ -222,16 +153,6 @@ test("loadAppConfig resolves plugin configuration from the config file shape", (
     assert.equal(config.telegramBotToken, "telegram-token");
     assert.equal(config.telegramApiRoot, "https://api.telegram.org");
     assert.equal(config.stateFilePath, join(cwd, "data/opencode-tbot.state.json"));
-});
-
-test("loadAppConfig ignores legacy openrouter configuration", () => {
-    const config = loadAppConfig(createConfig({
-        openrouter: {
-            apiKey: "openrouter-key",
-        },
-    }));
-
-    assert.equal("openrouter" in config, false);
 });
 
 test("loadAppConfig applies prompt timeout defaults and overrides", () => {
@@ -247,11 +168,11 @@ test("loadAppConfig applies prompt timeout defaults and overrides", () => {
     assert.equal(config.promptRecoveryInactivityTimeoutMs, 120_000);
 });
 
-test("loadAppConfig maps the structured logging section and keeps legacy logLevel compatibility", () => {
+test("loadAppConfig maps the structured logging section", () => {
     const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-logging-config-"));
     const config = loadAppConfig(createConfig({
-        logLevel: "debug",
         logging: {
+            level: "debug",
             file: {
                 retention: {
                     maxFiles: 7,
@@ -336,26 +257,18 @@ test("mergePluginConfigSources merges logging configuration by key", () => {
 test("preparePluginConfiguration loads telegram.botToken from the global config file", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-plugin-config-"));
     const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-home-config-"));
-    const globalConfigFilePath = join(homeDir, ".config", "opencode", "opencode-tbot", "config.json");
+    const configFilePath = join(homeDir, ".config", "opencode", "opencode-tbot", "config.json");
 
     mkdirSync(join(homeDir, ".config", "opencode", "opencode-tbot"), { recursive: true });
     writeFileSync(
-        globalConfigFilePath,
+        configFilePath,
         serializePluginConfig({
             telegram: {
                 botToken: "global-token",
             },
-            logLevel: "debug",
-        }),
-        "utf8",
-    );
-    writeFileSync(
-        join(cwd, PLUGIN_CONFIG_FILE_NAME),
-        serializePluginConfig({
-            telegram: {
-                botToken: "file-token",
+            logging: {
+                level: "debug",
             },
-            logLevel: "error",
         }),
         "utf8",
     );
@@ -366,19 +279,18 @@ test("preparePluginConfiguration loads telegram.botToken from the global config 
     });
 
     assert.equal(prepared.config.telegram?.botToken, "global-token");
-    assert.equal(prepared.config.logLevel, "debug");
-    assert.equal(prepared.configFilePath, globalConfigFilePath);
-    assert.equal(prepared.ignoredProjectConfigFilePath, join(cwd, PLUGIN_CONFIG_FILE_NAME));
+    assert.equal(prepared.config.logging?.level, "debug");
+    assert.equal(prepared.configFilePath, configFilePath);
 });
 
-test("preparePluginConfiguration ignores worktree overrides and preserves global defaults", async () => {
+test("preparePluginConfiguration merges explicit overrides on top of the global config file", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-plugin-merge-"));
     const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-home-"));
-    const globalConfigFilePath = join(homeDir, ".config", "opencode", "opencode-tbot", "config.json");
+    const configFilePath = join(homeDir, ".config", "opencode", "opencode-tbot", "config.json");
 
     mkdirSync(join(homeDir, ".config", "opencode", "opencode-tbot"), { recursive: true });
     writeFileSync(
-        globalConfigFilePath,
+        configFilePath,
         serializePluginConfig({
             telegram: {
                 botToken: "global-token",
@@ -386,91 +298,8 @@ test("preparePluginConfiguration ignores worktree overrides and preserves global
             state: {
                 path: "./global-state.json",
             },
-            openrouter: {
-                apiKey: "global-openrouter-key",
-            },
-            logLevel: "debug",
-        }),
-        "utf8",
-    );
-    writeFileSync(
-        join(cwd, PLUGIN_CONFIG_FILE_NAME),
-        serializePluginConfig({
-            state: {
-                path: "./project-state.json",
-            },
-            logLevel: "error",
-            openrouter: {
-                model: "openai/gpt-audio-mini",
-            },
-        }),
-        "utf8",
-    );
-
-    const prepared = await preparePluginConfiguration({
-        cwd,
-        homeDir,
-    });
-
-    assert.equal(prepared.config.telegram?.botToken, "global-token");
-    assert.equal(prepared.config.logLevel, "debug");
-    assert.equal(prepared.config.state?.path, "./global-state.json");
-    assert.equal("openrouter" in prepared.config, false);
-    assert.equal(prepared.globalConfigFilePath, globalConfigFilePath);
-    assert.equal(prepared.configFilePath, globalConfigFilePath);
-    assert.equal(prepared.projectConfigFilePath, join(cwd, PLUGIN_CONFIG_FILE_NAME));
-    assert.equal(prepared.ignoredProjectConfigFilePath, join(cwd, PLUGIN_CONFIG_FILE_NAME));
-});
-
-test("preparePluginConfiguration strips legacy openrouter config from global config and ignores worktree config", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-plugin-global-key-"));
-    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-home-global-key-"));
-    const globalConfigFilePath = join(homeDir, ".config", "opencode", "opencode-tbot", "config.json");
-
-    mkdirSync(join(homeDir, ".config", "opencode", "opencode-tbot"), { recursive: true });
-    writeFileSync(
-        globalConfigFilePath,
-        serializePluginConfig({
-            telegram: {
-                botToken: "global-token",
-            },
-            openrouter: {
-                apiKey: "global-openrouter-key",
-                model: "openai/gpt-audio-mini",
-            },
-        }),
-        "utf8",
-    );
-    writeFileSync(
-        join(cwd, PLUGIN_CONFIG_FILE_NAME),
-        serializePluginConfig({
-            openrouter: {
-                apiKey: "project-openrouter-key",
-                timeoutMs: 60_000,
-            },
-        }),
-        "utf8",
-    );
-
-    const prepared = await preparePluginConfiguration({
-        cwd,
-        homeDir,
-    });
-
-    assert.equal("openrouter" in prepared.config, false);
-    assert.equal(prepared.config.telegram?.botToken, "global-token");
-    assert.equal(prepared.configFilePath, globalConfigFilePath);
-    assert.equal(prepared.ignoredProjectConfigFilePath, join(cwd, PLUGIN_CONFIG_FILE_NAME));
-});
-
-test("preparePluginConfiguration keeps missing tokens unresolved for the installer flow", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-plugin-no-tty-"));
-    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-home-empty-"));
-    writeFileSync(
-        join(cwd, PLUGIN_CONFIG_FILE_NAME),
-        serializePluginConfig({
-            telegram: {
-                botToken: "file-token",
+            logging: {
+                level: "debug",
             },
         }),
         "utf8",
@@ -480,13 +309,40 @@ test("preparePluginConfiguration keeps missing tokens unresolved for the install
         cwd,
         homeDir,
         config: {
-            logLevel: "info",
+            state: {
+                path: "./override-state.json",
+            },
+            logging: {
+                sinks: {
+                    file: false,
+                },
+            },
+        },
+    });
+
+    assert.equal(prepared.config.telegram?.botToken, "global-token");
+    assert.equal(prepared.config.logging?.level, "debug");
+    assert.equal(prepared.config.logging?.sinks?.file, false);
+    assert.equal(prepared.config.state?.path, "./override-state.json");
+    assert.equal(prepared.configFilePath, configFilePath);
+});
+
+test("preparePluginConfiguration keeps missing tokens unresolved for the installer flow", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-plugin-no-tty-"));
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-home-empty-"));
+
+    const prepared = await preparePluginConfiguration({
+        cwd,
+        homeDir,
+        config: {
+            logging: {
+                level: "info",
+            },
         },
     });
 
     assert.equal(prepared.config.telegram?.botToken, undefined);
-    assert.equal(prepared.config.logLevel, "info");
-    assert.equal(prepared.ignoredProjectConfigFilePath, join(cwd, PLUGIN_CONFIG_FILE_NAME));
+    assert.equal(prepared.config.logging?.level, "info");
 });
 
 test("ensureTelegramBotPluginRuntime starts the Telegram runtime only once per worktree", async () => {
@@ -560,18 +416,18 @@ test("ensureTelegramBotPluginRuntime starts the Telegram runtime only once per w
     }
 });
 
-test("ensureTelegramBotPluginRuntime accepts legacy injected SDK clients", async () => {
+test("ensureTelegramBotPluginRuntime reuses the active runtime when a later plugin call omits context", async () => {
     await resetTelegramBotPluginRuntimeForTests();
 
     try {
-        const sdkClient = createLegacySdkClientStub();
+        const sdkClient = createSdkClientStub();
         const configSource = createConfig();
         let started = 0;
 
-        const runtime = await ensureTelegramBotPluginRuntime({
+        const first = await ensureTelegramBotPluginRuntime({
             context: {
                 client: sdkClient,
-                worktree: "E:/workspace-legacy",
+                worktree: "E:/workspace-reuse",
             },
             config: configSource,
             bootstrapApp: (
@@ -600,50 +456,18 @@ test("ensureTelegramBotPluginRuntime accepts legacy injected SDK clients", async
                 };
             },
         });
-
-        assert.ok(runtime);
-        assert.equal(started, 1);
-    } finally {
-        await resetTelegramBotPluginRuntimeForTests();
-    }
-});
-
-test("ensureTelegramBotPluginRuntime warns when a legacy worktree config exists", async () => {
-    await resetTelegramBotPluginRuntimeForTests();
-
-    try {
-        const sdkClient = createSdkClientStub();
-        const configSource = createConfig();
-        let containerCalls: ContainerStubCalls | undefined;
-        const bootstrapApp = (
-            _client: OpenCodeSdkClientLike,
-            runtimeConfig: PluginConfigSource | undefined,
-            options: { cwd?: string } = {},
-        ) => {
-            const stub = createContainerStub(String(options.cwd));
-            containerCalls = stub.calls;
-
-            return {
-                config: loadAppConfig(runtimeConfig, options),
-                container: stub.container,
-            };
-        };
-
-        await ensureTelegramBotPluginRuntime({
-            context: {
-                client: sdkClient,
-                worktree: "E:/workspace",
-            },
+        const second = await ensureTelegramBotPluginRuntime({
+            context: undefined,
             config: configSource,
-            bootstrapApp,
-            prepareConfiguration: async ({ cwd, config }) => createPreparedConfiguration(
-                cwd,
-                config,
-                configSource,
-                {
-                    ignoredProjectConfigFilePath: join(cwd, PLUGIN_CONFIG_FILE_NAME),
-                },
-            ),
+            bootstrapApp: (
+                _client: OpenCodeSdkClientLike,
+                runtimeConfig: PluginConfigSource | undefined,
+                options: { cwd?: string } = {},
+            ) => ({
+                config: loadAppConfig(runtimeConfig, options),
+                container: createContainerStub(String(options.cwd)).container,
+            }),
+            prepareConfiguration: async ({ cwd, config }) => createPreparedConfiguration(cwd, config, configSource),
             startRuntime: async (input) => ({
                 bot: {} as never,
                 container: input.container,
@@ -654,17 +478,74 @@ test("ensureTelegramBotPluginRuntime warns when a legacy worktree config exists"
             }),
         });
 
-        assert.equal(containerCalls?.warn.length, 1);
-        assert.match(
-            containerCalls?.warn[0]?.message ?? "",
-            /legacy worktree plugin config is ignored/u,
-        );
-        assert.deepEqual(containerCalls?.warn[0]?.input, {
-            cwd: "E:/workspace",
-            event: "runtime.config.legacy_worktree_ignored",
-            ignoredProjectConfigFilePath: join("E:/workspace", PLUGIN_CONFIG_FILE_NAME),
-            globalConfigFilePath: join("E:/Users/demo", ".config", "opencode", "opencode-tbot", "config.json"),
+        assert.equal(first, second);
+        assert.equal(started, 1);
+    } finally {
+        await resetTelegramBotPluginRuntimeForTests();
+    }
+});
+
+test("ensureTelegramBotPluginRuntime starts when only directory is provided", async () => {
+    await resetTelegramBotPluginRuntimeForTests();
+
+    try {
+        const sdkClient = createSdkClientStub();
+        const configSource = createConfig();
+        let startedCwd: string | null = null;
+
+        const runtime = await ensureTelegramBotPluginRuntime({
+            context: {
+                client: sdkClient,
+                directory: "E:/workspace-directory-only",
+            },
+            config: configSource,
+            bootstrapApp: (
+                client: OpenCodeSdkClientLike,
+                runtimeConfig: PluginConfigSource | undefined,
+                options: { cwd?: string } = {},
+            ) => {
+                assert.equal(client, sdkClient);
+
+                return {
+                    config: loadAppConfig(runtimeConfig, options),
+                    container: createContainerStub(String(options.cwd)).container,
+                };
+            },
+            prepareConfiguration: async ({ cwd, config }) => createPreparedConfiguration(cwd, config, configSource),
+            startRuntime: async (input) => {
+                startedCwd = (input.container as AppContainer & { __cwd: string }).__cwd;
+
+                return {
+                    bot: {} as never,
+                    container: input.container,
+                    stop() { },
+                    dispose() {
+                        input.container.dispose();
+                    },
+                };
+            },
         });
+
+        assert.ok(runtime);
+        assert.equal(startedCwd, "E:/workspace-directory-only");
+    } finally {
+        await resetTelegramBotPluginRuntimeForTests();
+    }
+});
+
+test("ensureTelegramBotPluginRuntime throws a readable error when the first plugin call is missing client", async () => {
+    await resetTelegramBotPluginRuntimeForTests();
+
+    try {
+        await assert.rejects(
+            ensureTelegramBotPluginRuntime({
+                context: {
+                    worktree: "E:/workspace-missing-client",
+                },
+                config: createConfig(),
+            }),
+            /OpenCode plugin context\.client is required\./u,
+        );
     } finally {
         await resetTelegramBotPluginRuntimeForTests();
     }

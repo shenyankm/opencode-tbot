@@ -7,14 +7,17 @@ import test from "node:test";
 import { createPromptSession, installPlugin, runCli } from "../src/cli.js";
 import { OPENCODE_TBOT_VERSION } from "../src/app/package-info.js";
 import {
+    getGlobalPluginBridgeFilePath,
     getGlobalPluginConfigFilePath,
-    getOpenCodeConfigFilePath,
-    getOpenCodeJsoncConfigFilePath,
-    resolveWritableOpenCodeConfigFilePath,
+    getOpenCodeConfigDirectory,
 } from "../src/app/plugin-config.js";
 import { getDefaultPluginLogDirectory } from "../src/app/opencode-paths.js";
 
-test("installPlugin registers the npm plugin and writes the global runtime config", async () => {
+function getLegacyOpenCodeConfigFilePath(homeDir: string): string {
+    return join(getOpenCodeConfigDirectory(homeDir), "opencode.json");
+}
+
+test("installPlugin writes the global plugin bridge and runtime config", async () => {
     const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-"));
 
     await installPlugin({
@@ -23,59 +26,30 @@ test("installPlugin registers the npm plugin and writes the global runtime confi
         telegramApiRoot: "http://127.0.0.1:9000",
     });
 
-    const openCodeConfigPath = getOpenCodeConfigFilePath(homeDir);
+    const pluginBridgePath = getGlobalPluginBridgeFilePath(homeDir);
     const pluginConfigPath = getGlobalPluginConfigFilePath(homeDir);
-    const openCodeConfig = JSON.parse(readFileSync(openCodeConfigPath, "utf8")) as { plugin: string[] };
+    const pluginBridgeSource = readFileSync(pluginBridgePath, "utf8");
     const pluginConfig = JSON.parse(readFileSync(pluginConfigPath, "utf8")) as {
         telegram: { botToken: string; apiRoot: string };
     };
 
-    assert.deepEqual(openCodeConfig.plugin, ["opencode-tbot@latest"]);
+    assert.equal(existsSync(getLegacyOpenCodeConfigFilePath(homeDir)), false);
+    assert.match(pluginBridgeSource, /^export \{ default \} from "file:\/\/\/.+\/(?:src\/plugin\.ts|dist\/plugin\.js)";\n$/u);
     assert.equal(pluginConfig.telegram.botToken, "telegram-token");
     assert.equal(pluginConfig.telegram.apiRoot, "http://127.0.0.1:9000");
 });
 
-test("installPlugin prefers an existing opencode.jsonc when registering the global plugin", async () => {
-    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-jsonc-"));
-    const openCodeJsoncPath = getOpenCodeJsoncConfigFilePath(homeDir);
-
-    mkdirSync(join(homeDir, ".config", "opencode"), { recursive: true });
-    writeFileSync(openCodeJsoncPath, `{
-  // existing user config
-  "plugin": ["oh-my-opencode@latest"]
-}
-`, "utf8");
-
-    await installPlugin({
-        homeDir,
-        botToken: "telegram-token",
-    });
-
-    assert.equal(await resolveWritableOpenCodeConfigFilePath(homeDir), openCodeJsoncPath);
-    assert.equal(existsSync(getOpenCodeConfigFilePath(homeDir)), false);
-    assert.deepEqual(
-        JSON.parse(readFileSync(openCodeJsoncPath, "utf8")) as { plugin: string[] },
-        {
-            plugin: [
-                "oh-my-opencode@latest",
-                "opencode-tbot@latest",
-            ],
-        },
-    );
-});
-
-test("installPlugin is idempotent and removes legacy openrouter config", async () => {
+test("installPlugin preserves unrelated plugin config keys and is idempotent", async () => {
     const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-cleanup-"));
     const pluginConfigPath = getGlobalPluginConfigFilePath(homeDir);
 
     mkdirSync(join(homeDir, ".config", "opencode", "opencode-tbot"), { recursive: true });
     writeFileSync(pluginConfigPath, JSON.stringify({
+        state: {
+            path: "./custom-state.json",
+        },
         telegram: {
             botToken: "old-token",
-        },
-        openrouter: {
-            apiKey: "openrouter-key",
-            model: "openai/gpt-audio-mini",
         },
     }, null, 2));
 
@@ -88,11 +62,13 @@ test("installPlugin is idempotent and removes legacy openrouter config", async (
         botToken: "telegram-token",
     });
 
-    const openCodeConfig = JSON.parse(readFileSync(getOpenCodeConfigFilePath(homeDir), "utf8")) as { plugin: string[] };
-    const pluginConfig = JSON.parse(readFileSync(pluginConfigPath, "utf8")) as Record<string, unknown>;
+    const pluginConfig = JSON.parse(readFileSync(pluginConfigPath, "utf8")) as {
+        state?: { path?: string };
+        telegram?: { botToken?: string };
+    };
 
-    assert.deepEqual(openCodeConfig.plugin, ["opencode-tbot@latest"]);
-    assert.equal("openrouter" in pluginConfig, false);
+    assert.equal(pluginConfig.state?.path, "./custom-state.json");
+    assert.equal(pluginConfig.telegram?.botToken, "telegram-token");
 });
 
 test("installPlugin can skip plugin registration for local integration tests", async () => {
@@ -104,17 +80,15 @@ test("installPlugin can skip plugin registration for local integration tests", a
         registerPlugin: false,
     });
 
-    assert.equal(existsSync(getOpenCodeConfigFilePath(homeDir)), false);
+    assert.equal(existsSync(getGlobalPluginBridgeFilePath(homeDir)), false);
     assert.equal(existsSync(getGlobalPluginConfigFilePath(homeDir)), true);
 });
 
-test("installPlugin prints config and log directories on normal completion", async () => {
+test("installPlugin prints bridge, config, and log directories without mentioning OpenCode config", async () => {
     const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-success-"));
-    const originalCwd = process.cwd();
     const originalWrite = process.stdout.write.bind(process.stdout);
     let output = "";
 
-    process.chdir(homeDir);
     process.stdout.write = ((chunk: string | Uint8Array) => {
         output += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
         return true;
@@ -126,14 +100,36 @@ test("installPlugin prints config and log directories on normal completion", asy
             botToken: "telegram-token",
         });
     } finally {
-        process.chdir(originalCwd);
         process.stdout.write = originalWrite;
     }
 
     assert.match(output, /Success\.\n/u);
-    assert.match(output, new RegExp(`OpenCode config: ${escapeRegExp(await resolveWritableOpenCodeConfigFilePath(homeDir))}`));
+    assert.doesNotMatch(output, /OpenCode config:/u);
+    assert.match(output, new RegExp(`Plugin bridge: ${escapeRegExp(getGlobalPluginBridgeFilePath(homeDir))}`));
     assert.match(output, new RegExp(`Plugin config: ${escapeRegExp(getGlobalPluginConfigFilePath(homeDir))}`));
     assert.match(output, new RegExp(`Plugin logs: ${escapeRegExp(getDefaultPluginLogDirectory(homeDir))}`));
+});
+
+test("installPlugin leaves existing OpenCode config files untouched", async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-legacy-config-"));
+    const openCodeConfigPath = getLegacyOpenCodeConfigFilePath(homeDir);
+
+    mkdirSync(getOpenCodeConfigDirectory(homeDir), { recursive: true });
+    writeFileSync(openCodeConfigPath, JSON.stringify({
+        plugin: ["other-plugin", "opencode-tbot@0.1.0"],
+    }, null, 2));
+
+    await installPlugin({
+        homeDir,
+        botToken: "telegram-token",
+    });
+
+    assert.deepEqual(
+        JSON.parse(readFileSync(openCodeConfigPath, "utf8")) as { plugin: string[] },
+        {
+            plugin: ["other-plugin", "opencode-tbot@0.1.0"],
+        },
+    );
 });
 
 test("runCli defaults to install mode", async () => {
@@ -170,84 +166,36 @@ test("runCli prints the package version for --version", async () => {
     }
 });
 
-test("updatePlugin replaces stale opencode-tbot plugin specs in opencode.json and keeps unrelated plugins", async () => {
+test("runCli update refreshes the global plugin bridge without modifying OpenCode config", async () => {
     const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-update-"));
-    const openCodeConfigPath = getOpenCodeConfigFilePath(homeDir);
+    const openCodeConfigPath = getLegacyOpenCodeConfigFilePath(homeDir);
 
-    mkdirSync(join(homeDir, ".config", "opencode"), { recursive: true });
+    mkdirSync(getOpenCodeConfigDirectory(homeDir), { recursive: true });
     writeFileSync(openCodeConfigPath, JSON.stringify({
-        plugin: [
-            "other-plugin",
-            "opencode-tbot@0.1.0",
-            "opencode-tbot",
-        ],
+        plugin: ["other-plugin", "opencode-tbot@0.1.0"],
     }, null, 2));
 
     const exitCode = await runCli([
         "update",
         "--home-dir",
         homeDir,
-        "--plugin-spec",
-        "opencode-tbot@latest",
     ]);
 
     assert.equal(exitCode, 0);
+    assert.equal(existsSync(getGlobalPluginBridgeFilePath(homeDir)), true);
     assert.deepEqual(
         JSON.parse(readFileSync(openCodeConfigPath, "utf8")) as { plugin: string[] },
         {
-            plugin: [
-                "other-plugin",
-                "opencode-tbot@latest",
-            ],
+            plugin: ["other-plugin", "opencode-tbot@0.1.0"],
         },
     );
 });
 
-test("updatePlugin prefers an existing opencode.jsonc and keeps using it", async () => {
-    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-update-jsonc-"));
-    const openCodeJsoncPath = getOpenCodeJsoncConfigFilePath(homeDir);
-
-    mkdirSync(join(homeDir, ".config", "opencode"), { recursive: true });
-    writeFileSync(openCodeJsoncPath, `{
-  "plugin": [
-    "oh-my-opencode@latest",
-    "opencode-tbot@0.1.0"
-  ]
-}
-`, "utf8");
-
-    const exitCode = await runCli([
-        "update",
-        "--home-dir",
-        homeDir,
-    ]);
-
-    assert.equal(exitCode, 0);
-    assert.equal(await resolveWritableOpenCodeConfigFilePath(homeDir), openCodeJsoncPath);
-    assert.equal(existsSync(getOpenCodeConfigFilePath(homeDir)), false);
-    assert.deepEqual(
-        JSON.parse(readFileSync(openCodeJsoncPath, "utf8")) as { plugin: string[] },
-        {
-            plugin: [
-                "oh-my-opencode@latest",
-                "opencode-tbot@latest",
-            ],
-        },
-    );
-});
-
-test("runCli update prints config and log directories on normal completion", async () => {
+test("runCli update prints bridge, config, and log directories without mentioning OpenCode config", async () => {
     const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-update-output-"));
-    const openCodeConfigPath = getOpenCodeConfigFilePath(homeDir);
-    const originalCwd = process.cwd();
     const originalWrite = process.stdout.write.bind(process.stdout);
     let output = "";
 
-    mkdirSync(join(homeDir, ".config", "opencode"), { recursive: true });
-    writeFileSync(openCodeConfigPath, JSON.stringify({
-        plugin: ["opencode-tbot@0.1.0"],
-    }, null, 2));
-    process.chdir(homeDir);
     process.stdout.write = ((chunk: string | Uint8Array) => {
         output += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
         return true;
@@ -262,12 +210,12 @@ test("runCli update prints config and log directories on normal completion", asy
 
         assert.equal(exitCode, 0);
     } finally {
-        process.chdir(originalCwd);
         process.stdout.write = originalWrite;
     }
 
     assert.match(output, /Success\.\n/u);
-    assert.match(output, new RegExp(`OpenCode config: ${escapeRegExp(await resolveWritableOpenCodeConfigFilePath(homeDir))}`));
+    assert.doesNotMatch(output, /OpenCode config:/u);
+    assert.match(output, new RegExp(`Plugin bridge: ${escapeRegExp(getGlobalPluginBridgeFilePath(homeDir))}`));
     assert.match(output, new RegExp(`Plugin config: ${escapeRegExp(getGlobalPluginConfigFilePath(homeDir))}`));
     assert.match(output, new RegExp(`Plugin logs: ${escapeRegExp(getDefaultPluginLogDirectory(homeDir))}`));
 });
@@ -324,42 +272,12 @@ test("createPromptSession aborts masked input on Ctrl+C", async () => {
         input,
         output,
     });
-    const secretPromise = prompt.askSecret("OpenRouter API key: ");
+    const secretPromise = prompt.askSecret("OpenCode token: ");
 
     input.write("\u0003");
 
     await assert.rejects(secretPromise, /Prompt cancelled\./u);
     assert.deepEqual(rawModes, [true, false]);
-});
-
-test("installPlugin warns when a legacy local npm install can affect the plugin display name", async () => {
-    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-legacy-"));
-    const legacyPackageDir = join(homeDir, "node_modules", "opencode-tbot");
-    let output = "";
-    const originalCwd = process.cwd();
-    const originalWrite = process.stdout.write.bind(process.stdout);
-
-    mkdirSync(legacyPackageDir, { recursive: true });
-    writeFileSync(join(legacyPackageDir, "package.json"), JSON.stringify({ name: "opencode-tbot" }));
-    process.chdir(homeDir);
-    process.stdout.write = ((chunk: string | Uint8Array) => {
-        output += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
-        return true;
-    }) as typeof process.stdout.write;
-
-    try {
-        await installPlugin({
-            homeDir,
-            botToken: "telegram-token",
-        });
-    } finally {
-        process.chdir(originalCwd);
-        process.stdout.write = originalWrite;
-    }
-
-    assert.match(output, /Detected local opencode-tbot npm installation\(s\)/u);
-    assert.match(output, /npm uninstall opencode-tbot/u);
-    assert.match(output, /npm exec --package opencode-tbot@latest opencode-tbot -- install/u);
 });
 
 function escapeRegExp(value: string): string {

@@ -9,7 +9,6 @@ import type { AppContainer } from "../src/app/container.js";
 
 function createConfig(): AppConfig {
     return {
-        logLevel: "info",
         loggingFileDir: "E:/repo/.logs/opencode-tbot",
         loggingFileSinkEnabled: true,
         loggingHostSinkEnabled: true,

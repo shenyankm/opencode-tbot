@@ -1,28 +1,22 @@
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import type { PluginConfigSource } from "./config.js";
 import {
     getDefaultPluginLogDirectory,
+    getGlobalPluginBridgeFilePath,
     getGlobalPluginConfigFilePath,
+    getGlobalPluginsDirectory,
     getOpenCodeConfigDirectory,
-    getOpenCodeConfigFilePath,
-    getOpenCodeJsoncConfigFilePath,
+    GLOBAL_PLUGIN_BRIDGE_FILE_NAME,
     GLOBAL_PLUGIN_CONFIG_FILE_NAME,
     GLOBAL_PLUGIN_DIRECTORY_NAME,
-    OPENCODE_CONFIG_FILE_NAME,
-    OPENCODE_CONFIG_JSONC_FILE_NAME,
-    resolveWritableOpenCodeConfigFilePath,
+    GLOBAL_PLUGINS_DIRECTORY_NAME,
 } from "./opencode-paths.js";
-
-export const PLUGIN_CONFIG_FILE_NAME = "tbot.config.json";
 
 export interface PreparedPluginConfiguration {
     cwd: string;
     config: PluginConfigSource;
-    globalConfigFilePath: string;
-    projectConfigFilePath: string;
-    ignoredProjectConfigFilePath?: string;
     configFilePath: string;
 }
 
@@ -36,39 +30,27 @@ export async function preparePluginConfiguration(
     options: PreparePluginConfigurationOptions,
 ): Promise<PreparedPluginConfiguration> {
     const homeDir = options.homeDir ?? homedir();
-    const globalConfigFilePath = getGlobalPluginConfigFilePath(homeDir);
-    const projectConfigFilePath = await resolveProjectPluginConfigFilePath(options.cwd);
-    const [globalConfig, hasIgnoredProjectConfig] = await Promise.all([
-        loadPluginConfigFile(globalConfigFilePath),
-        pathExists(projectConfigFilePath),
-    ]);
-    const config = stripLegacyVoiceConfig(mergePluginConfigSources(globalConfig, options.config));
-    const ignoredProjectConfigFilePath = hasIgnoredProjectConfig
-        ? projectConfigFilePath
-        : undefined;
-    const configFilePath = globalConfigFilePath;
+    const configFilePath = getGlobalPluginConfigFilePath(homeDir);
+    const globalConfig = await loadPluginConfigFile(configFilePath);
+    const config = mergePluginConfigSources(globalConfig, options.config);
 
     return {
         cwd: options.cwd,
         config,
-        globalConfigFilePath,
-        projectConfigFilePath,
-        ...(ignoredProjectConfigFilePath ? { ignoredProjectConfigFilePath } : {}),
         configFilePath,
     };
 }
 
 export {
     getDefaultPluginLogDirectory,
+    getGlobalPluginBridgeFilePath,
     getGlobalPluginConfigFilePath,
+    getGlobalPluginsDirectory,
     getOpenCodeConfigDirectory,
-    getOpenCodeConfigFilePath,
-    getOpenCodeJsoncConfigFilePath,
+    GLOBAL_PLUGIN_BRIDGE_FILE_NAME,
     GLOBAL_PLUGIN_CONFIG_FILE_NAME,
     GLOBAL_PLUGIN_DIRECTORY_NAME,
-    OPENCODE_CONFIG_FILE_NAME,
-    OPENCODE_CONFIG_JSONC_FILE_NAME,
-    resolveWritableOpenCodeConfigFilePath,
+    GLOBAL_PLUGINS_DIRECTORY_NAME,
 };
 
 export async function writePluginConfigFile(
@@ -203,7 +185,6 @@ function orderPluginConfig(config: PluginConfigSource): PluginConfigSource {
         "state",
         "prompt",
         "logging",
-        "logLevel",
     ]);
     const ordered: PluginConfigSource = {};
 
@@ -223,10 +204,6 @@ function orderPluginConfig(config: PluginConfigSource): PluginConfigSource {
         ordered.logging = config.logging;
     }
 
-    if (config.logLevel !== undefined) {
-        ordered.logLevel = config.logLevel;
-    }
-
     for (const [key, value] of Object.entries(config)) {
         if (!prioritizedKeys.has(key)) {
             ordered[key] = value;
@@ -242,31 +219,4 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
     return error instanceof Error && "code" in error && error.code === "ENOENT";
-}
-
-async function resolveProjectPluginConfigFilePath(cwd: string): Promise<string> {
-    const preferredPath = join(cwd, PLUGIN_CONFIG_FILE_NAME);
-
-    return preferredPath;
-}
-
-async function pathExists(filePath: string): Promise<boolean> {
-    try {
-        await access(filePath);
-        return true;
-    } catch (error) {
-        if (isMissingFileError(error)) {
-            return false;
-        }
-
-        throw error;
-    }
-}
-
-function stripLegacyVoiceConfig(config: PluginConfigSource): PluginConfigSource {
-    const { openrouter: _openrouter, ...rest } = config as PluginConfigSource & {
-        openrouter?: unknown;
-    };
-
-    return rest;
 }

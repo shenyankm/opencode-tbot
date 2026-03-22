@@ -29,6 +29,9 @@ export interface BotCopy {
         processing: string;
         alreadyProcessing: string;
     };
+    auth: {
+        unauthorizedChat: string;
+    };
     prompt: {
         emptyResponse: string;
     };
@@ -47,6 +50,27 @@ export interface BotCopy {
         noSession: string;
         notRunning: string;
         aborted: string;
+    };
+    permission: {
+        requestTitle: string;
+        permissionLabel: string;
+        sessionLabel: string;
+        patternsLabel: string;
+        noPatterns: string;
+        allowOnce: string;
+        allowAlways: string;
+        reject: string;
+        replyFailed: string;
+        replyLabels: {
+            once: string;
+            always: string;
+            reject: string;
+        };
+        resolved(requestId: string, replyLabel: string): string;
+    };
+    sessionEvents: {
+        unknownError: string;
+        failed(sessionId: string, error: string): string;
     };
     errors: {
         unexpected: string;
@@ -194,6 +218,9 @@ const EN_BOT_COPY: BotCopy = {
         processing: "Processing...",
         alreadyProcessing: "Another request is still running. Wait for it to finish before sending a new prompt.",
     },
+    auth: {
+        unauthorizedChat: "Unauthorized chat.",
+    },
     prompt: {
         emptyResponse: "OpenCode returned empty response.",
     },
@@ -212,6 +239,41 @@ const EN_BOT_COPY: BotCopy = {
         noSession: "No active session is bound to this chat yet.",
         notRunning: "No request is currently running for the current session.",
         aborted: "Abort signal sent to the current session.",
+    },
+    permission: {
+        requestTitle: "Permission Request",
+        permissionLabel: "Permission",
+        sessionLabel: "Session",
+        patternsLabel: "Patterns",
+        noPatterns: "(none)",
+        allowOnce: "Allow once",
+        allowAlways: "Always allow",
+        reject: "Reject",
+        replyFailed: "Failed to reply to the permission request.",
+        replyLabels: {
+            once: "allow once",
+            always: "always allow",
+            reject: "reject",
+        },
+        resolved(requestId: string, replyLabel: string) {
+            return [
+                "Permission request resolved.",
+                "",
+                `Request: ${requestId}`,
+                `Reply: ${replyLabel}`,
+            ].join("\n");
+        },
+    },
+    sessionEvents: {
+        unknownError: "Unknown session error.",
+        failed(sessionId: string, error: string) {
+            return [
+                "Session failed.",
+                "",
+                `Session: ${sessionId}`,
+                `Error: ${error}`,
+            ].join("\n");
+        },
     },
     errors: {
         unexpected: "Unexpected error.",
@@ -408,6 +470,9 @@ const ZH_CN_BOT_COPY: BotCopy = {
         processing: "处理中...",
         alreadyProcessing: "另一个请求仍在运行。请等待其完成后再发送新的提示词。",
     },
+    auth: {
+        unauthorizedChat: "当前聊天未获授权。",
+    },
     prompt: {
         emptyResponse: "OpenCode 返回了空响应。",
     },
@@ -426,6 +491,41 @@ const ZH_CN_BOT_COPY: BotCopy = {
         noSession: "当前聊天还没有绑定活动会话。",
         notRunning: "当前会话没有正在运行的请求。",
         aborted: "已向当前会话发送中止信号。",
+    },
+    permission: {
+        requestTitle: "权限请求",
+        permissionLabel: "权限",
+        sessionLabel: "会话",
+        patternsLabel: "匹配范围",
+        noPatterns: "（无）",
+        allowOnce: "本次允许",
+        allowAlways: "始终允许",
+        reject: "拒绝",
+        replyFailed: "回复权限请求失败。",
+        replyLabels: {
+            once: "本次允许",
+            always: "始终允许",
+            reject: "拒绝",
+        },
+        resolved(requestId: string, replyLabel: string) {
+            return [
+                "权限请求已处理。",
+                "",
+                `请求：${requestId}`,
+                `结果：${replyLabel}`,
+            ].join("\n");
+        },
+    },
+    sessionEvents: {
+        unknownError: "未知会话错误。",
+        failed(sessionId: string, error: string) {
+            return [
+                "会话执行失败。",
+                "",
+                `会话：${sessionId}`,
+                `错误：${error}`,
+            ].join("\n");
+        },
     },
     errors: {
         unexpected: "发生未知错误。",
@@ -622,6 +722,9 @@ const JA_BOT_COPY: BotCopy = {
         processing: "処理中...",
         alreadyProcessing: "別のリクエストがまだ実行中です。完了するまで新しいプロンプトを送信しないでください。",
     },
+    auth: {
+        unauthorizedChat: "このチャットにはアクセス権がありません。",
+    },
     prompt: {
         emptyResponse: "OpenCode から空の応答が返されました。",
     },
@@ -640,6 +743,41 @@ const JA_BOT_COPY: BotCopy = {
         noSession: "このチャットにはまだアクティブなセッションが紐付いていません。",
         notRunning: "現在のセッションで実行中のリクエストはありません。",
         aborted: "現在のセッションに中止シグナルを送信しました。",
+    },
+    permission: {
+        requestTitle: "権限リクエスト",
+        permissionLabel: "権限",
+        sessionLabel: "セッション",
+        patternsLabel: "対象パターン",
+        noPatterns: "（なし）",
+        allowOnce: "今回のみ許可",
+        allowAlways: "常に許可",
+        reject: "拒否",
+        replyFailed: "権限リクエストへの応答に失敗しました。",
+        replyLabels: {
+            once: "今回のみ許可",
+            always: "常に許可",
+            reject: "拒否",
+        },
+        resolved(requestId: string, replyLabel: string) {
+            return [
+                "権限リクエストを処理しました。",
+                "",
+                `リクエスト: ${requestId}`,
+                `結果: ${replyLabel}`,
+            ].join("\n");
+        },
+    },
+    sessionEvents: {
+        unknownError: "不明なセッションエラーです。",
+        failed(sessionId: string, error: string) {
+            return [
+                "セッションの実行に失敗しました。",
+                "",
+                `セッション: ${sessionId}`,
+                `エラー: ${error}`,
+            ].join("\n");
+        },
     },
     errors: {
         unexpected: "予期しないエラーが発生しました。",

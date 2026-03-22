@@ -74,10 +74,13 @@ function normalizeError(error: unknown, copy: BotCopy): PresentedError {
     }
 
     if (isNamedError(error, "APIError")) {
+        const providerMessage = extractMessage(error.data);
+
         return {
             message: copy.errors.providerRequest,
             cause: joinNonEmptyParts([
-                extractMessage(error.data),
+                getProviderCompatibilityHint(providerMessage),
+                providerMessage,
                 extractStatusCode(error.data, copy),
                 extractRetryable(error.data, copy),
             ]),
@@ -109,6 +112,16 @@ function normalizeError(error: unknown, copy: BotCopy): PresentedError {
         message: copy.errors.unexpected,
         cause: extractMessage(error) ?? stringifyUnknown(error),
     };
+}
+
+function getProviderCompatibilityHint(message: string | null): string | null {
+    if (!message) {
+        return null;
+    }
+
+    return /tool_choice parameter does not support being set to required or object in thinking mode/iu.test(message)
+        ? "Current model/reasoning mode is incompatible with tool calling. Switch to a compatible model or disable thinking mode."
+        : null;
 }
 
 function isBadRequestError(error: unknown): error is { data?: unknown; errors?: unknown[]; success: false } {

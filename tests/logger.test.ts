@@ -13,11 +13,14 @@ import test from "node:test";
 import { createOpenCodeAppLogger } from "../src/infra/logger/index.js";
 
 test("createOpenCodeAppLogger sends structured log entries through root client.app.log", async () => {
-    const calls: Array<Record<string, unknown>> = [];
+    const calls: Array<{ input: Record<string, unknown>; options?: Record<string, unknown> }> = [];
     const logger = createOpenCodeAppLogger({
         app: {
-            async log(input) {
-                calls.push(input);
+            async log(input, options) {
+                calls.push({
+                    input,
+                    ...(options ? { options } : {}),
+                });
                 return true;
             },
         },
@@ -40,77 +43,33 @@ test("createOpenCodeAppLogger sends structured log entries through root client.a
 
     assert.equal(calls.length, 1);
     assert.deepEqual(calls[0], {
-        body: {
+        input: {
             service: "opencode-tbot",
             level: "info",
             message: "hello",
             extra: {
-                ts: calls[0]?.body && typeof calls[0].body === "object"
-                    ? (calls[0].body as { extra?: Record<string, unknown> }).extra?.ts
-                    : undefined,
+                ts: (calls[0]?.input.extra as Record<string, unknown> | undefined)?.ts,
                 component: "runtime",
                 event: "runtime.started",
-                runtimeId: calls[0]?.body && typeof calls[0].body === "object"
-                    ? (calls[0].body as { extra?: Record<string, unknown> }).extra?.runtimeId
-                    : undefined,
+                runtimeId: (calls[0]?.input.extra as Record<string, unknown> | undefined)?.runtimeId,
                 operationId: null,
                 correlationId: null,
                 token: "[REDACTED]",
             },
         },
-        responseStyle: "data",
-        throwOnError: true,
+        options: {
+            responseStyle: "data",
+            throwOnError: true,
+        },
     });
     assert.match(
-        String((calls[0].body as { extra?: Record<string, unknown> }).extra?.runtimeId ?? ""),
+        String((calls[0].input.extra as { runtimeId?: unknown } | undefined)?.runtimeId ?? ""),
         /^[0-9a-f-]{36}$/u,
     );
     assert.match(
-        String((calls[0].body as { extra?: Record<string, unknown> }).extra?.ts ?? ""),
+        String((calls[0].input.extra as { ts?: unknown } | undefined)?.ts ?? ""),
         /^\d{4}-\d{2}-\d{2}T/u,
     );
-});
-
-test("createOpenCodeAppLogger keeps supporting legacy two-argument app.log clients", async () => {
-    const calls: Array<{ input: Record<string, unknown>; options?: Record<string, unknown> }> = [];
-    const logger = createOpenCodeAppLogger({
-        app: {
-            async log(input, options) {
-                calls.push({
-                    input,
-                    ...(options ? { options } : {}),
-                });
-                return true;
-            },
-        },
-    }, {
-        sinks: {
-            file: false,
-            host: true,
-        },
-    });
-
-    logger.error(
-        {
-            apiKey: "secret",
-            component: "runtime",
-            event: "runtime.failed",
-        },
-        "broken",
-    );
-    await logger.flush();
-
-    assert.equal(calls.length, 1);
-    assert.equal(calls[0]?.input.service, "opencode-tbot");
-    assert.equal(calls[0]?.input.level, "error");
-    assert.equal(calls[0]?.input.message, "broken");
-    assert.equal((calls[0]?.input.extra as Record<string, unknown>)?.component, "runtime");
-    assert.equal((calls[0]?.input.extra as Record<string, unknown>)?.event, "runtime.failed");
-    assert.equal((calls[0]?.input.extra as Record<string, unknown>)?.apiKey, "[REDACTED]");
-    assert.deepEqual(calls[0]?.options, {
-        responseStyle: "data",
-        throwOnError: true,
-    });
 });
 
 test("createOpenCodeAppLogger writes metadata-only JSONL file logs", async () => {
@@ -275,7 +234,7 @@ test("createOpenCodeAppLogger keeps host logging alive when the file sink cannot
     await logger.flush();
 
     assert.equal(calls.length, 1);
-    assert.equal((calls[0].body as { message?: string }).message, "host still works");
+    assert.equal(calls[0]?.message, "host still works");
 
     rmSync(blockedRoot, { force: true, recursive: true });
 });

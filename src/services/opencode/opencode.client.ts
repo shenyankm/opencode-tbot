@@ -1,7 +1,7 @@
 import {
     createOpencodeClient,
     type OpencodeClient,
-} from "@opencode-ai/sdk";
+} from "@opencode-ai/sdk/v2/client";
 import type {
     Agent,
     Config,
@@ -115,44 +115,8 @@ export interface OpenCodeConfiguredModel {
     variants: Record<string, Record<string, unknown>>;
 }
 export type OpenCodeTextOutputFormat = Extract<OutputFormat, { type: "text" }>;
-
-type RawSdkRequestOptions = {
-    responseStyle?: "data" | "fields";
-    signal?: AbortSignal;
-    throwOnError?: boolean;
-    url: string;
-};
-
-type RawSdkRequestClient = {
-    get?(options: RawSdkRequestOptions): Promise<unknown>;
-};
-
-type OpenCodeSdkPermissionScopeLike = {
-    list?(parameters?: unknown, options?: Record<string, unknown>): Promise<unknown>;
-    reply?(parameters?: unknown, options?: Record<string, unknown>): Promise<unknown>;
-};
-
-type OpenCodeSdkScopedClientLike = Pick<OpencodeClient, "app" | "config" | "global" | "lsp" | "mcp" | "path" | "project" | "session"> & {
-    permission?: OpenCodeSdkPermissionScopeLike;
-};
-
-type OpenCodeSdkPermissionReplyClientLike = {
-    postSessionIdPermissionsPermissionId?(options: Record<string, unknown>): Promise<unknown>;
-};
-
-export type OpenCodeSdkClientLike = OpenCodeSdkScopedClientLike & OpenCodeSdkPermissionReplyClientLike;
-
-type OpenCodeSdkClientWithRawRequestClient = OpenCodeSdkClientLike & {
-    _client?: RawSdkRequestClient;
-    client?: RawSdkRequestClient;
-};
+export type OpenCodeSdkClientLike = OpencodeClient;
 type MaybeWrappedResponse<T> = T | { data: T };
-type ScopedSdkScope = "app" | "config" | "global" | "lsp" | "mcp" | "path" | "permission" | "project" | "session";
-type ScopedSdkInvocationInput = {
-    legacyParameters?: unknown;
-    parameters?: Record<string, unknown>;
-    signal?: AbortSignal;
-};
 type OpenCodeProviderCatalog = {
     providers: OpenCodeProvider[];
     default: Record<string, string>;
@@ -289,9 +253,8 @@ export interface OpenCodeClientLike {
         requestId: string,
         reply: "once" | "always" | "reject",
         message?: string,
-        sessionId?: string,
     ): Promise<boolean>;
-    listConfiguredPlugins?(): Promise<string[]>;
+    listConfiguredPlugins(): Promise<string[]>;
     listModels(): Promise<OpenCodeConfiguredModel[]>;
     promptSession(input: PromptSessionInput): Promise<PromptSessionResult>;
 }
@@ -334,136 +297,107 @@ export class OpenCodeClient implements OpenCodeClientLike {
         });
     }
 
-    private async callScopedSdkMethod<T>(
-        scope: ScopedSdkScope,
-        method: string,
-        input: ScopedSdkInvocationInput,
-    ): Promise<T> {
-        const target = this.client[scope] as unknown as Record<string, unknown> | undefined;
-        const handler = target?.[method];
+    private async callSdkMethod<TResponse, TParameters>(
+        operation: (
+            parameters: TParameters,
+            options?: typeof SDK_OPTIONS & { signal?: AbortSignal },
+        ) => Promise<MaybeWrappedResponse<TResponse>>,
+        parameters: TParameters,
+        signal?: AbortSignal,
+    ): Promise<TResponse> {
+        return unwrapSdkData(
+            await operation(parameters, {
+                ...SDK_OPTIONS,
+                ...(signal ? { signal } : {}),
+            }),
+        );
+    }
 
-        if (typeof handler !== "function") {
-            throw new Error(`OpenCode SDK client does not expose a compatible ${scope}.${method} method.`);
-        }
+    private async callSdkOptionalMethod<TResponse, TParameters>(
+        operation: (
+            parameters?: TParameters,
+            options?: typeof SDK_OPTIONS & { signal?: AbortSignal },
+        ) => Promise<MaybeWrappedResponse<TResponse>>,
+        parameters?: TParameters,
+        signal?: AbortSignal,
+    ): Promise<TResponse> {
+        return unwrapSdkData(
+            await operation(parameters, {
+                ...SDK_OPTIONS,
+                ...(signal ? { signal } : {}),
+            }),
+        );
+    }
 
-        const options = {
-            ...SDK_OPTIONS,
-            ...(input.signal ? { signal: input.signal } : {}),
-        };
-        const response = handler.length >= 2
-            ? await (handler as (parameters: unknown, requestOptions: Record<string, unknown>) => Promise<MaybeWrappedResponse<T>>).call(
-                target,
-                input.legacyParameters,
-                options,
-            )
-            : await (handler as (requestOptions: Record<string, unknown>) => Promise<MaybeWrappedResponse<T>>).call(
-                target,
-                input.parameters === undefined
-                    ? options
-                    : {
-                        ...input.parameters,
-                        ...options,
-                    },
-            );
-
-        return unwrapSdkData(response);
+    private async callSdkOptionsOnlyMethod<TResponse>(
+        operation: (
+            options: typeof SDK_OPTIONS & { signal?: AbortSignal },
+        ) => Promise<MaybeWrappedResponse<TResponse>>,
+        signal?: AbortSignal,
+    ): Promise<TResponse> {
+        return unwrapSdkData(
+            await operation({
+                ...SDK_OPTIONS,
+                ...(signal ? { signal } : {}),
+            }),
+        );
     }
 
     async getHealth(): Promise<OpenCodeHealth> {
-        try {
-            return await this.callScopedSdkMethod<OpenCodeHealth>("global", "health", {});
-        } catch (error) {
-            if (!isMissingScopedSdkMethodError(error, "global", "health")) {
-                throw error;
-            }
-
-            return this.callRawSdkGet<OpenCodeHealth>("/global/health");
-        }
+        return this.callSdkOptionsOnlyMethod(
+            this.client.global.health.bind(this.client.global),
+        );
     }
 
     async abortSession(sessionId: string): Promise<boolean> {
-        return this.callScopedSdkMethod<boolean>("session", "abort", {
-            legacyParameters: {
+        return this.callSdkMethod(
+            this.client.session.abort.bind(this.client.session),
+            {
                 sessionID: sessionId,
             },
-            parameters: {
-                path: {
-                    id: sessionId,
-                },
-            },
-        });
+        );
     }
 
     async deleteSession(sessionId: string): Promise<boolean> {
-        return this.callScopedSdkMethod<boolean>("session", "delete", {
-            legacyParameters: {
+        return this.callSdkMethod(
+            this.client.session.delete.bind(this.client.session),
+            {
                 sessionID: sessionId,
             },
-            parameters: {
-                path: {
-                    id: sessionId,
-                },
-            },
-        });
+        );
     }
 
     async forkSession(sessionId: string, messageId?: string): Promise<OpenCodeSession> {
-        return this.callScopedSdkMethod<OpenCodeSession>("session", "fork", {
-            legacyParameters: {
+        return this.callSdkMethod(
+            this.client.session.fork.bind(this.client.session),
+            {
                 sessionID: sessionId,
                 ...(messageId?.trim()
                     ? { messageID: messageId.trim() }
                     : {}),
             },
-            parameters: {
-                path: {
-                    id: sessionId,
-                },
-                ...(
-                    messageId?.trim()
-                        ? {
-                            body: {
-                                messageID: messageId.trim(),
-                            },
-                        }
-                        : {}
-                ),
-            },
-        });
+        );
     }
 
     async getPath(): Promise<OpenCodePath> {
-        return this.callScopedSdkMethod<OpenCodePath>("path", "get", {});
+        return this.callSdkOptionalMethod(
+            this.client.path.get.bind(this.client.path),
+            undefined,
+        );
     }
 
     async listLspStatuses(directory?: string): Promise<OpenCodeLspStatus[]> {
-        return this.callScopedSdkMethod<OpenCodeLspStatus[]>("lsp", "status", {
-            legacyParameters: directory
-                ? { directory }
-                : undefined,
-            parameters: directory
-                ? {
-                    query: {
-                        directory,
-                    },
-                }
-                : undefined,
-        });
+        return this.callSdkOptionalMethod(
+            this.client.lsp.status.bind(this.client.lsp),
+            directory ? { directory } : undefined,
+        );
     }
 
     async listMcpStatuses(directory?: string): Promise<Record<string, OpenCodeMcpStatus>> {
-        return this.callScopedSdkMethod<Record<string, OpenCodeMcpStatus>>("mcp", "status", {
-            legacyParameters: directory
-                ? { directory }
-                : undefined,
-            parameters: directory
-                ? {
-                    query: {
-                        directory,
-                    },
-                }
-                : undefined,
-        });
+        return this.callSdkOptionalMethod(
+            this.client.mcp.status.bind(this.client.mcp),
+            directory ? { directory } : undefined,
+        );
     }
 
     async getSessionStatuses(): Promise<Record<string, OpenCodeSessionStatus>> {
@@ -471,69 +405,55 @@ export class OpenCodeClient implements OpenCodeClientLike {
     }
 
     async listProjects(): Promise<OpenCodeProject[]> {
-        return this.callScopedSdkMethod<OpenCodeProject[]>("project", "list", {});
+        return this.callSdkOptionalMethod(
+            this.client.project.list.bind(this.client.project),
+            undefined,
+        );
     }
 
     async listSessions(): Promise<OpenCodeSession[]> {
-        return this.callScopedSdkMethod<OpenCodeSession[]>("session", "list", {});
+        return this.callSdkOptionalMethod(
+            this.client.session.list.bind(this.client.session),
+            undefined,
+        );
     }
 
     async getCurrentProject(): Promise<OpenCodeProject> {
-        return this.callScopedSdkMethod<OpenCodeProject>("project", "current", {});
+        return this.callSdkOptionalMethod(
+            this.client.project.current.bind(this.client.project),
+            undefined,
+        );
     }
 
     async createSessionForDirectory(directory: string, title?: string): Promise<OpenCodeSession> {
-        return this.callScopedSdkMethod<OpenCodeSession>("session", "create", {
-            legacyParameters: title ? { directory, title } : { directory },
-            parameters: {
-                query: {
-                    directory,
-                },
-                ...(title
-                    ? {
-                        body: {
-                            title,
-                        },
-                    }
-                    : {}),
-            },
-        });
+        return this.callSdkMethod(
+            this.client.session.create.bind(this.client.session),
+            title ? { directory, title } : { directory },
+        );
     }
 
     async renameSession(sessionId: string, title: string): Promise<OpenCodeSession> {
-        return this.callScopedSdkMethod<OpenCodeSession>("session", "update", {
-            legacyParameters: {
+        return this.callSdkMethod(
+            this.client.session.update.bind(this.client.session),
+            {
                 sessionID: sessionId,
                 title,
             },
-            parameters: {
-                path: {
-                    id: sessionId,
-                },
-                body: {
-                    title,
-                },
-            },
-        });
+        );
     }
 
     async listAgents(): Promise<OpenCodeAgent[]> {
-        return this.callScopedSdkMethod<OpenCodeAgent[]>("app", "agents", {});
+        return this.callSdkOptionalMethod(
+            this.client.app.agents.bind(this.client.app),
+            undefined,
+        );
     }
 
     async listPendingPermissions(directory?: string): Promise<OpenCodePermissionRequest[]> {
-        const permissions = await this.callScopedSdkMethod<unknown[]>("permission", "list", {
-            legacyParameters: directory
-                ? { directory }
-                : undefined,
-            parameters: directory
-                ? {
-                    query: {
-                        directory,
-                    },
-                }
-                : undefined,
-        });
+        const permissions = await this.callSdkOptionalMethod(
+            this.client.permission.list.bind(this.client.permission),
+            directory ? { directory } : undefined,
+        );
 
         return permissions.map(normalizePermissionRequest).filter((permission): permission is OpenCodePermissionRequest => !!permission);
     }
@@ -542,50 +462,19 @@ export class OpenCodeClient implements OpenCodeClientLike {
         requestId: string,
         reply: "once" | "always" | "reject",
         message?: string,
-        sessionId?: string,
     ): Promise<boolean> {
         const normalizedMessage = message?.trim();
-        const rootPermissionHandler = this.client.postSessionIdPermissionsPermissionId;
 
-        if (sessionId && typeof rootPermissionHandler === "function") {
-            return unwrapSdkData(await rootPermissionHandler.call(this.client, {
-                ...SDK_OPTIONS,
-                body: {
-                    response: reply,
-                    ...(normalizedMessage
-                        ? { message: normalizedMessage }
-                        : {}),
-                },
-                path: {
-                    id: sessionId,
-                    permissionID: requestId,
-                },
-            }) as MaybeWrappedResponse<boolean>);
-        }
-
-        return this.callScopedSdkMethod<boolean>("permission", "reply", {
-            legacyParameters: {
+        return this.callSdkMethod(
+            this.client.permission.reply.bind(this.client.permission),
+            {
                 requestID: requestId,
                 reply,
                 ...(normalizedMessage
                     ? { message: normalizedMessage }
                     : {}),
             },
-            parameters: sessionId
-                ? {
-                    body: {
-                        response: reply,
-                        ...(normalizedMessage
-                            ? { message: normalizedMessage }
-                            : {}),
-                    },
-                    path: {
-                        id: sessionId,
-                        permissionID: requestId,
-                    },
-                }
-                : undefined,
-        });
+        );
     }
 
     async listModels(): Promise<OpenCodeConfiguredModel[]> {
@@ -859,19 +748,14 @@ export class OpenCodeClient implements OpenCodeClientLike {
                     messageId,
                 },
                 async (requestSignal) => {
-                    return normalizePromptResponse(await this.callScopedSdkMethod<OpenCodePromptResponse>("session", "message", {
-                        legacyParameters: {
+                    return normalizePromptResponse(await this.callSdkMethod(
+                        this.client.session.message.bind(this.client.session),
+                        {
                             sessionID: sessionId,
                             messageID: messageId,
                         },
-                        parameters: {
-                            path: {
-                                id: sessionId,
-                                messageID: messageId,
-                            },
-                        },
-                        signal: requestSignal,
-                    }));
+                        requestSignal,
+                    ));
                 },
                 signal,
             );
@@ -917,21 +801,14 @@ export class OpenCodeClient implements OpenCodeClientLike {
                     timeoutMs: this.promptTimeoutPolicy.pollRequestTimeoutMs,
                 },
                 async (requestSignal) => {
-                    return normalizePromptResponses(await this.callScopedSdkMethod<OpenCodePromptResponse[]>("session", "messages", {
-                        legacyParameters: {
+                    return normalizePromptResponses(await this.callSdkMethod(
+                        this.client.session.messages.bind(this.client.session),
+                        {
                             sessionID: sessionId,
                             limit: PROMPT_MESSAGE_POLL_LIMIT,
                         },
-                        parameters: {
-                            path: {
-                                id: sessionId,
-                            },
-                            query: {
-                                limit: PROMPT_MESSAGE_POLL_LIMIT,
-                            },
-                        },
-                        signal: requestSignal,
-                    }));
+                        requestSignal,
+                    ));
                 },
                 signal,
             );
@@ -1013,11 +890,17 @@ export class OpenCodeClient implements OpenCodeClientLike {
     }
 
     private async loadConfig(): Promise<OpenCodeConfig> {
-        return this.callScopedSdkMethod<OpenCodeConfig>("config", "get", {});
+        return this.callSdkOptionalMethod(
+            this.client.config.get.bind(this.client.config),
+            undefined,
+        );
     }
 
     private async loadProviderCatalog(): Promise<OpenCodeProviderCatalog> {
-        return this.callScopedSdkMethod<OpenCodeProviderCatalog>("config", "providers", {});
+        return this.callSdkOptionalMethod(
+            this.client.config.providers.bind(this.client.config),
+            undefined,
+        );
     }
 
     private async sendPromptRequest(
@@ -1035,37 +918,28 @@ export class OpenCodeClient implements OpenCodeClientLike {
             ...(input.variant ? { variant: input.variant } : {}),
             parts,
         };
-        const legacyRequestParameters = {
-            sessionID: input.sessionId,
-            ...requestBody,
-        };
-        const requestParameters = {
-            body: requestBody,
-            path: {
-                id: input.sessionId,
-            },
-        };
 
         try {
-            if (typeof this.client.session?.promptAsync === "function") {
-                await this.runPromptRequestWithTimeout(
-                    {
-                        sessionId: input.sessionId,
-                        stage: "send-prompt",
-                        timeoutMs: this.promptTimeoutPolicy.waitTimeoutMs,
-                    },
-                    async (signal) => {
-                        await this.callScopedSdkMethod<void>("session", "promptAsync", {
-                            legacyParameters: legacyRequestParameters,
-                            parameters: requestParameters,
-                            signal,
-                        });
-                    },
-                    input.signal,
-                );
+            await this.runPromptRequestWithTimeout(
+                {
+                    sessionId: input.sessionId,
+                    stage: "send-prompt",
+                    timeoutMs: this.promptTimeoutPolicy.waitTimeoutMs,
+                },
+                async (signal) => {
+                    await this.callSdkMethod(
+                        this.client.session.promptAsync.bind(this.client.session),
+                        {
+                            sessionID: input.sessionId,
+                            ...requestBody,
+                        },
+                        signal,
+                    );
+                },
+                input.signal,
+            );
 
-                return;
-            }
+            return;
         } catch (error) {
             this.logPromptRequestFailure(error, {
                 sessionId: input.sessionId,
@@ -1075,34 +949,16 @@ export class OpenCodeClient implements OpenCodeClientLike {
             throw error;
         }
 
-        throw new Error("OpenCode SDK client does not expose session.promptAsync().");
     }
 
     private async loadSessionStatuses(
         signal?: AbortSignal,
     ): Promise<Record<string, OpenCodeSessionStatus>> {
-        return this.callScopedSdkMethod<Record<string, OpenCodeSessionStatus>>("session", "status", {
+        return this.callSdkOptionalMethod(
+            this.client.session.status.bind(this.client.session),
+            undefined,
             signal,
-        });
-    }
-
-    private async callRawSdkGet<T>(
-        url: string,
-        signal?: AbortSignal,
-    ): Promise<T> {
-        const rawClient = getRawSdkRequestClient(this.client);
-
-        if (typeof rawClient?.get !== "function") {
-            throw new Error(`OpenCode SDK client does not expose a compatible raw GET endpoint for ${url}.`);
-        }
-
-        const response = await rawClient.get({
-            ...SDK_OPTIONS,
-            ...(signal ? { signal } : {}),
-            url,
-        }) as MaybeWrappedResponse<T>;
-
-        return unwrapSdkData(response);
+        );
     }
 
     private async runPromptRequestWithTimeout<T>(
@@ -1835,21 +1691,6 @@ function normalizePermissionPatterns(permission: Record<string, unknown>): strin
     }
 
     return [];
-}
-
-function getRawSdkRequestClient(client: OpenCodeSdkClientLike): RawSdkRequestClient | null {
-    const compatibleClient = client as OpenCodeSdkClientWithRawRequestClient;
-
-    return compatibleClient.client ?? compatibleClient._client ?? null;
-}
-
-function isMissingScopedSdkMethodError(
-    error: unknown,
-    scope: string,
-    method: string,
-): error is Error {
-    return error instanceof Error
-        && error.message === `OpenCode SDK client does not expose a compatible ${scope}.${method} method.`;
 }
 
 function resolvePromptTimeoutPolicy(

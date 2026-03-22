@@ -93,18 +93,10 @@ export interface FileLogSinkOptions {
 interface OpenCodeAppLogClientLike {
     app: {
         log(input: {
-            body?: {
-                service: string;
-                level: AppLogLevel;
-                message: string;
-                extra?: Record<string, unknown>;
-            };
             service?: string;
             level?: AppLogLevel;
             message?: string;
             extra?: Record<string, unknown>;
-            responseStyle?: "data" | "fields";
-            throwOnError?: boolean;
         }, options?: {
             responseStyle?: "data" | "fields";
             throwOnError?: boolean;
@@ -366,25 +358,14 @@ function createSinks(
 function createHostSink(client: OpenCodeAppLogClientLike, service: string): LogSink {
     return {
         async write(event) {
-            const payload = {
+            await client.app.log({
                 service,
                 level: event.level,
                 message: event.message,
                 extra: buildHostLogExtra(event),
-            };
-
-            if (client.app.log.length >= 2) {
-                await client.app.log(payload, {
-                    responseStyle: "data",
-                    throwOnError: true,
-                });
-                return;
-            }
-
-            await client.app.log({
-                body: payload,
-                responseStyle: "data",
+            }, {
                 throwOnError: true,
+                responseStyle: "data",
             });
         },
     };

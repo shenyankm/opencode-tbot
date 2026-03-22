@@ -112,47 +112,6 @@ test("permission.asked sends Telegram approval messages and persists them", asyn
     }]);
 });
 
-test("permission.updated from the root SDK event stream is normalized into Telegram approval messages", async () => {
-    const { runtime, sessionRepo, permissionApprovalRepo, messages } = createRuntime();
-
-    await sessionRepo.setCurrent({
-        chatId: 111,
-        sessionId: "session-root",
-        projectId: "project-1",
-        directory: "E:/repo",
-        agentName: null,
-        modelProviderId: null,
-        modelId: null,
-        modelVariant: null,
-        language: "en",
-        updatedAt: new Date(0).toISOString(),
-    });
-
-    await handleTelegramBotPluginEvent(runtime, {
-        type: "permission.updated",
-        properties: {
-            id: "permission-1",
-            sessionID: "session-root",
-            type: "write",
-            pattern: ["README.md"],
-            metadata: {},
-            time: {
-                created: 1,
-            },
-            title: "Write README.md",
-            messageID: "message-1",
-        },
-    });
-
-    const approvals = await permissionApprovalRepo.listByRequestId("permission-1");
-
-    assert.equal(messages.length, 1);
-    assert.equal(messages[0]?.chatId, 111);
-    assert.match(messages[0]?.text ?? "", /Permission Request/);
-    assert.match(messages[0]?.text ?? "", /README\.md/);
-    assert.equal(approvals[0]?.requestId, "permission-1");
-});
-
 test("permission.asked also routes foreground child-session approvals back to the active Telegram chat", async () => {
     const { runtime, permissionApprovalRepo, messages } = createRuntime();
 
@@ -185,6 +144,53 @@ test("permission.asked also routes foreground child-session approvals back to th
     stopTracking();
 });
 
+test("permission.asked retries with plain text when Telegram rejects the MarkdownV2 payload", async () => {
+    const { runtime, sessionRepo, permissionApprovalRepo, messages } = createRuntime();
+
+    await sessionRepo.setCurrent({
+        chatId: 212,
+        sessionId: "session-special",
+        projectId: "project-1",
+        directory: "E:/repo",
+        agentName: null,
+        modelProviderId: null,
+        modelId: null,
+        modelVariant: null,
+        language: "en",
+        updatedAt: new Date(0).toISOString(),
+    });
+
+    const originalSendMessage = runtime.bot.api.sendMessage;
+
+    runtime.bot.api.sendMessage = async (chatId, text, options) => {
+        if ((options as { parse_mode?: string } | undefined)?.parse_mode === "MarkdownV2") {
+            throw new Error("can't parse entities");
+        }
+
+        return originalSendMessage(chatId, text, options);
+    };
+
+    await handleTelegramBotPluginEvent(runtime, {
+        type: "permission.asked",
+        properties: {
+            id: "request-special",
+            sessionID: "session-special",
+            permission: "write",
+            patterns: ["README_[draft].md"],
+            metadata: {},
+            always: [],
+        },
+    });
+
+    const approvals = await permissionApprovalRepo.listByRequestId("request-special");
+
+    assert.equal(messages.length, 1);
+    assert.equal(messages[0]?.chatId, 212);
+    assert.equal((messages[0]?.options as { parse_mode?: string } | undefined)?.parse_mode, undefined);
+    assert.match(messages[0]?.text ?? "", /README_\[draft\]\.md/u);
+    assert.equal(approvals[0]?.requestId, "request-special");
+});
+
 test("permission.replied updates existing Telegram approval messages", async () => {
     const { runtime, permissionApprovalRepo, edits } = createRuntime();
 
@@ -211,7 +217,7 @@ test("permission.replied updates existing Telegram approval messages", async () 
     assert.deepEqual(edits, [{
         chatId: 101,
         messageId: 55,
-        text: "Permission request resolved.\n\nRequest: request-1\nReply: always",
+        text: "Permission request resolved.\n\nRequest: request-1\nReply: always allow",
     }]);
     assert.equal(approvals[0]?.status, "always");
 });
@@ -251,6 +257,22 @@ test("permission callback replies through the OpenCode client and updates local 
             },
         },
         permissionApprovalRepo,
+        sessionRepo: {
+            async getByChatId() {
+                return {
+                    chatId: 101,
+                    sessionId: "session-1",
+                    projectId: "project-1",
+                    directory: "E:/repo",
+                    agentName: null,
+                    modelProviderId: null,
+                    modelId: null,
+                    modelVariant: null,
+                    language: "en",
+                    updatedAt: new Date(0).toISOString(),
+                };
+            },
+        },
     } as never);
 
     const approvals = await permissionApprovalRepo.listByRequestId("request-1");
@@ -259,8 +281,66 @@ test("permission callback replies through the OpenCode client and updates local 
         requestId: "request-1",
         reply: "once",
     }]);
-    assert.equal(editedText, "Permission request resolved.\n\nRequest: request-1\nReply: once");
+    assert.equal(editedText, "Permission request resolved.\n\nRequest: request-1\nReply: allow once");
     assert.equal(approvals[0]?.status, "once");
+});
+
+test("permission callback keeps local state pending when the OpenCode host rejects the reply", async () => {
+    const { permissionApprovalRepo } = createRuntime();
+
+    await permissionApprovalRepo.set({
+        requestId: "request-2",
+        sessionId: "session-2",
+        chatId: 102,
+        messageId: 56,
+        status: "pending",
+        updatedAt: new Date(0).toISOString(),
+    });
+
+    let editedText = "";
+    await handlePermissionApprovalCallback({
+        chat: { id: 102 },
+        callbackQuery: {
+            data: "permission:reject:request-2",
+            message: { message_id: 56 },
+        },
+        async answerCallbackQuery() {
+            return true;
+        },
+        async editMessageText(text: string) {
+            editedText = text;
+            return true;
+        },
+    }, {
+        logger,
+        opencodeClient: {
+            async replyToPermission() {
+                return false;
+            },
+        },
+        permissionApprovalRepo,
+        sessionRepo: {
+            async getByChatId() {
+                return {
+                    chatId: 102,
+                    sessionId: "session-2",
+                    projectId: "project-1",
+                    directory: "E:/repo",
+                    agentName: null,
+                    modelProviderId: null,
+                    modelId: null,
+                    modelVariant: null,
+                    language: "en",
+                    updatedAt: new Date(0).toISOString(),
+                };
+            },
+        },
+    } as never);
+
+    const approvals = await permissionApprovalRepo.listByRequestId("request-2");
+
+    assert.equal(editedText, "Failed to reply to the permission request.");
+    assert.equal(approvals[0]?.status, "pending");
 });
 
 test("session.error suppresses foreground child-session notifications and clears tracking", async () => {
@@ -288,6 +368,28 @@ test("session.error suppresses foreground child-session notifications and clears
     assert.equal(foregroundRequest?.signal.aborted, true);
     assert.equal((foregroundRequest?.signal.reason as { name?: string })?.name, "APIError");
     assert.equal((foregroundRequest?.signal.reason as { data?: { message?: string } })?.data?.message, "boom");
+});
+
+test("session.error preserves a plain-object message for foreground child sessions without a named error", async () => {
+    const { runtime, messages } = createRuntime();
+
+    const foregroundRequest = runtime.container.foregroundSessionTracker.acquire(313);
+    foregroundRequest?.attachSession("session-child");
+
+    await handleTelegramBotPluginEvent(runtime, {
+        type: "session.error",
+        properties: {
+            sessionID: "session-child",
+            error: {
+                message: "provider exploded",
+            },
+        },
+    });
+
+    assert.deepEqual(messages, []);
+    assert.equal(runtime.container.foregroundSessionTracker.isForeground("session-child"), false);
+    assert.equal(foregroundRequest?.signal.aborted, true);
+    assert.equal((foregroundRequest?.signal.reason as Error)?.message, "provider exploded");
 });
 
 test("session.idle suppresses foreground child-session notifications and clears tracking", async () => {
