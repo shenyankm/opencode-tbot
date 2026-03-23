@@ -6,312 +6,99 @@ import {
     type AppLogger,
 } from "../infra/logger/index.js";
 import type {
-    OpenCodeClientLike,
     PromptSessionFilePartInput,
 } from "../services/opencode/opencode.client.js";
-import { resolveSelectedAgent } from "./agent-selection.js";
+import type { OpenCodePromptGateway } from "../services/opencode/opencode.ports.js";
 import {
-    clearStoredAgentSelection,
-    clearStoredModelSelection,
-    clearStoredModelVariant,
-    clearStoredSessionContext,
-} from "./binding-update.js";
-import { createAndBindCurrentProjectSession } from "./session-creation.js";
+    PromptContextResolver,
+    type ActiveChatBinding,
+} from "./prompt-context.js";
+import { TemporaryImageSessionManager } from "./temporary-image-session-manager.js";
 
-type ActiveChatBinding = ChatSessionBinding & {
-    directory: string;
+export interface SendPromptInput {
+    chatId: number;
+    files?: PromptSessionFilePartInput[];
+    onExecutionSession?: (sessionId: string) => void;
+    signal?: AbortSignal;
+    text?: string | null;
+}
+
+export interface SendPromptResult {
+    assistantReply: Awaited<ReturnType<OpenCodePromptGateway["promptSession"]>>;
     projectId: string;
     sessionId: string;
-};
+}
 
 export class SendPromptUseCase {
+    private readonly promptContextResolver: PromptContextResolver;
+    private readonly temporaryImageSessionManager: TemporaryImageSessionManager;
+
     constructor(
         private readonly sessionRepo: SessionRepository,
-        private readonly opencodeClient: OpenCodeClientLike,
+        private readonly opencodeClient: OpenCodePromptGateway,
         private readonly logger: AppLogger,
-    ) { }
+        promptContextResolver = new PromptContextResolver(sessionRepo, opencodeClient, logger),
+        temporaryImageSessionManager = new TemporaryImageSessionManager(opencodeClient, logger),
+    ) {
+        this.promptContextResolver = promptContextResolver;
+        this.temporaryImageSessionManager = temporaryImageSessionManager;
+    }
 
-    async execute(input: {
-        chatId: number;
-        files?: PromptSessionFilePartInput[];
-        onExecutionSession?: (sessionId: string) => void;
-        signal?: AbortSignal;
-        text?: string | null;
-    }) {
+    async execute(input: SendPromptInput): Promise<SendPromptResult> {
         const files = input.files ?? [];
-        const promptText = buildPromptText(input.text, files);
-
-        if (!promptText && files.length === 0) {
-            throw new Error("Prompt requires text or file attachments.");
-        }
-
-        let binding = await this.sessionRepo.getByChatId(input.chatId);
-
-        if (binding?.projectId && binding.directory) {
-            const projects = await this.opencodeClient.listProjects();
-            const selectedProject = projects.find((project) =>
-                project.id === binding?.projectId && project.worktree === binding.directory,
-            );
-
-            if (!selectedProject) {
-                binding = await this.clearInvalidSessionContext(
-                    input.chatId,
-                    binding,
-                    "saved project is no longer available",
-                );
-            }
-        }
-
-        if (binding?.sessionId && binding.projectId) {
-            const sessions = await this.opencodeClient.listSessions();
-            const selectedSession = sessions.find((session) =>
-                session.id === binding?.sessionId && session.projectID === binding.projectId,
-            );
-
-            if (!selectedSession) {
-                binding = await this.clearInvalidSessionContext(
-                    input.chatId,
-                    binding,
-                    "saved session is no longer available",
-                );
-            }
-        }
-
-        if (!binding || !binding.sessionId || !binding.projectId || !binding.directory) {
-            const createdSession = await createAndBindCurrentProjectSession(
-                this.sessionRepo,
-                this.opencodeClient,
-                {
-                    chatId: input.chatId,
-                    binding,
-                },
-            );
-            binding = createdSession.binding;
-            logPromptLifecycle(
-                this.logger,
-                {
-                    chatId: input.chatId,
-                    event: "prompt.session.created",
-                    projectId: createdSession.session.projectID,
-                    sessionId: createdSession.session.id,
-                    directory: createdSession.session.directory,
-                },
-                "session created",
-            );
-        }
-
-        if (binding?.modelProviderId && binding?.modelId) {
-            const availableModels = await this.opencodeClient.listModels();
-            const selectedModel = availableModels.find((model) =>
-                model.providerID === binding?.modelProviderId && model.id === binding?.modelId,
-            );
-
-            if (!selectedModel) {
-                binding = await clearStoredModelSelection(this.sessionRepo, binding);
-                this.logger.warn?.(
-                    {
-                        chatId: input.chatId,
-                        event: "prompt.model.unavailable",
-                    },
-                    "selected model is no longer available, falling back to OpenCode default",
-                );
-            } else if (binding.modelVariant && !(binding.modelVariant in selectedModel.variants)) {
-                binding = await clearStoredModelVariant(this.sessionRepo, binding);
-                this.logger.warn?.(
-                    {
-                        chatId: input.chatId,
-                        event: "prompt.model.variant_unavailable",
-                        providerId: selectedModel.providerID,
-                        modelId: selectedModel.id,
-                    },
-                    "selected model variant is no longer available, falling back to default variant",
-                );
-            }
-        }
-
-        if (!binding || !binding.sessionId || !binding.projectId) {
-            throw new Error("Failed to initialize chat session.");
-        }
-
-        let activeBinding = binding as ActiveChatBinding;
-        const shouldIsolateImageTurn = hasImageFiles(files);
-        const model = activeBinding.modelProviderId && activeBinding.modelId
-            ? {
-                providerID: activeBinding.modelProviderId,
-                modelID: activeBinding.modelId,
-            }
-            : null;
-        const availableAgents = await this.opencodeClient.listAgents();
-        const selectedAgent = resolveSelectedAgent(availableAgents, activeBinding.agentName);
-
-        if (activeBinding.agentName && selectedAgent?.name !== activeBinding.agentName) {
-            activeBinding = await clearStoredAgentSelection(this.sessionRepo, activeBinding) as ActiveChatBinding;
-            this.logger.warn?.(
-                {
-                    chatId: input.chatId,
-                    event: "prompt.agent.unavailable",
-                },
-                "selected agent is no longer available, falling back to OpenCode default",
-            );
-        }
-
-        const temporarySessionId = shouldIsolateImageTurn
-            ? await this.createTemporaryImageSession(input.chatId, activeBinding.sessionId)
-            : null;
-        const executionSessionId = temporarySessionId ?? activeBinding.sessionId;
-
-        input.onExecutionSession?.(executionSessionId);
-        let result;
-
-        try {
-            logOpenCodeRequest(this.logger, {
+        const context = await this.promptContextResolver.resolve({
+            chatId: input.chatId,
+            files,
+            text: input.text,
+        });
+        const result = await this.temporaryImageSessionManager.withExecutionSession(
+            {
                 chatId: input.chatId,
-                event: "opencode.prompt.submit",
-                projectId: activeBinding.projectId,
-                sessionId: executionSessionId,
-                fileCount: files.length,
-                status: "started",
-            }, "submitting OpenCode prompt");
-            result = await this.opencodeClient.promptSession({
-                sessionId: executionSessionId,
-                prompt: promptText,
-                ...(files.length > 0 ? { files } : {}),
-                ...(selectedAgent ? { agent: selectedAgent.name } : {}),
-                format: {
-                    type: "text",
-                },
-                ...(model ? { model } : {}),
-                ...(input.signal ? { signal: input.signal } : {}),
-                ...(activeBinding.modelVariant ? { variant: activeBinding.modelVariant } : {}),
-            });
-            logPromptLifecycle(this.logger, {
-                chatId: input.chatId,
-                event: "prompt.completed",
-                projectId: activeBinding.projectId,
-                sessionId: executionSessionId,
-                status: "completed",
-            }, "prompt completed");
-        } finally {
-            if (temporarySessionId) {
-                await this.cleanupTemporaryImageSession(
-                    input.chatId,
-                    activeBinding.sessionId,
-                    temporarySessionId,
-                );
-            }
-        }
+                isolate: context.shouldIsolateImageTurn,
+                sessionId: context.activeBinding.sessionId,
+            },
+            async (executionSessionId) => {
+                input.onExecutionSession?.(executionSessionId);
+                logOpenCodeRequest(this.logger, {
+                    chatId: input.chatId,
+                    event: "opencode.prompt.submit",
+                    projectId: context.activeBinding.projectId,
+                    sessionId: executionSessionId,
+                    fileCount: files.length,
+                    status: "started",
+                }, "submitting OpenCode prompt");
+
+                const assistantReply = await this.opencodeClient.promptSession({
+                    sessionId: executionSessionId,
+                    prompt: context.promptText,
+                    ...(files.length > 0 ? { files } : {}),
+                    ...(context.selectedAgent ? { agent: context.selectedAgent.name } : {}),
+                    format: {
+                        type: "text",
+                    },
+                    ...(context.model ? { model: context.model } : {}),
+                    ...(input.signal ? { signal: input.signal } : {}),
+                    ...(context.activeBinding.modelVariant ? { variant: context.activeBinding.modelVariant } : {}),
+                });
+
+                logPromptLifecycle(this.logger, {
+                    chatId: input.chatId,
+                    event: "prompt.completed",
+                    projectId: context.activeBinding.projectId,
+                    sessionId: executionSessionId,
+                    status: "completed",
+                }, "prompt completed");
+
+                return assistantReply;
+            },
+        );
 
         await this.sessionRepo.touch(input.chatId);
 
         return {
             assistantReply: result,
-            sessionId: activeBinding.sessionId,
-            projectId: activeBinding.projectId,
+            sessionId: context.activeBinding.sessionId,
+            projectId: context.activeBinding.projectId,
         };
     }
-
-    private async clearInvalidSessionContext(
-        chatId: number,
-        binding: ChatSessionBinding,
-        reason: string,
-    ) {
-        const nextBinding = await clearStoredSessionContext(this.sessionRepo, binding);
-        this.logger.warn?.(
-            {
-                chatId,
-                event: "prompt.session.invalid_context",
-            },
-            `${reason}, falling back to the current OpenCode project`,
-        );
-
-        return nextBinding;
-    }
-
-    private async createTemporaryImageSession(chatId: number, sessionId: string): Promise<string> {
-        const temporarySession = await this.opencodeClient.forkSession(sessionId);
-
-        if (!temporarySession.id || temporarySession.id === sessionId) {
-            throw new Error("OpenCode did not return a distinct temporary session for the image turn.");
-        }
-
-        logPromptLifecycle(
-            this.logger,
-            {
-                chatId,
-                event: "prompt.temporary_session.created",
-                parentSessionId: sessionId,
-                sessionId: temporarySession.id,
-            },
-            "created temporary image session",
-        );
-
-        return temporarySession.id;
-    }
-
-    private async cleanupTemporaryImageSession(
-        chatId: number,
-        parentSessionId: string,
-        sessionId: string,
-    ): Promise<void> {
-        try {
-            const deleted = await this.opencodeClient.deleteSession(sessionId);
-
-            if (!deleted) {
-                this.logger.warn?.(
-                    {
-                        chatId,
-                        event: "prompt.temporary_session.cleanup_failed",
-                        parentSessionId,
-                        sessionId,
-                    },
-                    "failed to delete temporary image session",
-                );
-            }
-        } catch (error) {
-            this.logger.warn?.(
-                {
-                    error,
-                    chatId,
-                    event: "prompt.temporary_session.cleanup_failed",
-                    parentSessionId,
-                    sessionId,
-                },
-                "failed to delete temporary image session",
-            );
-        }
-    }
-}
-
-function buildPromptText(
-    text: string | null | undefined,
-    files: PromptSessionFilePartInput[],
-): string {
-    const trimmedText = text?.trim() ?? "";
-
-    if (!files.some(isImageFile)) {
-        return trimmedText;
-    }
-
-    const promptSections = [
-        [
-            "System note for this turn:",
-            "The user attached one or more images in this message and you can inspect those images directly.",
-            "Ignore any earlier statements in this conversation claiming that you could not view images or attachments, because those may have come from a previous model or an earlier limitation.",
-            "If an image is blurry or unreadable, say that it is blurry or unreadable instead of saying that you cannot view images.",
-        ].join(" "),
-    ];
-
-    if (trimmedText) {
-        promptSections.push(trimmedText);
-    }
-
-    return promptSections.join("\n\n");
-}
-
-function isImageFile(file: PromptSessionFilePartInput): boolean {
-    return file.mime.trim().toLowerCase().startsWith("image/");
-}
-
-function hasImageFiles(files: PromptSessionFilePartInput[]): boolean {
-    return files.some(isImageFile);
 }

@@ -1,6 +1,11 @@
 import type { Bot } from "grammy";
 import { scopeDependenciesToTelegramContext } from "../logger-context.js";
-import type { BotDependencies } from "../types.js";
+import type {
+    BotDependencies,
+    ForegroundPromptDependencies,
+    PendingActionDependencies,
+    UploadFeatureDependencies,
+} from "../types.js";
 import { executePromptRequest, type PromptExecutionContext } from "./prompt.handler.js";
 import { replyIfSessionRenamePending } from "../session-rename.js";
 import { ImageMessageUnsupportedError } from "../../use-cases/upload-file.usecase.js";
@@ -28,7 +33,12 @@ interface FileContext extends PromptExecutionContext {
     };
 }
 
-export async function handleImageMessage(ctx: FileContext, dependencies: BotDependencies) {
+type FileHandlerDependencies =
+    & ForegroundPromptDependencies
+    & PendingActionDependencies
+    & UploadFeatureDependencies;
+
+export async function handleImageMessage(ctx: FileContext, dependencies: FileHandlerDependencies) {
     const image = resolveTelegramImage(ctx.message);
 
     if (!image) {

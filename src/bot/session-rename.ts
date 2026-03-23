@@ -3,7 +3,10 @@ import { getSafeChatCopy } from "./i18n.js";
 import { restoreSessionsListMessage } from "./sessions-menu.js";
 import { presentError } from "./presenters/error.presenter.js";
 import { presentSessionRenamedMessage } from "./presenters/message.presenter.js";
-import type { BotDependencies } from "./types.js";
+import type {
+    PendingActionDependencies,
+    SessionsFeatureDependencies,
+} from "./types.js";
 
 interface SessionRenameApi {
     editMessageText(
@@ -25,7 +28,7 @@ interface SessionRenameTextContext extends SessionRenameReplyContext {
 }
 
 export async function getPendingSessionRenameAction(
-    dependencies: BotDependencies,
+    dependencies: PendingActionDependencies,
     chatId: number,
 ): Promise<SessionRenamePendingAction | null> {
     const action = await dependencies.pendingActionRepo.getByChatId(chatId);
@@ -35,7 +38,7 @@ export async function getPendingSessionRenameAction(
 
 export async function replyIfSessionRenamePending(
     ctx: Pick<SessionRenameReplyContext, "chat" | "reply">,
-    dependencies: BotDependencies,
+    dependencies: PendingActionDependencies,
 ): Promise<boolean> {
     const pendingAction = await getPendingSessionRenameAction(dependencies, ctx.chat.id);
 
@@ -51,7 +54,7 @@ export async function replyIfSessionRenamePending(
 
 export async function handlePendingSessionRenameText(
     ctx: SessionRenameTextContext,
-    dependencies: BotDependencies,
+    dependencies: PendingActionDependencies & Pick<SessionsFeatureDependencies, "listSessionsUseCase" | "renameSessionUseCase">,
 ): Promise<boolean> {
     const pendingAction = await getPendingSessionRenameAction(dependencies, ctx.chat.id);
 
@@ -99,7 +102,7 @@ export async function handlePendingSessionRenameText(
 
 export async function cancelPendingSessionRename(
     ctx: SessionRenameReplyContext,
-    dependencies: BotDependencies,
+    dependencies: PendingActionDependencies & Pick<SessionsFeatureDependencies, "listSessionsUseCase">,
 ): Promise<boolean> {
     const pendingAction = await getPendingSessionRenameAction(dependencies, ctx.chat.id);
 
@@ -118,7 +121,7 @@ export async function cancelPendingSessionRename(
 async function bestEffortRestoreSessionsList(
     api: SessionRenameApi,
     pendingAction: SessionRenamePendingAction,
-    dependencies: BotDependencies,
+    dependencies: PendingActionDependencies & Pick<SessionsFeatureDependencies, "listSessionsUseCase">,
 ) {
     try {
         await restoreSessionsListMessage(

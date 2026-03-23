@@ -1,8 +1,8 @@
 import type { SessionRepository } from "../domain/session/session.repository.js";
 import type {
-    OpenCodeClientLike,
     OpenCodeConfiguredModel,
 } from "../services/opencode/opencode.client.js";
+import type { OpenCodeModelCatalog } from "../services/opencode/opencode.ports.js";
 import {
     clearStoredModelSelection,
     clearStoredModelVariant,
@@ -15,13 +15,17 @@ export interface ListModelsResult {
     currentModelVariant: string | null;
 }
 
+export interface ListModelsInput {
+    chatId: number;
+}
+
 export class ListModelsUseCase {
     constructor(
         private readonly sessionRepo: SessionRepository,
-        private readonly opencodeClient: OpenCodeClientLike,
+        private readonly opencodeClient: OpenCodeModelCatalog,
     ) { }
 
-    async execute(input: { chatId: number }): Promise<ListModelsResult> {
+    async execute(input: ListModelsInput): Promise<ListModelsResult> {
         let [binding, models] = await Promise.all([
             this.sessionRepo.getByChatId(input.chatId),
             this.opencodeClient.listModels(),

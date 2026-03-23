@@ -1,10 +1,12 @@
 {
     "extends": "./tsconfig.json",
     "compilerOptions": {
+        "allowImportingTsExtensions": true,
         "rootDir": ".",
         "noEmit": true
     },
     "include": [
-        "vite.config.ts"
+        "vite.config.ts",
+        "tests/**/*.ts"
     ]
 }

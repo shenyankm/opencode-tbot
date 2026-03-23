@@ -2,47 +2,107 @@ import type { PendingActionRepository } from "../domain/pending-action/pending-a
 import type { SessionRepository } from "../domain/session/session.repository.js";
 import type { AppLogger } from "../infra/logger/index.js";
 import type { ForegroundSessionTrackerLike } from "../services/session-activity/foreground-session-tracker.js";
-import type { TelegramFileClientLike } from "../services/telegram/telegram.client.js";
-import type { UploadFileUseCase } from "../use-cases/upload-file.usecase.js";
-import type { CreateSessionUseCase } from "../use-cases/create-session.usecase.js";
-import type { GetHealthUseCase } from "../use-cases/get-health.usecase.js";
-import type { GetPathUseCase } from "../use-cases/get-path.usecase.js";
-import type { AbortPromptUseCase } from "../use-cases/abort-prompt.usecase.js";
-import type { GetStatusUseCase } from "../use-cases/get-status.usecase.js";
-import type { ListAgentsUseCase } from "../use-cases/list-agents.usecase.js";
-import type { ListLspUseCase } from "../use-cases/list-lsp.usecase.js";
-import type { ListMcpUseCase } from "../use-cases/list-mcp.usecase.js";
-import type { ListModelsUseCase } from "../use-cases/list-models.usecase.js";
-import type { ListSessionsUseCase } from "../use-cases/list-sessions.usecase.js";
-import type { SendPromptUseCase } from "../use-cases/send-prompt.usecase.js";
-import type { RenameSessionUseCase } from "../use-cases/rename-session.usecase.js";
-import type { SwitchAgentUseCase } from "../use-cases/switch-agent.usecase.js";
-import type { SwitchModelUseCase } from "../use-cases/switch-model.usecase.js";
-import type { SwitchSessionUseCase } from "../use-cases/switch-session.usecase.js";
+import type { PromptSessionFilePartInput } from "../services/opencode/opencode.client.js";
+import type {
+    AbortPromptInput,
+    AbortPromptResult,
+} from "../use-cases/abort-prompt.usecase.js";
+import type {
+    CreateSessionInput,
+    CreateSessionResult,
+} from "../use-cases/create-session.usecase.js";
+import type { GetStatusInput, GetStatusResult } from "../use-cases/get-status.usecase.js";
+import type { ListAgentsInput, ListAgentsResult } from "../use-cases/list-agents.usecase.js";
+import type { ListLspInput, ListLspResult } from "../use-cases/list-lsp.usecase.js";
+import type { ListMcpInput, ListMcpResult } from "../use-cases/list-mcp.usecase.js";
+import type { ListModelsInput, ListModelsResult } from "../use-cases/list-models.usecase.js";
+import type { ListSessionsInput, ListSessionsResult } from "../use-cases/list-sessions.usecase.js";
+import type {
+    RenameSessionInput,
+    RenameSessionResult,
+} from "../use-cases/rename-session.usecase.js";
+import type {
+    SendPromptInput,
+    SendPromptResult,
+} from "../use-cases/send-prompt.usecase.js";
+import type { SwitchAgentInput, SwitchAgentResult } from "../use-cases/switch-agent.usecase.js";
+import type { SwitchModelInput, SwitchModelResult } from "../use-cases/switch-model.usecase.js";
+import type { SwitchSessionInput, SwitchSessionResult } from "../use-cases/switch-session.usecase.js";
+import type { UploadFileInput } from "../use-cases/upload-file.usecase.js";
 import type { BotLanguage } from "./copy.js";
 
-export interface BotDependencies {
-    abortPromptUseCase: AbortPromptUseCase;
-    createSessionUseCase: CreateSessionUseCase;
-    foregroundSessionTracker: ForegroundSessionTrackerLike;
-    getHealthUseCase: GetHealthUseCase;
-    getPathUseCase: GetPathUseCase;
-    getStatusUseCase: GetStatusUseCase;
-    listAgentsUseCase: ListAgentsUseCase;
-    listLspUseCase: ListLspUseCase;
-    listMcpUseCase: ListMcpUseCase;
+export interface UseCaseExecutor<TInput, TResult> {
+    execute(input: TInput): Promise<TResult>;
+}
+
+export interface LoggerDependencies {
     logger: AppLogger;
-    listModelsUseCase: ListModelsUseCase;
-    listSessionsUseCase: ListSessionsUseCase;
-    pendingActionRepo: PendingActionRepository;
-    renameSessionUseCase: RenameSessionUseCase;
+}
+
+export interface ChatStateDependencies extends LoggerDependencies {
     sessionRepo: SessionRepository;
-    sendPromptUseCase: SendPromptUseCase;
-    switchAgentUseCase: SwitchAgentUseCase;
-    switchModelUseCase: SwitchModelUseCase;
-    switchSessionUseCase: SwitchSessionUseCase;
-    telegramFileClient: TelegramFileClientLike;
-    uploadFileUseCase: UploadFileUseCase;
+}
+
+export interface PendingActionDependencies extends ChatStateDependencies {
+    pendingActionRepo: PendingActionRepository;
+}
+
+export interface ForegroundPromptDependencies extends ChatStateDependencies {
+    foregroundSessionTracker: ForegroundSessionTrackerLike;
+    sendPromptUseCase: UseCaseExecutor<SendPromptInput, SendPromptResult>;
+}
+
+export interface AgentsFeatureDependencies extends ChatStateDependencies {
+    listAgentsUseCase: UseCaseExecutor<ListAgentsInput, ListAgentsResult>;
+    switchAgentUseCase: UseCaseExecutor<SwitchAgentInput, SwitchAgentResult>;
+}
+
+export interface ModelsFeatureDependencies extends ChatStateDependencies {
+    listModelsUseCase: UseCaseExecutor<ListModelsInput, ListModelsResult>;
+    switchModelUseCase: UseCaseExecutor<SwitchModelInput, SwitchModelResult>;
+}
+
+export interface SessionsFeatureDependencies extends PendingActionDependencies {
+    listSessionsUseCase: UseCaseExecutor<ListSessionsInput, ListSessionsResult>;
+    renameSessionUseCase: UseCaseExecutor<RenameSessionInput, RenameSessionResult>;
+    switchSessionUseCase: UseCaseExecutor<SwitchSessionInput, SwitchSessionResult>;
+}
+
+export interface StatusFeatureDependencies extends ChatStateDependencies {
+    getStatusUseCase: UseCaseExecutor<GetStatusInput, GetStatusResult>;
+}
+
+export interface SessionCreationDependencies extends ChatStateDependencies {
+    createSessionUseCase: UseCaseExecutor<CreateSessionInput, CreateSessionResult>;
+}
+
+export interface AbortFeatureDependencies extends ChatStateDependencies {
+    abortPromptUseCase: UseCaseExecutor<AbortPromptInput, AbortPromptResult>;
+}
+
+export interface UploadFeatureDependencies {
+    uploadFileUseCase: UseCaseExecutor<UploadFileInput, PromptSessionFilePartInput>;
+}
+
+export interface BotDependencies {
+    abortPromptUseCase: UseCaseExecutor<AbortPromptInput, AbortPromptResult>;
+    createSessionUseCase: UseCaseExecutor<CreateSessionInput, CreateSessionResult>;
+    foregroundSessionTracker: ForegroundSessionTrackerLike;
+    getStatusUseCase: UseCaseExecutor<GetStatusInput, GetStatusResult>;
+    listAgentsUseCase: UseCaseExecutor<ListAgentsInput, ListAgentsResult>;
+    listLspUseCase: UseCaseExecutor<ListLspInput, ListLspResult>;
+    listMcpUseCase: UseCaseExecutor<ListMcpInput, ListMcpResult>;
+    logger: AppLogger;
+    listModelsUseCase: UseCaseExecutor<ListModelsInput, ListModelsResult>;
+    listSessionsUseCase: UseCaseExecutor<ListSessionsInput, ListSessionsResult>;
+    pendingActionRepo: PendingActionRepository;
+    renameSessionUseCase: UseCaseExecutor<RenameSessionInput, RenameSessionResult>;
+    sessionRepo: SessionRepository;
+    sendPromptUseCase: UseCaseExecutor<SendPromptInput, SendPromptResult>;
+    switchAgentUseCase: UseCaseExecutor<SwitchAgentInput, SwitchAgentResult>;
+    switchModelUseCase: UseCaseExecutor<SwitchModelInput, SwitchModelResult>;
+    switchSessionUseCase: UseCaseExecutor<SwitchSessionInput, SwitchSessionResult>;
+    uploadFileUseCase: UseCaseExecutor<UploadFileInput, PromptSessionFilePartInput>;
 }
 
 export type AgentsCallbackData = `agents:page:${number}` | `agents:select:${number}`;

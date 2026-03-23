@@ -1907,7 +1907,7 @@ function throwIfAborted(signal?: AbortSignal): void {
     throw normalizeAbortReason(signal.reason);
 }
 
-function isPlainRecord(value: unknown): value is Record<string, any> {
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
     return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 

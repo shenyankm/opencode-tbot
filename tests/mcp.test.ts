@@ -26,7 +26,7 @@ test("ListMcpUseCase returns the current project and sorts statuses", async () =
             async getCurrentProject() {
                 return currentProject;
             },
-            async listMcpStatuses(directory) {
+            async listMcpStatuses(directory?: string) {
                 calls.push(directory ?? "");
 
                 return {
@@ -71,7 +71,7 @@ test("ListMcpUseCase clears a stale saved project binding and falls back to the 
             async listProjects() {
                 return [currentProject];
             },
-            async listMcpStatuses(directory) {
+            async listMcpStatuses(directory?: string) {
                 assert.equal(directory, "E:/repo-2");
                 return {};
             },

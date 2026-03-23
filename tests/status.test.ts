@@ -13,7 +13,10 @@ import type {
 import { renderMarkdownToTelegramMarkdownV2 } from "../src/services/telegram/telegram-format.js";
 import { GetHealthUseCase } from "../src/use-cases/get-health.usecase.js";
 import { GetPathUseCase } from "../src/use-cases/get-path.usecase.js";
-import { GetStatusUseCase } from "../src/use-cases/get-status.usecase.js";
+import {
+    createStatusSectionProviders,
+    GetStatusUseCase,
+} from "../src/use-cases/get-status.usecase.js";
 import { ListLspUseCase } from "../src/use-cases/list-lsp.usecase.js";
 import { ListMcpUseCase } from "../src/use-cases/list-mcp.usecase.js";
 import { ListSessionsUseCase } from "../src/use-cases/list-sessions.usecase.js";
@@ -51,17 +54,15 @@ function createDependencies(client: OpenCodeClientLike) {
     const listLspUseCase = new ListLspUseCase(sessionRepo, client);
     const listMcpUseCase = new ListMcpUseCase(sessionRepo, client);
     const listSessionsUseCase = new ListSessionsUseCase(sessionRepo, client);
-    const getStatusUseCase = new GetStatusUseCase(
+    const getStatusUseCase = new GetStatusUseCase(createStatusSectionProviders({
+        configuredPluginReader: client,
         getHealthUseCase,
         getPathUseCase,
         listLspUseCase,
         listMcpUseCase,
         listSessionsUseCase,
         sessionRepo,
-        client as {
-            listConfiguredPlugins(): Promise<string[]>;
-        },
-    );
+    }));
 
     return {
         dependencies: {
@@ -143,7 +144,7 @@ test("/status aggregates health, path, plugins, LSP, and MCP into one reply", as
             async listProjects() {
                 return [project];
             },
-            async listLspStatuses(directory) {
+            async listLspStatuses(directory?: string) {
                 assert.equal(directory, "E:/repo-1");
 
                 return [
@@ -152,7 +153,7 @@ test("/status aggregates health, path, plugins, LSP, and MCP into one reply", as
                     { id: "ts-1", name: "TypeScript", root: "E:/repo-1", status: "connected" },
                 ] as never;
             },
-            async listMcpStatuses(directory) {
+            async listMcpStatuses(directory?: string) {
                 assert.equal(directory, "E:/repo-1");
 
                 return {

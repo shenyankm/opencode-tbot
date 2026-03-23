@@ -92,20 +92,21 @@ function createPromptReply(text: string): PromptSessionResult {
     };
 }
 
-function createDependencies(client: OpenCodeClientLike) {
+function createDependencies(client: Partial<OpenCodeClientLike>) {
     const repo = new InMemorySessionRepository();
-    const dependencies: BotDependencies = {
+    const typedClient = client as OpenCodeClientLike;
+    const dependencies = {
         abortPromptUseCase: {
             async execute() {
                 return { sessionId: null, sessionStatus: null, status: "no_session" as const };
             },
-        },
+        } as unknown as BotDependencies["abortPromptUseCase"],
         logger,
-        listModelsUseCase: new ListModelsUseCase(repo, client),
+        listModelsUseCase: new ListModelsUseCase(repo, typedClient),
         sessionRepo: repo,
-        sendPromptUseCase: new SendPromptUseCase(repo, client, logger),
-        switchModelUseCase: new SwitchModelUseCase(repo, client, logger),
-    };
+        sendPromptUseCase: new SendPromptUseCase(repo, typedClient, logger),
+        switchModelUseCase: new SwitchModelUseCase(repo, typedClient, logger),
+    } as unknown as BotDependencies;
 
     return { dependencies, repo };
 }

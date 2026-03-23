@@ -26,6 +26,37 @@ export interface PreparePluginConfigurationOptions {
     homeDir?: string;
 }
 
+type KnownPluginConfigSections = Pick<
+    PluginConfigSource,
+    "telegram" | "state" | "prompt" | "logging"
+>;
+
+type PluginConfigSectionKey = keyof KnownPluginConfigSections;
+
+type PluginConfigSectionValue<TKey extends PluginConfigSectionKey> =
+    NonNullable<KnownPluginConfigSections[TKey]>;
+
+type SectionMerger<TKey extends PluginConfigSectionKey> = (
+    previous: KnownPluginConfigSections[TKey] | undefined,
+    next: PluginConfigSectionValue<TKey>,
+) => PluginConfigSectionValue<TKey>;
+
+const PLUGIN_CONFIG_SECTION_KEYS = [
+    "telegram",
+    "state",
+    "prompt",
+    "logging",
+] as const satisfies PluginConfigSectionKey[];
+
+const PLUGIN_CONFIG_SECTION_MERGERS: {
+    [TKey in PluginConfigSectionKey]: SectionMerger<TKey>;
+} = {
+    telegram: mergeObjectSection,
+    state: mergeObjectSection,
+    prompt: mergeObjectSection,
+    logging: mergeLoggingConfig,
+};
+
 export async function preparePluginConfiguration(
     options: PreparePluginConfigurationOptions,
 ): Promise<PreparedPluginConfiguration> {
@@ -71,68 +102,26 @@ export function mergePluginConfigSources(
             continue;
         }
 
-        const normalized = source;
-        const previousTelegram = merged.telegram;
-        const previousState = merged.state;
-        const previousPrompt = merged.prompt;
-        const previousLogging = merged.logging;
+        const previousSections = {
+            telegram: merged.telegram,
+            state: merged.state,
+            prompt: merged.prompt,
+            logging: merged.logging,
+        } satisfies Partial<KnownPluginConfigSections>;
 
-        Object.assign(merged, normalized);
+        Object.assign(merged, source);
 
-        if (normalized.telegram) {
-            merged.telegram = {
-                ...(previousTelegram ?? {}),
-                ...normalized.telegram,
-            };
-        }
+        for (const key of PLUGIN_CONFIG_SECTION_KEYS) {
+            const nextSection = source[key];
 
-        if (normalized.state) {
-            merged.state = {
-                ...(previousState ?? {}),
-                ...normalized.state,
-            };
-        }
+            if (!nextSection) {
+                continue;
+            }
 
-        if (normalized.prompt) {
-            merged.prompt = {
-                ...(previousPrompt ?? {}),
-                ...normalized.prompt,
-            };
-        }
-
-        if (normalized.logging) {
-            const previousLoggingSinks = previousLogging?.sinks;
-            const previousLoggingFile = previousLogging?.file;
-            const previousRetention = previousLoggingFile?.retention;
-
-            merged.logging = {
-                ...(previousLogging ?? {}),
-                ...normalized.logging,
-                ...(normalized.logging.sinks || previousLoggingSinks
-                    ? {
-                        sinks: {
-                            ...(previousLoggingSinks ?? {}),
-                            ...(normalized.logging.sinks ?? {}),
-                        },
-                    }
-                    : {}),
-                ...(normalized.logging.file || previousLoggingFile
-                    ? {
-                        file: {
-                            ...(previousLoggingFile ?? {}),
-                            ...(normalized.logging.file ?? {}),
-                            ...(normalized.logging.file?.retention || previousRetention
-                                ? {
-                                    retention: {
-                                        ...(previousRetention ?? {}),
-                                        ...(normalized.logging.file?.retention ?? {}),
-                                    },
-                                }
-                                : {}),
-                        },
-                    }
-                    : {}),
-            };
+            merged[key] = PLUGIN_CONFIG_SECTION_MERGERS[key](
+                previousSections[key],
+                nextSection,
+            );
         }
     }
 
@@ -219,4 +208,42 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
     return error instanceof Error && "code" in error && error.code === "ENOENT";
+}
+
+function mergeObjectSection<TSection extends Record<string, unknown>>(
+    previous: TSection | undefined,
+    next: TSection,
+): TSection {
+    return {
+        ...(previous ?? {}),
+        ...next,
+    };
+}
+
+function mergeLoggingConfig(
+    previous: PluginConfigSource["logging"] | undefined,
+    next: NonNullable<PluginConfigSource["logging"]>,
+): NonNullable<PluginConfigSource["logging"]> {
+    const merged = mergeObjectSection(previous ?? {}, next);
+    const mergedSinks = next.sinks || previous?.sinks
+        ? mergeObjectSection(previous?.sinks ?? {}, next.sinks ?? {})
+        : undefined;
+    const mergedRetention = next.file?.retention || previous?.file?.retention
+        ? mergeObjectSection(
+            previous?.file?.retention ?? {},
+            next.file?.retention ?? {},
+        )
+        : undefined;
+    const mergedFile = next.file || previous?.file
+        ? {
+            ...mergeObjectSection(previous?.file ?? {}, next.file ?? {}),
+            ...(mergedRetention ? { retention: mergedRetention } : {}),
+        }
+        : undefined;
+
+    return {
+        ...merged,
+        ...(mergedSinks ? { sinks: mergedSinks } : {}),
+        ...(mergedFile ? { file: mergedFile } : {}),
+    };
 }

@@ -33,17 +33,17 @@ function createAgent(
         prompt: "",
         tools: [],
         model: undefined,
-    } as OpenCodeAgent;
+    } as unknown as OpenCodeAgent;
 }
 
 function createDependencies(client: OpenCodeClientLike) {
     const repo = new InMemorySessionRepository();
-    const dependencies: BotDependencies = {
+    const dependencies = {
         listAgentsUseCase: new ListAgentsUseCase(repo, client),
         logger,
         sessionRepo: repo,
         switchAgentUseCase: new SwitchAgentUseCase(repo, client, logger),
-    } as never;
+    } as unknown as BotDependencies;
 
     return { dependencies, repo };
 }

@@ -1,43 +1,12 @@
 import type { BotCommand } from "grammy/types";
 import { getBotCopy, type BotLanguage } from "../copy.js";
+import { getTelegramCommandDefinitions } from "./registry.js";
 
 export function getTelegramCommands(language: BotLanguage = "en"): BotCommand[] {
     const copy = getBotCopy(language);
 
-    return [
-        {
-            command: "start",
-            description: copy.commands.start,
-        },
-        {
-            command: "status",
-            description: copy.commands.status,
-        },
-        {
-            command: "new",
-            description: copy.commands.new,
-        },
-        {
-            command: "agents",
-            description: copy.commands.agents,
-        },
-        {
-            command: "sessions",
-            description: copy.commands.sessions,
-        },
-        {
-            command: "cancel",
-            description: copy.commands.cancel,
-        },
-        {
-            command: "model",
-            description: copy.commands.model,
-        },
-        {
-            command: "language",
-            description: copy.commands.language,
-        },
-    ];
+    return getTelegramCommandDefinitions().map((definition) => ({
+        command: definition.names[0],
+        description: definition.describe(copy),
+    }));
 }
-
-export const TELEGRAM_COMMANDS: BotCommand[] = getTelegramCommands();

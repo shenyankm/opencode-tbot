@@ -120,10 +120,10 @@ function createContainerStub(cwd = "E:/workspace") {
                 calls.warn.push({ input, message });
             },
         },
-        dispose() {
+        async dispose() {
             calls.dispose += 1;
         },
-    } as AppContainer & { __cwd: string };
+    } as unknown as AppContainer & { __cwd: string };
 
     return { calls, container };
 }
@@ -378,8 +378,8 @@ test("ensureTelegramBotPluginRuntime starts the Telegram runtime only once per w
                 bot: {} as never,
                 container: input.container,
                 stop() { },
-                dispose() {
-                    input.container.dispose();
+                async dispose() {
+                    await input.container.dispose();
                 },
             };
         };
@@ -450,8 +450,8 @@ test("ensureTelegramBotPluginRuntime reuses the active runtime when a later plug
                     bot: {} as never,
                     container: input.container,
                     stop() { },
-                    dispose() {
-                        input.container.dispose();
+                    async dispose() {
+                        await input.container.dispose();
                     },
                 };
             },
@@ -472,8 +472,8 @@ test("ensureTelegramBotPluginRuntime reuses the active runtime when a later plug
                 bot: {} as never,
                 container: input.container,
                 stop() { },
-                dispose() {
-                    input.container.dispose();
+                async dispose() {
+                    await input.container.dispose();
                 },
             }),
         });
@@ -519,8 +519,8 @@ test("ensureTelegramBotPluginRuntime starts when only directory is provided", as
                     bot: {} as never,
                     container: input.container,
                     stop() { },
-                    dispose() {
-                        input.container.dispose();
+                    async dispose() {
+                        await input.container.dispose();
                     },
                 };
             },
@@ -605,8 +605,8 @@ test("ensureTelegramBotPluginRuntime clears the singleton and disposes the conta
                     bot: {} as never,
                     container: input.container,
                     stop() { },
-                    dispose() {
-                        input.container.dispose();
+                    async dispose() {
+                        await input.container.dispose();
                     },
                 };
             },
@@ -653,10 +653,10 @@ test("ensureTelegramBotPluginRuntime rebuilds the runtime when the worktree chan
                 stop() {
                     record.stop += 1;
                 },
-                dispose() {
+                async dispose() {
                     record.dispose += 1;
                     record.stop += 1;
-                    input.container.dispose();
+                    await input.container.dispose();
                 },
             };
         };
@@ -719,9 +719,9 @@ test("resetTelegramBotPluginRuntimeForTests disposes the active runtime", async 
             bot: {} as never,
             container: input.container,
             stop() { },
-            dispose() {
+            async dispose() {
                 runtimeCalls.dispose += 1;
-                input.container.dispose();
+                await input.container.dispose();
             },
         }),
     });

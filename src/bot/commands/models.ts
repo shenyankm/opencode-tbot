@@ -1,17 +1,18 @@
 import type { Bot } from "grammy";
 import { getSafeChatCopy } from "../i18n.js";
 import { scopeDependenciesToTelegramContext } from "../logger-context.js";
-import type { BotDependencies } from "../types.js";
+import type { BotDependencies, ModelsFeatureDependencies } from "../types.js";
 import { buildModelsKeyboard } from "../presenters/keyboard.presenter.js";
 import { presentError } from "../presenters/error.presenter.js";
 import { presentModelsMessage } from "../presenters/message.presenter.js";
+import type { TelegramCommandDefinition } from "./registry.js";
 
 interface ModelsCommandContext {
     chat: { id: number };
     reply(text: string, other?: { reply_markup?: unknown }): Promise<unknown>;
 }
 
-export async function handleModelsCommand(ctx: ModelsCommandContext, dependencies: BotDependencies) {
+export async function handleModelsCommand(ctx: ModelsCommandContext, dependencies: ModelsFeatureDependencies) {
     const copy = await getSafeChatCopy(dependencies.sessionRepo, ctx.chat.id, dependencies.logger);
 
     try {
@@ -49,3 +50,11 @@ export function registerModelsCommand(bot: Pick<Bot, "command">, dependencies: B
         await handleModelsCommand(ctx, scopeDependenciesToTelegramContext(dependencies, ctx, "telegram"));
     });
 }
+
+export const MODELS_COMMAND_DEFINITION: TelegramCommandDefinition = {
+    describe(copy) {
+        return copy.commands.model;
+    },
+    names: ["model", "models"],
+    register: registerModelsCommand,
+};

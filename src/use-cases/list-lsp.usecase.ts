@@ -1,10 +1,14 @@
 import type { ChatSessionBinding } from "../domain/session/session.entity.js";
 import type { SessionRepository } from "../domain/session/session.repository.js";
 import type {
-    OpenCodeClientLike,
     OpenCodeLspStatus,
     OpenCodeProject,
 } from "../services/opencode/opencode.client.js";
+import type {
+    OpenCodeCurrentProjectReader,
+    OpenCodeLspCatalog,
+    OpenCodeProjectCatalog,
+} from "../services/opencode/opencode.ports.js";
 import { clearStoredSessionContext } from "./binding-update.js";
 
 export interface ListLspResult {
@@ -12,13 +16,17 @@ export interface ListLspResult {
     statuses: OpenCodeLspStatus[];
 }
 
+export interface ListLspInput {
+    chatId: number;
+}
+
 export class ListLspUseCase {
     constructor(
         private readonly sessionRepo: SessionRepository,
-        private readonly opencodeClient: OpenCodeClientLike,
+        private readonly opencodeClient: OpenCodeCurrentProjectReader & OpenCodeLspCatalog & OpenCodeProjectCatalog,
     ) { }
 
-    async execute(input: { chatId: number }): Promise<ListLspResult> {
+    async execute(input: ListLspInput): Promise<ListLspResult> {
         let binding = await this.sessionRepo.getByChatId(input.chatId);
 
         if (binding?.projectId && binding.directory) {

@@ -90,13 +90,15 @@ test("package root entry re-exports the plugin module", async () => {
 test("vite build keeps both npm and explicit plugin entrypoints", async () => {
     const viteConfigModule = await import("../vite.config.ts");
     const viteConfig = viteConfigModule.default;
+    const output = viteConfig.build?.rollupOptions?.output;
 
     assert.deepEqual(
         Object.keys(viteConfig.build?.rollupOptions?.input ?? {}).sort(),
         ["cli", "index", "plugin"],
     );
     assert.equal(viteConfig.build?.outDir, "dist");
-    assert.equal(viteConfig.build?.rollupOptions?.output?.entryFileNames, "[name].js");
+    assert.ok(output && !Array.isArray(output));
+    assert.equal(output.entryFileNames, "[name].js");
 });
 
 function collectSourceFiles(directory: URL): URL[] {

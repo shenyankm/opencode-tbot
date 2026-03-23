@@ -2,7 +2,7 @@ import type { Bot } from "grammy";
 import type { BotCommandScope } from "grammy/types";
 import type { AppLogger } from "../../infra/logger/index.js";
 import { type BotLanguage } from "../copy.js";
-import { getTelegramCommands, TELEGRAM_COMMANDS } from "./command-list.js";
+import { getTelegramCommands } from "./command-list.js";
 
 export const TELEGRAM_COMMAND_SYNC_SCOPES: ReadonlyArray<BotCommandScope> = [
     { type: "default" },
@@ -10,16 +10,18 @@ export const TELEGRAM_COMMAND_SYNC_SCOPES: ReadonlyArray<BotCommandScope> = [
 ];
 
 export async function syncTelegramCommands(bot: Bot, logger: AppLogger): Promise<void> {
+    const commands = getTelegramCommands();
+
     await Promise.all(
         TELEGRAM_COMMAND_SYNC_SCOPES.map((scope) =>
-            bot.api.setMyCommands(TELEGRAM_COMMANDS, { scope }),
+            bot.api.setMyCommands(commands, { scope }),
         ),
     );
 
     logger.info(
         {
             component: "runtime",
-            commands: TELEGRAM_COMMANDS.map((command) => command.command),
+            commands: commands.map((command) => command.command),
             event: "runtime.commands.synced",
             scopes: TELEGRAM_COMMAND_SYNC_SCOPES.map((scope) => scope.type),
         },

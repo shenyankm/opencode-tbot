@@ -7,7 +7,8 @@ import {
     presentStatusMessage,
 } from "../presenters/message.presenter.js";
 import { renderMarkdownToTelegramMarkdownV2 } from "../../services/telegram/telegram-format.js";
-import type { BotDependencies } from "../types.js";
+import type { BotDependencies, StatusFeatureDependencies } from "../types.js";
+import type { TelegramCommandDefinition } from "./registry.js";
 
 interface StatusCommandContext {
     chat?: { id: number };
@@ -19,7 +20,7 @@ interface StatusCommandContext {
     ): Promise<unknown>;
 }
 
-export async function handleStatusCommand(ctx: StatusCommandContext, dependencies: BotDependencies) {
+export async function handleStatusCommand(ctx: StatusCommandContext, dependencies: StatusFeatureDependencies) {
     const copy = await getSafeChatCopy(dependencies.sessionRepo, ctx.chat?.id, dependencies.logger);
 
     try {
@@ -46,3 +47,11 @@ export function registerStatusCommand(bot: Pick<Bot, "command">, dependencies: B
         await handleStatusCommand(ctx, scopeDependenciesToTelegramContext(dependencies, ctx, "telegram"));
     });
 }
+
+export const STATUS_COMMAND_DEFINITION: TelegramCommandDefinition = {
+    describe(copy) {
+        return copy.commands.status;
+    },
+    names: ["status"],
+    register: registerStatusCommand,
+};

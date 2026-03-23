@@ -1,6 +1,11 @@
 import type { Bot } from "grammy";
 import { scopeDependenciesToTelegramContext } from "../logger-context.js";
-import type { BotDependencies } from "../types.js";
+import type {
+    BotDependencies,
+    ForegroundPromptDependencies,
+    PendingActionDependencies,
+    SessionsFeatureDependencies,
+} from "../types.js";
 import { executePromptRequest, type PromptExecutionContext } from "./prompt.handler.js";
 import { handlePendingSessionRenameText } from "../session-rename.js";
 
@@ -16,7 +21,12 @@ interface MessageContext extends PromptExecutionContext {
     message: { text?: string };
 }
 
-export async function handleTextMessage(ctx: MessageContext, dependencies: BotDependencies) {
+type MessageHandlerDependencies =
+    & ForegroundPromptDependencies
+    & PendingActionDependencies
+    & Pick<SessionsFeatureDependencies, "listSessionsUseCase" | "renameSessionUseCase">;
+
+export async function handleTextMessage(ctx: MessageContext, dependencies: MessageHandlerDependencies) {
     const text = ctx.message.text?.trim();
 
     if (await handlePendingSessionRenameText(ctx, dependencies)) return;

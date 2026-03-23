@@ -1,7 +1,7 @@
 import type { Bot } from "grammy";
 import { getSafeChatCopy } from "../i18n.js";
 import { scopeDependenciesToTelegramContext } from "../logger-context.js";
-import type { BotDependencies } from "../types.js";
+import type { BotDependencies, PendingActionDependencies } from "../types.js";
 import { replyIfSessionRenamePending } from "../session-rename.js";
 
 interface VoiceContext {
@@ -10,7 +10,7 @@ interface VoiceContext {
     reply(text: string): Promise<unknown>;
 }
 
-export async function handleVoiceMessage(ctx: VoiceContext, dependencies: BotDependencies) {
+export async function handleVoiceMessage(ctx: VoiceContext, dependencies: PendingActionDependencies) {
     if (!ctx.message.voice) {
         return;
     }

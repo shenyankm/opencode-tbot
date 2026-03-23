@@ -1,6 +1,7 @@
 import type { SessionRepository } from "../domain/session/session.repository.js";
 import type { AppLogger } from "../infra/logger/index.js";
-import type { OpenCodeClientLike, OpenCodeSession } from "../services/opencode/opencode.client.js";
+import type { OpenCodeSession } from "../services/opencode/opencode.client.js";
+import type { OpenCodeCurrentProjectReader, OpenCodeSessionCatalog, OpenCodeSessionManager } from "../services/opencode/opencode.ports.js";
 
 export type RenameSessionResult =
     | {
@@ -11,14 +12,20 @@ export type RenameSessionResult =
         session: OpenCodeSession;
     };
 
+export interface RenameSessionInput {
+    chatId: number;
+    sessionId: string;
+    title: string;
+}
+
 export class RenameSessionUseCase {
     constructor(
         private readonly sessionRepo: SessionRepository,
-        private readonly opencodeClient: OpenCodeClientLike,
+        private readonly opencodeClient: OpenCodeCurrentProjectReader & OpenCodeSessionCatalog & Pick<OpenCodeSessionManager, "renameSession">,
         private readonly logger: AppLogger,
     ) { }
 
-    async execute(input: { chatId: number; sessionId: string; title: string }): Promise<RenameSessionResult> {
+    async execute(input: RenameSessionInput): Promise<RenameSessionResult> {
         const title = input.title.trim();
 
         if (!title) {

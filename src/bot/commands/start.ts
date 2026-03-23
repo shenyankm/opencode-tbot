@@ -4,7 +4,8 @@ import { getSafeChatCopy } from "../i18n.js";
 import { scopeDependenciesToTelegramContext } from "../logger-context.js";
 import { presentError } from "../presenters/error.presenter.js";
 import { presentStartMarkdownMessage } from "../presenters/static.presenter.js";
-import type { BotDependencies } from "../types.js";
+import type { BotDependencies, ChatStateDependencies } from "../types.js";
+import type { TelegramCommandDefinition } from "./registry.js";
 
 interface StartCommandContext {
     chat?: { id: number };
@@ -16,7 +17,7 @@ interface StartCommandContext {
     ): Promise<unknown>;
 }
 
-export async function handleStartCommand(ctx: StartCommandContext, dependencies: BotDependencies) {
+export async function handleStartCommand(ctx: StartCommandContext, dependencies: ChatStateDependencies) {
     const copy = await getSafeChatCopy(dependencies.sessionRepo, ctx.chat?.id, dependencies.logger);
     const reply = buildTelegramStaticReply(presentStartMarkdownMessage(copy));
 
@@ -39,3 +40,11 @@ export function registerStartCommand(bot: Pick<Bot, "command">, dependencies: Bo
         await handleStartCommand(ctx, scopeDependenciesToTelegramContext(dependencies, ctx, "telegram"));
     });
 }
+
+export const START_COMMAND_DEFINITION: TelegramCommandDefinition = {
+    describe(copy) {
+        return copy.commands.start;
+    },
+    names: ["start"],
+    register: registerStartCommand,
+};

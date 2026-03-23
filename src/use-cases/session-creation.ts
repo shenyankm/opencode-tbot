@@ -1,10 +1,10 @@
 import type { ChatSessionBinding } from "../domain/session/session.entity.js";
 import type { SessionRepository } from "../domain/session/session.repository.js";
 import type {
-    OpenCodeClientLike,
     OpenCodeProject,
     OpenCodeSession,
 } from "../services/opencode/opencode.client.js";
+import type { OpenCodeCurrentProjectReader, OpenCodeSessionManager } from "../services/opencode/opencode.ports.js";
 
 interface CreateAndBindCurrentProjectSessionInput {
     chatId: number;
@@ -20,7 +20,7 @@ export interface CreateAndBindCurrentProjectSessionResult {
 
 export async function createAndBindCurrentProjectSession(
     sessionRepo: SessionRepository,
-    opencodeClient: OpenCodeClientLike,
+    opencodeClient: OpenCodeCurrentProjectReader & Pick<OpenCodeSessionManager, "createSessionForDirectory">,
     input: CreateAndBindCurrentProjectSessionInput,
 ): Promise<CreateAndBindCurrentProjectSessionResult> {
     const binding = input.binding ?? await sessionRepo.getByChatId(input.chatId);

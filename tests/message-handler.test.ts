@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { BotDependencies } from "../src/bot/types.js";
 import {
     OpenCodePromptTimeoutError,
     type PromptSessionResult,
@@ -105,7 +106,7 @@ function createDependencies(options: {
             sendPromptUseCase: {
                 execute: options.sendPrompt,
             },
-        } as never,
+        } as unknown as BotDependencies,
         errors,
         pendingActionRepo,
         sessionRepo,
@@ -443,7 +444,11 @@ test("handleTextMessage rejects a second plain-text prompt while one is already 
         dependencies,
     );
 
-    releaseFirstRequest?.();
+    if (!releaseFirstRequest) {
+        throw new Error("expected the first request gate to be initialized");
+    }
+
+    (releaseFirstRequest as () => void)();
     await firstCall;
 
     assert.deepEqual(replies, [

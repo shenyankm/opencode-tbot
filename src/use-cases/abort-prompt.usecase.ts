@@ -1,9 +1,9 @@
 import type { SessionRepository } from "../domain/session/session.repository.js";
 import {
     createMessageAbortedError,
-    type OpenCodeClientLike,
     type OpenCodeSessionStatus,
 } from "../services/opencode/opencode.client.js";
+import type { OpenCodeSessionCatalog, OpenCodeSessionManager } from "../services/opencode/opencode.ports.js";
 import {
     NOOP_FOREGROUND_SESSION_TRACKER,
     type ForegroundSessionTrackerLike,
@@ -15,14 +15,18 @@ export interface AbortPromptResult {
     sessionStatus: OpenCodeSessionStatus | null;
 }
 
+export interface AbortPromptInput {
+    chatId: number;
+}
+
 export class AbortPromptUseCase {
     constructor(
         private readonly sessionRepo: SessionRepository,
-        private readonly opencodeClient: OpenCodeClientLike,
+        private readonly opencodeClient: OpenCodeSessionCatalog & Pick<OpenCodeSessionManager, "abortSession">,
         private readonly foregroundSessionTracker: ForegroundSessionTrackerLike = NOOP_FOREGROUND_SESSION_TRACKER,
     ) { }
 
-    async execute(input: { chatId: number }): Promise<AbortPromptResult> {
+    async execute(input: AbortPromptInput): Promise<AbortPromptResult> {
         const hasForegroundRequest = this.foregroundSessionTracker.hasActiveRequest(input.chatId);
         const activeSessionId = this.foregroundSessionTracker.getActiveSessionId(input.chatId);
         const binding = activeSessionId

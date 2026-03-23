@@ -1,6 +1,7 @@
 import type { SessionRepository } from "../domain/session/session.repository.js";
 import type { AppLogger } from "../infra/logger/index.js";
-import type { OpenCodeClientLike, OpenCodeSession } from "../services/opencode/opencode.client.js";
+import type { OpenCodeSession } from "../services/opencode/opencode.client.js";
+import type { OpenCodeCurrentProjectReader, OpenCodeSessionCatalog } from "../services/opencode/opencode.ports.js";
 
 export type SwitchSessionResult =
     | {
@@ -11,14 +12,19 @@ export type SwitchSessionResult =
         session: OpenCodeSession;
     };
 
+export interface SwitchSessionInput {
+    chatId: number;
+    sessionId: string;
+}
+
 export class SwitchSessionUseCase {
     constructor(
         private readonly sessionRepo: SessionRepository,
-        private readonly opencodeClient: OpenCodeClientLike,
+        private readonly opencodeClient: OpenCodeCurrentProjectReader & OpenCodeSessionCatalog,
         private readonly logger: AppLogger,
     ) { }
 
-    async execute(input: { chatId: number; sessionId: string }): Promise<SwitchSessionResult> {
+    async execute(input: SwitchSessionInput): Promise<SwitchSessionResult> {
         const [binding, sessions] = await Promise.all([
             this.sessionRepo.getByChatId(input.chatId),
             this.opencodeClient.listSessions(),

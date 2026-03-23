@@ -7,6 +7,15 @@ import {
 import type { AppConfig } from "../src/app/config.js";
 import type { AppContainer } from "../src/app/container.js";
 
+interface BotStub {
+    api: {
+        getUpdates(options?: unknown, signal?: unknown): Promise<unknown[]>;
+        setMyCommands(): Promise<boolean>;
+    };
+    catch(handler: (error: unknown) => unknown): BotStub;
+    readonly errorHandler?: (error: unknown) => unknown;
+}
+
 function createConfig(): AppConfig {
     return {
         loggingFileDir: "E:/repo/.logs/opencode-tbot",
@@ -52,12 +61,12 @@ function createContainer() {
         async dispose() {
             calls.dispose += 1;
         },
-    } as AppContainer;
+    } as unknown as AppContainer;
 
     return { calls, container };
 }
 
-function createBotStub() {
+function createBotStub(): BotStub {
     let errorHandler: ((error: unknown) => unknown) | undefined;
     const bot = {
         api: {
@@ -77,7 +86,7 @@ function createBotStub() {
         },
     };
 
-    return bot as never;
+    return bot;
 }
 
 function createRunnerHandle() {
@@ -104,7 +113,7 @@ test("startTelegramBotRuntime starts polling before command sync and only warns 
     const runtime = await startTelegramBotRuntime({
         config: createConfig(),
         container,
-        botFactory: () => createBotStub(),
+        botFactory: () => createBotStub() as never,
         registerBotHandlers: () => {
             steps.push("register");
         },
@@ -137,7 +146,7 @@ test("startTelegramBotRuntime reuses the active runtime for the same Telegram bo
     const firstRuntime = await startTelegramBotRuntime({
         config: createConfig(),
         container: first.container,
-        botFactory: () => createBotStub(),
+        botFactory: () => createBotStub() as never,
         registerBotHandlers: () => undefined,
         runBot: () => {
             runCount += 1;
@@ -148,7 +157,7 @@ test("startTelegramBotRuntime reuses the active runtime for the same Telegram bo
     const secondRuntime = await startTelegramBotRuntime({
         config: createConfig(),
         container: second.container,
-        botFactory: () => createBotStub(),
+        botFactory: () => createBotStub() as never,
         registerBotHandlers: () => undefined,
         runBot: () => {
             runCount += 1;
@@ -179,14 +188,14 @@ test("startTelegramBotRuntime logs getUpdates failures through the app logger", 
     const runtime = await startTelegramBotRuntime({
         config: createConfig(),
         container,
-        botFactory: () => bot,
+        botFactory: () => bot as never,
         registerBotHandlers: () => undefined,
         runBot: (runningBot) => {
             void runningBot.api.getUpdates({
                 limit: 1,
                 offset: 0,
                 timeout: 30,
-            }, new AbortController().signal).catch(() => undefined);
+            }, new AbortController().signal as never).catch(() => undefined);
 
             return createRunnerHandle();
         },

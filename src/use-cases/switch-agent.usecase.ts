@@ -2,8 +2,8 @@ import type { SessionRepository } from "../domain/session/session.repository.js"
 import type { AppLogger } from "../infra/logger/index.js";
 import type {
     OpenCodeAgent,
-    OpenCodeClientLike,
 } from "../services/opencode/opencode.client.js";
+import type { OpenCodeAgentCatalog } from "../services/opencode/opencode.ports.js";
 import { isSelectableAgent } from "./agent-selection.js";
 
 export type SwitchAgentResult =
@@ -15,14 +15,19 @@ export type SwitchAgentResult =
         agent: OpenCodeAgent;
     };
 
+export interface SwitchAgentInput {
+    agentName: string;
+    chatId: number;
+}
+
 export class SwitchAgentUseCase {
     constructor(
         private readonly sessionRepo: SessionRepository,
-        private readonly opencodeClient: OpenCodeClientLike,
+        private readonly opencodeClient: OpenCodeAgentCatalog,
         private readonly logger: AppLogger,
     ) { }
 
-    async execute(input: { chatId: number; agentName: string }): Promise<SwitchAgentResult> {
+    async execute(input: SwitchAgentInput): Promise<SwitchAgentResult> {
         const [binding, agents] = await Promise.all([
             this.sessionRepo.getByChatId(input.chatId),
             this.opencodeClient.listAgents(),

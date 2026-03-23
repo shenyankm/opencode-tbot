@@ -1,10 +1,14 @@
 import type { ChatSessionBinding } from "../domain/session/session.entity.js";
 import type { SessionRepository } from "../domain/session/session.repository.js";
 import type {
-    OpenCodeClientLike,
     OpenCodeProject,
     OpenCodeSession,
 } from "../services/opencode/opencode.client.js";
+import type {
+    OpenCodeCurrentProjectReader,
+    OpenCodeProjectCatalog,
+    OpenCodeSessionCatalog,
+} from "../services/opencode/opencode.ports.js";
 import { clearStoredSessionContext } from "./binding-update.js";
 
 export interface ListSessionsResult {
@@ -14,13 +18,17 @@ export interface ListSessionsResult {
     currentSessionId: string | null;
 }
 
+export interface ListSessionsInput {
+    chatId: number;
+}
+
 export class ListSessionsUseCase {
     constructor(
         private readonly sessionRepo: SessionRepository,
-        private readonly opencodeClient: OpenCodeClientLike,
+        private readonly opencodeClient: OpenCodeCurrentProjectReader & OpenCodeProjectCatalog & OpenCodeSessionCatalog,
     ) { }
 
-    async execute(input: { chatId: number }): Promise<ListSessionsResult> {
+    async execute(input: ListSessionsInput): Promise<ListSessionsResult> {
         let binding = await this.sessionRepo.getByChatId(input.chatId);
         const [sessions, projects] = await Promise.all([
             this.opencodeClient.listSessions(),

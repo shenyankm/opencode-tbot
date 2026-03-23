@@ -1,9 +1,9 @@
 import type { SessionRepository } from "../domain/session/session.repository.js";
 import type { AppLogger } from "../infra/logger/index.js";
 import type {
-    OpenCodeClientLike,
     OpenCodeConfiguredModel,
 } from "../services/opencode/opencode.client.js";
+import type { OpenCodeModelCatalog } from "../services/opencode/opencode.ports.js";
 
 export type SwitchModelResult =
     | {
@@ -15,19 +15,21 @@ export type SwitchModelResult =
         variant: string | null;
     };
 
+export interface SwitchModelInput {
+    chatId: number;
+    modelId: string;
+    providerId: string;
+    variant?: string | null;
+}
+
 export class SwitchModelUseCase {
     constructor(
         private readonly sessionRepo: SessionRepository,
-        private readonly opencodeClient: OpenCodeClientLike,
+        private readonly opencodeClient: OpenCodeModelCatalog,
         private readonly logger: AppLogger,
     ) { }
 
-    async execute(input: {
-        chatId: number;
-        providerId: string;
-        modelId: string;
-        variant?: string | null;
-    }): Promise<SwitchModelResult> {
+    async execute(input: SwitchModelInput): Promise<SwitchModelResult> {
         const [binding, models] = await Promise.all([
             this.sessionRepo.getByChatId(input.chatId),
             this.opencodeClient.listModels(),

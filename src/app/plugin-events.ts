@@ -34,54 +34,51 @@ interface NormalizedSessionStatusEvent extends NormalizedSessionIdleEvent {
     statusType: string;
 }
 
+interface PluginEventHandlerDefinition {
+    handle(runtime: TelegramBotRuntime, event: unknown): Promise<void>;
+    normalize(properties: unknown): unknown | null;
+}
+
+const PLUGIN_EVENT_HANDLERS: Record<string, PluginEventHandlerDefinition> = {
+    "permission.asked": createPluginEventHandler(
+        normalizePermissionRequestEvent,
+        handlePermissionAsked,
+    ),
+    "permission.replied": createPluginEventHandler(
+        normalizePermissionReplyEvent,
+        handlePermissionReplied,
+    ),
+    "session.error": createPluginEventHandler(
+        normalizeSessionErrorEvent,
+        handleSessionError,
+    ),
+    "session.idle": createPluginEventHandler(
+        normalizeSessionIdleEvent,
+        handleSessionIdle,
+    ),
+    "session.status": createPluginEventHandler(
+        normalizeSessionStatusEvent,
+        handleSessionStatus,
+    ),
+};
+
 export async function handleTelegramBotPluginEvent(
     runtime: TelegramBotRuntime,
     event: OpenCodePluginEvent,
 ): Promise<void> {
-    switch (event.type) {
-        case "permission.asked": {
-            const request = normalizePermissionRequestEvent(event.properties);
+    const handler = PLUGIN_EVENT_HANDLERS[event.type];
 
-            if (request) {
-                await handlePermissionAsked(runtime, request);
-            }
-            return;
-        }
-        case "permission.replied": {
-            const replyEvent = normalizePermissionReplyEvent(event.properties);
-
-            if (replyEvent) {
-                await handlePermissionReplied(runtime, replyEvent);
-            }
-            return;
-        }
-        case "session.error": {
-            const sessionError = normalizeSessionErrorEvent(event.properties);
-
-            if (sessionError) {
-                await handleSessionError(runtime, sessionError);
-            }
-            return;
-        }
-        case "session.idle": {
-            const sessionIdle = normalizeSessionIdleEvent(event.properties);
-
-            if (sessionIdle) {
-                await handleSessionIdle(runtime, sessionIdle);
-            }
-            return;
-        }
-        case "session.status": {
-            const sessionStatus = normalizeSessionStatusEvent(event.properties);
-
-            if (sessionStatus) {
-                await handleSessionStatus(runtime, sessionStatus);
-            }
-            return;
-        }
-        default:
-            return;
+    if (!handler) {
+        return;
     }
+
+    const normalizedEvent = handler.normalize(event.properties);
+
+    if (!normalizedEvent) {
+        return;
+    }
+
+    await handler.handle(runtime, normalizedEvent);
 }
 
 async function handlePermissionAsked(
@@ -487,12 +484,26 @@ function normalizeForegroundSessionError(error: unknown): Error {
     return new Error("Unknown session error.");
 }
 
+function createPluginEventHandler<TEvent>(
+    normalize: (properties: unknown) => TEvent | null,
+    handle: (runtime: TelegramBotRuntime, event: TEvent) => Promise<void>,
+): PluginEventHandlerDefinition {
+    return {
+        handle(runtime, event) {
+            return handle(runtime, event as TEvent);
+        },
+        normalize(properties) {
+            return normalize(properties);
+        },
+    };
+}
+
 function asNonEmptyString(value: unknown): string | null {
     return typeof value === "string" && value.trim().length > 0
         ? value.trim()
         : null;
 }
 
-function isPlainRecord(value: unknown): value is Record<string, any> {
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
     return value !== null && typeof value === "object" && !Array.isArray(value);
 }

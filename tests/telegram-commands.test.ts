@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getTelegramCommands, TELEGRAM_COMMANDS } from "../src/bot/commands/command-list.js";
+import { getTelegramCommands } from "../src/bot/commands/command-list.js";
 import type { AppLogger } from "../src/infra/logger/index.js";
 import {
     syncTelegramCommands,
@@ -18,7 +18,7 @@ const logger = {
 } as unknown as AppLogger;
 
 test("TELEGRAM_COMMANDS only advertises implemented commands", () => {
-    assert.deepEqual(TELEGRAM_COMMANDS, [
+    assert.deepEqual(getTelegramCommands(), [
         {
             command: "start",
             description: "Show welcome and quick start",
@@ -56,6 +56,7 @@ test("TELEGRAM_COMMANDS only advertises implemented commands", () => {
 
 test("syncTelegramCommands pushes the command list to Telegram", async () => {
     const calls: Array<{ commands: unknown; other?: unknown }> = [];
+    const commands = getTelegramCommands();
 
     await syncTelegramCommands(
         {
@@ -72,7 +73,7 @@ test("syncTelegramCommands pushes the command list to Telegram", async () => {
     assert.deepEqual(
         calls,
         TELEGRAM_COMMAND_SYNC_SCOPES.map((scope) => ({
-            commands: TELEGRAM_COMMANDS,
+            commands,
             other: { scope },
         })),
     );

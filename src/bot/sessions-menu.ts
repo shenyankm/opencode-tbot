@@ -8,7 +8,7 @@ import {
     presentSessionActionsMessage,
     presentSessionsMessage,
 } from "./presenters/message.presenter.js";
-import type { BotDependencies } from "./types.js";
+import type { ChatStateDependencies, SessionsFeatureDependencies } from "./types.js";
 
 interface SessionsMessageApi {
     editMessageText(
@@ -32,7 +32,7 @@ interface SessionsListView {
 export async function buildSessionsListView(
     chatId: number,
     requestedPage: number,
-    dependencies: BotDependencies,
+    dependencies: ChatStateDependencies & Pick<SessionsFeatureDependencies, "listSessionsUseCase">,
 ): Promise<SessionsListView> {
     const copy = await getSafeChatCopy(dependencies.sessionRepo, chatId, dependencies.logger);
     const result = await dependencies.listSessionsUseCase.execute({
@@ -72,7 +72,7 @@ export async function buildSessionActionView(
     chatId: number,
     requestedPage: number,
     sessionId: string,
-    dependencies: BotDependencies,
+    dependencies: ChatStateDependencies & Pick<SessionsFeatureDependencies, "listSessionsUseCase">,
 ) {
     const listView = await buildSessionsListView(chatId, requestedPage, dependencies);
     const session = listView.sessions.find((item) => item.id === sessionId);
@@ -102,7 +102,7 @@ export async function restoreSessionsListMessage(
     chatId: number,
     messageId: number,
     requestedPage: number,
-    dependencies: BotDependencies,
+    dependencies: ChatStateDependencies & Pick<SessionsFeatureDependencies, "listSessionsUseCase">,
 ) {
     const listView = await buildSessionsListView(chatId, requestedPage, dependencies);
 

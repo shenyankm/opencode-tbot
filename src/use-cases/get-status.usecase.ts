@@ -5,6 +5,7 @@ import type {
     OpenCodePath,
     OpenCodeSession,
 } from "../services/opencode/opencode.client.js";
+import type { OpenCodeConfiguredPluginCatalog } from "../services/opencode/opencode.ports.js";
 import type { GetHealthUseCase } from "./get-health.usecase.js";
 import type { GetPathUseCase } from "./get-path.usecase.js";
 import type { ListLspResult, ListLspUseCase } from "./list-lsp.usecase.js";
@@ -27,10 +28,6 @@ export interface ConfiguredPluginsResult {
     plugins: string[];
 }
 
-interface ConfiguredPluginReader {
-    listConfiguredPlugins(): Promise<string[]>;
-}
-
 export interface WorkspaceStatusResult {
     currentProject: string;
     currentSession: string | null;
@@ -45,115 +42,185 @@ export interface GetStatusResult {
     workspace: StatusSectionResult<WorkspaceStatusResult>;
 }
 
-export class GetStatusUseCase {
-    constructor(
-        private readonly getHealthUseCase: GetHealthUseCase,
-        private readonly getPathUseCase: GetPathUseCase,
-        private readonly listLspUseCase: ListLspUseCase,
-        private readonly listMcpUseCase: ListMcpUseCase,
-        private readonly listSessionsUseCase: ListSessionsUseCase,
-        private readonly sessionRepo: SessionRepository,
-        private readonly configuredPluginReader: ConfiguredPluginReader,
-    ) { }
+export interface GetStatusInput {
+    chatId: number;
+}
 
-    async execute(input: { chatId: number }): Promise<GetStatusResult> {
-        const [health, path, lsp, mcp, plugins] = await Promise.allSettled([
-            this.getHealthUseCase.execute(),
-            this.getPathUseCase.execute(),
-            this.listLspUseCase.execute({ chatId: input.chatId }),
-            this.listMcpUseCase.execute({ chatId: input.chatId }),
-            this.configuredPluginReader.listConfiguredPlugins(),
-        ]);
-        const pathResult = mapSettledResult(path);
-        const pluginResult = loadConfiguredPluginsResult(plugins);
-        const workspace = await loadWorkspaceStatusResult(
-            input.chatId,
-            pathResult,
-            this.listSessionsUseCase,
-            this.sessionRepo,
-        );
+export interface StatusSectionLoadContext {
+    chatId: number;
+    resolve<TKey extends keyof GetStatusResult>(key: TKey): Promise<GetStatusResult[TKey]>;
+}
+
+export interface StatusSectionProvider<TKey extends keyof GetStatusResult = keyof GetStatusResult> {
+    key: TKey;
+    load(context: StatusSectionLoadContext): Promise<GetStatusResult[TKey]>;
+}
+
+export type StatusSectionProviders = {
+    [TKey in keyof GetStatusResult]: StatusSectionProvider<TKey>;
+};
+
+export interface CreateStatusSectionProvidersInput {
+    configuredPluginReader: OpenCodeConfiguredPluginCatalog;
+    getHealthUseCase: GetHealthUseCase;
+    getPathUseCase: GetPathUseCase;
+    listLspUseCase: ListLspUseCase;
+    listMcpUseCase: ListMcpUseCase;
+    listSessionsUseCase: ListSessionsUseCase;
+    sessionRepo: SessionRepository;
+}
+
+const STATUS_SECTION_KEYS: Array<keyof GetStatusResult> = [
+    "health",
+    "path",
+    "plugins",
+    "workspace",
+    "lsp",
+    "mcp",
+];
+
+export class GetStatusUseCase {
+    constructor(private readonly providers: StatusSectionProviders) { }
+
+    async execute(input: GetStatusInput): Promise<GetStatusResult> {
+        const sectionPromises = new Map<
+            keyof GetStatusResult,
+            Promise<GetStatusResult[keyof GetStatusResult]>
+        >();
+        const resolveSection = <TKey extends keyof GetStatusResult>(
+            key: TKey,
+        ): Promise<GetStatusResult[TKey]> => {
+            const existingSectionPromise = sectionPromises.get(key);
+
+            if (existingSectionPromise) {
+                return existingSectionPromise as Promise<GetStatusResult[TKey]>;
+            }
+
+            const nextSectionPromise = this.providers[key].load(context);
+
+            sectionPromises.set(
+                key,
+                nextSectionPromise as Promise<GetStatusResult[keyof GetStatusResult]>,
+            );
+
+            return nextSectionPromise;
+        };
+        const context: StatusSectionLoadContext = {
+            chatId: input.chatId,
+            resolve: resolveSection,
+        };
+
+        await Promise.all(STATUS_SECTION_KEYS.map((key) => resolveSection(key)));
 
         return {
-            health: mapSettledResult(health),
-            path: pathResult,
-            plugins: pluginResult,
-            workspace,
-            lsp: mapSettledResult(lsp),
-            mcp: mapSettledResult(mcp),
+            health: await resolveSection("health"),
+            path: await resolveSection("path"),
+            plugins: await resolveSection("plugins"),
+            workspace: await resolveSection("workspace"),
+            lsp: await resolveSection("lsp"),
+            mcp: await resolveSection("mcp"),
         };
     }
 }
 
-function mapSettledResult<TData>(result: PromiseSettledResult<TData>): StatusSectionResult<TData> {
-    if (result.status === "fulfilled") {
+export function createStatusSectionProviders(
+    input: CreateStatusSectionProvidersInput,
+): StatusSectionProviders {
+    return {
+        health: {
+            key: "health",
+            async load() {
+                return loadStatusSection(async () => input.getHealthUseCase.execute());
+            },
+        },
+        path: {
+            key: "path",
+            async load() {
+                return loadStatusSection(async () => input.getPathUseCase.execute());
+            },
+        },
+        plugins: {
+            key: "plugins",
+            async load() {
+                return loadStatusSection(async () => ({
+                    plugins: normalizeConfiguredPluginLabels(
+                        await input.configuredPluginReader.listConfiguredPlugins(),
+                    ),
+                }));
+            },
+        },
+        workspace: {
+            key: "workspace",
+            async load(context) {
+                const path = await context.resolve("path");
+
+                if (path.status === "error") {
+                    return {
+                        error: path.error,
+                        status: "error",
+                    };
+                }
+
+                const binding = await input.sessionRepo.getByChatId(context.chatId);
+                let currentProject = resolveWorkspaceProjectPath(path.data);
+                let currentSession = binding?.sessionId ?? null;
+
+                try {
+                    const sessions = await input.listSessionsUseCase.execute({ chatId: context.chatId });
+
+                    currentProject = resolveWorkspaceProjectPath(path.data, sessions.currentDirectory);
+                    currentSession = sessions.currentSessionId
+                        ? formatSessionStatusLabel(
+                            sessions.sessions.find((session) => session.id === sessions.currentSessionId) ?? null,
+                            sessions.currentSessionId,
+                        )
+                        : null;
+                } catch {
+                    // Keep path/session binding fallbacks when session listing is unavailable.
+                }
+
+                return {
+                    data: {
+                        currentProject,
+                        currentSession,
+                    },
+                    status: "ok",
+                };
+            },
+        },
+        lsp: {
+            key: "lsp",
+            async load(context) {
+                return loadStatusSection(async () =>
+                    input.listLspUseCase.execute({ chatId: context.chatId })
+                );
+            },
+        },
+        mcp: {
+            key: "mcp",
+            async load(context) {
+                return loadStatusSection(async () =>
+                    input.listMcpUseCase.execute({ chatId: context.chatId })
+                );
+            },
+        },
+    };
+}
+
+async function loadStatusSection<TData>(
+    load: () => Promise<TData>,
+): Promise<StatusSectionResult<TData>> {
+    try {
         return {
-            data: result.value,
+            data: await load(),
             status: "ok",
         };
-    }
-
-    return {
-        error: result.reason,
-        status: "error",
-    };
-}
-
-function loadConfiguredPluginsResult(
-    result: PromiseSettledResult<string[]>,
-): StatusSectionResult<ConfiguredPluginsResult> {
-    if (result.status === "rejected") {
+    } catch (error) {
         return {
-            error: result.reason,
+            error,
             status: "error",
         };
     }
-
-    return {
-        data: {
-            plugins: normalizeConfiguredPluginLabels(result.value),
-        },
-        status: "ok",
-    };
-}
-
-async function loadWorkspaceStatusResult(
-    chatId: number,
-    path: StatusSectionResult<OpenCodePath>,
-    listSessionsUseCase: ListSessionsUseCase,
-    sessionRepo: SessionRepository,
-): Promise<StatusSectionResult<WorkspaceStatusResult>> {
-    if (path.status === "error") {
-        return {
-            error: path.error,
-            status: "error",
-        };
-    }
-
-    const binding = await sessionRepo.getByChatId(chatId);
-    let currentProject = resolveWorkspaceProjectPath(path.data);
-    let currentSession = binding?.sessionId ?? null;
-
-    try {
-        const sessions = await listSessionsUseCase.execute({ chatId });
-
-        currentProject = resolveWorkspaceProjectPath(path.data, sessions.currentDirectory);
-        currentSession = sessions.currentSessionId
-            ? formatSessionStatusLabel(
-                sessions.sessions.find((session) => session.id === sessions.currentSessionId) ?? null,
-                sessions.currentSessionId,
-            )
-            : null;
-    } catch {
-        // Keep path/session binding fallbacks when session listing is unavailable.
-    }
-
-    return {
-        data: {
-            currentProject,
-            currentSession,
-        },
-        status: "ok",
-    };
 }
 
 function formatSessionStatusLabel(session: OpenCodeSession | null, fallbackId: string): string {

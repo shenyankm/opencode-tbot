@@ -13,7 +13,8 @@ import {
     presentLanguageSwitchMessage,
 } from "../presenters/message.presenter.js";
 import { syncTelegramCommandsForChat } from "./sync-commands.js";
-import type { BotDependencies } from "../types.js";
+import type { BotDependencies, ChatStateDependencies } from "../types.js";
+import type { TelegramCommandDefinition } from "./registry.js";
 
 interface LanguageCommandContext {
     chat: { id: number };
@@ -21,7 +22,7 @@ interface LanguageCommandContext {
     reply(text: string, other?: { reply_markup?: unknown }): Promise<unknown>;
 }
 
-export async function handleLanguageCommand(ctx: LanguageCommandContext, dependencies: BotDependencies) {
+export async function handleLanguageCommand(ctx: LanguageCommandContext, dependencies: ChatStateDependencies) {
     const language = await getSafeChatLanguage(dependencies.sessionRepo, ctx.chat.id, dependencies.logger);
     const copy = await getSafeChatCopy(dependencies.sessionRepo, ctx.chat.id, dependencies.logger);
 
@@ -43,7 +44,7 @@ export async function switchLanguageForChat(
     api: Pick<Bot["api"], "setMyCommands">,
     chatId: number,
     language: string,
-    dependencies: BotDependencies,
+    dependencies: ChatStateDependencies,
 ): Promise<
     | { found: false; copy: Awaited<ReturnType<typeof getSafeChatCopy>> }
     | {
@@ -75,7 +76,7 @@ export async function presentLanguageSwitchForChat(
     chatId: number,
     api: Pick<Bot["api"], "setMyCommands">,
     language: string,
-    dependencies: BotDependencies,
+    dependencies: ChatStateDependencies,
 ) {
     const result = await switchLanguageForChat(api, chatId, language, dependencies);
 
@@ -104,3 +105,11 @@ export function registerLanguageCommand(bot: Pick<Bot, "command">, dependencies:
         await handleLanguageCommand(ctx, scopeDependenciesToTelegramContext(dependencies, ctx, "telegram"));
     });
 }
+
+export const LANGUAGE_COMMAND_DEFINITION: TelegramCommandDefinition = {
+    describe(copy) {
+        return copy.commands.language;
+    },
+    names: ["language"],
+    register: registerLanguageCommand,
+};

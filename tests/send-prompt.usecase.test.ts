@@ -55,7 +55,7 @@ function createAgent(name: string): OpenCodeAgent {
         prompt: "",
         tools: [],
         model: undefined,
-    } as OpenCodeAgent;
+    } as unknown as OpenCodeAgent;
 }
 
 function createPromptReply(text: string): PromptSessionResult {
@@ -80,6 +80,10 @@ function createPromptReply(text: string): PromptSessionResult {
             body_md: text,
         },
     };
+}
+
+function createClient(client: Partial<OpenCodeClientLike>): OpenCodeClientLike {
+    return client as OpenCodeClientLike;
 }
 
 function withImageTurnGuidance(text?: string): string {
@@ -117,7 +121,7 @@ test("SendPromptUseCase creates a session in the current project when the chat i
         sessionId?: string;
     }> = [];
     const currentProject = createProject("project-1", "E:/repo-1");
-    const client: OpenCodeClientLike = {
+    const client = createClient({
         async abortSession() {
             return true;
         },
@@ -158,20 +162,17 @@ test("SendPromptUseCase creates a session in the current project when the chat i
         async getPath() {
             throw new Error("unused");
         },
-        async getConfig() {
-            throw new Error("unused");
-        },
         async promptSession(input) {
             calls.push({
                 type: "prompt",
                 sessionId: input.sessionId,
-                prompt: input.prompt,
+                prompt: input.prompt ?? undefined,
                 agent: input.agent ?? undefined,
                 format: input.format,
             });
             return createPromptReply("assistant reply");
         },
-    };
+    });
 
     const useCase = new SendPromptUseCase(repo, client, logger);
     const result = await useCase.execute({
@@ -229,7 +230,7 @@ test("SendPromptUseCase preserves a selected model when it needs to create a ses
 
     const currentProject = createProject("project-1", "E:/repo-1");
     const promptCalls: unknown[] = [];
-    const client: OpenCodeClientLike = {
+    const client = createClient({
         async abortSession() {
             return true;
         },
@@ -269,14 +270,11 @@ test("SendPromptUseCase preserves a selected model when it needs to create a ses
         async getPath() {
             throw new Error("unused");
         },
-        async getConfig() {
-            throw new Error("unused");
-        },
         async promptSession(input) {
             promptCalls.push(input);
             return createPromptReply("reply from model");
         },
-    };
+    });
 
     const useCase = new SendPromptUseCase(repo, client, logger);
     const result = await useCase.execute({
@@ -335,7 +333,7 @@ test("SendPromptUseCase clears a stale model selection before prompting", async 
     });
 
     const promptCalls: unknown[] = [];
-    const client: OpenCodeClientLike = {
+    const client = createClient({
         async abortSession() {
             return true;
         },
@@ -379,7 +377,7 @@ test("SendPromptUseCase clears a stale model selection before prompting", async 
             promptCalls.push(input);
             return createPromptReply("reply from default model");
         },
-    };
+    });
 
     const useCase = new SendPromptUseCase(repo, client, logger);
     const result = await useCase.execute({
@@ -429,7 +427,7 @@ test("SendPromptUseCase recreates the session when the saved session context is 
     });
 
     const promptCalls: unknown[] = [];
-    const client: OpenCodeClientLike = {
+    const client = createClient({
         async abortSession() {
             return true;
         },
@@ -461,7 +459,7 @@ test("SendPromptUseCase recreates the session when the saved session context is 
             promptCalls.push(input);
             return createPromptReply("reply after recreating the session");
         },
-    };
+    });
 
     const useCase = new SendPromptUseCase(repo, client, logger);
     const result = await useCase.execute({
@@ -511,7 +509,7 @@ test("SendPromptUseCase clears stale selected agents before prompting", async ()
     });
 
     const promptCalls: unknown[] = [];
-    const client: OpenCodeClientLike = {
+    const client = createClient({
         async abortSession() {
             return true;
         },
@@ -543,7 +541,7 @@ test("SendPromptUseCase clears stale selected agents before prompting", async ()
             promptCalls.push(input);
             return createPromptReply("reply from default agent");
         },
-    };
+    });
 
     const useCase = new SendPromptUseCase(repo, client, logger);
     await useCase.execute({
@@ -581,7 +579,7 @@ test("SendPromptUseCase clears selected subagents before prompting", async () =>
     });
 
     const promptCalls: unknown[] = [];
-    const client: OpenCodeClientLike = {
+    const client = createClient({
         async abortSession() {
             return true;
         },
@@ -619,7 +617,7 @@ test("SendPromptUseCase clears selected subagents before prompting", async () =>
             promptCalls.push(input);
             return createPromptReply("reply from default agent");
         },
-    };
+    });
 
     const useCase = new SendPromptUseCase(repo, client, logger);
     await useCase.execute({
@@ -657,7 +655,7 @@ test("SendPromptUseCase forks a temporary child session for image prompts and ke
     });
 
     const calls: Array<{ kind: "delete" | "fork" | "prompt"; value: unknown }> = [];
-    const client: OpenCodeClientLike = {
+    const client = createClient({
         async abortSession() {
             return true;
         },
@@ -697,7 +695,7 @@ test("SendPromptUseCase forks a temporary child session for image prompts and ke
             calls.push({ kind: "prompt", value: input });
             return createPromptReply("reply with image");
         },
-    };
+    });
     const files = [createImageFile()];
 
     const useCase = new SendPromptUseCase(repo, client, logger);
@@ -732,7 +730,7 @@ test("SendPromptUseCase creates and keeps a main session when the first prompt i
     const repo = new InMemorySessionRepository();
     const currentProject = createProject("project-1", "E:/repo-1");
     const calls: Array<{ kind: "create" | "delete" | "fork" | "prompt"; value: unknown }> = [];
-    const client: OpenCodeClientLike = {
+    const client = createClient({
         async abortSession() {
             return true;
         },
@@ -773,7 +771,7 @@ test("SendPromptUseCase creates and keeps a main session when the first prompt i
             calls.push({ kind: "prompt", value: input });
             return createPromptReply("reply with image only");
         },
-    };
+    });
     const files = [createImageFile()];
 
     const useCase = new SendPromptUseCase(repo, client, logger);
@@ -833,7 +831,7 @@ test("SendPromptUseCase returns to the main session after an image turn", async 
     const promptCalls: unknown[] = [];
     const forkCalls: string[] = [];
     const deleteCalls: string[] = [];
-    const client: OpenCodeClientLike = {
+    const client = createClient({
         async abortSession() {
             return true;
         },
@@ -873,7 +871,7 @@ test("SendPromptUseCase returns to the main session after an image turn", async 
             promptCalls.push(input);
             return createPromptReply("reply");
         },
-    };
+    });
 
     const useCase = new SendPromptUseCase(repo, client, logger);
     await useCase.execute({
@@ -926,7 +924,7 @@ test("SendPromptUseCase deletes the temporary image session even when the prompt
 
     const deleteCalls: string[] = [];
     const expectedError = new Error("child prompt failed");
-    const client: OpenCodeClientLike = {
+    const client = createClient({
         async abortSession() {
             return true;
         },
@@ -964,7 +962,7 @@ test("SendPromptUseCase deletes the temporary image session even when the prompt
         async promptSession() {
             throw expectedError;
         },
-    };
+    });
 
     const useCase = new SendPromptUseCase(repo, client, logger);
 
@@ -1002,7 +1000,7 @@ test("SendPromptUseCase logs a warning when temporary image session cleanup fail
             warnings.push({ input, message });
         },
     } as unknown as AppLogger;
-    const client: OpenCodeClientLike = {
+    const client = createClient({
         async abortSession() {
             return true;
         },
@@ -1039,7 +1037,7 @@ test("SendPromptUseCase logs a warning when temporary image session cleanup fail
         async promptSession() {
             return createPromptReply("reply with image");
         },
-    };
+    });
 
     const useCase = new SendPromptUseCase(repo, client, localLogger);
     const result = await useCase.execute({
@@ -1062,7 +1060,7 @@ test("SendPromptUseCase forwards the execution session id when promptSession tim
         stage: "send-prompt",
         timeoutMs: 5,
     } satisfies OpenCodePromptTimeoutErrorData);
-    const client: OpenCodeClientLike = {
+    const client = createClient({
         async abortSession() {
             return true;
         },
@@ -1093,7 +1091,7 @@ test("SendPromptUseCase forwards the execution session id when promptSession tim
         async promptSession() {
             throw timeoutError;
         },
-    };
+    });
 
     const useCase = new SendPromptUseCase(repo, client, logger);
 

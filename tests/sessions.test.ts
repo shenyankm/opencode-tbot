@@ -52,7 +52,7 @@ function createSession(id: string, projectID: string, directory: string, title =
 function createDependencies(client: OpenCodeClientLike) {
     const repo = new InMemorySessionRepository();
     const pendingActionRepo = new InMemoryPendingActionRepository();
-    const dependencies: BotDependencies = {
+    const dependencies = {
         abortPromptUseCase: {
             async execute() {
                 return { sessionId: null, sessionStatus: null, status: "no_session" as const };
@@ -64,7 +64,7 @@ function createDependencies(client: OpenCodeClientLike) {
         renameSessionUseCase: new RenameSessionUseCase(repo, client, logger),
         sessionRepo: repo,
         switchSessionUseCase: new SwitchSessionUseCase(repo, client, logger),
-    } as never;
+    } as unknown as BotDependencies;
 
     return { dependencies, pendingActionRepo, repo };
 }
@@ -271,7 +271,7 @@ test("session rename callbacks enter pending rename mode", async () => {
         async listSessions() {
             return sessions;
         },
-        async renameSession(sessionId, title) {
+        async renameSession(sessionId: string, title: string) {
             return createSession(sessionId, currentProject.id, currentProject.worktree, title);
         },
     } as never);

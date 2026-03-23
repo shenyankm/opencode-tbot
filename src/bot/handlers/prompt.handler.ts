@@ -1,8 +1,9 @@
 import { getSafeChatCopy } from "../i18n.js";
 import { presentError } from "../presenters/error.presenter.js";
 import { buildTelegramPromptReply } from "../../services/telegram/telegram-format.js";
-import type { BotDependencies } from "../types.js";
+import type { ForegroundPromptDependencies } from "../types.js";
 import type { PromptSessionFilePartInput } from "../../services/opencode/opencode.client.js";
+import type { SendPromptResult } from "../../use-cases/send-prompt.usecase.js";
 
 interface SentMessage {
     message_id: number;
@@ -23,7 +24,7 @@ export interface PromptExecutionInput {
 
 export async function executePromptRequest(
     ctx: PromptExecutionContext,
-    dependencies: BotDependencies,
+    dependencies: ForegroundPromptDependencies,
     resolvePrompt: () => Promise<PromptExecutionInput>,
 ) {
     const copy = await getSafeChatCopy(dependencies.sessionRepo, ctx.chat.id, dependencies.logger);
@@ -80,7 +81,7 @@ export async function executePromptRequest(
 }
 
 function normalizePromptReplyForDisplay(
-    promptReply: Awaited<ReturnType<BotDependencies["sendPromptUseCase"]["execute"]>>["assistantReply"],
+    promptReply: SendPromptResult["assistantReply"],
     copy: Awaited<ReturnType<typeof getSafeChatCopy>>,
 ) {
     if (!promptReply.assistantError) {

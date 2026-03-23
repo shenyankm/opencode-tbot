@@ -1,5 +1,5 @@
 import type { AppLogger, LogComponent, LoggerContext } from "../infra/logger/index.js";
-import type { BotDependencies } from "./types.js";
+import type { LoggerDependencies } from "./types.js";
 
 interface TelegramLogContextLike {
     callbackQuery?: { data?: string | null };
@@ -44,7 +44,7 @@ export function scopeLoggerToTelegramContext(
     return logger.child(buildTelegramLoggerContext(ctx, component));
 }
 
-export function scopeDependenciesToTelegramContext<TDependencies extends BotDependencies>(
+export function scopeDependenciesToTelegramContext<TDependencies extends LoggerDependencies>(
     dependencies: TDependencies,
     ctx: TelegramLogContextLike,
     component: LogComponent = "telegram",

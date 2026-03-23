@@ -25,7 +25,7 @@ test("ListLspUseCase returns the current project and sorts statuses", async () =
             async getCurrentProject() {
                 return currentProject;
             },
-            async listLspStatuses(directory) {
+            async listLspStatuses(directory?: string) {
                 calls.push(directory ?? "");
 
                 return [
@@ -68,7 +68,7 @@ test("ListLspUseCase clears a stale saved project binding and falls back to the 
             async listProjects() {
                 return [currentProject];
             },
-            async listLspStatuses(directory) {
+            async listLspStatuses(directory?: string) {
                 assert.equal(directory, "E:/repo-2");
                 return [];
             },

@@ -47,7 +47,7 @@ function createSession(id: string, projectID: string, directory: string, title =
 
 function createDependencies(client: OpenCodeClientLike) {
     const repo = new InMemorySessionRepository();
-    const dependencies: BotDependencies = {
+    const dependencies = {
         abortPromptUseCase: {} as never,
         createSessionUseCase: new CreateSessionUseCase(repo, client, logger),
         getHealthUseCase: {} as never,
@@ -62,7 +62,7 @@ function createDependencies(client: OpenCodeClientLike) {
         switchAgentUseCase: {} as never,
         switchModelUseCase: {} as never,
         switchSessionUseCase: {} as never,
-    };
+    } as unknown as BotDependencies;
 
     return { dependencies, repo };
 }
@@ -74,7 +74,7 @@ test("/new creates a session in the current project, keeps prior selections, and
         async getCurrentProject() {
             return project;
         },
-        async createSessionForDirectory(directory, title) {
+        async createSessionForDirectory(directory: string, title?: string) {
             createCalls.push({ directory, title });
             return createSession("session-2", "project-1", directory, title ?? "Feature work");
         },
@@ -138,7 +138,7 @@ test("CreateSessionUseCase creates an untitled session when /new has no extra te
             async getCurrentProject() {
                 return project;
             },
-            async createSessionForDirectory(directory, title) {
+            async createSessionForDirectory(directory: string, title?: string) {
                 createCalls.push({ directory, title });
                 return createSession("session-3", "project-1", directory);
             },

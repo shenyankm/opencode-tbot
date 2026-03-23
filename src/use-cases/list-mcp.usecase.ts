@@ -1,10 +1,14 @@
 import type { ChatSessionBinding } from "../domain/session/session.entity.js";
 import type { SessionRepository } from "../domain/session/session.repository.js";
 import type {
-    OpenCodeClientLike,
     OpenCodeMcpStatus,
     OpenCodeProject,
 } from "../services/opencode/opencode.client.js";
+import type {
+    OpenCodeCurrentProjectReader,
+    OpenCodeMcpCatalog,
+    OpenCodeProjectCatalog,
+} from "../services/opencode/opencode.ports.js";
 import { clearStoredSessionContext } from "./binding-update.js";
 
 export interface ListMcpEntry {
@@ -17,13 +21,17 @@ export interface ListMcpResult {
     statuses: ListMcpEntry[];
 }
 
+export interface ListMcpInput {
+    chatId: number;
+}
+
 export class ListMcpUseCase {
     constructor(
         private readonly sessionRepo: SessionRepository,
-        private readonly opencodeClient: OpenCodeClientLike,
+        private readonly opencodeClient: OpenCodeCurrentProjectReader & OpenCodeMcpCatalog & OpenCodeProjectCatalog,
     ) { }
 
-    async execute(input: { chatId: number }): Promise<ListMcpResult> {
+    async execute(input: ListMcpInput): Promise<ListMcpResult> {
         let binding = await this.sessionRepo.getByChatId(input.chatId);
 
         if (binding?.projectId && binding.directory) {
