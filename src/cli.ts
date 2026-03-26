@@ -13,7 +13,6 @@ import {
     writePluginConfigFile,
 } from "./app/plugin-config.js";
 import {
-    getDefaultPluginLogDirectory,
     getGlobalOpenCodeConfigFilePath,
     getGlobalPluginConfigFilePath,
 } from "./app/opencode-paths.js";
@@ -25,7 +24,7 @@ export interface InstallCommandOptions {
 }
 
 interface CliOptions extends InstallCommandOptions {
-    command: "help" | "install" | "update" | "version";
+    command: "help" | "install" | "uninstall" | "update" | "version";
 }
 
 export interface PromptSessionLike {
@@ -82,6 +81,11 @@ export async function runCli(argv: string[]): Promise<number> {
         return 0;
     }
 
+    if (options.command === "uninstall") {
+        await uninstallPlugin(options);
+        return 0;
+    }
+
     await installPlugin(options);
     return 0;
 }
@@ -111,9 +115,6 @@ export async function installPlugin(options: InstallCommandOptions = {}): Promis
         await writePluginConfigFile(globalPluginConfigFilePath, nextPluginConfig);
 
         stdout.write("Success.\n");
-        stdout.write(`OpenCode config: ${openCodeConfigFilePath}\n`);
-        stdout.write(`Plugin config: ${globalPluginConfigFilePath}\n`);
-        stdout.write(`Plugin logs: ${getDefaultPluginLogDirectory(homeDir)}\n`);
     } finally {
         prompt.close();
     }
@@ -123,13 +124,23 @@ export async function updatePlugin(options: Pick<InstallCommandOptions, "homeDir
     const homeDir = options.homeDir ?? homedir();
     const openCodeConfigFilePath = getGlobalOpenCodeConfigFilePath(homeDir);
     const existingOpenCodeConfig = await readOpenCodeConfigFile(openCodeConfigFilePath);
-    const globalPluginConfigFilePath = getGlobalPluginConfigFilePath(homeDir);
-
     await writeOpenCodeConfigFile(openCodeConfigFilePath, buildInstalledOpenCodeConfig(existingOpenCodeConfig));
     stdout.write("Success.\n");
-    stdout.write(`OpenCode config: ${openCodeConfigFilePath}\n`);
-    stdout.write(`Plugin config: ${globalPluginConfigFilePath}\n`);
-    stdout.write(`Plugin logs: ${getDefaultPluginLogDirectory(homeDir)}\n`);
+}
+
+export async function uninstallPlugin(options: Pick<InstallCommandOptions, "homeDir"> = {}): Promise<void> {
+    const homeDir = options.homeDir ?? homedir();
+    const openCodeConfigFilePath = getGlobalOpenCodeConfigFilePath(homeDir);
+    const existingOpenCodeConfig = await readOpenCodeConfigFileIfPresent(openCodeConfigFilePath);
+
+    if (existingOpenCodeConfig) {
+        await writeOpenCodeConfigFile(
+            openCodeConfigFilePath,
+            buildUninstalledOpenCodeConfig(existingOpenCodeConfig),
+        );
+    }
+
+    stdout.write("Success.\n");
 }
 
 function parseCliOptions(argv: string[]): CliOptions {
@@ -146,6 +157,8 @@ function parseCliOptions(argv: string[]): CliOptions {
             ? "help"
             : command === "version" || command === "--version" || command === "-v"
                 ? "version"
+                : command === "uninstall"
+                    ? "uninstall"
                 : command === "update"
                     ? "update"
                     : "install",
@@ -234,6 +247,23 @@ async function readOpenCodeConfigFile(configFilePath: string): Promise<OpenCodeC
     }
 }
 
+async function readOpenCodeConfigFileIfPresent(configFilePath: string): Promise<OpenCodeConfigSource | null> {
+    try {
+        const content = await readFile(configFilePath, "utf8");
+        const parsed = JSON.parse(content) as unknown;
+
+        return isPlainObject(parsed)
+            ? parsed as OpenCodeConfigSource
+            : {};
+    } catch (error) {
+        if (isMissingFileError(error)) {
+            return null;
+        }
+
+        throw error;
+    }
+}
+
 async function writeOpenCodeConfigFile(
     configFilePath: string,
     config: OpenCodeConfigSource,
@@ -257,6 +287,26 @@ function buildInstalledOpenCodeConfig(current: OpenCodeConfigSource): OpenCodeCo
         ...current,
         plugin: pluginSpecs,
     };
+}
+
+function buildUninstalledOpenCodeConfig(current: OpenCodeConfigSource): OpenCodeConfigSource {
+    if (typeof current.plugin === "undefined") {
+        return current;
+    }
+
+    const pluginSpecs = normalizePluginSpecs(current.plugin)
+        .filter((pluginSpec) => normalizeNpmPackageName(pluginSpec) !== OPENCODE_TBOT_PACKAGE_NAME);
+    const nextConfig: OpenCodeConfigSource = {
+        ...current,
+    };
+
+    if (pluginSpecs.length > 0) {
+        nextConfig.plugin = pluginSpecs;
+        return nextConfig;
+    }
+
+    delete nextConfig.plugin;
+    return nextConfig;
 }
 
 function normalizePluginSpecs(value: unknown): string[] {
@@ -487,17 +537,19 @@ function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
 
 function buildHelpText(): string {
     return [
-        "Usage: opencode-tbot [install|update] [options]",
+        "Usage: opencode-tbot [install|update|uninstall] [options]",
         "       opencode-tbot --version",
         "",
         "Recommended npm usage:",
         "  npm exec -- opencode-tbot@latest",
         "  npm exec -- opencode-tbot@latest update",
+        "  npm exec -- opencode-tbot@latest uninstall",
         "  npm exec -- opencode-tbot@latest --version",
         "",
         "Commands:",
         "  install",
         "  update",
+        "  uninstall",
         "",
         "Options:",
         "  --bot-token <token>",

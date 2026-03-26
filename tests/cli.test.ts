@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import test from "node:test";
-import { createPromptSession, installPlugin, runCli } from "../src/cli.js";
+import { fileURLToPath } from "node:url";
+import { createPromptSession, installPlugin, runCli, uninstallPlugin } from "../src/cli.js";
 import { OPENCODE_TBOT_VERSION } from "../src/app/package-info.js";
 import {
     getGlobalPluginConfigFilePath,
@@ -14,6 +16,27 @@ import { getGlobalOpenCodeConfigFilePath } from "../src/app/opencode-paths.js";
 
 function getLegacyOpenCodeConfigFilePath(homeDir: string): string {
     return getGlobalOpenCodeConfigFilePath(homeDir);
+}
+
+function runCliInSubprocess(argv: string[]) {
+    const tsxCliPath = fileURLToPath(new URL("../node_modules/tsx/dist/cli.mjs", import.meta.url));
+    const cliModuleUrl = new URL("../src/cli.ts", import.meta.url).href;
+    const script = [
+        "(async () => {",
+        `  const { runCli } = await import(${JSON.stringify(cliModuleUrl)});`,
+        `  const exitCode = await runCli(${JSON.stringify(argv)});`,
+        "  process.exitCode = exitCode;",
+        "})();",
+    ].join("\n");
+
+    return spawnSync(
+        process.execPath,
+        [tsxCliPath, "--eval", script],
+        {
+            cwd: process.cwd(),
+            encoding: "utf8",
+        },
+    );
 }
 
 test("installPlugin writes the OpenCode config and runtime config", async () => {
@@ -140,6 +163,19 @@ test("runCli returns success for --version", async () => {
     assert.equal(OPENCODE_TBOT_VERSION.length > 0, true);
 });
 
+test("runCli install prints only a minimal success message", async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-output-install-"));
+    const result = runCliInSubprocess([
+        "--home-dir",
+        homeDir,
+        "--bot-token",
+        "telegram-token",
+    ]);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, "Success.\n");
+});
+
 test("runCli update refreshes the OpenCode config without modifying plugin config", async () => {
     const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-update-"));
     const openCodeConfigPath = getLegacyOpenCodeConfigFilePath(homeDir);
@@ -219,6 +255,108 @@ test("runCli update rewrites the OpenCode config without changing the bot config
         }).telegram.botToken,
         "old-token",
     );
+});
+
+test("uninstallPlugin removes opencode-tbot from the OpenCode config and keeps plugin config", async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-uninstall-"));
+    const openCodeConfigPath = getLegacyOpenCodeConfigFilePath(homeDir);
+    const pluginConfigPath = getGlobalPluginConfigFilePath(homeDir);
+
+    mkdirSync(getOpenCodeConfigDirectory(homeDir), { recursive: true });
+    mkdirSync(join(homeDir, ".config", "opencode", "opencode-tbot"), { recursive: true });
+    writeFileSync(openCodeConfigPath, JSON.stringify({
+        $schema: "https://opencode.ai/config.json",
+        model: "openai/gpt-5.4",
+        plugin: ["other-plugin", "opencode-tbot@0.1.0"],
+    }, null, 2));
+    writeFileSync(pluginConfigPath, JSON.stringify({
+        telegram: {
+            botToken: "old-token",
+        },
+    }, null, 2));
+
+    await uninstallPlugin({
+        homeDir,
+    });
+
+    assert.deepEqual(
+        JSON.parse(readFileSync(openCodeConfigPath, "utf8")) as {
+            $schema: string;
+            model: string;
+            plugin: string[];
+        },
+        {
+            $schema: "https://opencode.ai/config.json",
+            model: "openai/gpt-5.4",
+            plugin: ["other-plugin"],
+        },
+    );
+    assert.deepEqual(
+        JSON.parse(readFileSync(pluginConfigPath, "utf8")) as { telegram: { botToken: string } },
+        {
+            telegram: {
+                botToken: "old-token",
+            },
+        },
+    );
+});
+
+test("runCli uninstall removes the sole plugin entry and preserves plugin config", async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-uninstall-run-"));
+    const openCodeConfigPath = getLegacyOpenCodeConfigFilePath(homeDir);
+    const pluginConfigPath = getGlobalPluginConfigFilePath(homeDir);
+
+    mkdirSync(getOpenCodeConfigDirectory(homeDir), { recursive: true });
+    mkdirSync(join(homeDir, ".config", "opencode", "opencode-tbot"), { recursive: true });
+    writeFileSync(openCodeConfigPath, JSON.stringify({
+        $schema: "https://opencode.ai/config.json",
+        plugin: ["opencode-tbot"],
+    }, null, 2));
+    writeFileSync(pluginConfigPath, JSON.stringify({
+        telegram: {
+            botToken: "old-token",
+        },
+    }, null, 2));
+
+    const exitCode = await runCli([
+        "uninstall",
+        "--home-dir",
+        homeDir,
+    ]);
+
+    assert.equal(exitCode, 0);
+    assert.deepEqual(
+        JSON.parse(readFileSync(openCodeConfigPath, "utf8")) as { $schema: string },
+        {
+            $schema: "https://opencode.ai/config.json",
+        },
+    );
+    assert.equal(
+        (JSON.parse(readFileSync(pluginConfigPath, "utf8")) as {
+            telegram: { botToken: string };
+        }).telegram.botToken,
+        "old-token",
+    );
+});
+
+test("runCli uninstall prints only a minimal success message", async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-output-uninstall-"));
+    const openCodeConfigPath = getLegacyOpenCodeConfigFilePath(homeDir);
+
+    mkdirSync(getOpenCodeConfigDirectory(homeDir), { recursive: true });
+    writeFileSync(openCodeConfigPath, JSON.stringify({
+        $schema: "https://opencode.ai/config.json",
+        plugin: ["opencode-tbot"],
+    }, null, 2));
+
+    const result = runCliInSubprocess([
+        "uninstall",
+        "--home-dir",
+        homeDir,
+    ]);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, "Success.\n");
 });
 
 test("createPromptSession masks secret input with stars and supports backspace", async () => {
