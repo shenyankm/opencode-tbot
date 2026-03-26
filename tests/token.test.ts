@@ -61,7 +61,7 @@ test("/token shows the current global token breakdown setting", async () => {
         "",
         "Current status: Disabled",
         "Replies always show Duration | Displayed Tokens.",
-        "When enabled, a second line shows input, output, reasoning, cache.read, and cache.write.",
+        "When enabled, a second line shows request input, output, reasoning, cache.read, and cache.write.",
     ].join("\n"));
     const keyboard = replies[0]?.other?.reply_markup as {
         inline_keyboard: Array<Array<{ callback_data: string; text: string }>>;
