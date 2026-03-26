@@ -16,6 +16,7 @@ import {
     getGlobalOpenCodeConfigFilePath,
     getGlobalPluginConfigFilePath,
 } from "./app/opencode-paths.js";
+import { stripUtf8ByteOrderMark } from "./infra/utils/utf8.js";
 
 export interface InstallCommandOptions {
     botToken?: string;
@@ -213,7 +214,7 @@ function buildInstalledPluginConfig(
 async function readPluginConfigFile(configFilePath: string): Promise<PluginConfigSource> {
     try {
         const content = await readFile(configFilePath, "utf8");
-        const parsed = JSON.parse(content) as unknown;
+        const parsed = JSON.parse(stripUtf8ByteOrderMark(content)) as unknown;
 
         return isPlainObject(parsed)
             ? parsed as PluginConfigSource
@@ -233,7 +234,7 @@ async function ensureParentDirectory(filePath: string): Promise<void> {
 async function readOpenCodeConfigFile(configFilePath: string): Promise<OpenCodeConfigSource> {
     try {
         const content = await readFile(configFilePath, "utf8");
-        const parsed = JSON.parse(content) as unknown;
+        const parsed = JSON.parse(stripUtf8ByteOrderMark(content)) as unknown;
 
         return isPlainObject(parsed)
             ? parsed as OpenCodeConfigSource
@@ -250,7 +251,7 @@ async function readOpenCodeConfigFile(configFilePath: string): Promise<OpenCodeC
 async function readOpenCodeConfigFileIfPresent(configFilePath: string): Promise<OpenCodeConfigSource | null> {
     try {
         const content = await readFile(configFilePath, "utf8");
-        const parsed = JSON.parse(content) as unknown;
+        const parsed = JSON.parse(stripUtf8ByteOrderMark(content)) as unknown;
 
         return isPlainObject(parsed)
             ? parsed as OpenCodeConfigSource

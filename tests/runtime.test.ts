@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { GrammyError } from "grammy";
 import {
     resetTelegramBotRuntimeRegistryForTests,
     startTelegramBotRuntime,
@@ -9,6 +10,7 @@ import type { AppContainer } from "../src/app/container.js";
 
 interface BotStub {
     api: {
+        getMe(): Promise<{ id: number; username?: string }>;
         getUpdates(options?: unknown, signal?: unknown): Promise<unknown[]>;
         setMyCommands(): Promise<boolean>;
     };
@@ -70,6 +72,12 @@ function createBotStub(): BotStub {
     let errorHandler: ((error: unknown) => unknown) | undefined;
     const bot = {
         api: {
+            async getMe() {
+                return {
+                    id: 42,
+                    username: "opencode_tbot",
+                };
+            },
             async getUpdates() {
                 return [];
             },
@@ -208,5 +216,43 @@ test("startTelegramBotRuntime logs getUpdates failures through the app logger", 
     assert.match(calls.warn[0]?.message ?? "", /telegram getUpdates failed/u);
 
     await runtime.dispose();
+    resetTelegramBotRuntimeRegistryForTests();
+});
+
+test("startTelegramBotRuntime throws a readable error when telegram token validation fails", async () => {
+    resetTelegramBotRuntimeRegistryForTests();
+    const { calls, container } = createContainer();
+    const bot = createBotStub();
+
+    bot.api.getMe = async () => {
+        throw new GrammyError(
+            "Call to 'getMe' failed!",
+            {
+                ok: false,
+                error_code: 401,
+                description: "Unauthorized",
+                parameters: {},
+            },
+            "getMe",
+            {},
+        );
+    };
+
+    await assert.rejects(
+        startTelegramBotRuntime({
+            config: createConfig(),
+            container,
+            botFactory: () => bot as never,
+            registerBotHandlers: () => undefined,
+            runBot: () => {
+                throw new Error("runner should not start");
+            },
+            syncCommands: false,
+        }),
+        /Telegram bot token is invalid or revoked/u,
+    );
+
+    assert.equal(calls.error.length, 1);
+    assert.match(calls.error[0]?.message ?? "", /startup validation failed/u);
     resetTelegramBotRuntimeRegistryForTests();
 });

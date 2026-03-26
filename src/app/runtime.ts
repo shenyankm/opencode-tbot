@@ -97,6 +97,7 @@ async function startTelegramBotRuntimeInternal(
         component: "runtime",
     });
 
+    await verifyTelegramBotAccess(bot, input.config.telegramApiRoot, runtimeKey, runtimeLogger);
     wrapTelegramGetUpdates(bot, input.container);
     const registerBotHandlers = input.registerBotHandlers ?? registerBot;
     registerBotHandlers(bot, input.container, {
@@ -247,6 +248,68 @@ function wrapTelegramGetUpdates(bot: Bot, container: AppContainer): void {
             throw error;
         }
     };
+}
+
+async function verifyTelegramBotAccess(
+    bot: Bot,
+    telegramApiRoot: string,
+    runtimeKey: string,
+    runtimeLogger: AppContainer["logger"],
+): Promise<void> {
+    try {
+        const botProfile = await bot.api.getMe();
+
+        runtimeLogger.info(
+            {
+                event: "runtime.telegram.auth.validated",
+                runtimeKey,
+                telegramBotId: botProfile.id,
+                telegramBotUsername: botProfile.username ?? null,
+            },
+            "telegram bot access verified",
+        );
+    } catch (error) {
+        runtimeLogger.error(
+            {
+                event: "runtime.telegram.auth.failed",
+                error,
+                runtimeKey,
+                telegramApiRoot,
+            },
+            "telegram bot startup validation failed",
+        );
+        throw createTelegramStartupError(error, telegramApiRoot);
+    }
+}
+
+function createTelegramStartupError(error: unknown, telegramApiRoot: string): Error {
+    if (error instanceof GrammyError) {
+        if (error.error_code === 401) {
+            return new Error(
+                `Telegram bot token is invalid or revoked (${error.description}). ` +
+                "Check telegram.botToken in the plugin config.",
+            );
+        }
+
+        return new Error(
+            `Telegram Bot API rejected startup validation via '${error.method}' ` +
+            `(${error.error_code}: ${error.description}).`,
+        );
+    }
+
+    if (error instanceof HttpError) {
+        const cause = error.error instanceof Error && error.error.message.trim().length > 0
+            ? ` ${error.error.message.trim()}`
+            : "";
+
+        return new Error(
+            `Unable to reach the Telegram Bot API at ${telegramApiRoot}.${cause}`,
+        );
+    }
+
+    return error instanceof Error
+        ? error
+        : new Error(String(error));
 }
 
 function buildTelegramRuntimeKey(config: AppConfig): string {

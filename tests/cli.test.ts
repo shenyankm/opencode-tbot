@@ -98,6 +98,54 @@ test("installPlugin preserves unrelated plugin config keys and is idempotent", a
     assert.equal(pluginConfig.telegram?.botToken, "telegram-token");
 });
 
+test("installPlugin tolerates UTF-8 BOM in existing OpenCode and plugin config files", async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-bom-"));
+    const openCodeConfigPath = getLegacyOpenCodeConfigFilePath(homeDir);
+    const pluginConfigPath = getGlobalPluginConfigFilePath(homeDir);
+
+    mkdirSync(getOpenCodeConfigDirectory(homeDir), { recursive: true });
+    mkdirSync(join(homeDir, ".config", "opencode", "opencode-tbot"), { recursive: true });
+    writeFileSync(
+        openCodeConfigPath,
+        `\ufeff${JSON.stringify({
+            $schema: "https://opencode.ai/config.json",
+            plugin: ["other-plugin"],
+        }, null, 2)}\n`,
+        "utf8",
+    );
+    writeFileSync(
+        pluginConfigPath,
+        `\ufeff${JSON.stringify({
+            telegram: {
+                botToken: "old-token",
+            },
+        }, null, 2)}\n`,
+        "utf8",
+    );
+
+    await installPlugin({
+        homeDir,
+        botToken: "telegram-token",
+    });
+
+    assert.deepEqual(
+        JSON.parse(readFileSync(openCodeConfigPath, "utf8")) as {
+            $schema: string;
+            plugin: string[];
+        },
+        {
+            $schema: "https://opencode.ai/config.json",
+            plugin: ["other-plugin", "opencode-tbot"],
+        },
+    );
+    assert.equal(
+        (JSON.parse(readFileSync(pluginConfigPath, "utf8")) as {
+            telegram: { botToken: string };
+        }).telegram.botToken,
+        "telegram-token",
+    );
+});
+
 test("installPlugin merges existing OpenCode npm plugins and normalizes opencode-tbot", async () => {
     const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-open-code-merge-"));
     const openCodeConfigPath = getLegacyOpenCodeConfigFilePath(homeDir);

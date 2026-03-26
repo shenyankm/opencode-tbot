@@ -11,6 +11,7 @@ import {
     GLOBAL_PLUGIN_DIRECTORY_NAME,
     GLOBAL_OPENCODE_CONFIG_FILE_NAME,
 } from "./opencode-paths.js";
+import { stripUtf8ByteOrderMark } from "../infra/utils/utf8.js";
 
 export interface PreparedPluginConfiguration {
     cwd: string;
@@ -147,7 +148,7 @@ function parsePluginConfigText(
     configFilePath: string,
 ): PluginConfigSource {
     try {
-        const parsed = JSON.parse(content) as unknown;
+        const parsed = JSON.parse(stripUtf8ByteOrderMark(content)) as unknown;
 
         if (!isPlainObject(parsed)) {
             throw new Error("Config root must be a JSON object.");

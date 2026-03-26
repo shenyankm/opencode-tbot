@@ -283,6 +283,31 @@ test("preparePluginConfiguration loads telegram.botToken from the global config 
     assert.equal(prepared.configFilePath, configFilePath);
 });
 
+test("preparePluginConfiguration accepts a global config file with a UTF-8 BOM", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-plugin-bom-"));
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-home-bom-"));
+    const configFilePath = join(homeDir, ".config", "opencode", "opencode-tbot", "config.json");
+
+    mkdirSync(join(homeDir, ".config", "opencode", "opencode-tbot"), { recursive: true });
+    writeFileSync(
+        configFilePath,
+        `\ufeff${serializePluginConfig({
+            telegram: {
+                botToken: "global-token",
+            },
+        })}`,
+        "utf8",
+    );
+
+    const prepared = await preparePluginConfiguration({
+        cwd,
+        homeDir,
+    });
+
+    assert.equal(prepared.config.telegram?.botToken, "global-token");
+    assert.equal(prepared.configFilePath, configFilePath);
+});
+
 test("preparePluginConfiguration merges explicit overrides on top of the global config file", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-plugin-merge-"));
     const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-home-"));
