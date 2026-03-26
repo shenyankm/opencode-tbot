@@ -31,7 +31,7 @@ Guidance for coding agents working in `opencode-tbot`.
 - `src/repositories/`: in-memory and file-backed persistence adapters.
 - `src/domain/`: core interfaces and entity shapes.
 - `tests/`: unit-focused suite plus one env-gated integration test.
-- `.opencode/plugins/opencode-tbot.ts`: local source bridge for OpenCode development.
+- `~/.config/opencode/opencode.json`: npm plugin registration written by the installer.
 - `dist/`: generated bundle output; do not edit by hand.
 
 ## Commands

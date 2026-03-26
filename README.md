@@ -30,35 +30,35 @@ A Telegram plugin for driving [OpenCode](https://opencode.ai) from chat.
 Recommended install:
 
 ```bash
-npm exec --package opencode-tbot@latest opencode-tbot -- install
+npm exec -- opencode-tbot@latest
 ```
 
 The installer:
 
-- writes `~/.config/opencode/plugins/opencode-tbot.js`
+- writes `~/.config/opencode/opencode.json` with `plugin: ["opencode-tbot"]`
 - creates missing parent directories automatically
 - writes or merges `~/.config/opencode/opencode-tbot/config.json`
-- prints the plugin bridge path, plugin config path, and default plugin log directory
+- prints the OpenCode config path, plugin config path, and default plugin log directory
 
 `install` is the default command. This also works for a non-interactive install:
 
 ```bash
-npm exec --package opencode-tbot@latest opencode-tbot -- --bot-token <token>
+npm exec -- opencode-tbot@latest --bot-token <token>
 ```
 
-Refresh the global plugin bridge without changing your bot token:
+Refresh the OpenCode config entry without changing your bot token:
 
 ```bash
-npm exec --package opencode-tbot@latest opencode-tbot -- update
+npm exec -- opencode-tbot@latest update
 ```
 
 Check the installed CLI version:
 
 ```bash
-npm exec --package opencode-tbot@latest opencode-tbot -- --version
+npm exec -- opencode-tbot@latest --version
 ```
 
-`install` and `update` only manage the global bridge and plugin config. They do not rewrite `opencode.json` or `opencode.jsonc`.
+`install` and `update` only manage the npm plugin registration in `opencode.json` and the plugin config file.
 
 ### CLI Options
 
@@ -66,7 +66,6 @@ npm exec --package opencode-tbot@latest opencode-tbot -- --version
 
 - `--bot-token <token>` set the Telegram bot token non-interactively
 - `--telegram-api-root <url>` override the Telegram Bot API root
-- `--skip-register` only rewrite plugin config without touching the global plugin bridge
 - `--home-dir <path>` use a custom home directory
 
 `update` supports:
@@ -81,9 +80,9 @@ Runtime config is loaded from:
 
 Programmatic callers may also inject config explicitly. When present, injected values override file values.
 
-OpenCode loads the global plugin bridge from:
+OpenCode loads the npm plugin registration from:
 
-- `~/.config/opencode/plugins/opencode-tbot.js`
+- `~/.config/opencode/opencode.json`
 
 This plugin does not read runtime settings from `.env`.
 
@@ -151,7 +150,7 @@ This plugin does not read runtime settings from `.env`.
 
 ## Quick Start
 
-1. Install the plugin with `npm exec --package opencode-tbot@latest opencode-tbot -- install`.
+1. Install the plugin with `npm exec -- opencode-tbot@latest`.
 2. Set `telegram.allowedChatIds` in `~/.config/opencode/opencode-tbot/config.json` if you want to restrict the bot to specific chats.
 3. Start OpenCode in the target worktree so the plugin runtime can load.
 4. In Telegram, run `/status` to verify the connection.
@@ -167,7 +166,7 @@ This plugin does not read runtime settings from `.env`.
 | `/agents` or `/agent` | List available agents and switch the active one. |
 | `/sessions` | List available sessions, switch the active one, and offer rename actions. |
 | `/cancel` | Cancel pending session rename input or abort the running request for the current session. |
-| `/model` or `/models` | List available models, switch the active one, and choose a reasoning level when available. |
+| `/model` or `/models` | List models exposed by OpenCode for connected providers, switch the active one, and choose a reasoning level when available. |
 | `/language` | Switch the bot display language for the current chat. |
 
 ### Message Behavior
@@ -227,25 +226,13 @@ npm install -g opencode-ai
 $env:OPENCODE_HOST_E2E="1"; pnpm test
 ```
 
-Normal usage should rely on the generated global bridge at `~/.config/opencode/plugins/opencode-tbot.js` plus the global plugin config. This repository does not ship a default project-local `.opencode/plugins` bridge.
-
-If you need source-based local loading while developing in this repository, create `.opencode/plugins/opencode-tbot.ts` manually:
-
-```ts
-export { default } from "../../src/plugin.ts";
-```
-
-Keep only one loading path enabled at a time: either the manual local bridge or the generated global bridge in `~/.config/opencode/plugins/`.
+Normal usage should rely on the npm registration in `~/.config/opencode/opencode.json` plus the plugin config under `~/.config/opencode/opencode-tbot/config.json`.
 
 ## FAQ
 
 ### Do I need a running OpenCode instance?
 
 Yes. This repository provides a Telegram integration layer and depends on the OpenCode host process that loads the plugin.
-
-### Why can the generated bridge point to `file:///.../node_modules/...`?
-
-That usually means the installer was run from a local project that has `opencode-tbot` in its own `node_modules`, so the generated bridge points at that package location. Re-run the recommended `npm exec --package ...` install flow if you want the bridge to target the published package directly.
 
 ### Is this an official OpenCode project?
 

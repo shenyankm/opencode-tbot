@@ -13,14 +13,11 @@ import test from "node:test";
 import { createOpenCodeAppLogger } from "../src/infra/logger/index.js";
 
 test("createOpenCodeAppLogger sends structured log entries through root client.app.log", async () => {
-    const calls: Array<{ input: Record<string, unknown>; options?: Record<string, unknown> }> = [];
+    const calls: Array<Record<string, unknown>> = [];
     const logger = createOpenCodeAppLogger({
         app: {
-            async log(input, options) {
-                calls.push({
-                    input,
-                    ...(options ? { options } : {}),
-                });
+            async log(input: Record<string, unknown>) {
+                calls.push(input);
                 return true;
             },
         },
@@ -43,31 +40,29 @@ test("createOpenCodeAppLogger sends structured log entries through root client.a
 
     assert.equal(calls.length, 1);
     assert.deepEqual(calls[0], {
-        input: {
+        body: {
             service: "opencode-tbot",
             level: "info",
             message: "hello",
             extra: {
-                ts: (calls[0]?.input.extra as Record<string, unknown> | undefined)?.ts,
+                ts: ((calls[0]?.body as { extra?: Record<string, unknown> } | undefined)?.extra)?.ts,
                 component: "runtime",
                 event: "runtime.started",
-                runtimeId: (calls[0]?.input.extra as Record<string, unknown> | undefined)?.runtimeId,
+                runtimeId: ((calls[0]?.body as { extra?: Record<string, unknown> } | undefined)?.extra)?.runtimeId,
                 operationId: null,
                 correlationId: null,
                 token: "[REDACTED]",
             },
         },
-        options: {
-            responseStyle: "data",
-            throwOnError: true,
-        },
+        responseStyle: "data",
+        throwOnError: true,
     });
     assert.match(
-        String((calls[0].input.extra as { runtimeId?: unknown } | undefined)?.runtimeId ?? ""),
+        String((((calls[0].body as { extra?: { runtimeId?: unknown } } | undefined)?.extra)?.runtimeId) ?? ""),
         /^[0-9a-f-]{36}$/u,
     );
     assert.match(
-        String((calls[0].input.extra as { ts?: unknown } | undefined)?.ts ?? ""),
+        String((((calls[0].body as { extra?: { ts?: unknown } } | undefined)?.extra)?.ts) ?? ""),
         /^\d{4}-\d{2}-\d{2}T/u,
     );
 });
@@ -234,7 +229,7 @@ test("createOpenCodeAppLogger keeps host logging alive when the file sink cannot
     await logger.flush();
 
     assert.equal(calls.length, 1);
-    assert.equal(calls[0]?.message, "host still works");
+    assert.equal((calls[0]?.body as { message?: string } | undefined)?.message, "host still works");
 
     rmSync(blockedRoot, { force: true, recursive: true });
 });

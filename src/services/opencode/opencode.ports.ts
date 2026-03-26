@@ -5,7 +5,6 @@ import type {
     OpenCodeLspStatus,
     OpenCodeMcpStatus,
     OpenCodePath,
-    OpenCodePermissionRequest,
     OpenCodeProject,
     OpenCodeSession,
     OpenCodeSessionStatus,
@@ -45,15 +44,11 @@ export interface OpenCodePathReader {
     getPath(): Promise<OpenCodePath>;
 }
 
-export interface OpenCodePendingPermissionCatalog {
-    listPendingPermissions(directory?: string): Promise<OpenCodePermissionRequest[]>;
-}
-
 export interface OpenCodePermissionResponder {
     replyToPermission(
+        sessionId: string,
         requestId: string,
         reply: "always" | "once" | "reject",
-        message?: string,
     ): Promise<boolean>;
 }
 

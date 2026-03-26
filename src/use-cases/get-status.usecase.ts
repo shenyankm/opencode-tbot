@@ -141,7 +141,16 @@ export function createStatusSectionProviders(
         },
         plugins: {
             key: "plugins",
-            async load() {
+            async load(context) {
+                const path = await context.resolve("path");
+
+                if (path.status === "error") {
+                    return {
+                        error: path.error,
+                        status: "error",
+                    };
+                }
+
                 return loadStatusSection(async () => ({
                     plugins: normalizeConfiguredPluginLabels(
                         await input.configuredPluginReader.listConfiguredPlugins(),
@@ -228,11 +237,12 @@ function formatSessionStatusLabel(session: OpenCodeSession | null, fallbackId: s
         return fallbackId;
     }
 
-    const title = session.title.trim() || session.slug || session.id;
+    const slug = session.slug?.trim() || session.id;
+    const title = session.title.trim() || slug || session.id;
 
-    return title === session.slug
+    return title === slug
         ? title
-        : `${title} (${session.slug})`;
+        : `${title} (${slug})`;
 }
 
 function resolveWorkspaceProjectPath(path: OpenCodePath, preferredPath?: string | null): string {
@@ -283,56 +293,5 @@ function normalizeConfiguredPluginLabels(plugins: string[]): string[] {
 }
 
 function normalizeConfiguredPluginLabel(plugin: string): string {
-    const normalizedPlugin = plugin.trim();
-    const localPluginName = extractLocalPluginName(normalizedPlugin);
-
-    return localPluginName
-        ? `${localPluginName} (local plugin)`
-        : normalizedPlugin;
-}
-
-function extractLocalPluginName(plugin: string): string | null {
-    const filePath = parseFilePluginPath(plugin);
-
-    if (!filePath) {
-        return null;
-    }
-
-    const pathSegments = filePath.split("/").filter((segment) => segment.length > 0);
-    const fileName = pathSegments.at(-1);
-    const parentDirectoryName = pathSegments.at(-2);
-
-    if (!fileName || parentDirectoryName !== "plugins") {
-        return null;
-    }
-
-    const pluginName = fileName.replace(/\.(?:[cm]?js|[cm]?ts)$/iu, "");
-
-    return pluginName.trim().length > 0
-        ? pluginName.trim()
-        : null;
-}
-
-function parseFilePluginPath(plugin: string): string | null {
-    if (!plugin.startsWith("file://")) {
-        return null;
-    }
-
-    try {
-        const fileUrl = new URL(plugin);
-
-        if (fileUrl.protocol !== "file:") {
-            return null;
-        }
-
-        const normalizedPath = decodeURIComponent(fileUrl.pathname)
-            .replace(/^\/([A-Za-z]:)/u, "$1")
-            .replace(/\\/gu, "/");
-
-        return normalizedPath.length > 0
-            ? normalizedPath
-            : null;
-    } catch {
-        return null;
-    }
+    return plugin.trim();
 }

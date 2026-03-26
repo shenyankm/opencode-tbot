@@ -44,6 +44,10 @@ const PLUGIN_EVENT_HANDLERS: Record<string, PluginEventHandlerDefinition> = {
         normalizePermissionRequestEvent,
         handlePermissionAsked,
     ),
+    "permission.updated": createPluginEventHandler(
+        normalizePermissionRequestEvent,
+        handlePermissionAsked,
+    ),
     "permission.replied": createPluginEventHandler(
         normalizePermissionReplyEvent,
         handlePermissionReplied,

@@ -50,10 +50,16 @@ export async function handlePermissionApprovalCallback(
     try {
         const approvals = await dependencies.permissionApprovalRepo.listByRequestId(parsed.requestId);
         const approval = approvals.find((item) => item.chatId === ctx.chat?.id);
+
+        if (!approval) {
+            await ctx.editMessageText(copy.permission.replyFailed);
+            return;
+        }
+
         const accepted = await dependencies.opencodeClient.replyToPermission(
+            approval.sessionId,
             parsed.requestId,
             parsed.reply,
-            undefined,
         );
 
         if (!accepted) {
@@ -61,13 +67,11 @@ export async function handlePermissionApprovalCallback(
             return;
         }
 
-        if (approval) {
-            await dependencies.permissionApprovalRepo.set({
-                ...approval,
-                status: parsed.reply,
-                updatedAt: new Date().toISOString(),
-            });
-        }
+        await dependencies.permissionApprovalRepo.set({
+            ...approval,
+            status: parsed.reply,
+            updatedAt: new Date().toISOString(),
+        });
 
         await ctx.editMessageText(buildPermissionApprovalResolvedMessage(parsed.requestId, parsed.reply, copy));
     } catch (error) {

@@ -1,4 +1,4 @@
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname } from "node:path";
 import { stderr, stdin, stdout } from "node:process";
@@ -14,14 +14,13 @@ import {
 } from "./app/plugin-config.js";
 import {
     getDefaultPluginLogDirectory,
-    getGlobalPluginBridgeFilePath,
+    getGlobalOpenCodeConfigFilePath,
     getGlobalPluginConfigFilePath,
 } from "./app/opencode-paths.js";
 
 export interface InstallCommandOptions {
     botToken?: string;
     homeDir?: string;
-    registerPlugin?: boolean;
     telegramApiRoot?: string;
 }
 
@@ -42,6 +41,14 @@ export interface CreatePromptSessionOptions {
 }
 
 const PROMPT_CANCELLED_ERROR = "Prompt cancelled.";
+const OPENCODE_CONFIG_SCHEMA_URL = "https://opencode.ai/config.json";
+const OPENCODE_TBOT_PACKAGE_NAME = "opencode-tbot";
+
+interface OpenCodeConfigSource {
+    $schema?: string;
+    plugin?: string[];
+    [key: string]: unknown;
+}
 
 export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
     try {
@@ -81,9 +88,10 @@ export async function runCli(argv: string[]): Promise<number> {
 
 export async function installPlugin(options: InstallCommandOptions = {}): Promise<void> {
     const homeDir = options.homeDir ?? homedir();
-    const globalPluginBridgeFilePath = getGlobalPluginBridgeFilePath(homeDir);
+    const openCodeConfigFilePath = getGlobalOpenCodeConfigFilePath(homeDir);
     const globalPluginConfigFilePath = getGlobalPluginConfigFilePath(homeDir);
     const existingPluginConfig = await readPluginConfigFile(globalPluginConfigFilePath);
+    const existingOpenCodeConfig = await readOpenCodeConfigFile(openCodeConfigFilePath);
     const prompt = createPromptSession();
 
     try {
@@ -92,21 +100,18 @@ export async function installPlugin(options: InstallCommandOptions = {}): Promis
             "Telegram bot token is required.",
         );
         const telegramApiRoot = normalizeOptionalString(options.telegramApiRoot) ?? DEFAULT_TELEGRAM_API_ROOT;
+        const nextOpenCodeConfig = buildInstalledOpenCodeConfig(existingOpenCodeConfig);
         const nextPluginConfig = buildInstalledPluginConfig(
             existingPluginConfig,
             botToken,
             telegramApiRoot,
         );
 
-        if (options.registerPlugin !== false) {
-            await installGlobalPluginBridge(globalPluginBridgeFilePath);
-        }
+        await writeOpenCodeConfigFile(openCodeConfigFilePath, nextOpenCodeConfig);
         await writePluginConfigFile(globalPluginConfigFilePath, nextPluginConfig);
 
         stdout.write("Success.\n");
-        stdout.write(
-            `Plugin bridge: ${globalPluginBridgeFilePath}${options.registerPlugin === false ? " (skipped)" : ""}\n`,
-        );
+        stdout.write(`OpenCode config: ${openCodeConfigFilePath}\n`);
         stdout.write(`Plugin config: ${globalPluginConfigFilePath}\n`);
         stdout.write(`Plugin logs: ${getDefaultPluginLogDirectory(homeDir)}\n`);
     } finally {
@@ -116,12 +121,14 @@ export async function installPlugin(options: InstallCommandOptions = {}): Promis
 
 export async function updatePlugin(options: Pick<InstallCommandOptions, "homeDir"> = {}): Promise<void> {
     const homeDir = options.homeDir ?? homedir();
-    const globalPluginBridgeFilePath = getGlobalPluginBridgeFilePath(homeDir);
+    const openCodeConfigFilePath = getGlobalOpenCodeConfigFilePath(homeDir);
+    const existingOpenCodeConfig = await readOpenCodeConfigFile(openCodeConfigFilePath);
+    const globalPluginConfigFilePath = getGlobalPluginConfigFilePath(homeDir);
 
-    await installGlobalPluginBridge(globalPluginBridgeFilePath);
+    await writeOpenCodeConfigFile(openCodeConfigFilePath, buildInstalledOpenCodeConfig(existingOpenCodeConfig));
     stdout.write("Success.\n");
-    stdout.write(`Plugin bridge: ${globalPluginBridgeFilePath}\n`);
-    stdout.write(`Plugin config: ${getGlobalPluginConfigFilePath(homeDir)}\n`);
+    stdout.write(`OpenCode config: ${openCodeConfigFilePath}\n`);
+    stdout.write(`Plugin config: ${globalPluginConfigFilePath}\n`);
     stdout.write(`Plugin logs: ${getDefaultPluginLogDirectory(homeDir)}\n`);
 }
 
@@ -157,9 +164,6 @@ function parseCliOptions(argv: string[]): CliOptions {
                 break;
             case "--telegram-api-root":
                 options.telegramApiRoot = values[++index];
-                break;
-            case "--skip-register":
-                options.registerPlugin = false;
                 break;
             case "--home-dir":
                 options.homeDir = values[++index];
@@ -209,47 +213,98 @@ async function readPluginConfigFile(configFilePath: string): Promise<PluginConfi
         throw error;
     }
 }
-async function installGlobalPluginBridge(pluginBridgeFilePath: string): Promise<void> {
-    const pluginModuleUrl = await resolveInstalledPluginModuleUrl();
-
-    await writePluginBridgeFile(pluginBridgeFilePath, pluginModuleUrl);
-}
-
 async function ensureParentDirectory(filePath: string): Promise<void> {
     await mkdir(dirname(filePath), { recursive: true });
 }
 
-async function writePluginBridgeFile(
-    pluginBridgeFilePath: string,
-    pluginModuleUrl: string,
+async function readOpenCodeConfigFile(configFilePath: string): Promise<OpenCodeConfigSource> {
+    try {
+        const content = await readFile(configFilePath, "utf8");
+        const parsed = JSON.parse(content) as unknown;
+
+        return isPlainObject(parsed)
+            ? parsed as OpenCodeConfigSource
+            : {};
+    } catch (error) {
+        if (isMissingFileError(error)) {
+            return {};
+        }
+
+        throw error;
+    }
+}
+
+async function writeOpenCodeConfigFile(
+    configFilePath: string,
+    config: OpenCodeConfigSource,
 ): Promise<void> {
-    await ensureParentDirectory(pluginBridgeFilePath);
+    await ensureParentDirectory(configFilePath);
     await writeFile(
-        pluginBridgeFilePath,
-        buildPluginBridgeSource(pluginModuleUrl),
+        configFilePath,
+        `${JSON.stringify(config, null, 2)}\n`,
         "utf8",
     );
 }
 
-function buildPluginBridgeSource(pluginModuleUrl: string): string {
-    return `export { default } from ${JSON.stringify(pluginModuleUrl)};\n`;
+function buildInstalledOpenCodeConfig(current: OpenCodeConfigSource): OpenCodeConfigSource {
+    const pluginSpecs = normalizePluginSpecs(current.plugin)
+        .filter((pluginSpec) => normalizeNpmPackageName(pluginSpec) !== OPENCODE_TBOT_PACKAGE_NAME);
+
+    pluginSpecs.push(OPENCODE_TBOT_PACKAGE_NAME);
+
+    return {
+        $schema: current.$schema ?? OPENCODE_CONFIG_SCHEMA_URL,
+        ...current,
+        plugin: pluginSpecs,
+    };
 }
 
-async function resolveInstalledPluginModuleUrl(): Promise<string> {
-    const candidates = [
-        new URL("./plugin.js", import.meta.url),
-        new URL("./plugin.ts", import.meta.url),
-        new URL("../src/plugin.ts", import.meta.url),
-        new URL("../dist/plugin.js", import.meta.url),
-    ];
-
-    for (const candidate of candidates) {
-        if (await pathExists(candidate)) {
-            return candidate.href;
-        }
+function normalizePluginSpecs(value: unknown): string[] {
+    if (typeof value === "undefined") {
+        return [];
     }
 
-    throw new Error("Failed to resolve the opencode-tbot plugin entry for the global OpenCode bridge.");
+    if (!Array.isArray(value)) {
+        throw new Error("OpenCode config plugin field must be an array.");
+    }
+
+    const normalizedPluginSpecs: string[] = [];
+    const seenPluginSpecs = new Set<string>();
+
+    for (const entry of value) {
+        if (typeof entry !== "string") {
+            throw new Error("OpenCode config plugin entries must be strings.");
+        }
+
+        const normalizedEntry = entry.trim();
+
+        if (normalizedEntry.length === 0 || seenPluginSpecs.has(normalizedEntry)) {
+            continue;
+        }
+
+        seenPluginSpecs.add(normalizedEntry);
+        normalizedPluginSpecs.push(normalizedEntry);
+    }
+
+    return normalizedPluginSpecs;
+}
+
+function normalizeNpmPackageName(pluginSpec: string): string {
+    const normalizedPluginSpec = pluginSpec.trim();
+
+    if (!normalizedPluginSpec.startsWith("@")) {
+        const atIndex = normalizedPluginSpec.indexOf("@");
+
+        return atIndex >= 0
+            ? normalizedPluginSpec.slice(0, atIndex)
+            : normalizedPluginSpec;
+    }
+
+    const versionSeparatorIndex = normalizedPluginSpec.indexOf("@", normalizedPluginSpec.indexOf("/") + 1);
+
+    return versionSeparatorIndex >= 0
+        ? normalizedPluginSpec.slice(0, versionSeparatorIndex)
+        : normalizedPluginSpec;
 }
 
 export function createPromptSession(options: CreatePromptSessionOptions = {}): PromptSessionLike {
@@ -430,24 +485,15 @@ function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
     return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
-async function pathExists(filePath: string | URL): Promise<boolean> {
-    try {
-        await stat(filePath);
-        return true;
-    } catch {
-        return false;
-    }
-}
-
 function buildHelpText(): string {
     return [
         "Usage: opencode-tbot [install|update] [options]",
         "       opencode-tbot --version",
         "",
         "Recommended npm usage:",
-        "  npm exec --package opencode-tbot@latest opencode-tbot -- install",
-        "  npm exec --package opencode-tbot@latest opencode-tbot -- update",
-        "  npm exec --package opencode-tbot@latest opencode-tbot -- --version",
+        "  npm exec -- opencode-tbot@latest",
+        "  npm exec -- opencode-tbot@latest update",
+        "  npm exec -- opencode-tbot@latest --version",
         "",
         "Commands:",
         "  install",
@@ -456,7 +502,6 @@ function buildHelpText(): string {
         "Options:",
         "  --bot-token <token>",
         "  --telegram-api-root <url>",
-        "  --skip-register",
         "  --home-dir <path>",
         "  --version",
         "  --help",

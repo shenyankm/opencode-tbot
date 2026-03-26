@@ -390,7 +390,7 @@ const EN_BOT_COPY: BotCopy = {
     models: {
         none: "No models available.",
         title: "Model List",
-        configuredOnly: "Only models currently available in OpenCode and connected providers are shown.",
+        configuredOnly: "Only models exposed by OpenCode for connected providers are shown.",
         current(model: string) {
             return `Current model: ${model}`;
         },
@@ -642,7 +642,7 @@ const ZH_CN_BOT_COPY: BotCopy = {
     models: {
         none: "没有可用模型。",
         title: "模型列表",
-        configuredOnly: "仅显示当前在 OpenCode 和已连接 provider 中实际可用的模型。",
+        configuredOnly: "仅显示 OpenCode 为已连接 provider 暴露的模型。",
         current(model: string) {
             return `当前模型: ${model}`;
         },
@@ -894,7 +894,7 @@ const JA_BOT_COPY: BotCopy = {
     models: {
         none: "利用可能なモデルはありません。",
         title: "モデル一覧",
-        configuredOnly: "OpenCode と接続済み provider で現在利用可能なモデルのみ表示します。",
+        configuredOnly: "OpenCode が接続済み provider 向けに公開しているモデルのみ表示します。",
         current(model: string) {
             return `現在のモデル: ${model}`;
         },

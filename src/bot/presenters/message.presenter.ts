@@ -541,7 +541,7 @@ function getStatusLayoutCopy(copy: BotCopy): StatusLayoutCopy {
             mcpNotesLabel: "Notes",
             mcpRegistrationRequiredStatus: "\uD83D\uDFE1",
             mcpTitle: "\uD83D\uDD0C MCP",
-            noPluginsMessage: "No plugins detected in the current OpenCode setup.",
+            noPluginsMessage: "No npm plugins configured in OpenCode.",
             noneStatus: "\u26AA",
             openCodeVersionLabel: "OpenCode Version",
             overviewTitle: "\uD83D\uDDA5\uFE0F Overview",
@@ -565,7 +565,7 @@ function getStatusLayoutCopy(copy: BotCopy): StatusLayoutCopy {
             mcpNotesLabel: "補足",
             mcpRegistrationRequiredStatus: "\uD83D\uDFE1",
             mcpTitle: "\uD83D\uDD0C MCP",
-            noPluginsMessage: "現在の OpenCode 構成ではプラグインが検出されていません。",
+            noPluginsMessage: "OpenCode に npm プラグインが設定されていません。",
             noneStatus: "\u26AA",
             openCodeVersionLabel: "OpenCode バージョン",
             overviewTitle: "\uD83D\uDDA5\uFE0F 概要",
@@ -588,7 +588,7 @@ function getStatusLayoutCopy(copy: BotCopy): StatusLayoutCopy {
         mcpNotesLabel: "\u8BF4\u660E",
         mcpRegistrationRequiredStatus: "\uD83D\uDFE1",
         mcpTitle: "\uD83D\uDD0C MCP",
-        noPluginsMessage: "\u5F53\u524D OpenCode \u73AF\u5883\u4E2D\u672A\u68C0\u6D4B\u5230\u63D2\u4EF6\u3002",
+        noPluginsMessage: "当前 OpenCode 中未配置 npm 插件。",
         noneStatus: "\u26AA",
         openCodeVersionLabel: "OpenCode\u7248\u672C",
         overviewTitle: "\uD83D\uDDA5\uFE0F \u6982\u89C8",
@@ -809,11 +809,12 @@ function formatModelLabel(model: OpenCodeConfiguredModel): string {
 }
 
 function formatSessionLabel(session: OpenCodeSession): string {
-    const title = session.title.trim() || session.slug || session.id;
+    const slug = session.slug?.trim() || session.id;
+    const title = session.title.trim() || slug || session.id;
 
-    return title === session.slug
+    return title === slug
         ? title
-        : `${title} [${session.slug}]`;
+        : `${title} [${slug}]`;
 }
 
 function formatMcpStatus(status: OpenCodeMcpStatus, copy: BotCopy): string {

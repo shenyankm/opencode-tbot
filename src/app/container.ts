@@ -108,7 +108,6 @@ export function createAppContainer(
         config,
         createOpenCodeClientFromSdkClient(
             client,
-            fetch,
             {
                 waitTimeoutMs: config.promptWaitTimeoutMs,
                 pollRequestTimeoutMs: config.promptPollRequestTimeoutMs,

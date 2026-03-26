@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { join } from "node:path";
 import { createServer } from "node:http";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import test from "node:test";
@@ -13,7 +12,6 @@ const SHOULD_RUN = process.env.OPENCODE_HOST_E2E === "1";
 test("OpenCode host loads the plugin and starts Telegram polling", { skip: !SHOULD_RUN }, async () => {
     const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-host-home-"));
     const worktree = mkdtempSync(join(tmpdir(), "opencode-tbot-host-worktree-"));
-    const pluginBridgePath = join(homeDir, ".config", "opencode", "plugins", "opencode-tbot.ts");
     const requests: string[] = [];
     const server = createServer((request, response) => {
         requests.push(request.url ?? "");
@@ -60,16 +58,8 @@ test("OpenCode host loads the plugin and starts Telegram polling", { skip: !SHOU
     await installPlugin({
         homeDir,
         botToken: "123456:test-token",
-        registerPlugin: false,
         telegramApiRoot,
     });
-
-    mkdirSync(dirname(pluginBridgePath), { recursive: true });
-    writeFileSync(
-        pluginBridgePath,
-        `export { default } from ${JSON.stringify(pathToFileURL(resolve("dist/plugin.js")).href)}\n`,
-        "utf8",
-    );
     writeFileSync(join(worktree, "README.md"), "# opencode-tbot integration\n", "utf8");
 
     const command = process.platform === "win32"

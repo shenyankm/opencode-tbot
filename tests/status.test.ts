@@ -126,9 +126,8 @@ test("/status aggregates health, path, plugins, LSP, and MCP into one reply", as
             },
             async listConfiguredPlugins() {
                 return [
-                    "opencode-tbot@latest",
-                    "oh-my-opencode@latest",
-                    "file:///E:/repo-1/.opencode/plugins/workspace-tools.ts",
+                    "opencode-tbot",
+                    "oh-my-opencode",
                 ];
             },
             async listSessions() {
@@ -208,10 +207,8 @@ test("/status aggregates health, path, plugins, LSP, and MCP into one reply", as
     expectLine(markdown, `- **opencode-tbot Version:** ${OPENCODE_TBOT_VERSION}`);
     expectLine(markdown, "- **Current Project:** `E:/repo-1`");
     expectLine(markdown, "- **Current Session:** Build status (build-status)");
-    expectLine(markdown, "- `opencode-tbot@latest`");
-    expectLine(markdown, "- `oh-my-opencode@latest`");
-    expectLine(markdown, "- `workspace-tools (local plugin)`");
-    assert.doesNotMatch(markdown, /file:\/\/\/E:\/repo-1\/\.opencode\/plugins\/workspace-tools\.ts/u);
+    expectLine(markdown, "- `opencode-tbot`");
+    expectLine(markdown, "- `oh-my-opencode`");
     assert.match(markdown, /- `alpha`\n  - \*\*Status:\*\* \uD83D\uDFE2\n- `beta`/u);
     assert.match(markdown, /- `beta`\n  - \*\*Status:\*\* \u26AA/u);
     assert.match(markdown, /- \*\*Go\*\*\n  - \*\*Status:\*\* \uD83D\uDD34/u);
@@ -282,7 +279,7 @@ test("/status keeps successful sections when one section fails", async () => {
     assert.match(markdown, /- \*\*Details:\*\* Unexpected error\./u);
     assert.match(markdown, /- \*\*Details:\*\* Cause: health boom/u);
     assert.match(markdown, /- \*\*Details:\*\* Cause: mcp boom/u);
-    assert.match(markdown, /No plugins detected in the current OpenCode setup\./u);
+    assert.match(markdown, /No npm plugins configured in OpenCode\./u);
     assert.match(markdown, /No LSP servers detected for the current project\./u);
     assert.equal(await sessionRepo.getByChatId(2), null);
 });
@@ -364,7 +361,7 @@ test("/status uses the selected chat language", async () => {
     expectLine(markdown, `- **opencode-tbot\u7248\u672C:** ${OPENCODE_TBOT_VERSION}`);
     expectLine(markdown, "- **\u5F53\u524D\u9879\u76EE:** `E:/repo`");
     expectLine(markdown, "- **\u5F53\u524D\u4F1A\u8BDD:** OpenCode \u9ED8\u8BA4");
-    assert.match(markdown, /\u5F53\u524D OpenCode \u73AF\u5883\u4E2D\u672A\u68C0\u6D4B\u5230\u63D2\u4EF6\u3002/u);
+    assert.match(markdown, /当前 OpenCode 中未配置 npm 插件。/u);
     assert.doesNotMatch(markdown, /\u5DF2\u914D\u7F6E\u63D2\u4EF6/u);
     assert.doesNotMatch(markdown, /\u5DF2\u7981\u7528/u);
     assert.doesNotMatch(markdown, /\u670D\u52A1\u72B6\u6001/u);

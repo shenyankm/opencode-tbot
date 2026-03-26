@@ -1,21 +1,18 @@
 import {
     createOpencodeClient,
-    type OpencodeClient,
-} from "@opencode-ai/sdk/v2/client";
-import type {
     Agent,
     Config,
     LspStatus,
     McpStatus,
     Model,
-    OutputFormat,
+    OpencodeClient,
     Part,
     Path,
     Provider,
     Project,
     Session,
     SessionStatus,
-} from "@opencode-ai/sdk/v2/client";
+} from "@opencode-ai/sdk";
 import { stripMarkdownToPlainText } from "../../infra/utils/markdown-text.js";
 
 export interface OpenCodeClientOptions {
@@ -83,13 +80,16 @@ export interface PromptSessionResult {
 }
 
 export type OpenCodeProject = Project;
-export type OpenCodeSession = Session;
+export type OpenCodeSession = Session & {
+    slug?: string;
+    version?: string;
+};
 export type OpenCodeModel = Model;
 export type OpenCodeProvider = Provider;
 export type OpenCodeConfig = Config;
-export type OpenCodeAgent = Agent;
+export type OpenCodeAgent = Agent & { hidden?: boolean };
 export type OpenCodeLspStatus = LspStatus;
-export type OpenCodePath = Path;
+export type OpenCodePath = Path & { home?: string };
 export type OpenCodeMcpStatus = McpStatus;
 export type OpenCodeSessionStatus = SessionStatus;
 export interface OpenCodePermissionRequest {
@@ -114,14 +114,29 @@ export interface OpenCodeConfiguredModel {
     reasoning: boolean;
     variants: Record<string, Record<string, unknown>>;
 }
-export type OpenCodeTextOutputFormat = Extract<OutputFormat, { type: "text" }>;
+export interface OpenCodeTextOutputFormat {
+    type: "text";
+}
 export type OpenCodeSdkClientLike = OpencodeClient;
-type MaybeWrappedResponse<T> = T | { data: T };
+type OpenCodeSdkResult<T> = T | {
+    data: T;
+};
+type OpenCodeSdkRawGetOperation = (
+    options: { url: string } & typeof SDK_OPTIONS & { signal?: AbortSignal },
+) => Promise<OpenCodeSdkResult<OpenCodeHealth>>;
+type OpenCodeSdkRawCompatibleClient = {
+    _client?: {
+        get?: OpenCodeSdkRawGetOperation;
+    };
+    client?: {
+        get?: OpenCodeSdkRawGetOperation;
+    };
+};
 type OpenCodeProviderCatalog = {
     providers: OpenCodeProvider[];
     default: Record<string, string>;
 };
-type OpenCodeProviderAvailability = Map<string, Set<string> | null>;
+type OpenCodeConnectedProviders = Set<string>;
 type OpenCodeProviderConfig = NonNullable<OpenCodeConfig["provider"]>[string];
 type OpenCodeModelConfig = NonNullable<OpenCodeProviderConfig["models"]>[string];
 type OpenCodePromptResponse = {
@@ -228,9 +243,6 @@ const SDK_OPTIONS = {
     responseStyle: "data" as const,
     throwOnError: true as const,
 };
-const TEXT_OUTPUT_FORMAT: OpenCodeTextOutputFormat = {
-    type: "text",
-};
 
 export interface OpenCodeClientLike {
     readonly client?: OpenCodeSdkClientLike;
@@ -248,11 +260,10 @@ export interface OpenCodeClientLike {
     createSessionForDirectory(directory: string, title?: string): Promise<OpenCodeSession>;
     renameSession(sessionId: string, title: string): Promise<OpenCodeSession>;
     listAgents(): Promise<OpenCodeAgent[]>;
-    listPendingPermissions(directory?: string): Promise<OpenCodePermissionRequest[]>;
     replyToPermission(
+        sessionId: string,
         requestId: string,
         reply: "once" | "always" | "reject",
-        message?: string,
     ): Promise<boolean>;
     listConfiguredPlugins(): Promise<string[]>;
     listModels(): Promise<OpenCodeConfiguredModel[]>;
@@ -261,7 +272,6 @@ export interface OpenCodeClientLike {
 
 export class OpenCodeClient implements OpenCodeClientLike {
     readonly client: OpenCodeSdkClientLike;
-    private readonly fetchFn: typeof fetch;
     private promptTimeoutPolicy: OpenCodePromptTimeoutPolicy;
     private modelCache: {
         expiresAt: number;
@@ -276,7 +286,6 @@ export class OpenCodeClient implements OpenCodeClientLike {
     constructor(
         options?: OpenCodeClientOptions,
         client?: OpenCodeSdkClientLike,
-        fetchFn: typeof fetch = fetch,
         promptTimeoutPolicy: Partial<OpenCodePromptTimeoutPolicy> = {},
     ) {
         if (!options && !client) {
@@ -284,7 +293,6 @@ export class OpenCodeClient implements OpenCodeClientLike {
         }
 
         this.client = client ?? createOpencodeClient(buildOpenCodeSdkConfig(options as OpenCodeClientOptions));
-        this.fetchFn = fetchFn;
         this.promptTimeoutPolicy = resolvePromptTimeoutPolicy(promptTimeoutPolicy);
     }
 
@@ -297,63 +305,62 @@ export class OpenCodeClient implements OpenCodeClientLike {
         });
     }
 
-    private async callSdkMethod<TResponse, TParameters>(
-        operation: (
-            parameters: TParameters,
-            options?: typeof SDK_OPTIONS & { signal?: AbortSignal },
-        ) => Promise<MaybeWrappedResponse<TResponse>>,
-        parameters: TParameters,
-        signal?: AbortSignal,
-    ): Promise<TResponse> {
-        return unwrapSdkData(
-            await operation(parameters, {
-                ...SDK_OPTIONS,
-                ...(signal ? { signal } : {}),
-            }),
-        );
+    private buildSdkOptions(signal?: AbortSignal): typeof SDK_OPTIONS & { signal?: AbortSignal } {
+        return {
+            ...SDK_OPTIONS,
+            ...(signal ? { signal } : {}),
+        };
     }
 
-    private async callSdkOptionalMethod<TResponse, TParameters>(
+    private buildSdkRequest<TRequest extends Record<string, unknown>>(
+        request: TRequest,
+        signal?: AbortSignal,
+    ): TRequest & typeof SDK_OPTIONS & { signal?: AbortSignal } {
+        return {
+            ...request,
+            ...this.buildSdkOptions(signal),
+        };
+    }
+
+    private async callSdkMethod<TResponse, TRequest extends Record<string, unknown>>(
         operation: (
-            parameters?: TParameters,
-            options?: typeof SDK_OPTIONS & { signal?: AbortSignal },
-        ) => Promise<MaybeWrappedResponse<TResponse>>,
-        parameters?: TParameters,
+            request: TRequest & typeof SDK_OPTIONS & { signal?: AbortSignal },
+        ) => Promise<OpenCodeSdkResult<TResponse>>,
+        request: TRequest,
         signal?: AbortSignal,
     ): Promise<TResponse> {
-        return unwrapSdkData(
-            await operation(parameters, {
-                ...SDK_OPTIONS,
-                ...(signal ? { signal } : {}),
-            }),
-        );
+        return unwrapSdkData(await operation(this.buildSdkRequest(request, signal)));
     }
 
     private async callSdkOptionsOnlyMethod<TResponse>(
         operation: (
             options: typeof SDK_OPTIONS & { signal?: AbortSignal },
-        ) => Promise<MaybeWrappedResponse<TResponse>>,
+        ) => Promise<OpenCodeSdkResult<TResponse>>,
         signal?: AbortSignal,
     ): Promise<TResponse> {
-        return unwrapSdkData(
-            await operation({
-                ...SDK_OPTIONS,
-                ...(signal ? { signal } : {}),
-            }),
-        );
+        return unwrapSdkData(await operation(this.buildSdkOptions(signal)));
     }
 
     async getHealth(): Promise<OpenCodeHealth> {
-        return this.callSdkOptionsOnlyMethod(
-            this.client.global.health.bind(this.client.global),
-        );
+        const rawGet = resolveSdkRawGetOperation(this.client);
+
+        if (rawGet) {
+            return unwrapSdkData(await rawGet({
+                url: "/global/health",
+                ...this.buildSdkOptions(),
+            }));
+        }
+
+        throw new Error("Root @opencode-ai/sdk does not expose /global/health through a typed helper.");
     }
 
     async abortSession(sessionId: string): Promise<boolean> {
         return this.callSdkMethod(
             this.client.session.abort.bind(this.client.session),
             {
-                sessionID: sessionId,
+                path: {
+                    id: sessionId,
+                },
             },
         );
     }
@@ -362,7 +369,9 @@ export class OpenCodeClient implements OpenCodeClientLike {
         return this.callSdkMethod(
             this.client.session.delete.bind(this.client.session),
             {
-                sessionID: sessionId,
+                path: {
+                    id: sessionId,
+                },
             },
         );
     }
@@ -371,33 +380,50 @@ export class OpenCodeClient implements OpenCodeClientLike {
         return this.callSdkMethod(
             this.client.session.fork.bind(this.client.session),
             {
-                sessionID: sessionId,
+                path: {
+                    id: sessionId,
+                },
                 ...(messageId?.trim()
-                    ? { messageID: messageId.trim() }
+                    ? {
+                        body: {
+                            messageID: messageId.trim(),
+                        },
+                    }
                     : {}),
             },
         );
     }
 
     async getPath(): Promise<OpenCodePath> {
-        return this.callSdkOptionalMethod(
+        return this.callSdkOptionsOnlyMethod(
             this.client.path.get.bind(this.client.path),
-            undefined,
         );
     }
 
     async listLspStatuses(directory?: string): Promise<OpenCodeLspStatus[]> {
-        return this.callSdkOptionalMethod(
-            this.client.lsp.status.bind(this.client.lsp),
-            directory ? { directory } : undefined,
-        );
+        return directory
+            ? this.callSdkMethod(
+                this.client.lsp.status.bind(this.client.lsp),
+                {
+                    query: {
+                        directory,
+                    },
+                },
+            )
+            : this.callSdkOptionsOnlyMethod(this.client.lsp.status.bind(this.client.lsp));
     }
 
     async listMcpStatuses(directory?: string): Promise<Record<string, OpenCodeMcpStatus>> {
-        return this.callSdkOptionalMethod(
-            this.client.mcp.status.bind(this.client.mcp),
-            directory ? { directory } : undefined,
-        );
+        return directory
+            ? this.callSdkMethod(
+                this.client.mcp.status.bind(this.client.mcp),
+                {
+                    query: {
+                        directory,
+                    },
+                },
+            )
+            : this.callSdkOptionsOnlyMethod(this.client.mcp.status.bind(this.client.mcp));
     }
 
     async getSessionStatuses(): Promise<Record<string, OpenCodeSessionStatus>> {
@@ -405,30 +431,38 @@ export class OpenCodeClient implements OpenCodeClientLike {
     }
 
     async listProjects(): Promise<OpenCodeProject[]> {
-        return this.callSdkOptionalMethod(
+        return this.callSdkOptionsOnlyMethod(
             this.client.project.list.bind(this.client.project),
-            undefined,
         );
     }
 
     async listSessions(): Promise<OpenCodeSession[]> {
-        return this.callSdkOptionalMethod(
+        return this.callSdkOptionsOnlyMethod(
             this.client.session.list.bind(this.client.session),
-            undefined,
         );
     }
 
     async getCurrentProject(): Promise<OpenCodeProject> {
-        return this.callSdkOptionalMethod(
+        return this.callSdkOptionsOnlyMethod(
             this.client.project.current.bind(this.client.project),
-            undefined,
         );
     }
 
     async createSessionForDirectory(directory: string, title?: string): Promise<OpenCodeSession> {
         return this.callSdkMethod(
             this.client.session.create.bind(this.client.session),
-            title ? { directory, title } : { directory },
+            {
+                query: {
+                    directory,
+                },
+                ...(title
+                    ? {
+                        body: {
+                            title,
+                        },
+                    }
+                    : {}),
+            },
         );
     }
 
@@ -436,43 +470,37 @@ export class OpenCodeClient implements OpenCodeClientLike {
         return this.callSdkMethod(
             this.client.session.update.bind(this.client.session),
             {
-                sessionID: sessionId,
-                title,
+                path: {
+                    id: sessionId,
+                },
+                body: {
+                    title,
+                },
             },
         );
     }
 
     async listAgents(): Promise<OpenCodeAgent[]> {
-        return this.callSdkOptionalMethod(
+        return this.callSdkOptionsOnlyMethod(
             this.client.app.agents.bind(this.client.app),
-            undefined,
         );
-    }
-
-    async listPendingPermissions(directory?: string): Promise<OpenCodePermissionRequest[]> {
-        const permissions = await this.callSdkOptionalMethod(
-            this.client.permission.list.bind(this.client.permission),
-            directory ? { directory } : undefined,
-        );
-
-        return permissions.map(normalizePermissionRequest).filter((permission): permission is OpenCodePermissionRequest => !!permission);
     }
 
     async replyToPermission(
+        sessionId: string,
         requestId: string,
         reply: "once" | "always" | "reject",
-        message?: string,
     ): Promise<boolean> {
-        const normalizedMessage = message?.trim();
-
         return this.callSdkMethod(
-            this.client.permission.reply.bind(this.client.permission),
+            this.client.postSessionIdPermissionsPermissionId.bind(this.client),
             {
-                requestID: requestId,
-                reply,
-                ...(normalizedMessage
-                    ? { message: normalizedMessage }
-                    : {}),
+                path: {
+                    id: sessionId,
+                    permissionID: requestId,
+                },
+                body: {
+                    response: reply,
+                },
             },
         );
     }
@@ -751,8 +779,10 @@ export class OpenCodeClient implements OpenCodeClientLike {
                     return normalizePromptResponse(await this.callSdkMethod(
                         this.client.session.message.bind(this.client.session),
                         {
-                            sessionID: sessionId,
-                            messageID: messageId,
+                            path: {
+                                id: sessionId,
+                                messageID: messageId,
+                            },
                         },
                         requestSignal,
                     ));
@@ -804,8 +834,12 @@ export class OpenCodeClient implements OpenCodeClientLike {
                     return normalizePromptResponses(await this.callSdkMethod(
                         this.client.session.messages.bind(this.client.session),
                         {
-                            sessionID: sessionId,
-                            limit: PROMPT_MESSAGE_POLL_LIMIT,
+                            path: {
+                                id: sessionId,
+                            },
+                            query: {
+                                limit: PROMPT_MESSAGE_POLL_LIMIT,
+                            },
                         },
                         requestSignal,
                     ));
@@ -869,15 +903,15 @@ export class OpenCodeClient implements OpenCodeClientLike {
     }
 
     private async loadModels(): Promise<OpenCodeConfiguredModel[]> {
-        const [config, providerCatalog] = await Promise.all([
+        const [config, providerCatalog, connectedProviders] = await Promise.all([
             this.loadConfig(),
             this.loadProviderCatalog(),
+            this.loadConnectedProviders(),
         ]);
-        const providerAvailability = await resolveProviderAvailability(config, this.fetchFn);
         const models = buildSelectableModels(
             config,
             providerCatalog.providers,
-            providerAvailability,
+            connectedProviders,
         );
 
         this.modelCache = {
@@ -890,17 +924,23 @@ export class OpenCodeClient implements OpenCodeClientLike {
     }
 
     private async loadConfig(): Promise<OpenCodeConfig> {
-        return this.callSdkOptionalMethod(
+        return this.callSdkOptionsOnlyMethod(
             this.client.config.get.bind(this.client.config),
-            undefined,
         );
     }
 
     private async loadProviderCatalog(): Promise<OpenCodeProviderCatalog> {
-        return this.callSdkOptionalMethod(
+        return this.callSdkOptionsOnlyMethod(
             this.client.config.providers.bind(this.client.config),
-            undefined,
         );
+    }
+
+    private async loadConnectedProviders(): Promise<OpenCodeConnectedProviders> {
+        const providers = await this.callSdkOptionsOnlyMethod(
+            this.client.provider.list.bind(this.client.provider),
+        );
+
+        return new Set(providers.connected);
     }
 
     private async sendPromptRequest(
@@ -910,10 +950,8 @@ export class OpenCodeClient implements OpenCodeClientLike {
             | { type: "file"; filename?: string; mime: string; url: string }
         >,
     ): Promise<void> {
-        const format = input.format ?? TEXT_OUTPUT_FORMAT;
         const requestBody = {
             ...(input.agent ? { agent: input.agent } : {}),
-            format,
             ...(input.model ? { model: input.model } : {}),
             ...(input.variant ? { variant: input.variant } : {}),
             parts,
@@ -930,8 +968,10 @@ export class OpenCodeClient implements OpenCodeClientLike {
                     await this.callSdkMethod(
                         this.client.session.promptAsync.bind(this.client.session),
                         {
-                            sessionID: input.sessionId,
-                            ...requestBody,
+                            path: {
+                                id: input.sessionId,
+                            },
+                            body: requestBody,
                         },
                         signal,
                     );
@@ -954,9 +994,8 @@ export class OpenCodeClient implements OpenCodeClientLike {
     private async loadSessionStatuses(
         signal?: AbortSignal,
     ): Promise<Record<string, OpenCodeSessionStatus>> {
-        return this.callSdkOptionalMethod(
+        return this.callSdkOptionsOnlyMethod(
             this.client.session.status.bind(this.client.session),
-            undefined,
             signal,
         );
     }
@@ -1073,38 +1112,34 @@ export class OpenCodeClient implements OpenCodeClientLike {
             extra,
         };
 
-        void (log.length >= 2
-            ? (log as (body: Record<string, unknown>, options: Record<string, unknown>) => Promise<unknown>).call(
-                this.client.app,
-                payload,
-                SDK_OPTIONS,
-            )
-            : (log as (options: Record<string, unknown>) => Promise<unknown>).call(this.client.app, {
-                body: payload,
-                ...SDK_OPTIONS,
-            })
-        ).catch(() => undefined);
+        void log.call(this.client.app, {
+            body: payload,
+            ...SDK_OPTIONS,
+        }).catch(() => undefined);
     }
 }
 
 export function createOpenCodeClientFromSdkClient(
     client: OpenCodeSdkClientLike,
-    fetchFn: typeof fetch = fetch,
     promptTimeoutPolicy: Partial<OpenCodePromptTimeoutPolicy> = {},
 ): OpenCodeClientLike {
-    return new OpenCodeClient(undefined, client, fetchFn, promptTimeoutPolicy);
+    return new OpenCodeClient(undefined, client, promptTimeoutPolicy);
 }
 
 function buildSelectableModels(
     config: OpenCodeConfig,
     providers: OpenCodeProvider[],
-    providerAvailability: OpenCodeProviderAvailability = new Map(),
+    connectedProviders: OpenCodeConnectedProviders = new Set(),
 ): OpenCodeConfiguredModel[] {
     const configuredProviders = config.provider ?? {};
     const providersById = new Map(providers.map((provider) => [provider.id, provider]));
     const models = new Map<string, OpenCodeConfiguredModel>();
 
     for (const [providerId, providerConfig] of Object.entries(configuredProviders)) {
+        if (!connectedProviders.has(providerId)) {
+            continue;
+        }
+
         const configuredModels = providerConfig.models ?? {};
 
         for (const [configuredModelKey, modelConfig] of Object.entries(configuredModels)) {
@@ -1114,7 +1149,6 @@ function buildSelectableModels(
                 configuredModelKey,
                 modelConfig,
                 providersById.get(providerId),
-                providerAvailability.get(providerId) ?? null,
             );
 
             if (model) {
@@ -1124,7 +1158,11 @@ function buildSelectableModels(
     }
 
     for (const provider of providers) {
-        for (const model of buildCatalogProviderModels(provider, providerAvailability.get(provider.id) ?? null)) {
+        if (!connectedProviders.has(provider.id)) {
+            continue;
+        }
+
+        for (const model of buildCatalogProviderModels(provider)) {
             if (!models.has(model.qualifiedId)) {
                 models.set(model.qualifiedId, model);
             }
@@ -1140,16 +1178,11 @@ function buildConfiguredModel(
     configuredModelKey: string,
     modelConfig: OpenCodeModelConfig,
     providerCatalog: OpenCodeProvider | undefined,
-    availableModelIds: Set<string> | null,
 ): OpenCodeConfiguredModel | null {
     const modelId = modelConfig.id ?? configuredModelKey;
     const catalogModel = providerCatalog?.models[modelId];
 
     if (!isTextModel(modelConfig, catalogModel)) {
-        return null;
-    }
-
-    if (!isModelAvailable(modelId, availableModelIds)) {
         return null;
     }
 
@@ -1160,16 +1193,15 @@ function buildConfiguredModel(
         name: modelConfig.name ?? catalogModel?.name ?? modelId,
         qualifiedId: `${providerId}/${modelId}`,
         reasoning: modelConfig.reasoning ?? catalogModel?.capabilities.reasoning ?? false,
-        variants: normalizeVariants(modelConfig.variants ?? catalogModel?.variants),
+        variants: normalizeVariants(readModelVariants(modelConfig) ?? readModelVariants(catalogModel)),
     };
 }
 
 function buildCatalogProviderModels(
     provider: OpenCodeProvider,
-    availableModelIds: Set<string> | null,
 ): OpenCodeConfiguredModel[] {
     return Object.values(provider.models)
-        .filter((model) => isCatalogTextModel(model) && isModelAvailable(model.id, availableModelIds))
+        .filter((model) => isCatalogTextModel(model))
         .map((model) => ({
             id: model.id,
             providerID: provider.id,
@@ -1177,7 +1209,7 @@ function buildCatalogProviderModels(
             name: model.name,
             qualifiedId: `${provider.id}/${model.id}`,
             reasoning: model.capabilities.reasoning,
-            variants: normalizeVariants(model.variants),
+            variants: normalizeVariants(readModelVariants(model)),
         }));
 }
 
@@ -1195,10 +1227,6 @@ function isTextModel(modelConfig: OpenCodeModelConfig, catalogModel: OpenCodeMod
 
 function isCatalogTextModel(catalogModel: OpenCodeModel): boolean {
     return catalogModel.capabilities.input.text && catalogModel.capabilities.output.text;
-}
-
-function isModelAvailable(modelId: string, availableModelIds: Set<string> | null): boolean {
-    return availableModelIds === null || availableModelIds.has(modelId);
 }
 
 function resolveProviderDisplayName(
@@ -1245,16 +1273,20 @@ function safeParseUrlHost(value: string): string | null {
 }
 
 function normalizeVariants(
-    variants: OpenCodeModelConfig["variants"] | OpenCodeModel["variants"] | undefined,
+    variants: Record<string, unknown> | null | undefined,
 ): Record<string, Record<string, unknown>> {
-    if (!variants) {
+    if (!variants || !isPlainRecord(variants)) {
         return {};
     }
 
     return Object.fromEntries(
         Object.entries(variants)
-            .filter(([, config]) => !config?.disabled)
+            .filter(([, config]) => !isPlainRecord(config) || config.disabled !== true)
             .map(([variant, config]) => {
+                if (!isPlainRecord(config)) {
+                    return [variant, {}];
+                }
+
                 const normalized = Object.fromEntries(
                     Object.entries(config).filter(([key]) => key !== "disabled"),
                 );
@@ -1262,6 +1294,14 @@ function normalizeVariants(
                 return [variant, normalized];
             }),
     );
+}
+
+function readModelVariants(value: unknown): Record<string, unknown> | null {
+    if (!isPlainRecord(value) || !isPlainRecord(value.variants)) {
+        return null;
+    }
+
+    return value.variants;
 }
 
 function extractTextFromParts(parts: Part[] | null | undefined): string {
@@ -1536,6 +1576,16 @@ function resolvePromptEndpointKind(stage: OpenCodePromptTimeoutStage): "message"
     }
 }
 
+function resolveSdkRawGetOperation(client: OpenCodeSdkClientLike): OpenCodeSdkRawGetOperation | null {
+    const compatibleClient = client as OpenCodeSdkClientLike & OpenCodeSdkRawCompatibleClient;
+    const transport = compatibleClient.client ?? compatibleClient._client;
+    const operation = transport?.get;
+
+    return typeof operation === "function"
+        ? operation.bind(transport)
+        : null;
+}
+
 function getPromptMessagePollDelayMs(attempt: number): number {
     return PROMPT_MESSAGE_POLL_INITIAL_DELAYS_MS[attempt] ?? PROMPT_MESSAGE_POLL_INTERVAL_MS;
 }
@@ -1608,47 +1658,12 @@ function sumTokenMetrics(...values: Array<number | null>): number | null {
     return Number.isFinite(total) ? total : null;
 }
 
-function unwrapSdkData<T>(response: MaybeWrappedResponse<T>): T {
+function unwrapSdkData<T>(response: OpenCodeSdkResult<T>): T {
     if (response && typeof response === "object" && "data" in response) {
         return response.data;
     }
 
     return response;
-}
-
-function normalizePermissionRequest(permission: unknown): OpenCodePermissionRequest | null {
-    if (!isPlainRecord(permission)) {
-        return null;
-    }
-
-    const id = typeof permission.id === "string" && permission.id.trim().length > 0
-        ? permission.id
-        : null;
-    const sessionID = typeof permission.sessionID === "string" && permission.sessionID.trim().length > 0
-        ? permission.sessionID
-        : null;
-    const permissionName = typeof permission.permission === "string" && permission.permission.trim().length > 0
-        ? permission.permission
-        : typeof permission.type === "string" && permission.type.trim().length > 0
-            ? permission.type
-            : null;
-
-    if (!id || !sessionID || !permissionName) {
-        return null;
-    }
-
-    return {
-        always: Array.isArray(permission.always)
-            ? permission.always.filter((value): value is string => typeof value === "string")
-            : [],
-        id,
-        metadata: isPlainRecord(permission.metadata)
-            ? permission.metadata
-            : {},
-        patterns: normalizePermissionPatterns(permission),
-        permission: permissionName,
-        sessionID,
-    };
 }
 
 function normalizeConfiguredPluginSpecs(value: unknown): string[] {
@@ -1675,22 +1690,6 @@ function normalizeConfiguredPluginSpecs(value: unknown): string[] {
     }
 
     return normalizedPlugins;
-}
-
-function normalizePermissionPatterns(permission: Record<string, unknown>): string[] {
-    if (Array.isArray(permission.patterns)) {
-        return permission.patterns.filter((value): value is string => typeof value === "string");
-    }
-
-    if (typeof permission.pattern === "string" && permission.pattern.trim().length > 0) {
-        return [permission.pattern];
-    }
-
-    if (Array.isArray(permission.pattern)) {
-        return permission.pattern.filter((value): value is string => typeof value === "string");
-    }
-
-    return [];
 }
 
 function resolvePromptTimeoutPolicy(
@@ -1909,107 +1908,4 @@ function throwIfAborted(signal?: AbortSignal): void {
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
     return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-async function resolveProviderAvailability(
-    config: OpenCodeConfig,
-    fetchFn: typeof fetch,
-): Promise<OpenCodeProviderAvailability> {
-    const configuredProviders = Object.entries(config.provider ?? {});
-    const availabilityEntries = await Promise.all(
-        configuredProviders.map(async ([providerId, providerConfig]) => [
-            providerId,
-            await fetchProviderAvailableModelIds(providerConfig, fetchFn),
-        ] as const),
-    );
-
-    return new Map(availabilityEntries);
-}
-
-async function fetchProviderAvailableModelIds(
-    providerConfig: OpenCodeProviderConfig,
-    fetchFn: typeof fetch,
-): Promise<Set<string> | null> {
-    const baseUrl = extractConfiguredBaseUrl(providerConfig);
-    const apiKey = extractConfiguredApiKey(providerConfig);
-
-    if (!baseUrl || !apiKey) {
-        return null;
-    }
-
-    try {
-        const response = await fetchFn(
-            buildModelsEndpointUrl(baseUrl),
-            {
-                headers: {
-                    Authorization: `Bearer ${apiKey}`,
-                    Accept: "application/json",
-                },
-                signal: AbortSignal.timeout(10_000),
-            },
-        );
-
-        if (!response.ok) {
-            return null;
-        }
-
-        const payload = await response.json();
-        const modelIds = extractModelIdsFromPayload(payload);
-
-        return modelIds ? new Set(modelIds) : null;
-    } catch {
-        return null;
-    }
-}
-
-function extractConfiguredApiKey(providerConfig: OpenCodeProviderConfig): string | null {
-    const options = providerConfig.options;
-
-    if (!options || typeof options !== "object") {
-        return null;
-    }
-
-    const apiKey = "apiKey" in options ? options.apiKey : null;
-
-    return typeof apiKey === "string" && apiKey.trim().length > 0
-        ? apiKey.trim()
-        : null;
-}
-
-function buildModelsEndpointUrl(baseUrl: string): string {
-    const normalizedBaseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
-
-    return new URL("models", normalizedBaseUrl).toString();
-}
-
-function extractModelIdsFromPayload(payload: unknown): string[] | null {
-    if (Array.isArray(payload)) {
-        return payload
-            .map(extractModelId)
-            .filter((id): id is string => !!id);
-    }
-
-    if (payload && typeof payload === "object" && "data" in payload && Array.isArray(payload.data)) {
-        return payload.data
-            .map(extractModelId)
-            .filter((id): id is string => !!id);
-    }
-
-    return null;
-}
-
-function extractModelId(value: unknown): string | null {
-    if (typeof value === "string" && value.trim().length > 0) {
-        return value.trim();
-    }
-
-    if (value && typeof value === "object" && "id" in value) {
-        const id = (value as { id?: unknown }).id;
-
-        return typeof id === "string" && id.trim().length > 0
-            ? id.trim()
-            : null;
-    }
-
-    return null;
 }

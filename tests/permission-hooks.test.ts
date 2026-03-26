@@ -25,7 +25,7 @@ function createRuntime() {
     const permissionApprovalRepo = new InMemoryPermissionApprovalRepository();
     const messages: Array<{ chatId: number; text: string; options?: unknown }> = [];
     const edits: Array<{ chatId: number; messageId: number; text: string }> = [];
-    const replies: Array<{ requestId: string; reply: string }> = [];
+    const replies: Array<{ sessionId: string; requestId: string; reply: string }> = [];
     const runtime = {
         bot: {
             api: {
@@ -47,8 +47,8 @@ function createRuntime() {
             permissionApprovalRepo,
             foregroundSessionTracker: new ForegroundSessionTracker(),
             opencodeClient: {
-                async replyToPermission(requestId: string, reply: string) {
-                    replies.push({ requestId, reply });
+                async replyToPermission(sessionId: string, requestId: string, reply: string) {
+                    replies.push({ sessionId, requestId, reply });
                     return true;
                 },
             },
@@ -110,6 +110,42 @@ test("permission.asked sends Telegram approval messages and persists them", asyn
         status: "pending",
         updatedAt: approvals[0]?.updatedAt,
     }]);
+});
+
+test("permission.updated also normalizes the root SDK permission event shape", async () => {
+    const { runtime, sessionRepo, permissionApprovalRepo, messages } = createRuntime();
+
+    await sessionRepo.setCurrent({
+        chatId: 111,
+        sessionId: "session-root",
+        projectId: "project-1",
+        directory: "E:/repo",
+        agentName: null,
+        modelProviderId: null,
+        modelId: null,
+        modelVariant: null,
+        language: "en",
+        updatedAt: new Date(0).toISOString(),
+    });
+
+    await handleTelegramBotPluginEvent(runtime, {
+        type: "permission.updated",
+        properties: {
+            id: "request-root",
+            sessionID: "session-root",
+            type: "write",
+            pattern: "README.md",
+            metadata: {},
+            always: [],
+        },
+    });
+
+    const approvals = await permissionApprovalRepo.listByRequestId("request-root");
+
+    assert.equal(messages.length, 1);
+    assert.equal(messages[0]?.chatId, 111);
+    assert.equal(approvals[0]?.sessionId, "session-root");
+    assert.equal(approvals[0]?.requestId, "request-root");
 });
 
 test("permission.asked also routes foreground child-session approvals back to the active Telegram chat", async () => {
@@ -251,8 +287,8 @@ test("permission callback replies through the OpenCode client and updates local 
     }, {
         logger,
         opencodeClient: {
-            async replyToPermission(requestId: string, reply: string) {
-                replies.push({ requestId, reply });
+            async replyToPermission(sessionId: string, requestId: string, reply: string) {
+                replies.push({ sessionId, requestId, reply });
                 return true;
             },
         },
@@ -278,6 +314,7 @@ test("permission callback replies through the OpenCode client and updates local 
     const approvals = await permissionApprovalRepo.listByRequestId("request-1");
 
     assert.deepEqual(replies, [{
+        sessionId: "session-1",
         requestId: "request-1",
         reply: "once",
     }]);

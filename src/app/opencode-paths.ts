@@ -3,8 +3,7 @@ import { join } from "node:path";
 
 export const GLOBAL_PLUGIN_DIRECTORY_NAME = "opencode-tbot";
 export const GLOBAL_PLUGIN_CONFIG_FILE_NAME = "config.json";
-export const GLOBAL_PLUGINS_DIRECTORY_NAME = "plugins";
-export const GLOBAL_PLUGIN_BRIDGE_FILE_NAME = "opencode-tbot.js";
+export const GLOBAL_OPENCODE_CONFIG_FILE_NAME = "opencode.json";
 
 export function getOpenCodeConfigDirectory(homeDir: string = homedir()): string {
     return join(homeDir, ".config", "opencode");
@@ -18,14 +17,10 @@ export function getGlobalPluginConfigFilePath(homeDir: string = homedir()): stri
     );
 }
 
-export function getGlobalPluginsDirectory(homeDir: string = homedir()): string {
-    return join(getOpenCodeConfigDirectory(homeDir), GLOBAL_PLUGINS_DIRECTORY_NAME);
-}
-
-export function getGlobalPluginBridgeFilePath(homeDir: string = homedir()): string {
+export function getGlobalOpenCodeConfigFilePath(homeDir: string = homedir()): string {
     return join(
-        getGlobalPluginsDirectory(homeDir),
-        GLOBAL_PLUGIN_BRIDGE_FILE_NAME,
+        getOpenCodeConfigDirectory(homeDir),
+        GLOBAL_OPENCODE_CONFIG_FILE_NAME,
     );
 }
 

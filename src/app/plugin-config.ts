@@ -4,14 +4,12 @@ import { dirname } from "node:path";
 import type { PluginConfigSource } from "./config.js";
 import {
     getDefaultPluginLogDirectory,
-    getGlobalPluginBridgeFilePath,
+    getGlobalOpenCodeConfigFilePath,
     getGlobalPluginConfigFilePath,
-    getGlobalPluginsDirectory,
     getOpenCodeConfigDirectory,
-    GLOBAL_PLUGIN_BRIDGE_FILE_NAME,
     GLOBAL_PLUGIN_CONFIG_FILE_NAME,
     GLOBAL_PLUGIN_DIRECTORY_NAME,
-    GLOBAL_PLUGINS_DIRECTORY_NAME,
+    GLOBAL_OPENCODE_CONFIG_FILE_NAME,
 } from "./opencode-paths.js";
 
 export interface PreparedPluginConfiguration {
@@ -74,14 +72,12 @@ export async function preparePluginConfiguration(
 
 export {
     getDefaultPluginLogDirectory,
-    getGlobalPluginBridgeFilePath,
+    getGlobalOpenCodeConfigFilePath,
     getGlobalPluginConfigFilePath,
-    getGlobalPluginsDirectory,
     getOpenCodeConfigDirectory,
-    GLOBAL_PLUGIN_BRIDGE_FILE_NAME,
     GLOBAL_PLUGIN_CONFIG_FILE_NAME,
     GLOBAL_PLUGIN_DIRECTORY_NAME,
-    GLOBAL_PLUGINS_DIRECTORY_NAME,
+    GLOBAL_OPENCODE_CONFIG_FILE_NAME,
 };
 
 export async function writePluginConfigFile(
