@@ -1,6 +1,6 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { stderr, stdin, stdout } from "node:process";
 import { createInterface } from "node:readline/promises";
 import {
@@ -15,8 +15,10 @@ import {
 import {
     getGlobalOpenCodeConfigFilePath,
     getGlobalPluginConfigFilePath,
+    getOpenCodeConfigDirectory,
 } from "./app/opencode-paths.js";
 import { stripUtf8ByteOrderMark } from "./infra/utils/utf8.js";
+import { validateTelegramBotAccess } from "./services/telegram/telegram-bot-access.js";
 
 export interface InstallCommandOptions {
     botToken?: string;
@@ -43,6 +45,7 @@ export interface CreatePromptSessionOptions {
 const PROMPT_CANCELLED_ERROR = "Prompt cancelled.";
 const OPENCODE_CONFIG_SCHEMA_URL = "https://opencode.ai/config.json";
 const OPENCODE_TBOT_PACKAGE_NAME = "opencode-tbot";
+const CONFLICTING_LOCAL_PLUGIN_FILE_PATTERN = /^opencode-tbot\.(?:[cm]?[jt]s)$/u;
 
 interface OpenCodeConfigSource {
     $schema?: string;
@@ -93,6 +96,7 @@ export async function runCli(argv: string[]): Promise<number> {
 
 export async function installPlugin(options: InstallCommandOptions = {}): Promise<void> {
     const homeDir = options.homeDir ?? homedir();
+    await assertNoConflictingLocalPluginFiles(homeDir);
     const openCodeConfigFilePath = getGlobalOpenCodeConfigFilePath(homeDir);
     const globalPluginConfigFilePath = getGlobalPluginConfigFilePath(homeDir);
     const existingPluginConfig = await readPluginConfigFile(globalPluginConfigFilePath);
@@ -104,12 +108,15 @@ export async function installPlugin(options: InstallCommandOptions = {}): Promis
             options.botToken ?? await prompt.askSecret("Telegram bot token: "),
             "Telegram bot token is required.",
         );
-        const telegramApiRoot = normalizeOptionalString(options.telegramApiRoot) ?? DEFAULT_TELEGRAM_API_ROOT;
+        const validatedAccess = await validateTelegramBotAccess({
+            apiRoot: normalizeOptionalString(options.telegramApiRoot) ?? DEFAULT_TELEGRAM_API_ROOT,
+            botToken,
+        });
         const nextOpenCodeConfig = buildInstalledOpenCodeConfig(existingOpenCodeConfig);
         const nextPluginConfig = buildInstalledPluginConfig(
             existingPluginConfig,
-            botToken,
-            telegramApiRoot,
+            validatedAccess.botToken,
+            validatedAccess.apiRoot,
         );
 
         await writeOpenCodeConfigFile(openCodeConfigFilePath, nextOpenCodeConfig);
@@ -123,6 +130,7 @@ export async function installPlugin(options: InstallCommandOptions = {}): Promis
 
 export async function updatePlugin(options: Pick<InstallCommandOptions, "homeDir"> = {}): Promise<void> {
     const homeDir = options.homeDir ?? homedir();
+    await assertNoConflictingLocalPluginFiles(homeDir);
     const openCodeConfigFilePath = getGlobalOpenCodeConfigFilePath(homeDir);
     const existingOpenCodeConfig = await readOpenCodeConfigFile(openCodeConfigFilePath);
     await writeOpenCodeConfigFile(openCodeConfigFilePath, buildInstalledOpenCodeConfig(existingOpenCodeConfig));
@@ -534,6 +542,42 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
     return error instanceof Error && "code" in error && error.code === "ENOENT";
+}
+
+async function assertNoConflictingLocalPluginFiles(homeDir: string): Promise<void> {
+    const configDirectory = getOpenCodeConfigDirectory(homeDir);
+    const pluginFilePaths = await listConflictingLocalPluginFiles(configDirectory);
+
+    if (pluginFilePaths.length === 0) {
+        return;
+    }
+
+    throw new Error(
+        [
+            "Detected a conflicting local OpenCode plugin file:",
+            ...pluginFilePaths.map((filePath) => `- ${filePath}`),
+            "Remove or rename the local file plugin before installing opencode-tbot via npm.",
+        ].join("\n"),
+    );
+}
+
+async function listConflictingLocalPluginFiles(configDirectory: string): Promise<string[]> {
+    const pluginsDirectory = join(configDirectory, "plugins");
+
+    try {
+        const entries = await readdir(pluginsDirectory, { withFileTypes: true });
+
+        return entries
+            .filter((entry) => entry.isFile() && CONFLICTING_LOCAL_PLUGIN_FILE_PATTERN.test(entry.name))
+            .map((entry) => join(pluginsDirectory, entry.name))
+            .sort();
+    } catch (error) {
+        if (isMissingFileError(error)) {
+            return [];
+        }
+
+        throw error;
+    }
 }
 
 function buildHelpText(): string {

@@ -36,6 +36,7 @@ npm exec -- opencode-tbot@latest
 The installer:
 
 - prompts for the Telegram bot token when running interactively
+- validates the Telegram bot token with `getMe` before writing any config files
 - writes or updates `~/.config/opencode/opencode.json` so `plugin` contains `opencode-tbot`
 - writes or merges `~/.config/opencode/opencode-tbot/config.json`
 - creates missing parent directories automatically
@@ -73,10 +74,13 @@ npm exec -- opencode-tbot@latest --help
 
 Notes:
 
+- `install` only writes config after the Telegram token passes remote validation. If validation fails, no new config is written.
 - `install` updates both `opencode.json` and the global plugin config file.
 - `update` only refreshes `opencode.json` and leaves the existing plugin config contents untouched.
 - `uninstall` removes `opencode-tbot` from `opencode.json` and keeps `~/.config/opencode/opencode-tbot/config.json` in place.
 - OpenCode installs npm plugins automatically at startup from `opencode.json` and caches them under `~/.cache/opencode/node_modules/`, so `npm install -g opencode-tbot` is optional and not required for normal usage.
+- Existing `~/.config/opencode/package.json`, `bun.lock`, `.gitignore`, or `node_modules` may belong to OpenCode itself. The installer does not delete or migrate them.
+- The only supported conflict check is a same-name local file plugin under `~/.config/opencode/plugins/opencode-tbot.*`. If one exists, the installer stops and asks you to remove or rename it before enabling the npm plugin.
 
 ### CLI Options
 
@@ -151,7 +155,7 @@ This plugin does not read runtime settings from `.env`.
 
 | Field | Required | Default | Description |
 | --- | --- | --- | --- |
-| `telegram.botToken` | Yes | - | Telegram bot token. Normally written by the installer into the global plugin config. |
+| `telegram.botToken` | Yes | - | Telegram bot token. Normally written by the installer into the global plugin config after `getMe` validation succeeds. |
 | `telegram.allowedChatIds` | No | `[]` | Allowed Telegram chat IDs. If empty, the bot accepts messages from any chat. |
 | `telegram.apiRoot` | No | `https://api.telegram.org` | Telegram Bot API base URL. Useful for tests or self-hosted gateways. |
 | `state.path` | No | `./data/opencode-tbot.state.json` | JSON state file path, resolved relative to the current OpenCode worktree. |
@@ -268,6 +272,10 @@ Yes. This repository provides a Telegram integration layer and depends on the Op
 ### Do I need to install `opencode-tbot` globally?
 
 No. `npm exec -- opencode-tbot@latest` is the recommended path. A global install only installs the CLI; OpenCode still reads plugin registration from `opencode.json`.
+
+### What happens if the Telegram token is invalid?
+
+`install` fails before writing `opencode.json` or `~/.config/opencode/opencode-tbot/config.json`. If the runtime later becomes invalid, the plugin is disabled and OpenCode should continue to start without crashing.
 
 ### Is this an official OpenCode project?
 

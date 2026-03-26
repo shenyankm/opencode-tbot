@@ -36,6 +36,7 @@ npm exec -- opencode-tbot@latest
 インストーラーは次を行います。
 
 - 対話実行時には Telegram bot token の入力を促します
+- 設定ファイルを書き込む前に `getMe` で Telegram bot token を検証します
 - `~/.config/opencode/opencode.json` を書き換え、`plugin` に `opencode-tbot` が含まれるようにします
 - `~/.config/opencode/opencode-tbot/config.json` を書き込み、または既存内容とマージします
 - 足りない親ディレクトリを自動作成します
@@ -73,10 +74,13 @@ npm exec -- opencode-tbot@latest --help
 
 補足:
 
+- `install` は Telegram token のリモート検証に成功したあとでだけ設定を書き込みます。検証に失敗した場合、新しい設定は書き込まれません。
 - `install` は `opencode.json` とグローバルプラグイン設定ファイルの両方を更新します。
 - `update` は `opencode.json` だけを更新し、既存のプラグイン設定内容は変更しません。
 - `uninstall` は `opencode.json` から `opencode-tbot` を削除し、`~/.config/opencode/opencode-tbot/config.json` はそのまま残します。
 - OpenCode は起動時に `opencode.json` から npm プラグインを自動インストールし、`~/.cache/opencode/node_modules/` にキャッシュするため、通常利用では `npm install -g opencode-tbot` は不要です。
+- 既存の `~/.config/opencode/package.json`、`bun.lock`、`.gitignore`、`node_modules` は OpenCode 自身の実行状態に属している可能性があるため、インストーラーは削除も退避も行いません。
+- 衝突として扱うのは `~/.config/opencode/plugins/opencode-tbot.*` にある同名のローカルファイルプラグインだけです。見つかった場合は npm プラグインを有効にせず、名前変更または削除を案内します。
 
 ### CLI オプション
 
@@ -151,7 +155,7 @@ OpenCode は次のパスから npm プラグイン登録を読み込みます。
 
 | フィールド | 必須 | 既定値 | 説明 |
 | --- | --- | --- | --- |
-| `telegram.botToken` | はい | - | Telegram bot token。通常はインストーラーがグローバルプラグイン設定へ書き込みます。 |
+| `telegram.botToken` | はい | - | Telegram bot token。通常は `getMe` 検証に成功したあとでインストーラーがグローバルプラグイン設定へ書き込みます。 |
 | `telegram.allowedChatIds` | いいえ | `[]` | 許可する Telegram chat ID。空の場合は任意の chat からのメッセージを受け付けます。 |
 | `telegram.apiRoot` | いいえ | `https://api.telegram.org` | Telegram Bot API の base URL。テストや self-hosted gateway 向けです。 |
 | `state.path` | いいえ | `./data/opencode-tbot.state.json` | JSON 状態ファイルのパス。現在の OpenCode worktree を基準に解決されます。 |
@@ -268,6 +272,10 @@ $env:OPENCODE_HOST_E2E="1"; pnpm test
 ### `opencode-tbot` をグローバルインストールする必要はありますか？
 
 いいえ。推奨フローは `npm exec -- opencode-tbot@latest` です。グローバルインストールは CLI を入れるだけで、OpenCode 側のプラグイン登録は引き続き `opencode.json` から読み込まれます。
+
+### Telegram token が無効な場合はどうなりますか？
+
+`install` は `opencode.json` と `~/.config/opencode/opencode-tbot/config.json` を書き込む前に失敗します。実行中に token が無効化された場合でも、プラグインは無効化されるだけで、OpenCode 本体はクラッシュせずに起動を続ける想定です。
 
 ### これは OpenCode の公式プロジェクトですか？
 

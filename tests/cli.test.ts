@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -14,11 +15,21 @@ import {
 } from "../src/app/plugin-config.js";
 import { getGlobalOpenCodeConfigFilePath } from "../src/app/opencode-paths.js";
 
+const TEST_TELEGRAM_BOT_TOKEN = "123456:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+type TelegramApiHandler = (
+    request: IncomingMessage,
+    response: ServerResponse<IncomingMessage>,
+) => void;
+
 function getLegacyOpenCodeConfigFilePath(homeDir: string): string {
     return getGlobalOpenCodeConfigFilePath(homeDir);
 }
 
-function runCliInSubprocess(argv: string[]) {
+async function runCliInSubprocess(argv: string[]): Promise<{
+    status: number | null;
+    stderr: string;
+    stdout: string;
+}> {
     const tsxCliPath = fileURLToPath(new URL("../node_modules/tsx/dist/cli.mjs", import.meta.url));
     const cliModuleUrl = new URL("../src/cli.ts", import.meta.url).href;
     const script = [
@@ -29,23 +40,160 @@ function runCliInSubprocess(argv: string[]) {
         "})();",
     ].join("\n");
 
-    return spawnSync(
-        process.execPath,
-        [tsxCliPath, "--eval", script],
-        {
-            cwd: process.cwd(),
-            encoding: "utf8",
-        },
-    );
+    return await new Promise((resolve, reject) => {
+        const child = spawn(
+            process.execPath,
+            [tsxCliPath, "--eval", script],
+            {
+                cwd: process.cwd(),
+                stdio: ["ignore", "pipe", "pipe"],
+            },
+        );
+        let stdout = "";
+        let stderr = "";
+
+        child.stdout.setEncoding("utf8");
+        child.stderr.setEncoding("utf8");
+        child.stdout.on("data", (chunk) => {
+            stdout += chunk;
+        });
+        child.stderr.on("data", (chunk) => {
+            stderr += chunk;
+        });
+        child.on("error", reject);
+        child.on("close", (status) => {
+            resolve({
+                status,
+                stderr,
+                stdout,
+            });
+        });
+    });
+}
+
+async function withTelegramApiServer(
+    handler: TelegramApiHandler,
+    run: (apiRoot: string) => Promise<void>,
+): Promise<void> {
+    const server = createServer(handler);
+    await new Promise<void>((resolve) => {
+        server.listen(0, "127.0.0.1", resolve);
+    });
+
+    const address = server.address();
+
+    if (!address || typeof address === "string") {
+        await new Promise<void>((resolve, reject) => {
+            server.close((error) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
+
+                resolve();
+            });
+        });
+        throw new Error("Failed to allocate a local Telegram API mock server.");
+    }
+
+    try {
+        await run(`http://127.0.0.1:${address.port}`);
+    } finally {
+        await new Promise<void>((resolve, reject) => {
+            server.close((error) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
+
+                resolve();
+            });
+        });
+    }
+}
+
+async function withSuccessfulTelegramApi(
+    run: (apiRoot: string) => Promise<void>,
+): Promise<void> {
+    await withTelegramApiServer((request, response) => {
+        if (request.url?.endsWith("/getMe")) {
+            response.writeHead(200, {
+                "content-type": "application/json",
+            });
+            response.end(JSON.stringify({
+                ok: true,
+                result: {
+                    id: 42,
+                    is_bot: true,
+                    first_name: "OpenCode",
+                    username: "opencode_tbot",
+                    can_join_groups: true,
+                    can_read_all_group_messages: false,
+                    supports_inline_queries: false,
+                },
+            }));
+            return;
+        }
+
+        response.writeHead(404, {
+            "content-type": "application/json",
+        });
+        response.end(JSON.stringify({
+            ok: false,
+            error_code: 404,
+            description: "Not Found",
+        }));
+    }, run);
+}
+
+async function getUnusedLocalApiRoot(): Promise<string> {
+    const server = createServer((_request, response) => {
+        response.writeHead(204);
+        response.end();
+    });
+    await new Promise<void>((resolve) => {
+        server.listen(0, "127.0.0.1", resolve);
+    });
+
+    const address = server.address();
+
+    if (!address || typeof address === "string") {
+        await new Promise<void>((resolve, reject) => {
+            server.close((error) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
+
+                resolve();
+            });
+        });
+        throw new Error("Failed to allocate an unused local port.");
+    }
+
+    await new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+            if (error) {
+                reject(error);
+                return;
+            }
+
+            resolve();
+        });
+    });
+
+    return `http://127.0.0.1:${address.port}`;
 }
 
 test("installPlugin writes the OpenCode config and runtime config", async () => {
     const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-"));
 
-    await installPlugin({
-        homeDir,
-        botToken: "telegram-token",
-        telegramApiRoot: "http://127.0.0.1:9000",
+    await withSuccessfulTelegramApi(async (telegramApiRoot) => {
+        await installPlugin({
+            homeDir,
+            botToken: TEST_TELEGRAM_BOT_TOKEN,
+            telegramApiRoot,
+        });
     });
 
     const openCodeConfigPath = getLegacyOpenCodeConfigFilePath(homeDir);
@@ -62,8 +210,8 @@ test("installPlugin writes the OpenCode config and runtime config", async () => 
         $schema: "https://opencode.ai/config.json",
         plugin: ["opencode-tbot"],
     });
-    assert.equal(pluginConfig.telegram.botToken, "telegram-token");
-    assert.equal(pluginConfig.telegram.apiRoot, "http://127.0.0.1:9000");
+    assert.equal(pluginConfig.telegram.botToken, TEST_TELEGRAM_BOT_TOKEN);
+    assert.match(pluginConfig.telegram.apiRoot, /^http:\/\/127\.0\.0\.1:\d+$/u);
 });
 
 test("installPlugin preserves unrelated plugin config keys and is idempotent", async () => {
@@ -80,13 +228,17 @@ test("installPlugin preserves unrelated plugin config keys and is idempotent", a
         },
     }, null, 2));
 
-    await installPlugin({
-        homeDir,
-        botToken: "telegram-token",
-    });
-    await installPlugin({
-        homeDir,
-        botToken: "telegram-token",
+    await withSuccessfulTelegramApi(async (telegramApiRoot) => {
+        await installPlugin({
+            homeDir,
+            botToken: TEST_TELEGRAM_BOT_TOKEN,
+            telegramApiRoot,
+        });
+        await installPlugin({
+            homeDir,
+            botToken: TEST_TELEGRAM_BOT_TOKEN,
+            telegramApiRoot,
+        });
     });
 
     const pluginConfig = JSON.parse(readFileSync(pluginConfigPath, "utf8")) as {
@@ -95,7 +247,7 @@ test("installPlugin preserves unrelated plugin config keys and is idempotent", a
     };
 
     assert.equal(pluginConfig.state?.path, "./custom-state.json");
-    assert.equal(pluginConfig.telegram?.botToken, "telegram-token");
+    assert.equal(pluginConfig.telegram?.botToken, TEST_TELEGRAM_BOT_TOKEN);
 });
 
 test("installPlugin tolerates UTF-8 BOM in existing OpenCode and plugin config files", async () => {
@@ -123,9 +275,12 @@ test("installPlugin tolerates UTF-8 BOM in existing OpenCode and plugin config f
         "utf8",
     );
 
-    await installPlugin({
-        homeDir,
-        botToken: "telegram-token",
+    await withSuccessfulTelegramApi(async (telegramApiRoot) => {
+        await installPlugin({
+            homeDir,
+            botToken: TEST_TELEGRAM_BOT_TOKEN,
+            telegramApiRoot,
+        });
     });
 
     assert.deepEqual(
@@ -142,8 +297,111 @@ test("installPlugin tolerates UTF-8 BOM in existing OpenCode and plugin config f
         (JSON.parse(readFileSync(pluginConfigPath, "utf8")) as {
             telegram: { botToken: string };
         }).telegram.botToken,
-        "telegram-token",
+        TEST_TELEGRAM_BOT_TOKEN,
     );
+});
+
+test("installPlugin keeps existing OpenCode package-manager files untouched", async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-preserve-host-files-"));
+    const configDir = getOpenCodeConfigDirectory(homeDir);
+
+    mkdirSync(join(configDir, "node_modules", "@opencode-ai", "plugin"), { recursive: true });
+    writeFileSync(join(configDir, "package.json"), JSON.stringify({
+        dependencies: {
+            "@opencode-ai/plugin": "1.3.2",
+        },
+    }, null, 2));
+    writeFileSync(join(configDir, "bun.lock"), "lockfile-version = 1\n");
+    writeFileSync(join(configDir, ".gitignore"), "node_modules\n");
+
+    await withSuccessfulTelegramApi(async (telegramApiRoot) => {
+        await installPlugin({
+            homeDir,
+            botToken: TEST_TELEGRAM_BOT_TOKEN,
+            telegramApiRoot,
+        });
+    });
+
+    assert.equal(existsSync(join(configDir, "package.json")), true);
+    assert.equal(existsSync(join(configDir, "bun.lock")), true);
+    assert.equal(existsSync(join(configDir, "node_modules")), true);
+    assert.equal(existsSync(getLegacyOpenCodeConfigFilePath(homeDir)), true);
+});
+
+test("installPlugin fails without writing config when Telegram rejects the token", async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-invalid-token-"));
+
+    await withTelegramApiServer((request, response) => {
+        if (request.url?.endsWith("/getMe")) {
+            response.writeHead(401, {
+                "content-type": "application/json",
+            });
+            response.end(JSON.stringify({
+                ok: false,
+                error_code: 401,
+                description: "Unauthorized",
+            }));
+            return;
+        }
+
+        response.writeHead(404, {
+            "content-type": "application/json",
+        });
+        response.end(JSON.stringify({
+            ok: false,
+            error_code: 404,
+            description: "Not Found",
+        }));
+    }, async (telegramApiRoot) => {
+        await assert.rejects(
+            installPlugin({
+                homeDir,
+                botToken: TEST_TELEGRAM_BOT_TOKEN,
+                telegramApiRoot,
+            }),
+            /Telegram bot token is invalid or revoked/u,
+        );
+    });
+
+    assert.equal(existsSync(getLegacyOpenCodeConfigFilePath(homeDir)), false);
+    assert.equal(existsSync(getGlobalPluginConfigFilePath(homeDir)), false);
+});
+
+test("installPlugin fails without writing config when the Telegram API root is unreachable", async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-api-root-unreachable-"));
+    const telegramApiRoot = await getUnusedLocalApiRoot();
+
+    await assert.rejects(
+        installPlugin({
+            homeDir,
+            botToken: TEST_TELEGRAM_BOT_TOKEN,
+            telegramApiRoot,
+        }),
+        /Unable to reach the Telegram Bot API/u,
+    );
+
+    assert.equal(existsSync(getLegacyOpenCodeConfigFilePath(homeDir)), false);
+    assert.equal(existsSync(getGlobalPluginConfigFilePath(homeDir)), false);
+});
+
+test("installPlugin rejects conflicting local file plugins without modifying other files", async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-local-plugin-conflict-"));
+    const configDir = getOpenCodeConfigDirectory(homeDir);
+    const pluginsDir = join(configDir, "plugins");
+
+    mkdirSync(pluginsDir, { recursive: true });
+    writeFileSync(join(pluginsDir, "opencode-tbot.ts"), "export default async () => ({})\n");
+
+    await assert.rejects(
+        installPlugin({
+            homeDir,
+            botToken: TEST_TELEGRAM_BOT_TOKEN,
+            telegramApiRoot: "http://127.0.0.1:65535",
+        }),
+        /Detected a conflicting local OpenCode plugin file:/u,
+    );
+    assert.equal(existsSync(getLegacyOpenCodeConfigFilePath(homeDir)), false);
+    assert.equal(existsSync(join(pluginsDir, "opencode-tbot.ts")), true);
 });
 
 test("installPlugin merges existing OpenCode npm plugins and normalizes opencode-tbot", async () => {
@@ -157,9 +415,12 @@ test("installPlugin merges existing OpenCode npm plugins and normalizes opencode
         plugin: ["other-plugin", "opencode-tbot@0.1.0"],
     }, null, 2));
 
-    await installPlugin({
-        homeDir,
-        botToken: "telegram-token",
+    await withSuccessfulTelegramApi(async (telegramApiRoot) => {
+        await installPlugin({
+            homeDir,
+            botToken: TEST_TELEGRAM_BOT_TOKEN,
+            telegramApiRoot,
+        });
     });
 
     assert.deepEqual(
@@ -179,14 +440,19 @@ test("installPlugin merges existing OpenCode npm plugins and normalizes opencode
 test("runCli defaults to install mode", async () => {
     const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-default-"));
 
-    const exitCode = await runCli([
-        "--home-dir",
-        homeDir,
-        "--bot-token",
-        "telegram-token",
-    ]);
+    await withSuccessfulTelegramApi(async (telegramApiRoot) => {
+        const exitCode = await runCli([
+            "--home-dir",
+            homeDir,
+            "--bot-token",
+            TEST_TELEGRAM_BOT_TOKEN,
+            "--telegram-api-root",
+            telegramApiRoot,
+        ]);
 
-    assert.equal(exitCode, 0);
+        assert.equal(exitCode, 0);
+    });
+
     assert.deepEqual(
         JSON.parse(readFileSync(getLegacyOpenCodeConfigFilePath(homeDir), "utf8")) as {
             plugin: string[];
@@ -200,8 +466,26 @@ test("runCli defaults to install mode", async () => {
         (JSON.parse(readFileSync(getGlobalPluginConfigFilePath(homeDir), "utf8")) as {
             telegram: { botToken: string };
         }).telegram.botToken,
-        "telegram-token",
+        TEST_TELEGRAM_BOT_TOKEN,
     );
+});
+
+test("runCli install prints only a minimal success message", async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-output-install-"));
+
+    await withSuccessfulTelegramApi(async (telegramApiRoot) => {
+        const result = await runCliInSubprocess([
+            "--home-dir",
+            homeDir,
+            "--bot-token",
+            TEST_TELEGRAM_BOT_TOKEN,
+            "--telegram-api-root",
+            telegramApiRoot,
+        ]);
+
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(result.stdout, "Success.\n");
+    });
 });
 
 test("runCli returns success for --version", async () => {
@@ -209,19 +493,6 @@ test("runCli returns success for --version", async () => {
 
     assert.equal(exitCode, 0);
     assert.equal(OPENCODE_TBOT_VERSION.length > 0, true);
-});
-
-test("runCli install prints only a minimal success message", async () => {
-    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-output-install-"));
-    const result = runCliInSubprocess([
-        "--home-dir",
-        homeDir,
-        "--bot-token",
-        "telegram-token",
-    ]);
-
-    assert.equal(result.status, 0, result.stderr);
-    assert.equal(result.stdout, "Success.\n");
 });
 
 test("runCli update refreshes the OpenCode config without modifying plugin config", async () => {
@@ -397,7 +668,7 @@ test("runCli uninstall prints only a minimal success message", async () => {
         plugin: ["opencode-tbot"],
     }, null, 2));
 
-    const result = runCliInSubprocess([
+    const result = await runCliInSubprocess([
         "uninstall",
         "--home-dir",
         homeDir,

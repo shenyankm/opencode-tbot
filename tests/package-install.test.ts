@@ -71,20 +71,15 @@ test("runtime source does not depend on .env-based configuration", () => {
     }
 });
 
-test("package root entry re-exports the plugin module", async () => {
+test("package root entry only exposes the plugin function", async () => {
     const rootModule = await import("../src/index.js");
     const pluginModule = await import("../src/plugin.js");
 
     assert.equal(rootModule.default, pluginModule.default);
-    assert.equal(rootModule.TelegramBotPlugin, pluginModule.TelegramBotPlugin);
-    assert.equal(
-        rootModule.ensureTelegramBotPluginRuntime,
-        pluginModule.ensureTelegramBotPluginRuntime,
-    );
-    assert.equal(
-        rootModule.resetTelegramBotPluginRuntimeForTests,
-        pluginModule.resetTelegramBotPluginRuntimeForTests,
-    );
+    assert.deepEqual(Object.keys(rootModule), ["default"]);
+    assert.equal(pluginModule.TelegramBotPlugin, pluginModule.default);
+    assert.equal(typeof pluginModule.ensureTelegramBotPluginRuntime, "function");
+    assert.equal(typeof pluginModule.resetTelegramBotPluginRuntimeForTests, "function");
 });
 
 test("vite build keeps both npm and explicit plugin entrypoints", async () => {

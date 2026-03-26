@@ -36,6 +36,7 @@ npm exec -- opencode-tbot@latest
 安装器会：
 
 - 在交互式运行时提示输入 Telegram bot token
+- 在写入任何配置文件前通过 `getMe` 校验 Telegram bot token
 - 写入或更新 `~/.config/opencode/opencode.json`，确保 `plugin` 中包含 `opencode-tbot`
 - 写入或合并 `~/.config/opencode/opencode-tbot/config.json`
 - 自动创建缺失的父目录
@@ -73,10 +74,13 @@ npm exec -- opencode-tbot@latest --help
 
 说明：
 
+- `install` 只有在 Telegram token 通过远端校验后才会写入配置；如果校验失败，不会写入新的配置文件。
 - `install` 会同时更新 `opencode.json` 和全局插件配置文件。
 - `update` 只会刷新 `opencode.json`，不会改动现有插件配置内容。
 - `uninstall` 会从 `opencode.json` 中移除 `opencode-tbot`，并保留 `~/.config/opencode/opencode-tbot/config.json`。
 - OpenCode 会在启动时根据 `opencode.json` 自动安装 npm 插件，并缓存到 `~/.cache/opencode/node_modules/`，因此日常使用不需要 `npm install -g opencode-tbot`。
+- 现有的 `~/.config/opencode/package.json`、`bun.lock`、`.gitignore`、`node_modules` 可能属于 OpenCode 自身的运行状态；安装器不会删除或迁移这些文件。
+- 真正会阻止安装的是 `~/.config/opencode/plugins/opencode-tbot.*` 这类同名本地文件插件。遇到这种冲突时，安装器会提示先删除或重命名本地插件。
 
 ### CLI 参数
 
@@ -151,7 +155,7 @@ OpenCode 会从以下路径读取 npm 插件注册：
 
 | 字段 | 必填 | 默认值 | 说明 |
 | --- | --- | --- | --- |
-| `telegram.botToken` | 是 | - | Telegram bot token。通常由安装器写入全局插件配置。 |
+| `telegram.botToken` | 是 | - | Telegram bot token。通常会在 `getMe` 校验通过后由安装器写入全局插件配置。 |
 | `telegram.allowedChatIds` | 否 | `[]` | 允许访问的 Telegram chat ID。为空时，bot 会接受任意 chat 的消息。 |
 | `telegram.apiRoot` | 否 | `https://api.telegram.org` | Telegram Bot API 基础地址，适合测试或自建网关。 |
 | `state.path` | 否 | `./data/opencode-tbot.state.json` | JSON 状态文件路径，相对当前 OpenCode worktree 解析。 |
@@ -268,6 +272,10 @@ $env:OPENCODE_HOST_E2E="1"; pnpm test
 ### 需要全局安装 `opencode-tbot` 吗？
 
 不需要。推荐方式是 `npm exec -- opencode-tbot@latest`。全局安装只会安装 CLI；OpenCode 仍然通过 `opencode.json` 读取插件注册。
+
+### Telegram token 无效时会怎样？
+
+`install` 会在写入 `opencode.json` 和 `~/.config/opencode/opencode-tbot/config.json` 之前失败。如果运行期 token 之后失效，插件会被禁用，但 OpenCode 仍应继续启动，不再因为插件启动失败而崩溃。
 
 ### 这是 OpenCode 官方项目吗？
 

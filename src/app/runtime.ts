@@ -5,6 +5,7 @@ import { extractTelegramUpdateContext } from "../bot/error-boundary.js";
 import { registerBot } from "../bot/index.js";
 import type { AppConfig } from "./config.js";
 import type { AppContainer } from "./container.js";
+import { validateTelegramBotAccessWithBot } from "../services/telegram/telegram-bot-access.js";
 
 export interface StartTelegramBotRuntimeInput {
     botFactory?: (token: string, options: ConstructorParameters<typeof Bot>[1]) => Bot;
@@ -257,7 +258,7 @@ async function verifyTelegramBotAccess(
     runtimeLogger: AppContainer["logger"],
 ): Promise<void> {
     try {
-        const botProfile = await bot.api.getMe();
+        const botProfile = await validateTelegramBotAccessWithBot(bot, telegramApiRoot);
 
         runtimeLogger.info(
             {
@@ -278,38 +279,8 @@ async function verifyTelegramBotAccess(
             },
             "telegram bot startup validation failed",
         );
-        throw createTelegramStartupError(error, telegramApiRoot);
+        throw error;
     }
-}
-
-function createTelegramStartupError(error: unknown, telegramApiRoot: string): Error {
-    if (error instanceof GrammyError) {
-        if (error.error_code === 401) {
-            return new Error(
-                `Telegram bot token is invalid or revoked (${error.description}). ` +
-                "Check telegram.botToken in the plugin config.",
-            );
-        }
-
-        return new Error(
-            `Telegram Bot API rejected startup validation via '${error.method}' ` +
-            `(${error.error_code}: ${error.description}).`,
-        );
-    }
-
-    if (error instanceof HttpError) {
-        const cause = error.error instanceof Error && error.error.message.trim().length > 0
-            ? ` ${error.error.message.trim()}`
-            : "";
-
-        return new Error(
-            `Unable to reach the Telegram Bot API at ${telegramApiRoot}.${cause}`,
-        );
-    }
-
-    return error instanceof Error
-        ? error
-        : new Error(String(error));
 }
 
 function buildTelegramRuntimeKey(config: AppConfig): string {

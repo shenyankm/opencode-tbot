@@ -18,7 +18,9 @@ import {
 import {
     ensureTelegramBotPluginRuntime,
     resetTelegramBotPluginRuntimeForTests,
+    TelegramBotPlugin,
 } from "../src/plugin.js";
+import entryPlugin, * as entryModule from "../src/index.js";
 import { getDefaultPluginLogDirectory } from "../src/app/opencode-paths.js";
 import type { OpenCodeSdkClientLike } from "../src/services/opencode/opencode.client.js";
 
@@ -33,10 +35,14 @@ function createConfig(overrides: PluginConfigSource = {}): PluginConfigSource {
     }, overrides);
 }
 
-function createSdkClientStub(): OpenCodeSdkClientLike {
+function createSdkClientStub(hostLogCalls: Array<Record<string, unknown>> = []): OpenCodeSdkClientLike {
     return {
         app: {
             agents: async () => [],
+            log: async (input: Record<string, unknown>) => {
+                hostLogCalls.push(input);
+                return true;
+            },
         },
         config: {
             get: async () => ({ provider: {} }),
@@ -370,6 +376,12 @@ test("preparePluginConfiguration keeps missing tokens unresolved for the install
     assert.equal(prepared.config.logging?.level, "info");
 });
 
+test("package root only exports the plugin entrypoint at runtime", () => {
+    assert.deepEqual(Object.keys(entryModule), ["default"]);
+    assert.equal(entryModule.default, entryPlugin);
+    assert.equal(entryPlugin, TelegramBotPlugin);
+});
+
 test("ensureTelegramBotPluginRuntime starts the Telegram runtime only once per worktree", async () => {
     await resetTelegramBotPluginRuntimeForTests();
 
@@ -572,6 +584,50 @@ test("ensureTelegramBotPluginRuntime throws a readable error when the first plug
             /OpenCode plugin context\.client is required\./u,
         );
     } finally {
+        await resetTelegramBotPluginRuntimeForTests();
+    }
+});
+
+test("TelegramBotPlugin returns inert hooks and logs the failure when startup cannot build the runtime", async () => {
+    await resetTelegramBotPluginRuntimeForTests();
+
+    const originalHome = process.env.HOME;
+    const originalUserProfile = process.env.USERPROFILE;
+    const hostLogCalls: Array<Record<string, unknown>> = [];
+    const tempHome = mkdtempSync(join(tmpdir(), "opencode-tbot-plugin-inert-"));
+
+    process.env.HOME = tempHome;
+    process.env.USERPROFILE = tempHome;
+
+    try {
+        const hooks = await TelegramBotPlugin({
+            client: createSdkClientStub(hostLogCalls),
+            worktree: "E:/workspace-plugin-inert",
+        } as never);
+
+        assert.deepEqual(hooks, {});
+        assert.equal(hostLogCalls.length, 1);
+        assert.equal(
+            (((hostLogCalls[0]?.body as { extra?: { reason?: unknown } } | undefined)?.extra)?.reason),
+            "config_invalid",
+        );
+        assert.equal(
+            (((hostLogCalls[0]?.body as { message?: unknown } | undefined)?.message)),
+            "telegram bot plugin disabled during startup",
+        );
+    } finally {
+        if (typeof originalHome === "string") {
+            process.env.HOME = originalHome;
+        } else {
+            delete process.env.HOME;
+        }
+
+        if (typeof originalUserProfile === "string") {
+            process.env.USERPROFILE = originalUserProfile;
+        } else {
+            delete process.env.USERPROFILE;
+        }
+
         await resetTelegramBotPluginRuntimeForTests();
     }
 });

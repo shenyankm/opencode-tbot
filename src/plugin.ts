@@ -12,6 +12,7 @@ import {
 } from "./app/runtime.js";
 import type { PluginConfigSource } from "./app/config.js";
 import type { OpenCodeSdkClientLike } from "./services/opencode/opencode.client.js";
+import { TelegramStartupError } from "./services/telegram/telegram-bot-access.js";
 
 export interface OpenCodePluginContextLike {
     client?: OpenCodeSdkClientLike;
@@ -88,11 +89,19 @@ export async function ensureTelegramBotPluginRuntime(
 }
 
 export const TelegramBotPlugin: Plugin = async (context) => {
-    const runtime = await ensureTelegramBotPluginRuntime({
-        context: context as unknown as OpenCodePluginContextLike | undefined,
-    });
+    try {
+        const runtime = await ensureTelegramBotPluginRuntime({
+            context: context as unknown as OpenCodePluginContextLike | undefined,
+        });
 
-    return createHooks(runtime);
+        return createHooks(runtime);
+    } catch (error) {
+        await logPluginStartupFailure(
+            context as unknown as OpenCodePluginContextLike | undefined,
+            error,
+        );
+        return {};
+    }
 };
 
 export async function resetTelegramBotPluginRuntimeForTests() {
@@ -210,4 +219,77 @@ function getTelegramBotPluginRuntimeStateHolder(): TelegramBotPluginRuntimeState
     };
 
     return globalScope.__opencodeTbotPluginRuntimeState__;
+}
+
+async function logPluginStartupFailure(
+    context: OpenCodePluginContextLike | undefined,
+    error: unknown,
+): Promise<void> {
+    const logger = context?.client?.app?.log;
+
+    if (typeof logger !== "function") {
+        return;
+    }
+
+    try {
+        await logger({
+            body: {
+                service: "opencode-tbot",
+                level: "error",
+                message: "telegram bot plugin disabled during startup",
+                extra: {
+                    component: "runtime",
+                    event: "runtime.plugin.disabled",
+                    mode: "plugin",
+                    reason: classifyPluginStartupFailureReason(error),
+                    error: serializePluginStartupError(error),
+                },
+            },
+            responseStyle: "data",
+            throwOnError: true,
+        });
+    } catch {
+        // Best effort only. Startup should stay non-fatal even if host logging fails.
+    }
+}
+
+function classifyPluginStartupFailureReason(error: unknown): string {
+    if (error instanceof TelegramStartupError) {
+        return error.code;
+    }
+
+    if (
+        error instanceof Error
+        && (
+            error.message.includes("Invalid plugin configuration:")
+            || error.message.includes("OpenCode plugin context.client is required.")
+            || error.message.includes("Telegram bot token is required.")
+        )
+    ) {
+        return "config_invalid";
+    }
+
+    return "startup_failed";
+}
+
+function serializePluginStartupError(error: unknown): Record<string, unknown> {
+    if (error instanceof TelegramStartupError) {
+        return {
+            name: error.name,
+            message: error.message,
+            code: error.code,
+            data: error.data,
+        };
+    }
+
+    if (error instanceof Error) {
+        return {
+            name: error.name,
+            message: error.message,
+        };
+    }
+
+    return {
+        message: String(error),
+    };
 }
