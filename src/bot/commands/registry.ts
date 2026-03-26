@@ -9,6 +9,7 @@ import { NEW_COMMAND_DEFINITION } from "./new.js";
 import { SESSIONS_COMMAND_DEFINITION } from "./sessions.js";
 import { START_COMMAND_DEFINITION } from "./start.js";
 import { STATUS_COMMAND_DEFINITION } from "./status.js";
+import { TOKEN_COMMAND_DEFINITION } from "./token.js";
 
 export interface TelegramCommandDefinition {
     describe(copy: BotCopy): string;
@@ -25,6 +26,7 @@ export function getTelegramCommandDefinitions(): readonly TelegramCommandDefinit
         SESSIONS_COMMAND_DEFINITION,
         CANCEL_COMMAND_DEFINITION,
         MODELS_COMMAND_DEFINITION,
+        TOKEN_COMMAND_DEFINITION,
         LANGUAGE_COMMAND_DEFINITION,
     ];
 }

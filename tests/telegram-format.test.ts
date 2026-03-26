@@ -153,10 +153,10 @@ test("buildTelegramPromptReply falls back to plain text when markdown is unsuppo
 
     assert.deepEqual(result, {
         preferred: {
-            text: "bad\n\nDuration: n/a | Tokens: n/a",
+            text: "bad\n\nDuration: n/a | Displayed Tokens: n/a",
         },
         fallback: {
-            text: "bad\n\nDuration: n/a | Tokens: n/a",
+            text: "bad\n\nDuration: n/a | Displayed Tokens: n/a",
         },
     });
 });
@@ -168,13 +168,46 @@ test("buildTelegramPromptReply appends a compact metrics footer to markdown repl
     }));
 
     assert.deepEqual(result.preferred, {
-        text: "*Hello*\n\nDuration: 120 ms \\| Tokens: 42",
+        text: "*Hello*\n\nDuration: 120 ms \\| Displayed Tokens: 42",
         options: {
             parse_mode: "MarkdownV2",
         },
     });
     assert.deepEqual(result.fallback, {
-        text: "Hello\n\nDuration: 120 ms | Tokens: 42",
+        text: "Hello\n\nDuration: 120 ms | Displayed Tokens: 42",
+    });
+});
+
+test("buildTelegramPromptReply appends the full token breakdown when enabled", () => {
+    const result = buildTelegramPromptReply(
+        createPromptReply({
+            bodyMd: "## Hello",
+            fallbackText: "Hello",
+        }),
+        getBotCopy("en"),
+        {
+            showBreakdown: true,
+        },
+    );
+
+    assert.deepEqual(result.preferred, {
+        text: [
+            "*Hello*",
+            "",
+            "Duration: 120 ms \\| Displayed Tokens: 42",
+            "request input: 10 \\| output: 12 \\| reasoning: 5 \\| cache\\.read: 15 \\| cache\\.write: 0",
+        ].join("\n"),
+        options: {
+            parse_mode: "MarkdownV2",
+        },
+    });
+    assert.deepEqual(result.fallback, {
+        text: [
+            "Hello",
+            "",
+            "Duration: 120 ms | Displayed Tokens: 42",
+            "request input: 10 | output: 12 | reasoning: 5 | cache.read: 15 | cache.write: 0",
+        ].join("\n"),
     });
 });
 
@@ -195,22 +228,23 @@ test("buildTelegramPromptReply keeps MarkdownV2 enabled for table content", () =
 });
 
 test("buildTelegramPromptReply localizes the metrics footer", () => {
+    const copy = getBotCopy("zh-CN");
     const result = buildTelegramPromptReply(
         createPromptReply({
             bodyMd: "## Hello",
             fallbackText: "Hello",
         }),
-        getBotCopy("zh-CN"),
+        copy,
     );
 
     assert.deepEqual(result.preferred, {
-        text: "*Hello*\n\n耗时: 120 ms \\| 令牌数: 42",
+        text: `*Hello*\n\n${copy.replyMetrics.durationLabel}: 120 ms \\| ${copy.replyMetrics.tokensLabel}: 42`,
         options: {
             parse_mode: "MarkdownV2",
         },
     });
     assert.deepEqual(result.fallback, {
-        text: "Hello\n\n耗时: 120 ms | 令牌数: 42",
+        text: `Hello\n\n${copy.replyMetrics.durationLabel}: 120 ms | ${copy.replyMetrics.tokensLabel}: 42`,
     });
 });
 

@@ -12,10 +12,9 @@
 
 - 纯文本消息会转发到当前 OpenCode 会话。
 - Telegram 照片和图片文档会作为 OpenCode 文件分段上传。
-- 图片消息会在临时 fork 会话中处理，避免后续纯文本提示继承图片上下文。
 - OpenCode 发起的权限请求可以在 Telegram 内联按钮中批准或拒绝。
 - 会话错误事件可以回推到已绑定的 Telegram chat。
-- 语音消息会被明确拒绝，并返回本地化提示。
+- Telegram 语音消息功能已移除：Telegram 语音默认是 OGG 格式，接入可用语音模型需要额外转码，而转码带来的体积和维护成本过高，综合考虑后不再支持；收到语音消息时会返回本地化拒绝提示。
 - chat 绑定、语言选择，以及模型或 Agent 偏好会保存在 JSON 状态文件中。
 
 ## 环境要求
@@ -23,7 +22,6 @@
 - 一个正在运行且会加载该插件的 OpenCode Host 进程。
 - 一个 Telegram bot token。
 - 用于 CLI 和本地开发的 Node.js `>=22.12.0`。
-- 用于仓库开发的 `pnpm`。
 
 ## 安装、更新与卸载
 
@@ -41,12 +39,6 @@ npm exec -- opencode-tbot@latest
 - 写入或合并 `~/.config/opencode/opencode-tbot/config.json`
 - 自动创建缺失的父目录
 - 完成后仅输出最小化成功提示
-
-`install` 是默认命令。非交互场景请显式传入 token：
-
-```bash
-npm exec -- opencode-tbot@latest --bot-token <token>
-```
 
 在不修改现有插件配置的情况下刷新 OpenCode 插件注册：
 
@@ -123,7 +115,7 @@ OpenCode 会从以下路径读取 npm 插件注册：
 {
   "telegram": {
     "botToken": "your_telegram_bot_token",
-    "allowedChatIds": [123456789],
+    "allowedChatIds": ["123456789"],
     "apiRoot": "https://api.telegram.org"
   },
   "state": {
@@ -133,6 +125,9 @@ OpenCode 会从以下路径读取 npm 插件注册：
     "waitTimeoutMs": 1800000,
     "pollRequestTimeoutMs": 15000,
     "recoveryInactivityTimeoutMs": 120000
+  },
+  "tokens": {
+    "showBreakdown": false
   },
   "logging": {
     "level": "info",
@@ -162,6 +157,7 @@ OpenCode 会从以下路径读取 npm 插件注册：
 | `prompt.waitTimeoutMs` | 否 | `1800000` | 单次异步 prompt 生命周期的最长等待时间。 |
 | `prompt.pollRequestTimeoutMs` | 否 | `15000` | 每次向 OpenCode 发起恢复轮询请求时的超时时间。 |
 | `prompt.recoveryInactivityTimeoutMs` | 否 | `120000` | 仅在 prompt 进度停止推进时生效的恢复超时时间。 |
+| `tokens.showBreakdown` | 否 | `false` | `/token` 的全局开关，用于控制是否显示包含 `input`、`output`、`reasoning`、`cache.read`、`cache.write` 的第二行页脚明细。第一行显示令牌总数始终按这五项重算，不会写入 worktree 状态文件。 |
 | `logging.level` | 否 | `info` | host 和 file sink 共用的结构化日志级别。未知值会归一化为 `info`。 |
 | `logging.sinks.host` | 否 | `true` | 是否通过 `client.app.log(...)` 写入 OpenCode Host 日志。 |
 | `logging.sinks.file` | 否 | `true` | 是否写入插件自己的 JSONL 文件日志。 |
@@ -173,6 +169,8 @@ OpenCode 会从以下路径读取 npm 插件注册：
 
 - `state.path` 会相对当前 OpenCode worktree 解析。
 - 如果 `logging.file.dir` 是相对路径，也会相对当前 OpenCode worktree 解析；未配置时默认写入用户 home 目录下的日志目录。
+- `/token` 会更新 `~/.config/opencode/opencode-tbot/config.json` 中的全局 `tokens.showBreakdown` 设置，不会写入 worktree 状态文件。
+- 回复页脚第一行始终保持为“耗时 | 显示令牌数”。开启后，`/token` 会额外显示第二行完整明细：`input`、`output`、`reasoning`、`cache.read`、`cache.write`。
 - Telegram prompt 采用 async-first：插件先提交 `session.promptAsync()`，再通过会话消息和状态恢复最终回复。
 - 如果 `telegram.allowedChatIds` 为空，bot 会接受任意 chat 的消息；生产环境建议显式限制。
 - `/language` 会同时更新 bot 显示语言，以及当前 chat 的本地化 Telegram 命令描述。
@@ -197,6 +195,7 @@ OpenCode 会从以下路径读取 npm 插件注册：
 | `/sessions` | 列出可用会话、切换当前会话，并提供重命名操作。 |
 | `/cancel` | 取消待输入的会话重命名，或中止当前会话正在执行的请求。 |
 | `/model` 或 `/models` | 显示 OpenCode 为已连接 provider 暴露的模型，切换当前模型，并在可用时选择推理级别。 |
+| `/token` | 开启或关闭回复页脚第二行的完整令牌明细。该设置对整个插件全局生效。 |
 | `/language` | 切换当前 chat 的 bot 显示语言，并重新同步命令描述。 |
 
 ### 消息行为
@@ -206,7 +205,7 @@ OpenCode 会从以下路径读取 npm 插件注册：
 - 图片附件会在当前活动会话的临时 fork 中处理，避免污染后续纯文本上下文。
 - 权限审批可以直接通过 Telegram 内联按钮完成。
 - `/cancel` 会同时中止 OpenCode 会话请求和本地 Telegram 等待状态，让下一次 prompt 能立即开始。
-- Telegram 语音消息暂不支持，会收到本地化拒绝提示。
+- Telegram 语音消息功能已移除：Telegram 语音默认是 OGG 格式，接入可用语音模型需要额外转码，而转码带来的体积和维护成本过高，综合考虑后不再支持；收到语音消息时会返回本地化拒绝提示。
 
 ## 日志
 
@@ -216,52 +215,6 @@ OpenCode 会从以下路径读取 npm 插件注册：
 - 常见关联字段：`runtimeId`、`operationId`、`correlationId`、`updateId`、`chatId`、`sessionId`、`projectId`
 - 常见组件：`runtime`、`telegram`、`opencode`、`prompt`、`plugin-event`、`storage`
 - 默认保留策略：最新 30 个文件，总大小不超过 300 MB
-
-## 开发
-
-安装依赖：
-
-```bash
-pnpm install
-```
-
-构建产物：
-
-```bash
-pnpm build
-```
-
-类型检查：
-
-```bash
-pnpm typecheck
-```
-
-运行完整测试：
-
-```bash
-pnpm test
-```
-
-运行 CLI 测试文件：
-
-```bash
-pnpm exec tsx --test tests/cli.test.ts
-```
-
-运行最接近 CI 的集成路径：
-
-```bash
-npm install -g opencode-ai
-OPENCODE_HOST_E2E=1 pnpm test
-```
-
-PowerShell：
-
-```powershell
-npm install -g opencode-ai
-$env:OPENCODE_HOST_E2E="1"; pnpm test
-```
 
 ## FAQ
 

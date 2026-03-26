@@ -15,6 +15,10 @@ import {
     registerModelsCallbackRoute,
 } from "./callbacks/models-callback.handler.js";
 import {
+    handleTokenCallback,
+    registerTokenCallbackRoute,
+} from "./callbacks/token-callback.handler.js";
+import {
     handlePermissionApprovalCallback,
     registerPermissionApprovalCallbackRoute,
 } from "./callbacks/permission-approval-callback.handler.js";
@@ -34,6 +38,7 @@ const CALLBACK_ROUTE_REGISTRARS: Array<
     registerAgentsCallbackRoute,
     registerSessionsCallbackRoute,
     registerModelsCallbackRoute,
+    registerTokenCallbackRoute,
     registerLanguageCallbackRoute,
     registerPermissionApprovalCallbackRoute,
 ];
@@ -51,6 +56,7 @@ export {
     handleAgentsCallback,
     handleLanguageCallback,
     handleModelsCallback,
+    handleTokenCallback,
     handlePermissionApprovalCallback,
     handleSessionsCallback,
 };

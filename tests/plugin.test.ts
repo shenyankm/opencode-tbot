@@ -9,6 +9,7 @@ import {
     type AppConfig,
     type PluginConfigSource,
 } from "../src/app/config.js";
+import { DEFAULT_TOKEN_SHOW_BREAKDOWN } from "../src/domain/token/token-settings.entity.js";
 import {
     mergePluginConfigSources,
     preparePluginConfiguration,
@@ -200,6 +201,35 @@ test("loadAppConfig maps the structured logging section", () => {
     assert.equal(config.loggingFileDir, getDefaultPluginLogDirectory());
 });
 
+test("loadAppConfig applies the default token breakdown visibility", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-token-config-default-"));
+    const config = loadAppConfig(createConfig(), { cwd });
+
+    assert.equal(config.tokenShowBreakdown, DEFAULT_TOKEN_SHOW_BREAKDOWN);
+});
+
+test("loadAppConfig reads token breakdown visibility from the structured config", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-token-config-enabled-"));
+    const config = loadAppConfig(createConfig({
+        tokens: {
+            showBreakdown: true,
+        },
+    }), { cwd });
+
+    assert.equal(config.tokenShowBreakdown, true);
+});
+
+test("loadAppConfig ignores deprecated token total includes settings", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "opencode-tbot-token-config-legacy-"));
+    const config = loadAppConfig(createConfig({
+        tokens: {
+            totalIncludes: ["input", "output"] as never,
+        },
+    }), { cwd });
+
+    assert.equal(config.tokenShowBreakdown, false);
+});
+
 test("mergePluginConfigSources merges prompt configuration by key", () => {
     const merged = mergePluginConfigSources(
         {
@@ -256,6 +286,30 @@ test("mergePluginConfigSources merges logging configuration by key", () => {
             retention: {
                 maxFiles: 5,
             },
+        },
+    });
+});
+
+test("mergePluginConfigSources merges token configuration by key", () => {
+    const merged = mergePluginConfigSources(
+        {
+            telegram: {
+                botToken: "token-a",
+            },
+        },
+        {
+            tokens: {
+                showBreakdown: true,
+            },
+        },
+    );
+
+    assert.deepEqual(merged, {
+        telegram: {
+            botToken: "token-a",
+        },
+        tokens: {
+            showBreakdown: true,
         },
     });
 });

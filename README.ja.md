@@ -12,10 +12,9 @@ Telegram から [OpenCode](https://opencode.ai) を操作するためのプラ�
 
 - プレーンテキストメッセージは現在の OpenCode セッションに転送されます。
 - Telegram の写真や画像ドキュメントは OpenCode の file part としてアップロードされます。
-- 画像付きのやり取りは一時的な fork セッションで処理されるため、その後のテキスト専用プロンプトに画像コンテキストが残りません。
 - OpenCode が発行した権限リクエストは Telegram のインラインボタンから承認または拒否できます。
 - セッションエラーイベントは、バインド済みの Telegram chat に通知できます。
-- 音声メッセージは明示的に拒否され、ローカライズされた案内が返ります。
+- Telegram の音声メッセージ機能は廃止しました。Telegram の音声は既定で OGG 形式であり、利用可能な音声モデルを使うには追加のトランスコードが必要です。トランスコードによるサイズ増加と保守コストが大きいため、総合判断で機能を削除し、音声メッセージにはローカライズされた拒否案内を返します。
 - chat のバインド、言語設定、モデルやエージェントの選択は JSON 状態ファイルに保存されます。
 
 ## 要件
@@ -23,7 +22,6 @@ Telegram から [OpenCode](https://opencode.ai) を操作するためのプラ�
 - このプラグインを読み込む OpenCode Host プロセスが起動していること
 - Telegram bot token
 - CLI とローカル開発用の Node.js `>=22.12.0`
-- リポジトリ開発用の `pnpm`
 
 ## インストール、更新、アンインストール
 
@@ -41,12 +39,6 @@ npm exec -- opencode-tbot@latest
 - `~/.config/opencode/opencode-tbot/config.json` を書き込み、または既存内容とマージします
 - 足りない親ディレクトリを自動作成します
 - 完了時には最小限の成功メッセージだけを表示します
-
-`install` は既定コマンドです。非対話実行では token を明示的に渡してください。
-
-```bash
-npm exec -- opencode-tbot@latest --bot-token <token>
-```
 
 既存のプラグイン設定を変更せずに OpenCode のプラグイン登録だけを更新する場合:
 
@@ -134,6 +126,9 @@ OpenCode は次のパスから npm プラグイン登録を読み込みます。
     "pollRequestTimeoutMs": 15000,
     "recoveryInactivityTimeoutMs": 120000
   },
+  "tokens": {
+    "showBreakdown": false
+  },
   "logging": {
     "level": "info",
     "sinks": {
@@ -162,6 +157,7 @@ OpenCode は次のパスから npm プラグイン登録を読み込みます。
 | `prompt.waitTimeoutMs` | いいえ | `1800000` | 1 回の async prompt ライフサイクル全体に対する最大待機時間です。 |
 | `prompt.pollRequestTimeoutMs` | いいえ | `15000` | OpenCode に対する各 recovery poll リクエストのタイムアウトです。 |
 | `prompt.recoveryInactivityTimeoutMs` | いいえ | `120000` | prompt の進捗が止まったときにだけ適用される recovery timeout です。 |
+| `tokens.showBreakdown` | いいえ | `false` | `/token` 用のグローバルスイッチです。`input`、`output`、`reasoning`、`cache.read`、`cache.write` を含む2行目のフッター内訳を表示するかを制御します。1行目の表示トークン合計は常にこの5項目から再計算され、worktree の状態ファイルには保存されません。 |
 | `logging.level` | いいえ | `info` | host と file sink で使う構造化ログレベルです。未知の値は `info` に正規化されます。 |
 | `logging.sinks.host` | いいえ | `true` | `client.app.log(...)` 経由で OpenCode Host にログを書き込むかどうかです。 |
 | `logging.sinks.file` | いいえ | `true` | プラグイン独自の JSONL ファイルログを書き込むかどうかです。 |
@@ -173,6 +169,8 @@ OpenCode は次のパスから npm プラグイン登録を読み込みます。
 
 - `state.path` は現在の OpenCode worktree 基準で解決されます。
 - `logging.file.dir` が相対パスの場合も現在の OpenCode worktree 基準で解決されます。未指定の場合はユーザーの home ディレクトリ配下の既定ログディレクトリが使われます。
+- `/token` は `~/.config/opencode/opencode-tbot/config.json` のグローバル `tokens.showBreakdown` 設定を更新し、worktree の状態ファイルには書き込みません。
+- 返信フッターの1行目は常に `Duration | Displayed Tokens` です。有効化すると、`/token` は `input`、`output`、`reasoning`、`cache.read`、`cache.write` の完全な内訳を2行目に追加します。
 - Telegram の prompt 処理は async-first です。プラグインは `session.promptAsync()` を送信し、その後にセッションメッセージと状態から最終応答を復元します。
 - `telegram.allowedChatIds` を空にすると、bot は任意の chat からのメッセージを受け付けます。本番環境では明示的な制限を推奨します。
 - `/language` は bot の表示言語を切り替えるだけでなく、その chat 用の Telegram コマンド説明も再同期します。
@@ -197,6 +195,7 @@ OpenCode は次のパスから npm プラグイン登録を読み込みます。
 | `/sessions` | 利用可能なセッションを一覧表示し、切り替えや名前変更操作を提供します。 |
 | `/cancel` | 保留中のセッション名変更入力を取り消すか、現在のセッションで実行中のリクエストを中止します。 |
 | `/model` または `/models` | OpenCode が接続済み provider 向けに公開しているモデルを表示し、現在のモデルや推論レベルを切り替えます。 |
+| `/token` | 返信フッター2行目の完全なトークン内訳を表示するかどうかを切り替えます。この設定はプラグイン全体で共有されます。 |
 | `/language` | 現在の chat の bot 表示言語を切り替え、コマンド説明を再同期します。 |
 
 ### メッセージの挙動
@@ -206,7 +205,7 @@ OpenCode は次のパスから npm プラグイン登録を読み込みます。
 - 画像添付は現在のアクティブセッションの一時 fork 内で処理されるため、後続のテキスト専用コンテキストを汚しません。
 - 権限承認は Telegram のインラインボタンから処理できます。
 - `/cancel` は OpenCode セッションの処理と Telegram 側の待機状態を同時に中止し、次の prompt をすぐ開始できるようにします。
-- Telegram の音声メッセージは未対応で、ローカライズされた拒否メッセージを返します。
+- Telegram の音声メッセージ機能は廃止しました。Telegram の音声は既定で OGG 形式であり、利用可能な音声モデルを使うには追加のトランスコードが必要です。トランスコードによるサイズ増加と保守コストが大きいため、総合判断で機能を削除し、音声メッセージにはローカライズされた拒否案内を返します。
 
 ## ログ
 
@@ -216,52 +215,6 @@ OpenCode は次のパスから npm プラグイン登録を読み込みます。
 - 主な相関フィールド: `runtimeId`, `operationId`, `correlationId`, `updateId`, `chatId`, `sessionId`, `projectId`
 - よく使う component: `runtime`, `telegram`, `opencode`, `prompt`, `plugin-event`, `storage`
 - 既定の保持方針: 最新 30 ファイル、合計 300 MB 以下
-
-## 開発
-
-依存関係をインストール:
-
-```bash
-pnpm install
-```
-
-ビルド:
-
-```bash
-pnpm build
-```
-
-型チェック:
-
-```bash
-pnpm typecheck
-```
-
-テスト一式を実行:
-
-```bash
-pnpm test
-```
-
-CLI テストファイルを実行:
-
-```bash
-pnpm exec tsx --test tests/cli.test.ts
-```
-
-CI に最も近い統合経路:
-
-```bash
-npm install -g opencode-ai
-OPENCODE_HOST_E2E=1 pnpm test
-```
-
-PowerShell:
-
-```powershell
-npm install -g opencode-ai
-$env:OPENCODE_HOST_E2E="1"; pnpm test
-```
 
 ## FAQ
 

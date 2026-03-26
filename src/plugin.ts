@@ -133,7 +133,10 @@ async function startPluginRuntime(
     const { config, container } = bootstrapApp(
         client,
         preparedConfiguration.config,
-        { cwd: preparedConfiguration.cwd },
+        {
+            cwd: preparedConfiguration.cwd,
+            configFilePath: preparedConfiguration.configFilePath,
+        },
     );
 
     try {

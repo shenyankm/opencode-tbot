@@ -12,10 +12,9 @@ A Telegram plugin for driving [OpenCode](https://opencode.ai) from chat.
 
 - Plain text messages are forwarded to the current OpenCode session.
 - Telegram photos and image documents are uploaded as OpenCode file parts.
-- Image turns run in a temporary forked session, so later text-only prompts do not inherit image context.
 - Permission requests raised by OpenCode can be approved or rejected from Telegram inline buttons.
 - Session error events can be reported back to the bound Telegram chat.
-- Voice messages are explicitly rejected with a localized reply.
+- Telegram voice message support was removed. Telegram voice uses OGG by default, and usable speech models would require transcoding. Given the added bundle size and maintenance cost, the feature was dropped, and voice messages now receive a localized rejection reply.
 - Chat bindings, language selection, and model or agent preferences are stored in a JSON state file.
 
 ## Requirements
@@ -23,7 +22,6 @@ A Telegram plugin for driving [OpenCode](https://opencode.ai) from chat.
 - A running OpenCode host process that loads the plugin.
 - A Telegram bot token.
 - Node.js `>=22.12.0` for the CLI and local development workflow.
-- `pnpm` for repository development.
 
 ## Install, Update, And Uninstall
 
@@ -41,12 +39,6 @@ The installer:
 - writes or merges `~/.config/opencode/opencode-tbot/config.json`
 - creates missing parent directories automatically
 - prints a minimal success message on completion
-
-`install` is the default command. For non-interactive runs, pass the token explicitly:
-
-```bash
-npm exec -- opencode-tbot@latest --bot-token <token>
-```
 
 Refresh the OpenCode plugin registration without changing the existing plugin config:
 
@@ -134,6 +126,9 @@ This plugin does not read runtime settings from `.env`.
     "pollRequestTimeoutMs": 15000,
     "recoveryInactivityTimeoutMs": 120000
   },
+  "tokens": {
+    "showBreakdown": false
+  },
   "logging": {
     "level": "info",
     "sinks": {
@@ -162,6 +157,7 @@ This plugin does not read runtime settings from `.env`.
 | `prompt.waitTimeoutMs` | No | `1800000` | Maximum total wait for one async prompt lifecycle. |
 | `prompt.pollRequestTimeoutMs` | No | `15000` | Timeout for each individual recovery poll request to OpenCode. |
 | `prompt.recoveryInactivityTimeoutMs` | No | `120000` | Recovery timeout that only applies when prompt progress stops advancing. |
+| `tokens.showBreakdown` | No | `false` | Global `/token` switch for showing a second footer line with `input`, `output`, `reasoning`, `cache.read`, and `cache.write`. The first-line displayed total is always recalculated from those five metrics and is not stored in the worktree state file. |
 | `logging.level` | No | `info` | Structured log level for host and file sinks. Unknown values normalize to `info`. |
 | `logging.sinks.host` | No | `true` | Enable OpenCode host logging through `client.app.log(...)`. |
 | `logging.sinks.file` | No | `true` | Enable plugin-owned JSONL file logs. |
@@ -173,6 +169,8 @@ This plugin does not read runtime settings from `.env`.
 
 - `state.path` is resolved relative to the current OpenCode worktree.
 - Relative `logging.file.dir` values are also resolved from the current OpenCode worktree. If omitted, the default log directory is created under the user's home directory.
+- `/token` updates the global `tokens.showBreakdown` setting in `~/.config/opencode/opencode-tbot/config.json` and does not write to the worktree state file.
+- Reply footers always keep the first line as `Duration | Displayed Tokens`. When enabled, `/token` adds a second line with the full `input`, `output`, `reasoning`, `cache.read`, and `cache.write` breakdown.
 - Telegram prompt handling is async-first: the plugin submits `session.promptAsync()` and then recovers the reply from session messages and session status.
 - If `telegram.allowedChatIds` is left empty, the bot accepts messages from any chat. Restrict it in production.
 - `/language` updates both the bot display language and the localized Telegram command descriptions for that chat.
@@ -197,6 +195,7 @@ This plugin does not read runtime settings from `.env`.
 | `/sessions` | List available sessions, switch the active one, and offer rename actions. |
 | `/cancel` | Cancel pending session rename input or abort the running request for the current session. |
 | `/model` or `/models` | Show models exposed by OpenCode for connected providers, switch the active one, and choose a reasoning level when available. |
+| `/token` | Enable or disable the second footer line with the full token breakdown. This setting is global for the plugin. |
 | `/language` | Switch the bot display language for the current chat and resync command descriptions. |
 
 ### Message Behavior
@@ -206,7 +205,7 @@ This plugin does not read runtime settings from `.env`.
 - Image attachments are processed in a temporary fork of the active session so later text-only prompts stay clean.
 - Permission approvals are handled from Telegram inline buttons.
 - `/cancel` aborts both the OpenCode session and the local Telegram wait state, so the next prompt can start immediately.
-- Telegram voice messages are not supported and receive a localized rejection reply.
+- Telegram voice message support was removed. Telegram voice uses OGG by default, and usable speech models would require transcoding. Given the added bundle size and maintenance cost, the feature was dropped, and voice messages now receive a localized rejection reply.
 
 ## Logging
 
@@ -216,52 +215,6 @@ This plugin does not read runtime settings from `.env`.
 - Common correlation fields: `runtimeId`, `operationId`, `correlationId`, `updateId`, `chatId`, `sessionId`, `projectId`
 - Common components: `runtime`, `telegram`, `opencode`, `prompt`, `plugin-event`, `storage`
 - Default retention: newest 30 files and at most 300 MB total
-
-## Development
-
-Install dependencies:
-
-```bash
-pnpm install
-```
-
-Build the bundle:
-
-```bash
-pnpm build
-```
-
-Type-check:
-
-```bash
-pnpm typecheck
-```
-
-Run the full test suite:
-
-```bash
-pnpm test
-```
-
-Run the CLI test file:
-
-```bash
-pnpm exec tsx --test tests/cli.test.ts
-```
-
-Run the integration path closest to CI:
-
-```bash
-npm install -g opencode-ai
-OPENCODE_HOST_E2E=1 pnpm test
-```
-
-PowerShell:
-
-```powershell
-npm install -g opencode-ai
-$env:OPENCODE_HOST_E2E="1"; pnpm test
-```
 
 ## FAQ
 

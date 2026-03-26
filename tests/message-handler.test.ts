@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { getBotCopy } from "../src/bot/copy.js";
 import type { BotDependencies } from "../src/bot/types.js";
+import {
+    DEFAULT_TOKEN_SHOW_BREAKDOWN,
+} from "../src/domain/token/token-settings.entity.js";
 import {
     OpenCodePromptTimeoutError,
     type PromptSessionResult,
@@ -19,7 +23,7 @@ function createPromptReply(overrides: Partial<PromptSessionResult> = {}): Prompt
         metrics: {
             durationMs: 120,
             tokens: {
-                total: 42,
+                total: 37,
                 input: 10,
                 output: 12,
                 reasoning: 5,
@@ -67,6 +71,7 @@ function createDependencies(options: {
         };
     }>;
     sendPrompt: (input: { chatId: number; text: string }) => Promise<{ assistantReply: PromptSessionResult }>;
+    showBreakdown?: boolean;
 }) {
     const errors: unknown[] = [];
     const pendingActionRepo = new InMemoryPendingActionRepository();
@@ -84,6 +89,13 @@ function createDependencies(options: {
                 })),
             },
             foregroundSessionTracker: new ForegroundSessionTracker(),
+            getTokenSettingsUseCase: {
+                async execute() {
+                    return {
+                        showBreakdown: options.showBreakdown ?? DEFAULT_TOKEN_SHOW_BREAKDOWN,
+                    };
+                },
+            },
             logger: {
                 child() {
                     return this;
@@ -153,7 +165,7 @@ test("handleTextMessage sends MarkdownV2 replies with metrics and deletes the pr
     assert.deepEqual(replies, [
         { text: "Processing...", other: undefined },
         {
-            text: "*Hello*\n\nDuration: 120 ms \\| Tokens: 42",
+            text: "*Hello*\n\nDuration: 120 ms \\| Displayed Tokens: 42",
             other: { parse_mode: "MarkdownV2" },
         },
     ]);
@@ -163,7 +175,7 @@ test("handleTextMessage sends MarkdownV2 replies with metrics and deletes the pr
     assert.deepEqual(replies, [
         { text: "澶勭悊涓?..", other: undefined },
         {
-            text: "*Hello*\n\n鑰楁椂: 120 ms \\| 浠ょ墝鏁? 42",
+            text: "*Hello*\n\n鑰楁椂: 120 ms \\| 浠ょ墝鏁? 37",
             other: { parse_mode: "MarkdownV2" },
         },
     ]);
@@ -173,7 +185,7 @@ test("handleTextMessage sends MarkdownV2 replies with metrics and deletes the pr
     assert.deepEqual(replies, [
         { text: "Processing...", other: undefined },
         {
-            text: "*Hello*\n\nDuration: 120 ms \\| Tokens: 42",
+            text: "*Hello*\n\nDuration: 120 ms \\| Displayed Tokens: 42",
             other: { parse_mode: "MarkdownV2" },
         },
     ]);
@@ -219,16 +231,63 @@ test("handleTextMessage falls back to plain text when the preferred Telegram mar
     assert.deepEqual(replies, [
         { text: "Processing...", other: undefined },
         {
-            text: "*Hello*\n\nDuration: 120 ms \\| Tokens: 42",
+            text: "*Hello*\n\nDuration: 120 ms \\| Displayed Tokens: 42",
             other: { parse_mode: "MarkdownV2" },
         },
         {
-            text: "Hello\n\nDuration: 120 ms | Tokens: 42",
+            text: "Hello\n\nDuration: 120 ms | Displayed Tokens: 42",
             other: undefined,
         },
     ]);
     assert.equal(warnings.length, 1);
     assert.deepEqual(deleted, [{ chatId: 2, messageId: 200 }]);
+});
+
+test("handleTextMessage appends the full token breakdown when it is enabled globally", async () => {
+    const replies: Array<{ text: string; other?: unknown }> = [];
+    const deleted: Array<{ chatId: number; messageId: number }> = [];
+    let nextMessageId = 225;
+    const { dependencies } = createDependencies({
+        sendPrompt: async () => ({
+            assistantReply: createPromptReply(),
+        }),
+        showBreakdown: true,
+    });
+
+    await handleTextMessage(
+        {
+            chat: { id: 22 },
+            message: { text: "hello" },
+            api: {
+                async deleteMessage(chatId, messageId) {
+                    deleted.push({ chatId, messageId });
+                    return true;
+                },
+                async editMessageText() {
+                    return true;
+                },
+            },
+            async reply(text, other) {
+                replies.push({ text, other });
+                return { message_id: nextMessageId++ };
+            },
+        },
+        dependencies,
+    );
+
+    assert.deepEqual(replies, [
+        { text: "Processing...", other: undefined },
+        {
+            text: [
+                "*Hello*",
+                "",
+                "Duration: 120 ms \\| Displayed Tokens: 42",
+                "request input: 10 \\| output: 12 \\| reasoning: 5 \\| cache\\.read: 15 \\| cache\\.write: 0",
+            ].join("\n"),
+            other: { parse_mode: "MarkdownV2" },
+        },
+    ]);
+    assert.deepEqual(deleted, [{ chatId: 22, messageId: 225 }]);
 });
 
 test("handleTextMessage shows recovered assistant text instead of the empty-response copy when markdown is unavailable", async () => {
@@ -270,7 +329,7 @@ test("handleTextMessage shows recovered assistant text instead of the empty-resp
     assert.deepEqual(replies, [
         { text: "Processing...", other: undefined },
         {
-            text: "Recovered reply\n\nDuration: 120 ms | Tokens: 42",
+            text: "Recovered reply\n\nDuration: 120 ms | Displayed Tokens: 42",
             other: undefined,
         },
     ]);
@@ -366,7 +425,7 @@ test("handleTextMessage releases the active chat lock and deletes the placeholde
         { text: "OpenCode request timed out.", other: undefined },
         { text: "Processing...", other: undefined },
         {
-            text: "*Hello*\n\nDuration: 120 ms \\| Tokens: 42",
+            text: "*Hello*\n\nDuration: 120 ms \\| Displayed Tokens: 42",
             other: { parse_mode: "MarkdownV2" },
         },
     ]);
@@ -458,7 +517,7 @@ test("handleTextMessage rejects a second plain-text prompt while one is already 
             other: undefined,
         },
         {
-            text: "*Hello*\n\nDuration: 120 ms \\| Tokens: 42",
+            text: "*Hello*\n\nDuration: 120 ms \\| Displayed Tokens: 42",
             other: { parse_mode: "MarkdownV2" },
         },
     ]);
@@ -514,7 +573,7 @@ test("handleTextMessage renders assistant-side prompt errors with metrics and de
                 "Structured output validation failed.",
                 "Cause: Schema validation failed | retries: 2",
                 "",
-                "Duration: 120 ms | Tokens: 42",
+                "Duration: 120 ms | Displayed Tokens: 42",
             ].join("\n"),
             other: undefined,
         },
@@ -571,7 +630,7 @@ test("handleTextMessage shows assistant-side prompt errors even when text parts 
                 "Structured output validation failed.",
                 "Cause: Model did not produce structured output | retries: 0",
                 "",
-                "Duration: 120 ms | Tokens: 42",
+                "Duration: 120 ms | Displayed Tokens: 42",
             ].join("\n"),
             other: undefined,
         },
@@ -584,6 +643,7 @@ test("handleTextMessage localizes bot-generated status text and metrics footer f
     const replies: Array<{ text: string; other?: unknown }> = [];
     const deleted: Array<{ chatId: number; messageId: number }> = [];
     let nextMessageId = 900;
+    const copy = getBotCopy("zh-CN");
     const { dependencies, sessionRepo } = createDependencies({
         sendPrompt: async () => ({
             assistantReply: createPromptReply(),
@@ -625,9 +685,9 @@ test("handleTextMessage localizes bot-generated status text and metrics footer f
     );
 
     assert.deepEqual(replies, [
-        { text: "处理中...", other: undefined },
+        { text: copy.status.processing, other: undefined },
         {
-            text: "*Hello*\n\n耗时: 120 ms \\| 令牌数: 42",
+            text: `*Hello*\n\n${copy.replyMetrics.durationLabel}: 120 ms \\| ${copy.replyMetrics.tokensLabel}: 42`,
             other: { parse_mode: "MarkdownV2" },
         },
     ]);

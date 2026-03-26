@@ -1,6 +1,7 @@
 import { getSafeChatCopy } from "../i18n.js";
 import { presentError } from "../presenters/error.presenter.js";
 import { buildTelegramPromptReply } from "../../services/telegram/telegram-format.js";
+import { calculateDisplayedTokenTotal } from "../../domain/token/token-settings.entity.js";
 import type { ForegroundPromptDependencies } from "../types.js";
 import type { PromptSessionFilePartInput } from "../../services/opencode/opencode.client.js";
 import type { SendPromptResult } from "../../use-cases/send-prompt.usecase.js";
@@ -51,8 +52,17 @@ export async function executePromptRequest(
             signal: foregroundRequest.signal,
             text: promptInput.text,
         });
-        const promptReply = normalizePromptReplyForDisplay(result.assistantReply, copy);
-        const telegramReply = buildTelegramPromptReply(promptReply, copy);
+        const tokenSettings = await dependencies.getTokenSettingsUseCase.execute();
+        const promptReply = normalizePromptReplyForDisplay(
+            result.assistantReply,
+            tokenSettings.showBreakdown,
+            copy,
+        );
+        const telegramReply = buildTelegramPromptReply(
+            promptReply,
+            copy,
+            { showBreakdown: tokenSettings.showBreakdown },
+        );
 
         try {
             await ctx.reply(telegramReply.preferred.text, telegramReply.preferred.options);
@@ -82,15 +92,36 @@ export async function executePromptRequest(
 
 function normalizePromptReplyForDisplay(
     promptReply: SendPromptResult["assistantReply"],
+    _showBreakdown: Awaited<ReturnType<ForegroundPromptDependencies["getTokenSettingsUseCase"]["execute"]>>["showBreakdown"],
     copy: Awaited<ReturnType<typeof getSafeChatCopy>>,
 ) {
+    const displayedTokenTotal = calculateDisplayedTokenTotal(
+        promptReply.metrics.tokens,
+    );
+
     if (!promptReply.assistantError) {
-        return promptReply;
+        return withDisplayedTokenTotal(promptReply, displayedTokenTotal);
     }
 
-    return {
+    return withDisplayedTokenTotal({
         ...promptReply,
         bodyMd: null,
         fallbackText: presentError(promptReply.assistantError, copy),
+    }, displayedTokenTotal);
+}
+
+function withDisplayedTokenTotal(
+    promptReply: SendPromptResult["assistantReply"],
+    displayedTokenTotal: number | null,
+) {
+    return {
+        ...promptReply,
+        metrics: {
+            ...promptReply.metrics,
+            tokens: {
+                ...promptReply.metrics.tokens,
+                total: displayedTokenTotal,
+            },
+        },
     };
 }

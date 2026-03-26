@@ -22,6 +22,10 @@ export interface TelegramPromptReply {
     preferred: TelegramReplyPayload;
 }
 
+export interface TelegramPromptReplyOptions {
+    showBreakdown?: boolean;
+}
+
 export interface TelegramStaticReply {
     fallback: TelegramReplyPayload;
     preferred: TelegramReplyPayload;
@@ -30,9 +34,10 @@ export interface TelegramStaticReply {
 export function buildTelegramPromptReply(
     result: PromptSessionResult,
     copy: BotCopy = BOT_COPY,
+    options: TelegramPromptReplyOptions = {},
 ): TelegramPromptReply {
     const renderedMarkdown = result.bodyMd ? renderMarkdownToTelegramMarkdownV2(result.bodyMd) : null;
-    const footerPlain = formatPlainMetricsFooter(result.metrics, copy);
+    const footerPlain = formatPlainMetricsFooter(result.metrics, copy, options);
     const plainBody = normalizePlainBody(result, copy);
     const fallback = {
         text: joinBodyAndFooter(
@@ -48,7 +53,7 @@ export function buildTelegramPromptReply(
         };
     }
 
-    const footerMarkdown = formatMarkdownMetricsFooter(result.metrics, copy);
+    const footerMarkdown = formatMarkdownMetricsFooter(result.metrics, copy, options);
     const markdownText = joinBodyAndFooter(renderedMarkdown, footerMarkdown);
 
     if (markdownText.length > MAX_TELEGRAM_MESSAGE_LENGTH) {
@@ -285,12 +290,38 @@ function preprocessMarkdownForTelegram(markdown: string): string {
     return processed.join("\n");
 }
 
-function formatPlainMetricsFooter(metrics: PromptSessionMetrics, copy: BotCopy): string {
-    return `${copy.replyMetrics.durationLabel}: ${formatDuration(metrics.durationMs, copy)} | ${copy.replyMetrics.tokensLabel}: ${formatMetricValue(metrics.tokens.total, copy)}`;
+function formatPlainMetricsFooter(
+    metrics: PromptSessionMetrics,
+    copy: BotCopy,
+    options: TelegramPromptReplyOptions,
+): string {
+    const lines = [
+        `${copy.replyMetrics.durationLabel}: ${formatDuration(metrics.durationMs, copy)} | ${copy.replyMetrics.tokensLabel}: ${formatMetricValue(metrics.tokens.total, copy)}`,
+    ];
+
+    if (options.showBreakdown) {
+        lines.push(formatPlainTokenBreakdown(metrics, copy));
+    }
+
+    return lines.join("\n");
 }
 
-function formatMarkdownMetricsFooter(metrics: PromptSessionMetrics, copy: BotCopy): string {
-    return escapeMarkdownText(formatPlainMetricsFooter(metrics, copy));
+function formatMarkdownMetricsFooter(
+    metrics: PromptSessionMetrics,
+    copy: BotCopy,
+    options: TelegramPromptReplyOptions,
+): string {
+    return escapeMarkdownText(formatPlainMetricsFooter(metrics, copy, options));
+}
+
+function formatPlainTokenBreakdown(metrics: PromptSessionMetrics, copy: BotCopy): string {
+    return [
+        `${copy.replyMetrics.inputLabel}: ${formatMetricValue(metrics.tokens.input, copy)}`,
+        `${copy.replyMetrics.outputLabel}: ${formatMetricValue(metrics.tokens.output, copy)}`,
+        `${copy.replyMetrics.reasoningLabel}: ${formatMetricValue(metrics.tokens.reasoning, copy)}`,
+        `${copy.replyMetrics.cacheReadLabel}: ${formatMetricValue(metrics.tokens.cacheRead, copy)}`,
+        `${copy.replyMetrics.cacheWriteLabel}: ${formatMetricValue(metrics.tokens.cacheWrite, copy)}`,
+    ].join(" | ");
 }
 
 function formatDuration(durationMs: number | null, copy: BotCopy): string {

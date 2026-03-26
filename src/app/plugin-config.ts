@@ -27,7 +27,7 @@ export interface PreparePluginConfigurationOptions {
 
 type KnownPluginConfigSections = Pick<
     PluginConfigSource,
-    "telegram" | "state" | "prompt" | "logging"
+    "telegram" | "state" | "prompt" | "tokens" | "logging"
 >;
 
 type PluginConfigSectionKey = keyof KnownPluginConfigSections;
@@ -44,6 +44,7 @@ const PLUGIN_CONFIG_SECTION_KEYS = [
     "telegram",
     "state",
     "prompt",
+    "tokens",
     "logging",
 ] as const satisfies PluginConfigSectionKey[];
 
@@ -53,6 +54,7 @@ const PLUGIN_CONFIG_SECTION_MERGERS: {
     telegram: mergeObjectSection,
     state: mergeObjectSection,
     prompt: mergeObjectSection,
+    tokens: mergeObjectSection,
     logging: mergeLoggingConfig,
 };
 
@@ -103,6 +105,7 @@ export function mergePluginConfigSources(
             telegram: merged.telegram,
             state: merged.state,
             prompt: merged.prompt,
+            tokens: merged.tokens,
             logging: merged.logging,
         } satisfies Partial<KnownPluginConfigSections>;
 
@@ -143,6 +146,8 @@ async function loadPluginConfigFile(configFilePath: string): Promise<PluginConfi
     }
 }
 
+export { loadPluginConfigFile as readPluginConfigFile };
+
 function parsePluginConfigText(
     content: string,
     configFilePath: string,
@@ -170,6 +175,7 @@ function orderPluginConfig(config: PluginConfigSource): PluginConfigSource {
         "telegram",
         "state",
         "prompt",
+        "tokens",
         "logging",
     ]);
     const ordered: PluginConfigSource = {};
@@ -184,6 +190,10 @@ function orderPluginConfig(config: PluginConfigSource): PluginConfigSource {
 
     if (config.prompt) {
         ordered.prompt = config.prompt;
+    }
+
+    if (config.tokens) {
+        ordered.tokens = config.tokens;
     }
 
     if (config.logging) {

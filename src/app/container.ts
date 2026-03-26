@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
 import type { BotDependencies } from "../bot/types.js";
 import type { PermissionApprovalRepository } from "../domain/permission/approval.repository.js";
+import type { TokenSettingsRepository } from "../domain/token/token-settings.repository.js";
 import { createOpenCodeAppLogger } from "../infra/logger/index.js";
 import { FilePendingActionRepository } from "../repositories/pending-action.repo.js";
 import { FilePermissionApprovalRepository } from "../repositories/permission-approval.repo.js";
 import { FileSessionRepository } from "../repositories/session.repo.js";
+import { FileTokenSettingsRepository } from "../repositories/token-settings.repo.js";
 import {
     createOpenCodeClientFromSdkClient,
     type OpenCodeClientLike,
@@ -22,6 +24,7 @@ import {
     createStatusSectionProviders,
     GetStatusUseCase,
 } from "../use-cases/get-status.usecase.js";
+import { GetTokenSettingsUseCase } from "../use-cases/get-token-settings.usecase.js";
 import { ListAgentsUseCase } from "../use-cases/list-agents.usecase.js";
 import { ListLspUseCase } from "../use-cases/list-lsp.usecase.js";
 import { ListMcpUseCase } from "../use-cases/list-mcp.usecase.js";
@@ -32,12 +35,14 @@ import { SendPromptUseCase } from "../use-cases/send-prompt.usecase.js";
 import { SwitchAgentUseCase } from "../use-cases/switch-agent.usecase.js";
 import { SwitchModelUseCase } from "../use-cases/switch-model.usecase.js";
 import { SwitchSessionUseCase } from "../use-cases/switch-session.usecase.js";
+import { ToggleTokenSettingUseCase } from "../use-cases/toggle-token-setting.usecase.js";
 import { UploadFileUseCase } from "../use-cases/upload-file.usecase.js";
 import type { AppConfig } from "./config.js";
 
 export interface AppContainer extends BotDependencies {
     getHealthUseCase: GetHealthUseCase;
     getPathUseCase: GetPathUseCase;
+    tokenSettingsRepo: TokenSettingsRepository;
     listLspUseCase: ListLspUseCase;
     listMcpUseCase: ListMcpUseCase;
     opencodeClient: OpenCodeClientLike;
@@ -50,7 +55,7 @@ type ContainerLogger = BotDependencies["logger"];
 
 type ContainerRepositories = Pick<
     AppContainer,
-    "pendingActionRepo" | "permissionApprovalRepo" | "sessionRepo"
+    "pendingActionRepo" | "permissionApprovalRepo" | "sessionRepo" | "tokenSettingsRepo"
 >;
 
 type ContainerRuntimeServices = Pick<
@@ -65,6 +70,7 @@ type ContainerUseCases = Pick<
     | "getHealthUseCase"
     | "getPathUseCase"
     | "getStatusUseCase"
+    | "getTokenSettingsUseCase"
     | "listAgentsUseCase"
     | "listLspUseCase"
     | "listMcpUseCase"
@@ -75,6 +81,7 @@ type ContainerUseCases = Pick<
     | "switchAgentUseCase"
     | "switchModelUseCase"
     | "switchSessionUseCase"
+    | "toggleTokenSettingUseCase"
 >;
 
 interface CreateUseCasesInput extends ContainerRepositories, ContainerRuntimeServices {
@@ -168,6 +175,12 @@ function createContainerRepositories(config: AppConfig): ContainerRepositories {
         pendingActionRepo: new FilePendingActionRepository(stateStore),
         permissionApprovalRepo: new FilePermissionApprovalRepository(stateStore),
         sessionRepo: new FileSessionRepository(stateStore),
+        tokenSettingsRepo: new FileTokenSettingsRepository(
+            config.pluginConfigFilePath,
+            {
+                showBreakdown: config.tokenShowBreakdown,
+            },
+        ),
     };
 }
 
@@ -198,6 +211,7 @@ function createContainerUseCases(input: CreateUseCasesInput): ContainerUseCases 
     );
     const getHealthUseCase = new GetHealthUseCase(input.opencodeClient);
     const getPathUseCase = new GetPathUseCase(input.opencodeClient);
+    const getTokenSettingsUseCase = new GetTokenSettingsUseCase(input.tokenSettingsRepo);
     const listAgentsUseCase = new ListAgentsUseCase(input.sessionRepo, input.opencodeClient);
     const listLspUseCase = new ListLspUseCase(input.sessionRepo, input.opencodeClient);
     const listMcpUseCase = new ListMcpUseCase(input.sessionRepo, input.opencodeClient);
@@ -237,6 +251,7 @@ function createContainerUseCases(input: CreateUseCasesInput): ContainerUseCases 
         input.opencodeClient,
         opencodeLogger,
     );
+    const toggleTokenSettingUseCase = new ToggleTokenSettingUseCase(input.tokenSettingsRepo);
 
     return {
         abortPromptUseCase,
@@ -244,6 +259,7 @@ function createContainerUseCases(input: CreateUseCasesInput): ContainerUseCases 
         getHealthUseCase,
         getPathUseCase,
         getStatusUseCase,
+        getTokenSettingsUseCase,
         listAgentsUseCase,
         listLspUseCase,
         listMcpUseCase,
@@ -254,5 +270,6 @@ function createContainerUseCases(input: CreateUseCasesInput): ContainerUseCases 
         switchAgentUseCase,
         switchModelUseCase,
         switchSessionUseCase,
+        toggleTokenSettingUseCase,
     };
 }

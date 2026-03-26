@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { DEFAULT_TOKEN_SHOW_BREAKDOWN } from "../src/domain/token/token-settings.entity.js";
 import type { PromptSessionFilePartInput, PromptSessionResult } from "../src/services/opencode/opencode.client.js";
 import { handleImageMessage } from "../src/bot/handlers/file.handler.js";
 import { InMemoryPendingActionRepository } from "../src/repositories/pending-action.repo.js";
@@ -16,7 +17,7 @@ function createPromptReply(overrides: Partial<PromptSessionResult> = {}): Prompt
         metrics: {
             durationMs: 120,
             tokens: {
-                total: 42,
+                total: 37,
                 input: 10,
                 output: 12,
                 reasoning: 5,
@@ -62,6 +63,13 @@ function createDependencies(options: {
                 warn() { },
             },
             foregroundSessionTracker: new ForegroundSessionTracker(),
+            getTokenSettingsUseCase: {
+                async execute() {
+                    return {
+                        showBreakdown: DEFAULT_TOKEN_SHOW_BREAKDOWN,
+                    };
+                },
+            },
             pendingActionRepo,
             sessionRepo,
             sendPromptUseCase: {
@@ -149,7 +157,7 @@ test("handleImageMessage forwards image captions and file parts to OpenCode", as
     assert.deepEqual(replies, [
         { text: "Processing...", other: undefined },
         {
-            text: "*Hello*\n\nDuration: 120 ms \\| Tokens: 42",
+            text: "*Hello*\n\nDuration: 120 ms \\| Displayed Tokens: 42",
             other: { parse_mode: "MarkdownV2" },
         },
     ]);

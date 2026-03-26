@@ -6,6 +6,7 @@ import {
     startTelegramBotRuntime,
 } from "../src/app/runtime.js";
 import type { AppConfig } from "../src/app/config.js";
+import { DEFAULT_TOKEN_SHOW_BREAKDOWN } from "../src/domain/token/token-settings.entity.js";
 import type { AppContainer } from "../src/app/container.js";
 
 interface BotStub {
@@ -29,6 +30,8 @@ function createConfig(): AppConfig {
         promptPollRequestTimeoutMs: 15_000,
         promptRecoveryInactivityTimeoutMs: 120_000,
         promptWaitTimeoutMs: 1_800_000,
+        tokenShowBreakdown: DEFAULT_TOKEN_SHOW_BREAKDOWN,
+        pluginConfigFilePath: "E:/Users/demo/.config/opencode/opencode-tbot/config.json",
         stateFilePath: "E:/repo/data/opencode-tbot.state.json",
         telegramAllowedChatIds: [],
         telegramApiRoot: "https://api.telegram.org",

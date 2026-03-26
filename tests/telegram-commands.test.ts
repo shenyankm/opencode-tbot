@@ -48,6 +48,10 @@ test("TELEGRAM_COMMANDS only advertises implemented commands", () => {
             description: "Show and switch models",
         },
         {
+            command: "token",
+            description: "Show or hide token breakdown details",
+        },
+        {
             command: "language",
             description: "Show and switch language",
         },
@@ -137,6 +141,10 @@ test("getTelegramCommands returns Japanese descriptions when requested", () => {
             description: "モデルを表示して切り替え",
         },
         {
+            command: "token",
+            description: "トークン明細の表示を切り替え",
+        },
+        {
             command: "language",
             description: "言語を表示して切り替え",
         },
@@ -172,6 +180,10 @@ test("getTelegramCommands returns standardized Chinese descriptions when request
         {
             command: "model",
             description: "查看并切换模型",
+        },
+        {
+            command: "token",
+            description: "开启/关闭令牌明细显示",
         },
         {
             command: "language",

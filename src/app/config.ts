@@ -1,7 +1,13 @@
 import { homedir } from "node:os";
 import { isAbsolute, resolve } from "node:path";
 import { z } from "zod";
-import { getDefaultPluginLogDirectory } from "./opencode-paths.js";
+import {
+    getDefaultPluginLogDirectory,
+    getGlobalPluginConfigFilePath,
+} from "./opencode-paths.js";
+import {
+    DEFAULT_TOKEN_SHOW_BREAKDOWN,
+} from "../domain/token/token-settings.entity.js";
 
 export const DEFAULT_STATE_FILE_PATH = "./data/opencode-tbot.state.json";
 export const DEFAULT_TELEGRAM_API_ROOT = "https://api.telegram.org";
@@ -69,10 +75,18 @@ const LoggingConfigSchema = z.preprocess(
     }),
 );
 
+const TokenConfigSchema = z.preprocess(
+    (value) => value ?? {},
+    z.object({
+        showBreakdown: z.boolean().default(DEFAULT_TOKEN_SHOW_BREAKDOWN),
+    }),
+);
+
 const AppConfigSchema = z.object({
     telegram: TelegramConfigSchema,
     state: StateConfigSchema,
     prompt: PromptConfigSchema,
+    tokens: TokenConfigSchema.default({}),
     logging: LoggingConfigSchema.default({}),
 });
 
@@ -111,6 +125,10 @@ export interface PluginConfigSource {
         };
         [key: string]: unknown;
     };
+    tokens?: {
+        showBreakdown?: boolean;
+        [key: string]: unknown;
+    };
     [key: string]: unknown;
 }
 
@@ -127,12 +145,15 @@ export interface AppConfig {
     promptWaitTimeoutMs: number;
     promptPollRequestTimeoutMs: number;
     promptRecoveryInactivityTimeoutMs: number;
+    tokenShowBreakdown: boolean;
+    pluginConfigFilePath: string;
     stateFilePath: string;
     worktreePath: string;
 }
 
 export interface LoadAppConfigOptions {
     cwd?: string;
+    configFilePath?: string;
 }
 
 export function loadAppConfig(
@@ -169,6 +190,8 @@ function buildAppConfig(
         promptWaitTimeoutMs: data.prompt.waitTimeoutMs,
         promptPollRequestTimeoutMs: data.prompt.pollRequestTimeoutMs,
         promptRecoveryInactivityTimeoutMs: data.prompt.recoveryInactivityTimeoutMs,
+        tokenShowBreakdown: data.tokens.showBreakdown,
+        pluginConfigFilePath: options.configFilePath ?? getGlobalPluginConfigFilePath(homedir()),
         stateFilePath: resolveStatePath(data, cwd),
         worktreePath: cwd,
     };

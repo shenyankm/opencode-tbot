@@ -748,6 +748,23 @@ export function presentModelSwitchMessage(
     ].join("\n");
 }
 
+export function presentTokenSettingsMessage(
+    showBreakdown: boolean,
+    copy: BotCopy = BOT_COPY,
+): string {
+    const lines = [
+        copy.token.title,
+        copy.token.description,
+        copy.token.scopeNotice,
+        "",
+        copy.token.currentStatus(showBreakdown ? copy.token.enabledLabel : copy.token.disabledLabel),
+        copy.token.footerSummary,
+        copy.token.footerBreakdown,
+    ];
+
+    return lines.join("\n");
+}
+
 export function presentLanguageMessage(currentLanguage: BotLanguage, copy: BotCopy = BOT_COPY): string {
     return [
         copy.language.title,
