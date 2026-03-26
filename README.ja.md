@@ -1,6 +1,7 @@
 # opencode-tbot
 
 Telegram から [OpenCode](https://opencode.ai) を操作するためのプラグインです。
+[grammY](https://grammy.dev) と `@opencode-ai/sdk` を基盤として実装しています。
 
 [English](./README.md) | [简体中文](./README.zh-CN.md) | [日本語](./README.ja.md)
 
@@ -14,14 +15,18 @@ Telegram から [OpenCode](https://opencode.ai) を操作するためのプラ�
 - Telegram の写真や画像ドキュメントは OpenCode の file part としてアップロードされます。
 - OpenCode が発行した権限リクエストは Telegram のインラインボタンから承認または拒否できます。
 - セッションエラーイベントは、バインド済みの Telegram chat に通知できます。
-- Telegram の音声メッセージ機能は廃止しました。Telegram の音声は既定で OGG 形式であり、利用可能な音声モデルを使うには追加のトランスコードが必要です。トランスコードによるサイズ増加と保守コストが大きいため、総合判断で機能を削除し、音声メッセージにはローカライズされた拒否案内を返します。
 - chat のバインド、言語設定、モデルやエージェントの選択は JSON 状態ファイルに保存されます。
 
 ## 要件
 
 - このプラグインを読み込む OpenCode Host プロセスが起動していること
 - Telegram bot token
-- CLI とローカル開発用の Node.js `>=22.12.0`
+- CLI 用の Node.js `>=22.12.0`
+
+## Telegram 認証情報の取得
+
+- `botToken`: Telegram で `@BotFather` を開き、`/newbot` を実行して、返された token をコピーします。
+- `userId` / `chatId`: Telegram で `@userinfobot` を開き、返された数値 ID をコピーします。bot とのダイレクトチャットでは、その値を `telegram.allowedChatIds` に使えます。
 
 ## インストール、更新、アンインストール
 
@@ -70,9 +75,6 @@ npm exec -- opencode-tbot@latest --help
 - `install` は `opencode.json` とグローバルプラグイン設定ファイルの両方を更新します。
 - `update` は `opencode.json` だけを更新し、既存のプラグイン設定内容は変更しません。
 - `uninstall` は `opencode.json` から `opencode-tbot` を削除し、`~/.config/opencode/opencode-tbot/config.json` はそのまま残します。
-- OpenCode は起動時に `opencode.json` から npm プラグインを自動インストールし、`~/.cache/opencode/node_modules/` にキャッシュするため、通常利用では `npm install -g opencode-tbot` は不要です。
-- 既存の `~/.config/opencode/package.json`、`bun.lock`、`.gitignore`、`node_modules` は OpenCode 自身の実行状態に属している可能性があるため、インストーラーは削除も退避も行いません。
-- 衝突として扱うのは `~/.config/opencode/plugins/opencode-tbot.*` にある同名のローカルファイルプラグインだけです。見つかった場合は npm プラグインを有効にせず、名前変更または削除を案内します。
 
 ### CLI オプション
 
@@ -115,33 +117,10 @@ OpenCode は次のパスから npm プラグイン登録を読み込みます。
 {
   "telegram": {
     "botToken": "your_telegram_bot_token",
-    "allowedChatIds": [123456789],
-    "apiRoot": "https://api.telegram.org"
-  },
-  "state": {
-    "path": "./data/opencode-tbot.state.json"
-  },
-  "prompt": {
-    "waitTimeoutMs": 1800000,
-    "pollRequestTimeoutMs": 15000,
-    "recoveryInactivityTimeoutMs": 120000
+    "allowedChatIds": ["123456789"]
   },
   "tokens": {
     "showBreakdown": false
-  },
-  "logging": {
-    "level": "info",
-    "sinks": {
-      "host": true,
-      "file": true
-    },
-    "file": {
-      "dir": "<home>/.local/share/opencode/log/plugins/opencode-tbot",
-      "retention": {
-        "maxFiles": 30,
-        "maxTotalBytes": 314572800
-      }
-    }
   }
 }
 ```
@@ -152,37 +131,14 @@ OpenCode は次のパスから npm プラグイン登録を読み込みます。
 | --- | --- | --- | --- |
 | `telegram.botToken` | はい | - | Telegram bot token。通常は `getMe` 検証に成功したあとでインストーラーがグローバルプラグイン設定へ書き込みます。 |
 | `telegram.allowedChatIds` | いいえ | `[]` | 許可する Telegram chat ID。空の場合は任意の chat からのメッセージを受け付けます。 |
-| `telegram.apiRoot` | いいえ | `https://api.telegram.org` | Telegram Bot API の base URL。テストや self-hosted gateway 向けです。 |
-| `state.path` | いいえ | `./data/opencode-tbot.state.json` | JSON 状態ファイルのパス。現在の OpenCode worktree を基準に解決されます。 |
-| `prompt.waitTimeoutMs` | いいえ | `1800000` | 1 回の async prompt ライフサイクル全体に対する最大待機時間です。 |
-| `prompt.pollRequestTimeoutMs` | いいえ | `15000` | OpenCode に対する各 recovery poll リクエストのタイムアウトです。 |
-| `prompt.recoveryInactivityTimeoutMs` | いいえ | `120000` | prompt の進捗が止まったときにだけ適用される recovery timeout です。 |
-| `tokens.showBreakdown` | いいえ | `false` | `/token` 用のグローバルスイッチです。`input`、`output`、`reasoning`、`cache.read`、`cache.write` を含む2行目のフッター内訳を表示するかを制御します。1行目の表示トークン合計は常にこの5項目から再計算され、worktree の状態ファイルには保存されません。 |
-| `logging.level` | いいえ | `info` | host と file sink で使う構造化ログレベルです。未知の値は `info` に正規化されます。 |
-| `logging.sinks.host` | いいえ | `true` | `client.app.log(...)` 経由で OpenCode Host にログを書き込むかどうかです。 |
-| `logging.sinks.file` | いいえ | `true` | プラグイン独自の JSONL ファイルログを書き込むかどうかです。 |
-| `logging.file.dir` | いいえ | `<home>/.local/share/opencode/log/plugins/opencode-tbot` | プラグインの JSONL ログディレクトリ。相対パスは現在の OpenCode worktree 基準で解決されます。 |
-| `logging.file.retention.maxFiles` | いいえ | `30` | 保持するプラグインログファイルの最大数です。 |
-| `logging.file.retention.maxTotalBytes` | いいえ | `314572800` | 保持するプラグインログファイルの総容量上限です。 |
-
-### 補足
-
-- `state.path` は現在の OpenCode worktree 基準で解決されます。
-- `logging.file.dir` が相対パスの場合も現在の OpenCode worktree 基準で解決されます。未指定の場合はユーザーの home ディレクトリ配下の既定ログディレクトリが使われます。
-- `/token` は `~/.config/opencode/opencode-tbot/config.json` のグローバル `tokens.showBreakdown` 設定を更新し、worktree の状態ファイルには書き込みません。
-- 返信フッターの1行目は常に `Duration | Displayed Tokens` です。有効化すると、`/token` は `input`、`output`、`reasoning`、`cache.read`、`cache.write` の完全な内訳を2行目に追加します。
-- Telegram の prompt 処理は async-first です。プラグインは `session.promptAsync()` を送信し、その後にセッションメッセージと状態から最終応答を復元します。
-- `telegram.allowedChatIds` を空にすると、bot は任意の chat からのメッセージを受け付けます。本番環境では明示的な制限を推奨します。
-- `/language` は bot の表示言語を切り替えるだけでなく、その chat 用の Telegram コマンド説明も再同期します。
-- ファイルログは既定でメタデータのみを記録し、prompt 本文、添付内容、元 URL、secret は書き込みません。
+| `tokens.showBreakdown` | いいえ | `false` | `/token` 用のグローバルスイッチです。`今回のリクエスト総入力`、`output`、`reasoning`、`cache.read`、`cache.write` を含む2行目のフッター内訳を表示するかを制御します。1行目の表示トークン合計は常にこの5項目から再計算され、worktree の状態ファイルには保存されません。 |
 
 ## クイックスタート
 
 1. `npm exec -- opencode-tbot@latest` を実行します。
 2. 特定の chat のみを許可したい場合は、`~/.config/opencode/opencode-tbot/config.json` で `telegram.allowedChatIds` を設定します。
-3. 対象 worktree で OpenCode を起動し、プラグイン runtime が読み込まれるようにします。
-4. Telegram で `/status` を実行して接続を確認します。
-5. `/new [title]` を実行するか、テキストまたは画像メッセージを直接送って使い始めます。
+3. Telegram で `/status` を実行して接続を確認します。
+4. `/new [title]` を実行するか、テキストまたは画像メッセージを直接送って使い始めます。
 
 ## コマンド
 
@@ -206,15 +162,6 @@ OpenCode は次のパスから npm プラグイン登録を読み込みます。
 - 権限承認は Telegram のインラインボタンから処理できます。
 - `/cancel` は OpenCode セッションの処理と Telegram 側の待機状態を同時に中止し、次の prompt をすぐ開始できるようにします。
 - Telegram の音声メッセージ機能は廃止しました。Telegram の音声は既定で OGG 形式であり、利用可能な音声モデルを使うには追加のトランスコードが必要です。トランスコードによるサイズ増加と保守コストが大きいため、総合判断で機能を削除し、音声メッセージにはローカライズされた拒否案内を返します。
-
-## ログ
-
-- OpenCode Host のログディレクトリ: `<home>/.local/share/opencode/log`
-- 既定のプラグインログディレクトリ: `<home>/.local/share/opencode/log/plugins/opencode-tbot`
-- ファイル形式: append-only の JSONL、1 行につき 1 件の構造化イベント
-- 主な相関フィールド: `runtimeId`, `operationId`, `correlationId`, `updateId`, `chatId`, `sessionId`, `projectId`
-- よく使う component: `runtime`, `telegram`, `opencode`, `prompt`, `plugin-event`, `storage`
-- 既定の保持方針: 最新 30 ファイル、合計 300 MB 以下
 
 ## FAQ
 

@@ -7,6 +7,7 @@ Guidance for coding agents working in `opencode-tbot`.
 - This repo is a TypeScript/ESM Telegram plugin for OpenCode.
 - Runtime code lives in `src/`; generated output lives in `dist/`.
 - Tests use the Node test runner through `tsx`.
+- User-facing docs are maintained in `README.md`, `README.zh-CN.md`, and `README.ja.md`.
 - No repo-local `.cursorrules`, `.cursor/rules/`, or `.github/copilot-instructions.md` files exist right now.
 - If such rule files are added later, merge their instructions into this document instead of creating conflicting guidance.
 
@@ -18,7 +19,8 @@ Guidance for coding agents working in `opencode-tbot`.
 - Build tool: `vite`.
 - Static check: `tsc` via `pnpm typecheck`.
 - Test runner: `tsx --test tests/**/*.test.ts`.
-- CI installs `opencode-ai` globally before enabling the integration test path.
+- The env-gated host integration path typically installs `opencode-ai` globally before setting `OPENCODE_HOST_E2E=1`.
+- There is no committed GitHub Actions workflow in this repo right now; rely on the local verification commands below.
 
 ## Repo Map
 
@@ -42,7 +44,7 @@ Guidance for coding agents working in `opencode-tbot`.
 - `pnpm test`: run the normal test suite; the integration test stays skipped unless `OPENCODE_HOST_E2E=1` is set.
 - `pnpm exec tsx --test tests/cli.test.ts`: run one test file.
 - `pnpm exec tsx --test --test-name-pattern "runCli prints the package version for --version" tests/cli.test.ts`: run one named test.
-- `npm install -g opencode-ai` then `OPENCODE_HOST_E2E=1 pnpm test`: closest local match to CI integration coverage.
+- `npm install -g opencode-ai` then `OPENCODE_HOST_E2E=1 pnpm test`: closest local match to the env-gated host integration coverage.
 - There is no dedicated lint script today; treat `pnpm typecheck` as the required lint/static-quality command.
 
 ## Verification Defaults
@@ -99,6 +101,7 @@ Guidance for coding agents working in `opencode-tbot`.
 
 - Centralize user-facing copy in `src/bot/copy.ts`; do not scatter reply strings through handlers.
 - Preserve localization support for English, Simplified Chinese, and Japanese.
+- Keep `README.md`, `README.zh-CN.md`, and `README.ja.md` aligned when docs describe the same user-facing behavior.
 - Keep MarkdownV2 handling conservative; the repo already falls back to plain text when Telegram markdown is rejected.
 - If you add or change a command, update command registration, localized copy, presenters, and tests together.
 - Do not introduce voice transcription; the current behavior explicitly rejects voice messages.
@@ -131,4 +134,4 @@ Guidance for coding agents working in `opencode-tbot`.
 - Run targeted verification commands before finishing.
 - Run `pnpm typecheck` for all non-trivial TypeScript edits.
 - Run `pnpm build` when touching entrypoints, packaging, or runtime bootstrap behavior.
-- Check `README.md` for drift when changing commands, config flows, or user-facing behavior.
+- Check `README.md`, `README.zh-CN.md`, and `README.ja.md` for drift when changing commands, config flows, or user-facing behavior.
