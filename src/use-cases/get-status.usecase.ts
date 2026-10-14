@@ -1,4 +1,4 @@
-import { isAbsolute } from "node:path";
+import { isAbsolute, win32 } from "node:path";
 import type { SessionRepository } from "../domain/session/session.repository.js";
 import type {
     OpenCodeHealth,
@@ -271,7 +271,7 @@ function isUsableWorkspacePath(value: string | null | undefined): value is strin
     return normalized.length > 0
         && normalized !== "/"
         && normalized !== "\\"
-        && isAbsolute(normalized);
+        && (isAbsolute(normalized) || win32.isAbsolute(normalized));
 }
 
 function normalizeConfiguredPluginLabels(plugins: string[]): string[] {

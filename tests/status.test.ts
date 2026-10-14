@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { OPENCODE_TBOT_VERSION } from "../src/app/package-info.js";
 import { getChatCopy } from "../src/bot/i18n.js";
+import { getBotCopy } from "../src/bot/copy.js";
 import { handleStatusCommand } from "../src/bot/commands/status.js";
-import { presentStatusMarkdownMessage } from "../src/bot/presenters/message.presenter.js";
+import { presentMcpMessage, presentStatusMarkdownMessage } from "../src/bot/presenters/message.presenter.js";
 import type { AppLogger } from "../src/infra/logger/index.js";
 import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
 import type {
@@ -100,6 +101,17 @@ function escapeRegExp(value: string): string {
 function expectLine(markdown: string, line: string) {
     assert.match(markdown, new RegExp(`^${escapeRegExp(line)}$`, "mu"));
 }
+
+test("MCP pending connections show localized progress in all supported languages", () => {
+    for (const language of ["en", "zh-CN", "ja"] as const) {
+        const copy = getBotCopy(language);
+        const message = presentMcpMessage({
+            currentDirectory: "/workspace",
+            statuses: [{ name: "pending-server", status: { status: "pending" } }],
+        }, copy);
+        assert.ok(message.includes(copy.mcp.pending));
+    }
+});
 
 test("/status aggregates health, path, plugins, LSP, and MCP into one reply", async () => {
     const project = createProject("project-1", "E:/repo-1");

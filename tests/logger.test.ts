@@ -9,73 +9,33 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import test, { mock } from "node:test";
 import { createOpenCodeAppLogger } from "../src/infra/logger/index.js";
 
-test("createOpenCodeAppLogger sends structured log entries through root client.app.log", async () => {
-    const calls: Array<Record<string, unknown>> = [];
-    const logger = createOpenCodeAppLogger({
-        app: {
-            async log(input: Record<string, unknown>) {
-                calls.push(input);
-                return true;
-            },
-        },
-    }, {
-        sinks: {
-            file: false,
-            host: true,
-        },
-    });
-
-    logger.info(
-        {
-            component: "runtime",
-            event: "runtime.started",
-            token: "sk-secret-token",
-        },
-        "hello",
-    );
-    await logger.flush();
-
-    assert.equal(calls.length, 1);
-    assert.deepEqual(calls[0], {
-        body: {
-            service: "opencode-tbot",
-            level: "info",
-            message: "hello",
-            extra: {
-                ts: ((calls[0]?.body as { extra?: Record<string, unknown> } | undefined)?.extra)?.ts,
-                component: "runtime",
-                event: "runtime.started",
-                runtimeId: ((calls[0]?.body as { extra?: Record<string, unknown> } | undefined)?.extra)?.runtimeId,
-                operationId: null,
-                correlationId: null,
-                token: "[REDACTED]",
-            },
-        },
-        responseStyle: "data",
-        throwOnError: true,
-    });
-    assert.match(
-        String((((calls[0].body as { extra?: { runtimeId?: unknown } } | undefined)?.extra)?.runtimeId) ?? ""),
-        /^[0-9a-f-]{36}$/u,
-    );
-    assert.match(
-        String((((calls[0].body as { extra?: { ts?: unknown } } | undefined)?.extra)?.ts) ?? ""),
-        /^\d{4}-\d{2}-\d{2}T/u,
-    );
+test("createOpenCodeAppLogger sends redacted structured entries to the host console", async () => {
+    const log = mock.method(console, "info", () => undefined);
+    try {
+        const logger = createOpenCodeAppLogger({
+            sinks: { file: false, host: true },
+        });
+        logger.info({ component: "runtime", event: "runtime.started", token: "sk-secret-token" }, "hello");
+        await logger.flush();
+        assert.equal(log.mock.callCount(), 1);
+        const entry = JSON.parse(log.mock.calls[0]!.arguments[0] as string);
+        assert.equal(entry.service, "opencode-tbot");
+        assert.equal(entry.level, "info");
+        assert.equal(entry.message, "hello");
+        assert.equal(entry.token, "[REDACTED]");
+        assert.match(entry.runtimeId, /^[0-9a-f-]{36}$/u);
+        assert.match(entry.ts, /^\d{4}-\d{2}-\d{2}T/u);
+    } finally {
+        log.mock.restore();
+    }
 });
 
 test("createOpenCodeAppLogger writes metadata-only JSONL file logs", async () => {
     const logDir = mkdtempSync(join(tmpdir(), "opencode-tbot-logs-"));
     const logger = createOpenCodeAppLogger({
-        app: {
-            async log() {
-                return true;
-            },
-        },
-    }, {
         file: {
             dir: logDir,
         },
@@ -161,12 +121,6 @@ test("createOpenCodeAppLogger keeps only the newest retained file logs", async (
     utimesSync(oldFileTwo, new Date("2026-01-01T00:00:01.000Z"), new Date("2026-01-01T00:00:01.000Z"));
 
     const logger = createOpenCodeAppLogger({
-        app: {
-            async log() {
-                return true;
-            },
-        },
-    }, {
         file: {
             dir: logDir,
             retention: {
@@ -198,38 +152,19 @@ test("createOpenCodeAppLogger keeps only the newest retained file logs", async (
 test("createOpenCodeAppLogger keeps host logging alive when the file sink cannot write", async () => {
     const blockedRoot = mkdtempSync(join(tmpdir(), "opencode-tbot-blocked-"));
     const blockedFile = join(blockedRoot, "blocked");
-    const calls: Array<Record<string, unknown>> = [];
-
-    writeFileSync(blockedFile, "blocked", "utf8");
-
-    const logger = createOpenCodeAppLogger({
-        app: {
-            async log(input) {
-                calls.push(input);
-                return true;
-            },
-        },
-    }, {
-        file: {
-            dir: join(blockedFile, "nested"),
-        },
-        sinks: {
-            file: true,
-            host: true,
-        },
-    });
-
-    logger.warn(
-        {
-            component: "runtime",
-            event: "runtime.file_sink_failed",
-        },
-        "host still works",
-    );
-    await logger.flush();
-
-    assert.equal(calls.length, 1);
-    assert.equal((calls[0]?.body as { message?: string } | undefined)?.message, "host still works");
-
-    rmSync(blockedRoot, { force: true, recursive: true });
+    const log = mock.method(console, "warn", () => undefined);
+    try {
+        writeFileSync(blockedFile, "blocked", "utf8");
+        const logger = createOpenCodeAppLogger({
+            file: { dir: join(blockedFile, "nested") },
+            sinks: { file: true, host: true },
+        });
+        logger.warn({ component: "runtime", event: "runtime.file_sink_failed" }, "host still works");
+        await logger.flush();
+        assert.equal(log.mock.callCount(), 1);
+        assert.equal(JSON.parse(log.mock.calls[0]!.arguments[0] as string).message, "host still works");
+    } finally {
+        log.mock.restore();
+        rmSync(blockedRoot, { force: true, recursive: true });
+    }
 });

@@ -1,15 +1,13 @@
-import type { ChatSessionBinding } from "../domain/session/session.entity.js";
 import type { SessionRepository } from "../domain/session/session.repository.js";
-import type {
-    OpenCodeLspStatus,
-    OpenCodeProject,
-} from "../services/opencode/opencode.client.js";
+import type { OpenCodeLspStatus } from "../services/opencode/opencode.client.js";
 import type {
     OpenCodeCurrentProjectReader,
     OpenCodeLspCatalog,
     OpenCodeProjectCatalog,
+    OpenCodeSessionCatalog,
 } from "../services/opencode/opencode.ports.js";
 import { clearStoredSessionContext } from "./binding-update.js";
+import { hasMatchingProject } from "./project-binding.js";
 
 export interface ListLspResult {
     currentDirectory: string;
@@ -23,7 +21,10 @@ export interface ListLspInput {
 export class ListLspUseCase {
     constructor(
         private readonly sessionRepo: SessionRepository,
-        private readonly opencodeClient: OpenCodeCurrentProjectReader & OpenCodeLspCatalog & OpenCodeProjectCatalog,
+        private readonly opencodeClient: OpenCodeCurrentProjectReader
+            & OpenCodeLspCatalog
+            & OpenCodeProjectCatalog
+            & Pick<OpenCodeSessionCatalog, "listSessions">,
     ) { }
 
     async execute(input: ListLspInput): Promise<ListLspResult> {
@@ -32,7 +33,7 @@ export class ListLspUseCase {
         if (binding?.projectId && binding.directory) {
             const projects = await this.opencodeClient.listProjects();
 
-            if (!hasMatchingProject(projects, binding)) {
+            if (!(await hasMatchingProject(projects, binding, this.opencodeClient))) {
                 binding = await clearStoredSessionContext(this.sessionRepo, binding);
             }
         }
@@ -65,10 +66,4 @@ function compareLspStatuses(left: OpenCodeLspStatus, right: OpenCodeLspStatus): 
     return left.name.localeCompare(right.name)
         || left.root.localeCompare(right.root)
         || left.id.localeCompare(right.id);
-}
-
-function hasMatchingProject(projects: OpenCodeProject[], binding: ChatSessionBinding): boolean {
-    return projects.some((project) =>
-        project.id === binding.projectId && project.worktree === binding.directory,
-    );
 }

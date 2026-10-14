@@ -200,7 +200,7 @@ test("installPlugin writes the OpenCode config and runtime config", async () => 
     const pluginConfigPath = getGlobalPluginConfigFilePath(homeDir);
     const openCodeConfig = JSON.parse(readFileSync(openCodeConfigPath, "utf8")) as {
         $schema: string;
-        plugin: string[];
+        plugins: string[];
     };
     const pluginConfig = JSON.parse(readFileSync(pluginConfigPath, "utf8")) as {
         telegram: { botToken: string; apiRoot: string };
@@ -208,7 +208,7 @@ test("installPlugin writes the OpenCode config and runtime config", async () => 
 
     assert.deepEqual(openCodeConfig, {
         $schema: "https://opencode.ai/config.json",
-        plugin: ["opencode-tbot"],
+        plugins: ["opencode-tbot"],
     });
     assert.equal(pluginConfig.telegram.botToken, TEST_TELEGRAM_BOT_TOKEN);
     assert.match(pluginConfig.telegram.apiRoot, /^http:\/\/127\.0\.0\.1:\d+$/u);
@@ -261,7 +261,7 @@ test("installPlugin tolerates UTF-8 BOM in existing OpenCode and plugin config f
         openCodeConfigPath,
         `\ufeff${JSON.stringify({
             $schema: "https://opencode.ai/config.json",
-            plugin: ["other-plugin"],
+            plugins: ["other-plugin"],
         }, null, 2)}\n`,
         "utf8",
     );
@@ -286,11 +286,11 @@ test("installPlugin tolerates UTF-8 BOM in existing OpenCode and plugin config f
     assert.deepEqual(
         JSON.parse(readFileSync(openCodeConfigPath, "utf8")) as {
             $schema: string;
-            plugin: string[];
+            plugins: string[];
         },
         {
             $schema: "https://opencode.ai/config.json",
-            plugin: ["other-plugin", "opencode-tbot"],
+            plugins: ["other-plugin", "opencode-tbot"],
         },
     );
     assert.equal(
@@ -412,7 +412,7 @@ test("installPlugin merges existing OpenCode npm plugins and normalizes opencode
     writeFileSync(openCodeConfigPath, JSON.stringify({
         $schema: "https://opencode.ai/config.json",
         model: "openai/gpt-5.4",
-        plugin: ["other-plugin", "opencode-tbot@0.1.0"],
+        plugins: ["other-plugin", "opencode-tbot@0.1.0"],
     }, null, 2));
 
     await withSuccessfulTelegramApi(async (telegramApiRoot) => {
@@ -427,12 +427,12 @@ test("installPlugin merges existing OpenCode npm plugins and normalizes opencode
         JSON.parse(readFileSync(openCodeConfigPath, "utf8")) as {
             $schema: string;
             model: string;
-            plugin: string[];
+            plugins: string[];
         },
         {
             $schema: "https://opencode.ai/config.json",
             model: "openai/gpt-5.4",
-            plugin: ["other-plugin", "opencode-tbot"],
+            plugins: ["other-plugin", "opencode-tbot"],
         },
     );
 });
@@ -455,11 +455,11 @@ test("runCli defaults to install mode", async () => {
 
     assert.deepEqual(
         JSON.parse(readFileSync(getLegacyOpenCodeConfigFilePath(homeDir), "utf8")) as {
-            plugin: string[];
+            plugins: string[];
         },
         {
             $schema: "https://opencode.ai/config.json",
-            plugin: ["opencode-tbot"],
+            plugins: ["opencode-tbot"],
         },
     );
     assert.equal(
@@ -503,7 +503,7 @@ test("runCli update refreshes the OpenCode config without modifying plugin confi
     mkdirSync(getOpenCodeConfigDirectory(homeDir), { recursive: true });
     mkdirSync(join(homeDir, ".config", "opencode", "opencode-tbot"), { recursive: true });
     writeFileSync(openCodeConfigPath, JSON.stringify({
-        plugin: ["other-plugin", "opencode-tbot@0.1.0"],
+        plugins: ["other-plugin", "opencode-tbot@0.1.0"],
     }, null, 2));
     writeFileSync(pluginConfigPath, JSON.stringify({
         telegram: {
@@ -519,10 +519,10 @@ test("runCli update refreshes the OpenCode config without modifying plugin confi
 
     assert.equal(exitCode, 0);
     assert.deepEqual(
-        JSON.parse(readFileSync(openCodeConfigPath, "utf8")) as { plugin: string[] },
+        JSON.parse(readFileSync(openCodeConfigPath, "utf8")) as { plugins: string[] },
         {
             $schema: "https://opencode.ai/config.json",
-            plugin: ["other-plugin", "opencode-tbot"],
+            plugins: ["other-plugin", "opencode-tbot"],
         },
     );
     assert.deepEqual(
@@ -543,7 +543,7 @@ test("runCli update rewrites the OpenCode config without changing the bot config
     mkdirSync(getOpenCodeConfigDirectory(homeDir), { recursive: true });
     mkdirSync(join(homeDir, ".config", "opencode", "opencode-tbot"), { recursive: true });
     writeFileSync(openCodeConfigPath, JSON.stringify({
-        plugin: ["other-plugin"],
+        plugins: ["other-plugin"],
     }, null, 2));
     writeFileSync(pluginConfigPath, JSON.stringify({
         telegram: {
@@ -561,11 +561,11 @@ test("runCli update rewrites the OpenCode config without changing the bot config
     assert.deepEqual(
         JSON.parse(readFileSync(openCodeConfigPath, "utf8")) as {
             $schema: string;
-            plugin: string[];
+            plugins: string[];
         },
         {
             $schema: "https://opencode.ai/config.json",
-            plugin: ["other-plugin", "opencode-tbot"],
+            plugins: ["other-plugin", "opencode-tbot"],
         },
     );
     assert.equal(
@@ -574,6 +574,94 @@ test("runCli update rewrites the OpenCode config without changing the bot config
         }).telegram.botToken,
         "old-token",
     );
+});
+
+test("runCli update migrates legacy plugin entries and preserves V2 options without duplicates", async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-v2-migrate-"));
+    const openCodeConfigPath = getGlobalOpenCodeConfigFilePath(homeDir);
+    const botOptions = { tokens: { showBreakdown: true } };
+
+    mkdirSync(getOpenCodeConfigDirectory(homeDir), { recursive: true });
+    writeFileSync(openCodeConfigPath, JSON.stringify({
+        model: "openai/gpt-5.4",
+        plugin: [
+            " other-plugin ",
+            ["./plugin/local.ts", { enabled: true }],
+            "opencode-tbot@0.1.0",
+            "@scope/another-plugin@1.0.0",
+        ],
+        plugins: [
+            { package: "other-plugin", options: { strict: true } },
+            { package: "opencode-tbot@0.2.0", options: botOptions },
+            "other-plugin",
+            { package: "opencode-tbot", options: botOptions },
+        ],
+    }, null, 2));
+
+    await runCli(["update", "--home-dir", homeDir]);
+    const updated = readFileSync(openCodeConfigPath, "utf8");
+
+    assert.deepEqual(JSON.parse(updated), {
+        $schema: "https://opencode.ai/config.json",
+        model: "openai/gpt-5.4",
+        plugins: [
+            { package: "other-plugin", options: { strict: true } },
+            { package: "./plugin/local.ts", options: { enabled: true } },
+            "@scope/another-plugin@1.0.0",
+            { package: "opencode-tbot", options: botOptions },
+        ],
+    });
+
+    await runCli(["update", "--home-dir", homeDir]);
+    assert.equal(readFileSync(openCodeConfigPath, "utf8"), updated);
+});
+
+test("runCli update rejects conflicting plugin options without rewriting the config", async () => {
+    for (const packageName of ["other-plugin", "opencode-tbot"]) {
+        const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-v2-conflict-"));
+        const openCodeConfigPath = getGlobalOpenCodeConfigFilePath(homeDir);
+        const original = JSON.stringify({
+            plugin: [[packageName, { enabled: true }]],
+            plugins: [{ package: packageName, options: { enabled: false } }],
+        }, null, 2);
+
+        mkdirSync(getOpenCodeConfigDirectory(homeDir), { recursive: true });
+        writeFileSync(openCodeConfigPath, original);
+
+        await assert.rejects(
+            runCli(["update", "--home-dir", homeDir]),
+            /Conflicting OpenCode plugin options/u,
+        );
+        assert.equal(readFileSync(openCodeConfigPath, "utf8"), original);
+    }
+});
+
+test("runCli update rejects invalid plugin registrations without rewriting the config", async () => {
+    const invalidConfigs = [
+        { plugin: {} },
+        { plugins: {} },
+        { plugins: [42] },
+        { plugins: [["local-plugin", {}]] },
+        { plugins: [{ package: " " }] },
+        { plugins: [{ package: "local-plugin", options: null }] },
+        { plugins: [{ package: "local-plugin", options: "invalid" }] },
+        { plugin: [["local-plugin", {}, "extra"]] },
+    ];
+
+    for (const config of invalidConfigs) {
+        const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-v2-invalid-"));
+        const openCodeConfigPath = getGlobalOpenCodeConfigFilePath(homeDir);
+        const original = JSON.stringify(config, null, 2);
+
+        mkdirSync(getOpenCodeConfigDirectory(homeDir), { recursive: true });
+        writeFileSync(openCodeConfigPath, original);
+
+        await assert.rejects(
+            runCli(["update", "--home-dir", homeDir]),
+            /OpenCode config plugins?/u,
+        );
+        assert.equal(readFileSync(openCodeConfigPath, "utf8"), original);
+    }
 });
 
 test("uninstallPlugin removes opencode-tbot from the OpenCode config and keeps plugin config", async () => {
@@ -586,7 +674,7 @@ test("uninstallPlugin removes opencode-tbot from the OpenCode config and keeps p
     writeFileSync(openCodeConfigPath, JSON.stringify({
         $schema: "https://opencode.ai/config.json",
         model: "openai/gpt-5.4",
-        plugin: ["other-plugin", "opencode-tbot@0.1.0"],
+        plugins: ["other-plugin", "opencode-tbot@0.1.0"],
     }, null, 2));
     writeFileSync(pluginConfigPath, JSON.stringify({
         telegram: {
@@ -602,12 +690,12 @@ test("uninstallPlugin removes opencode-tbot from the OpenCode config and keeps p
         JSON.parse(readFileSync(openCodeConfigPath, "utf8")) as {
             $schema: string;
             model: string;
-            plugin: string[];
+            plugins: string[];
         },
         {
             $schema: "https://opencode.ai/config.json",
             model: "openai/gpt-5.4",
-            plugin: ["other-plugin"],
+            plugins: ["other-plugin"],
         },
     );
     assert.deepEqual(
@@ -629,7 +717,7 @@ test("runCli uninstall removes the sole plugin entry and preserves plugin config
     mkdirSync(join(homeDir, ".config", "opencode", "opencode-tbot"), { recursive: true });
     writeFileSync(openCodeConfigPath, JSON.stringify({
         $schema: "https://opencode.ai/config.json",
-        plugin: ["opencode-tbot"],
+        plugins: ["opencode-tbot"],
     }, null, 2));
     writeFileSync(pluginConfigPath, JSON.stringify({
         telegram: {
@@ -658,6 +746,35 @@ test("runCli uninstall removes the sole plugin entry and preserves plugin config
     );
 });
 
+test("uninstallPlugin removes legacy and V2 bot registrations while migrating other plugin options", async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-v2-uninstall-"));
+    const openCodeConfigPath = getGlobalOpenCodeConfigFilePath(homeDir);
+
+    mkdirSync(getOpenCodeConfigDirectory(homeDir), { recursive: true });
+    writeFileSync(openCodeConfigPath, JSON.stringify({
+        model: "openai/gpt-5.4",
+        plugin: [
+            "opencode-tbot@0.1.0",
+            ["opencode-tbot", { tokens: { showBreakdown: true } }],
+            ["./local-plugin.ts", { enabled: true }],
+        ],
+        plugins: [
+            "other-plugin",
+            { package: "opencode-tbot@0.2.0", options: { tokens: { showBreakdown: false } } },
+        ],
+    }, null, 2));
+
+    await uninstallPlugin({ homeDir });
+
+    assert.deepEqual(JSON.parse(readFileSync(openCodeConfigPath, "utf8")), {
+        model: "openai/gpt-5.4",
+        plugins: [
+            { package: "./local-plugin.ts", options: { enabled: true } },
+            "other-plugin",
+        ],
+    });
+});
+
 test("runCli uninstall prints only a minimal success message", async () => {
     const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-cli-output-uninstall-"));
     const openCodeConfigPath = getLegacyOpenCodeConfigFilePath(homeDir);
@@ -665,7 +782,7 @@ test("runCli uninstall prints only a minimal success message", async () => {
     mkdirSync(getOpenCodeConfigDirectory(homeDir), { recursive: true });
     writeFileSync(openCodeConfigPath, JSON.stringify({
         $schema: "https://opencode.ai/config.json",
-        plugin: ["opencode-tbot"],
+        plugins: ["opencode-tbot"],
     }, null, 2));
 
     const result = await runCliInSubprocess([

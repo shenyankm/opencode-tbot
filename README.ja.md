@@ -1,7 +1,7 @@
 # opencode-tbot
 
 Telegram から [OpenCode](https://opencode.ai) を操作するためのプラグインです。
-[grammY](https://grammy.dev) と `@opencode-ai/sdk` を基盤として実装しています。
+[grammY](https://grammy.dev) と `@opencode/client` と `@opencode/plugin` を基盤として実装しています。
 
 [English](./README.md) | [简体中文](./README.zh-CN.md) | [日本語](./README.ja.md)
 
@@ -19,7 +19,7 @@ Telegram から [OpenCode](https://opencode.ai) を操作するためのプラ�
 
 ## 要件
 
-- このプラグインを読み込む OpenCode Host プロセスが起動していること
+- `@opencode/client` と `@opencode/plugin` `2.0.29` に対応し、このプラグインを読み込む OpenCode V2 Host。OpenCode V1 はサポートしません。
 - Telegram bot token
 - CLI 用の Node.js `>=22.12.0`
 
@@ -40,7 +40,7 @@ npm exec -- opencode-tbot@latest
 
 - 対話実行時には Telegram bot token の入力を促します
 - 設定ファイルを書き込む前に `getMe` で Telegram bot token を検証します
-- `~/.config/opencode/opencode.json` を書き換え、`plugin` に `opencode-tbot` が含まれるようにします
+- `~/.config/opencode/opencode.json` を書き換え、`plugins` に `opencode-tbot` が含まれるようにします
 - `~/.config/opencode/opencode-tbot/config.json` を書き込み、または既存内容とマージします
 - 足りない親ディレクトリを自動作成します
 - 完了時には最小限の成功メッセージだけを表示します
@@ -75,6 +75,7 @@ npm exec -- opencode-tbot@latest --help
 - `install` は `opencode.json` とグローバルプラグイン設定ファイルの両方を更新します。
 - `update` は `opencode.json` だけを更新し、既存のプラグイン設定内容は変更しません。
 - `uninstall` は `opencode.json` から `opencode-tbot` を削除し、`~/.config/opencode/opencode-tbot/config.json` はそのまま残します。
+- 既存の V1 `plugin` 登録は、options 付きのタプルを含め V2 `plugins` に移行します。他のプラグインの options は保持します。`install` と `update` は、同じパッケージの重複登録で options が競合すると、設定を書き込む前にエラーになります。
 
 ### CLI オプション
 
@@ -111,6 +112,28 @@ OpenCode は次のパスから npm プラグイン登録を読み込みます。
 
 このプラグインは `.env` から実行時設定を読み込みません。
 
+実行ログは機密情報を除いた JSON として Host コンソールに出力します。ファイルログの既定の保存先は `~/.local/share/opencode/log/plugins/opencode-tbot/` です。`logging.sinks.host` と `logging.sinks.file` で各出力を制御します。
+
+### `opencode.json` の例
+
+インストーラーは `"plugins": ["opencode-tbot"]` を書き込みます。オブジェクト形式のプラグイン options でグローバル設定ファイルの値を上書きできます。Telegram token は `config.json` に残せます。
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [
+    {
+      "package": "opencode-tbot",
+      "options": {
+        "telegram": {
+          "allowedChatIds": ["123456789"]
+        }
+      }
+    }
+  ]
+}
+```
+
 ### `config.json` の例
 
 ```json
@@ -135,17 +158,22 @@ OpenCode は次のパスから npm プラグイン登録を読み込みます。
 
 ## クイックスタート
 
-1. `npm exec -- opencode-tbot@latest` を実行します。
-2. 特定の chat のみを許可したい場合は、`~/.config/opencode/opencode-tbot/config.json` で `telegram.allowedChatIds` を設定します。
-3. Telegram で `/status` を実行して接続を確認します。
-4. `/new [title]` を実行するか、テキストまたは画像メッセージを直接送って使い始めます。
+1. `npm install -g @opencode/cli` で [OpenCode V2 CLI](https://opencode.ai/v2/docs/cli/commands) をインストールします。
+2. `npm exec -- opencode-tbot@latest` でプラグインをインストールします。
+3. 特定の chat のみを許可したい場合は、`~/.config/opencode/opencode-tbot/config.json` で `telegram.allowedChatIds` を設定します。
+4. `opencode serve --service` で共有 Host を起動します。V2 共有サーバーが起動済みなら `opencode reload` で設定を読み込みます。Host は起動したままにしてください。
+5. 別のターミナルでプロジェクトディレクトリに移動し、`opencode api location.get --header "x-opencode-directory:$(node -p 'encodeURIComponent(process.cwd())')"` でプロジェクトとプラグインを読み込みます。
+6. Telegram で `/status` を実行して接続を確認します。
+7. `/new [title]` を実行するか、テキストまたは画像メッセージを直接送って使い始めます。
+
+プラグインは V2 共有サービスを通じて Host に接続します。独立した `opencode serve` は必要なサービス検出情報を提供しません。共有 Host の起動だけではプロジェクトを読み込まないため、手順 5 でプロジェクトディレクトリを指定してプラグインを起動します。
 
 ## コマンド
 
 | コマンド | 動作 |
 | --- | --- |
 | `/start` | 短いウェルカムメッセージとクイックスタートの案内を表示します。 |
-| `/status` | OpenCode の health、version、workspace path、plugin list、LSP 状態、MCP 状態をまとめて表示します。 |
+| `/status` | OpenCode の health、version、workspace path、plugin list、MCP 状態をまとめて表示します。現在の V2 HTTP API では LSP 状態を取得できません。 |
 | `/new [title]` | 現在のプロジェクトに新しい OpenCode セッションを作成します。 |
 | `/agents` または `/agent` | 利用可能なエージェントを一覧表示し、現在のエージェントを切り替えます。 |
 | `/sessions` | 利用可能なセッションを一覧表示し、切り替えや名前変更操作を提供します。 |
@@ -163,11 +191,13 @@ OpenCode は次のパスから npm プラグイン登録を読み込みます。
 - `/cancel` は OpenCode セッションの処理と Telegram 側の待機状態を同時に中止し、次の prompt をすぐ開始できるようにします。
 - Telegram の音声メッセージ機能は廃止しました。Telegram の音声は既定で OGG 形式であり、利用可能な音声モデルを使うには追加のトランスコードが必要です。トランスコードによるサイズ増加と保守コストが大きいため、総合判断で機能を削除し、音声メッセージにはローカライズされた拒否案内を返します。
 
+OpenCode V2 のエージェントとモデルの選択はセッション設定です。同じセッションを共有する chat と TUI クライアントは互いの選択に影響するため、個別の選択が必要なら別のセッションを使ってください。
+
 ## FAQ
 
 ### 実行中の OpenCode インスタンスは必要ですか？
 
-はい。このリポジトリは Telegram 連携レイヤーのみを提供し、プラグインを読み込む OpenCode Host プロセスに依存します。
+はい。このリポジトリは Telegram 連携レイヤーのみを提供し、プラグインを読み込む OpenCode V2 Host プロセスに依存します。
 
 ### `opencode-tbot` をグローバルインストールする必要はありますか？
 

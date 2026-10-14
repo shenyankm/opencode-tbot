@@ -138,6 +138,7 @@ export interface BotCopy {
         currentProject(worktree: string): string;
         connected: string;
         disabled: string;
+        pending: string;
         needsAuth: string;
         failed(error: string): string;
         needsClientRegistration(error: string): string;
@@ -382,6 +383,7 @@ const EN_BOT_COPY: BotCopy = {
         },
         connected: "connected",
         disabled: "disabled",
+        pending: "connecting",
         needsAuth: "needs auth",
         failed(error: string) {
             return `failed: ${error}`;
@@ -647,6 +649,7 @@ const ZH_CN_BOT_COPY: BotCopy = {
         },
         connected: "已连接",
         disabled: "已禁用",
+        pending: "连接中",
         needsAuth: "需要认证",
         failed(error: string) {
             return `失败: ${error}`;
@@ -912,6 +915,7 @@ const JA_BOT_COPY: BotCopy = {
         },
         connected: "接続済み",
         disabled: "無効",
+        pending: "接続中",
         needsAuth: "認証が必要",
         failed(error: string) {
             return `失敗: ${error}`;

@@ -4,7 +4,7 @@ Guidance for coding agents working in `opencode-tbot`.
 
 ## Scope
 
-- This repo is a TypeScript/ESM Telegram plugin for OpenCode.
+- This repo is a TypeScript/ESM Telegram plugin for OpenCode V2, using `@opencode/client` and `@opencode/plugin`.
 - Runtime code lives in `src/`; generated output lives in `dist/`.
 - Tests use the Node test runner through `tsx`.
 - User-facing docs are maintained in `README.md`, `README.zh-CN.md`, and `README.ja.md`.
@@ -19,12 +19,12 @@ Guidance for coding agents working in `opencode-tbot`.
 - Build tool: `vite`.
 - Static check: `tsc` via `pnpm typecheck`.
 - Test runner: `tsx --test tests/**/*.test.ts`.
-- The env-gated host integration path typically installs `opencode-ai` globally before setting `OPENCODE_HOST_E2E=1`.
+- The env-gated host integration path requires the V2 `@opencode/cli` binary on PATH before setting `OPENCODE_HOST_E2E=1`. It builds and packs this checkout, starts an isolated shared service, and verifies Telegram commands and plugin cleanup.
 - There is no committed GitHub Actions workflow in this repo right now; rely on the local verification commands below.
 
 ## Repo Map
 
-- `src/plugin.ts`: plugin entrypoint and runtime singleton lifecycle.
+- `src/plugin.ts`: V2 `Plugin.define` entrypoint, permission hook, event subscription, and runtime singleton lifecycle.
 - `src/cli.ts`: install/update CLI for plugin registration and config writing.
 - `src/app/`: config loading, bootstrap, DI container, runtime startup.
 - `src/bot/`: Telegram commands, handlers, presenters, middleware, localized copy.
@@ -33,7 +33,7 @@ Guidance for coding agents working in `opencode-tbot`.
 - `src/repositories/`: in-memory and file-backed persistence adapters.
 - `src/domain/`: core interfaces and entity shapes.
 - `tests/`: unit-focused suite plus one env-gated integration test.
-- `~/.config/opencode/opencode.json`: npm plugin registration written by the installer.
+- `~/.config/opencode/opencode.json`: V2 `plugins` registration written by the installer; legacy `plugin` entries are migrated without losing options.
 - `dist/`: generated bundle output; do not edit by hand.
 
 ## Commands
@@ -44,7 +44,7 @@ Guidance for coding agents working in `opencode-tbot`.
 - `pnpm test`: run the normal test suite; the integration test stays skipped unless `OPENCODE_HOST_E2E=1` is set.
 - `pnpm exec tsx --test tests/cli.test.ts`: run one test file.
 - `pnpm exec tsx --test --test-name-pattern "runCli prints the package version for --version" tests/cli.test.ts`: run one named test.
-- `npm install -g opencode-ai` then `OPENCODE_HOST_E2E=1 pnpm test`: closest local match to the env-gated host integration coverage.
+- `npm install -g @opencode/cli` then `OPENCODE_HOST_E2E=1 pnpm test`: run the V2 host integration coverage.
 - There is no dedicated lint script today; treat `pnpm typecheck` as the required lint/static-quality command.
 
 ## Verification Defaults
@@ -125,6 +125,8 @@ Guidance for coding agents working in `opencode-tbot`.
 - Legacy `openrouter` config is intentionally ignored/stripped; do not reintroduce it.
 - Keep state file paths relative to the OpenCode worktree unless there is a strong reason not to.
 - Be careful with the runtime singleton in `src/plugin.ts`; changing worktrees must dispose and rebuild cleanly.
+- The plugin connects to its own registered V2 shared service. Use `opencode serve --service`; do not start another service from plugin setup. Preserve the host PID check and encoded location header.
+- V2 has no public LSP status endpoint. Report that section as unavailable instead of presenting an empty or fabricated server list.
 
 ## Agent Checklist
 

@@ -90,21 +90,6 @@ export interface FileLogSinkOptions {
     runtimeId: string;
 }
 
-interface OpenCodeAppLogClientLike {
-    app: {
-        log(input: {
-            body?: {
-                service: string;
-                level: AppLogLevel;
-                message: string;
-                extra?: Record<string, unknown>;
-            };
-            responseStyle?: "data" | "fields";
-            throwOnError?: boolean;
-        }): Promise<unknown>;
-    };
-}
-
 interface LoggerSinkOptions {
     file?: boolean;
     host?: boolean;
@@ -167,7 +152,6 @@ const RESERVED_EVENT_FIELDS = new Set([
 ]);
 
 export function createOpenCodeAppLogger(
-    client: OpenCodeAppLogClientLike,
     options: CreateOpenCodeAppLoggerOptions = {},
 ): AppLogger {
     const service = normalizeServiceName(options.service);
@@ -178,14 +162,13 @@ export function createOpenCodeAppLogger(
         runtimeId,
         ...(options.worktree ? { worktree: options.worktree } : {}),
     };
-    const sinks = createSinks(client, {
+    const sinks = createSinks({
         file: {
             dir: options.file?.dir,
             maxFiles: options.file?.retention?.maxFiles,
             maxTotalBytes: options.file?.retention?.maxTotalBytes,
         },
         runtimeId,
-        service,
         sinks: options.sinks,
     });
     let queue = Promise.resolve();
@@ -325,7 +308,6 @@ export function logPluginEvent(
 }
 
 function createSinks(
-    client: OpenCodeAppLogClientLike,
     options: {
         file?: {
             dir?: string;
@@ -333,7 +315,6 @@ function createSinks(
             maxTotalBytes?: number;
         };
         runtimeId: string;
-        service: string;
         sinks?: LoggerSinkOptions;
     },
 ): LogSink[] {
@@ -341,7 +322,7 @@ function createSinks(
     const sinks: LogSink[] = [];
 
     if (sinkOptions.host !== false) {
-        sinks.push(createHostSink(client, options.service));
+        sinks.push(createHostSink());
     }
 
     if (sinkOptions.file !== false && options.file?.dir) {
@@ -356,19 +337,10 @@ function createSinks(
     return sinks;
 }
 
-function createHostSink(client: OpenCodeAppLogClientLike, service: string): LogSink {
+function createHostSink(): LogSink {
     return {
         async write(event) {
-            await client.app.log({
-                body: {
-                    service,
-                    level: event.level,
-                    message: event.message,
-                    extra: buildHostLogExtra(event),
-                },
-                throwOnError: true,
-                responseStyle: "data",
-            });
+            console[event.level](JSON.stringify(event));
         },
     };
 }
@@ -501,17 +473,6 @@ function buildStructuredLogEvent(
         ...(context.error ? { error: context.error } : {}),
         ...removeUndefinedFields(extracted.extra),
     };
-}
-
-function buildHostLogExtra(event: StructuredLogEvent): Record<string, unknown> {
-    const {
-        service: _service,
-        level: _level,
-        message: _message,
-        ...rest
-    } = event;
-
-    return rest;
 }
 
 function extractContextAndExtra(input: unknown): {

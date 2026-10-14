@@ -47,8 +47,8 @@
     },
     "dependencies": {
         "@grammyjs/runner": "^2.0.3",
-        "@opencode-ai/plugin": "1.2.27",
-        "@opencode-ai/sdk": "1.2.27",
+        "@opencode/client": "2.0.29",
+        "@opencode/plugin": "2.0.29",
         "grammy": "^1.38.0",
         "zod": "^3.23.8"
     },

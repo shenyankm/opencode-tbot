@@ -1,7 +1,7 @@
 # opencode-tbot
 
 一个通过 Telegram 驱动 [OpenCode](https://opencode.ai) 的插件。
-基于 [grammY](https://grammy.dev) 和 `@opencode-ai/sdk` 实现。
+基于 [grammY](https://grammy.dev) 和 `@opencode/client` 和 `@opencode/plugin` 实现。
 
 [English](./README.md) | [简体中文](./README.zh-CN.md) | [日本語](./README.ja.md)
 
@@ -19,7 +19,7 @@
 
 ## 环境要求
 
-- 一个正在运行且会加载该插件的 OpenCode Host 进程。
+- 一个兼容 `@opencode/client` 和 `@opencode/plugin` `2.0.29` 且会加载该插件的 OpenCode V2 Host。不支持 OpenCode V1。
 - 一个 Telegram bot token。
 - 用于 CLI 的 Node.js `>=22.12.0`。
 
@@ -40,7 +40,7 @@ npm exec -- opencode-tbot@latest
 
 - 在交互式运行时提示输入 Telegram bot token
 - 在写入任何配置文件前通过 `getMe` 校验 Telegram bot token
-- 写入或更新 `~/.config/opencode/opencode.json`，确保 `plugin` 中包含 `opencode-tbot`
+- 写入或更新 `~/.config/opencode/opencode.json`，确保 `plugins` 中包含 `opencode-tbot`
 - 写入或合并 `~/.config/opencode/opencode-tbot/config.json`
 - 自动创建缺失的父目录
 - 完成后仅输出最小化成功提示
@@ -75,6 +75,7 @@ npm exec -- opencode-tbot@latest --help
 - `install` 会同时更新 `opencode.json` 和全局插件配置文件。
 - `update` 只会刷新 `opencode.json`，不会改动现有插件配置内容。
 - `uninstall` 会从 `opencode.json` 中移除 `opencode-tbot`，并保留 `~/.config/opencode/opencode-tbot/config.json`。
+- 现有 V1 `plugin` 注册会迁移为 V2 `plugins`，包括带 options 的元组。其他插件的 options 会保留；`install` 和 `update` 会在写入配置前拒绝同一个包的重复注册中存在的冲突 options。
 
 ### CLI 参数
 
@@ -111,6 +112,28 @@ OpenCode 会从以下路径读取 npm 插件注册：
 
 本插件不会从 `.env` 读取运行时配置。
 
+运行日志以脱敏 JSON 输出到 Host 控制台。文件日志默认位于 `~/.local/share/opencode/log/plugins/opencode-tbot/`；`logging.sinks.host` 和 `logging.sinks.file` 分别控制这两种输出。
+
+### `opencode.json` 示例
+
+安装器写入 `"plugins": ["opencode-tbot"]`。使用对象形式的插件 options 可以覆盖全局配置文件中的字段；Telegram token 仍可保存在 `config.json` 中。
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [
+    {
+      "package": "opencode-tbot",
+      "options": {
+        "telegram": {
+          "allowedChatIds": ["123456789"]
+        }
+      }
+    }
+  ]
+}
+```
+
 ### `config.json` 示例
 
 ```json
@@ -135,17 +158,22 @@ OpenCode 会从以下路径读取 npm 插件注册：
 
 ## 快速开始
 
-1. 运行 `npm exec -- opencode-tbot@latest`。
-2. 如果需要限制可访问 chat，在 `~/.config/opencode/opencode-tbot/config.json` 中设置 `telegram.allowedChatIds`。
-3. 在 Telegram 中执行 `/status` 验证连通性。
-4. 执行 `/new [title]`，或者直接发送文本或图片消息开始使用。
+1. 使用 `npm install -g @opencode/cli` 安装 [OpenCode V2 CLI](https://opencode.ai/v2/docs/cli/commands)。
+2. 运行 `npm exec -- opencode-tbot@latest` 安装插件。
+3. 如果需要限制可访问 chat，在 `~/.config/opencode/opencode-tbot/config.json` 中设置 `telegram.allowedChatIds`。
+4. 使用 `opencode serve --service` 启动共享 Host；V2 共享服务已运行时使用 `opencode reload` 加载配置。保持 Host 运行。
+5. 在另一个终端进入项目目录，运行 `opencode api location.get --header "x-opencode-directory:$(node -p 'encodeURIComponent(process.cwd())')"` 加载该项目及插件。
+6. 在 Telegram 中执行 `/status` 验证连通性。
+7. 执行 `/new [title]`，或者直接发送文本或图片消息开始使用。
+
+插件通过 V2 共享服务连接 Host。独立运行的 `opencode serve` 不提供插件所需的服务发现信息。仅启动共享 Host 不会加载项目，第 5 步会指定项目目录并启动插件。
 
 ## 命令
 
 | 命令 | 作用 |
 | --- | --- |
 | `/start` | 显示简短欢迎信息和快速开始步骤。 |
-| `/status` | 汇总显示 OpenCode 健康状态、版本、工作区路径、插件列表、LSP 状态和 MCP 状态。 |
+| `/status` | 汇总显示 OpenCode 健康状态、版本、工作区路径、插件列表和 MCP 状态。当前 V2 HTTP API 不提供 LSP 状态。 |
 | `/new [title]` | 在当前项目中创建一个新的 OpenCode 会话。 |
 | `/agents` 或 `/agent` | 列出可用 Agent，并切换当前 Agent。 |
 | `/sessions` | 列出可用会话、切换当前会话，并提供重命名操作。 |
@@ -163,11 +191,13 @@ OpenCode 会从以下路径读取 npm 插件注册：
 - `/cancel` 会同时中止 OpenCode 会话请求和本地 Telegram 等待状态，让下一次 prompt 能立即开始。
 - Telegram 语音消息功能已移除：Telegram 语音默认是 OGG 格式，接入可用语音模型需要额外转码，而转码带来的体积和维护成本过高，综合考虑后不再支持；收到语音消息时会返回本地化拒绝提示。
 
+OpenCode V2 的 Agent 和模型选择属于会话设置。共用一个会话的 chat 和 TUI 客户端会互相影响；需要独立选择时请使用不同会话。
+
 ## FAQ
 
 ### 需要一个正在运行的 OpenCode 实例吗？
 
-需要。本仓库只提供 Telegram 集成层，依赖加载该插件的 OpenCode Host 进程。
+需要。本仓库只提供 Telegram 集成层，依赖加载该插件的 OpenCode V2 Host 进程。
 
 ### 需要全局安装 `opencode-tbot` 吗？
 

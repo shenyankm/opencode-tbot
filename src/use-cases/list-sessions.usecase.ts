@@ -10,6 +10,7 @@ import type {
     OpenCodeSessionCatalog,
 } from "../services/opencode/opencode.ports.js";
 import { clearStoredSessionContext } from "./binding-update.js";
+import { hasMatchingProject } from "./project-binding.js";
 
 export interface ListSessionsResult {
     sessions: OpenCodeSession[];
@@ -37,7 +38,11 @@ export class ListSessionsUseCase {
                 : Promise.resolve<OpenCodeProject[] | null>(null),
         ]);
 
-        if (binding?.projectId && binding.directory && !hasMatchingProject(projects, binding)) {
+        if (
+            binding?.projectId
+            && binding.directory
+            && !(await hasMatchingProject(projects, binding, this.opencodeClient, sessions))
+        ) {
             binding = await clearStoredSessionContext(this.sessionRepo, binding);
         }
 
@@ -68,19 +73,6 @@ export class ListSessionsUseCase {
             directory: currentProject.worktree,
         };
     }
-}
-
-function hasMatchingProject(
-    projects: OpenCodeProject[] | null,
-    binding: ChatSessionBinding,
-): boolean {
-    if (!projects) {
-        return true;
-    }
-
-    return projects.some((project) =>
-        project.id === binding.projectId && project.worktree === binding.directory,
-    );
 }
 
 function hasMatchingSession(

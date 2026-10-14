@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { stderr, stdin, stdout } from "node:process";
 import { createInterface } from "node:readline/promises";
+import { isDeepStrictEqual } from "node:util";
 import {
     DEFAULT_TELEGRAM_API_ROOT,
     type PluginConfigSource,
@@ -49,9 +50,16 @@ const CONFLICTING_LOCAL_PLUGIN_FILE_PATTERN = /^opencode-tbot\.(?:[cm]?[jt]s)$/u
 
 interface OpenCodeConfigSource {
     $schema?: string;
-    plugin?: string[];
+    plugin?: unknown;
+    plugins?: unknown;
     [key: string]: unknown;
 }
+
+type OpenCodePluginSpec = string | {
+    package: string;
+    options?: Record<string, unknown>;
+    [key: string]: unknown;
+};
 
 export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
     try {
@@ -286,66 +294,106 @@ async function writeOpenCodeConfigFile(
 }
 
 function buildInstalledOpenCodeConfig(current: OpenCodeConfigSource): OpenCodeConfigSource {
-    const pluginSpecs = normalizePluginSpecs(current.plugin)
-        .filter((pluginSpec) => normalizeNpmPackageName(pluginSpec) !== OPENCODE_TBOT_PACKAGE_NAME);
-
-    pluginSpecs.push(OPENCODE_TBOT_PACKAGE_NAME);
-
-    return {
+    const pluginSpecs = normalizePluginSpecs(current, true);
+    const botSpec = pluginSpecs.find((pluginSpec) => getPluginPackage(pluginSpec) === OPENCODE_TBOT_PACKAGE_NAME);
+    const nextConfig: OpenCodeConfigSource = {
         $schema: current.$schema ?? OPENCODE_CONFIG_SCHEMA_URL,
         ...current,
-        plugin: pluginSpecs,
+        plugins: [
+            ...pluginSpecs.filter((pluginSpec) => getPluginPackage(pluginSpec) !== OPENCODE_TBOT_PACKAGE_NAME),
+            botSpec ?? OPENCODE_TBOT_PACKAGE_NAME,
+        ],
     };
-}
-
-function buildUninstalledOpenCodeConfig(current: OpenCodeConfigSource): OpenCodeConfigSource {
-    if (typeof current.plugin === "undefined") {
-        return current;
-    }
-
-    const pluginSpecs = normalizePluginSpecs(current.plugin)
-        .filter((pluginSpec) => normalizeNpmPackageName(pluginSpec) !== OPENCODE_TBOT_PACKAGE_NAME);
-    const nextConfig: OpenCodeConfigSource = {
-        ...current,
-    };
-
-    if (pluginSpecs.length > 0) {
-        nextConfig.plugin = pluginSpecs;
-        return nextConfig;
-    }
 
     delete nextConfig.plugin;
     return nextConfig;
 }
 
-function normalizePluginSpecs(value: unknown): string[] {
-    if (typeof value === "undefined") {
-        return [];
+function buildUninstalledOpenCodeConfig(current: OpenCodeConfigSource): OpenCodeConfigSource {
+    if (typeof current.plugin === "undefined" && typeof current.plugins === "undefined") {
+        return current;
     }
 
-    if (!Array.isArray(value)) {
-        throw new Error("OpenCode config plugin field must be an array.");
+    const pluginSpecs = normalizePluginSpecs(current, false);
+    const nextConfig: OpenCodeConfigSource = {
+        ...current,
+    };
+
+    delete nextConfig.plugin;
+
+    if (pluginSpecs.length > 0) {
+        nextConfig.plugins = pluginSpecs;
+        return nextConfig;
     }
 
-    const normalizedPluginSpecs: string[] = [];
-    const seenPluginSpecs = new Set<string>();
+    delete nextConfig.plugins;
+    return nextConfig;
+}
 
-    for (const entry of value) {
-        if (typeof entry !== "string") {
-            throw new Error("OpenCode config plugin entries must be strings.");
-        }
+function normalizePluginSpecs(current: OpenCodeConfigSource, includeBot: boolean): OpenCodePluginSpec[] {
+    const pluginSpecs = new Map<string, OpenCodePluginSpec>();
 
-        const normalizedEntry = entry.trim();
+    for (const field of ["plugin", "plugins"] as const) {
+        const value = current[field];
 
-        if (normalizedEntry.length === 0 || seenPluginSpecs.has(normalizedEntry)) {
+        if (typeof value === "undefined") {
             continue;
         }
 
-        seenPluginSpecs.add(normalizedEntry);
-        normalizedPluginSpecs.push(normalizedEntry);
+        if (!Array.isArray(value)) {
+            throw new Error(`OpenCode config ${field} field must be an array.`);
+        }
+
+        for (const rawEntry of value) {
+            const entry: unknown = field === "plugin" && Array.isArray(rawEntry) && rawEntry.length === 2
+                ? { package: rawEntry[0], options: rawEntry[1] }
+                : rawEntry;
+            const packageSpec = typeof entry === "string"
+                ? entry.trim()
+                : isPlainObject(entry) && typeof entry.package === "string"
+                    ? entry.package.trim()
+                    : null;
+
+            if (packageSpec === null || (typeof entry !== "string" && packageSpec.length === 0)) {
+                throw new Error(`OpenCode config ${field} entries must be strings or objects with a package.`);
+            }
+
+            if (packageSpec.length === 0) {
+                continue;
+            }
+
+            if (isPlainObject(entry) && typeof entry.options !== "undefined" && !isPlainObject(entry.options)) {
+                throw new Error(`OpenCode config ${field} entry options must be an object.`);
+            }
+
+            const normalizedPackage = normalizeNpmPackageName(packageSpec) === OPENCODE_TBOT_PACKAGE_NAME
+                ? OPENCODE_TBOT_PACKAGE_NAME
+                : packageSpec;
+
+            if (!includeBot && normalizedPackage === OPENCODE_TBOT_PACKAGE_NAME) {
+                continue;
+            }
+
+            const normalizedEntry: OpenCodePluginSpec = typeof entry === "string"
+                ? normalizedPackage
+                : { ...entry as Record<string, unknown>, package: normalizedPackage };
+            const previous = pluginSpecs.get(normalizedPackage);
+
+            if (typeof previous === "object" && typeof normalizedEntry === "object") {
+                if (!isDeepStrictEqual(previous, normalizedEntry)) {
+                    throw new Error(`Conflicting OpenCode plugin options for ${normalizedPackage}.`);
+                }
+            } else if (typeof previous !== "object") {
+                pluginSpecs.set(normalizedPackage, normalizedEntry);
+            }
+        }
     }
 
-    return normalizedPluginSpecs;
+    return [...pluginSpecs.values()];
+}
+
+function getPluginPackage(pluginSpec: OpenCodePluginSpec): string {
+    return typeof pluginSpec === "string" ? pluginSpec : pluginSpec.package;
 }
 
 function normalizeNpmPackageName(pluginSpec: string): string {

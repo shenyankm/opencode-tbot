@@ -87,13 +87,13 @@ test("permission.asked sends Telegram approval messages and persists them", asyn
 
     await handleTelegramBotPluginEvent(runtime, {
         type: "permission.asked",
-        properties: {
+        data: {
             id: "request-1",
             sessionID: "session-1",
-            permission: "read",
-            patterns: ["src/**"],
+            action: "read",
+            resources: ["src/**"],
             metadata: {},
-            always: [],
+            save: [],
         },
     });
 
@@ -112,7 +112,7 @@ test("permission.asked sends Telegram approval messages and persists them", asyn
     }]);
 });
 
-test("permission.updated also normalizes the root SDK permission event shape", async () => {
+test("permission.asked deduplicates requests received more than once", async () => {
     const { runtime, sessionRepo, permissionApprovalRepo, messages } = createRuntime();
 
     await sessionRepo.setCurrent({
@@ -129,14 +129,24 @@ test("permission.updated also normalizes the root SDK permission event shape", a
     });
 
     await handleTelegramBotPluginEvent(runtime, {
-        type: "permission.updated",
-        properties: {
+        type: "permission.asked",
+        data: {
             id: "request-root",
             sessionID: "session-root",
-            type: "write",
-            pattern: "README.md",
+            action: "write",
+            resources: ["README.md"],
             metadata: {},
-            always: [],
+            save: [],
+        },
+    });
+
+    await handleTelegramBotPluginEvent(runtime, {
+        type: "permission.asked",
+        data: {
+            id: "request-root",
+            sessionID: "session-root",
+            action: "write",
+            resources: ["README.md"],
         },
     });
 
@@ -155,13 +165,13 @@ test("permission.asked also routes foreground child-session approvals back to th
 
     await handleTelegramBotPluginEvent(runtime, {
         type: "permission.asked",
-        properties: {
+        data: {
             id: "request-child",
             sessionID: "session-child",
-            permission: "write",
-            patterns: ["README.md"],
+            action: "write",
+            resources: ["README.md"],
             metadata: {},
-            always: [],
+            save: [],
         },
     });
 
@@ -208,13 +218,13 @@ test("permission.asked retries with plain text when Telegram rejects the Markdow
 
     await handleTelegramBotPluginEvent(runtime, {
         type: "permission.asked",
-        properties: {
+        data: {
             id: "request-special",
             sessionID: "session-special",
-            permission: "write",
-            patterns: ["README_[draft].md"],
+            action: "write",
+            resources: ["README_[draft].md"],
             metadata: {},
-            always: [],
+            save: [],
         },
     });
 
@@ -241,7 +251,7 @@ test("permission.replied updates existing Telegram approval messages", async () 
 
     await handleTelegramBotPluginEvent(runtime, {
         type: "permission.replied",
-        properties: {
+        data: {
             sessionID: "session-1",
             requestID: "request-1",
             reply: "always",
@@ -380,22 +390,20 @@ test("permission callback keeps local state pending when the OpenCode host rejec
     assert.equal(approvals[0]?.status, "pending");
 });
 
-test("session.error suppresses foreground child-session notifications and clears tracking", async () => {
+test("session.execution.failed suppresses foreground child-session notifications and clears tracking", async () => {
     const { runtime, messages } = createRuntime();
 
     const foregroundRequest = runtime.container.foregroundSessionTracker.acquire(303);
     foregroundRequest?.attachSession("session-child");
 
     await handleTelegramBotPluginEvent(runtime, {
-        type: "session.error",
-        properties: {
+        type: "session.execution.failed",
+        data: {
             sessionID: "session-child",
             error: {
-                name: "APIError",
-                data: {
-                    message: "boom",
-                    statusCode: 400,
-                },
+                type: "provider.invalid-request",
+                message: "boom",
+                status: 400,
             },
         },
     });
@@ -403,19 +411,20 @@ test("session.error suppresses foreground child-session notifications and clears
     assert.deepEqual(messages, []);
     assert.equal(runtime.container.foregroundSessionTracker.isForeground("session-child"), false);
     assert.equal(foregroundRequest?.signal.aborted, true);
-    assert.equal((foregroundRequest?.signal.reason as { name?: string })?.name, "APIError");
-    assert.equal((foregroundRequest?.signal.reason as { data?: { message?: string } })?.data?.message, "boom");
+    assert.equal((foregroundRequest?.signal.reason as Error)?.name, "provider.invalid-request");
+    assert.equal((foregroundRequest?.signal.reason as Error)?.message, "boom");
+    assert.equal((foregroundRequest?.signal.reason as { status?: number })?.status, 400);
 });
 
-test("session.error preserves a plain-object message for foreground child sessions without a named error", async () => {
+test("session.execution.failed preserves a plain-object message for foreground child sessions without a named error", async () => {
     const { runtime, messages } = createRuntime();
 
     const foregroundRequest = runtime.container.foregroundSessionTracker.acquire(313);
     foregroundRequest?.attachSession("session-child");
 
     await handleTelegramBotPluginEvent(runtime, {
-        type: "session.error",
-        properties: {
+        type: "session.execution.failed",
+        data: {
             sessionID: "session-child",
             error: {
                 message: "provider exploded",
@@ -436,7 +445,7 @@ test("session.idle suppresses foreground child-session notifications and clears 
 
     await handleTelegramBotPluginEvent(runtime, {
         type: "session.idle",
-        properties: {
+        data: {
             sessionID: "session-child",
         },
     });
@@ -463,7 +472,7 @@ test("session.idle does not send a completion message to bound chats", async () 
 
     await handleTelegramBotPluginEvent(runtime, {
         type: "session.idle",
-        properties: {
+        data: {
             sessionID: "session-bound",
         },
     });
@@ -489,7 +498,7 @@ test("session.status idle does not send a completion message to bound chats", as
 
     await handleTelegramBotPluginEvent(runtime, {
         type: "session.status",
-        properties: {
+        data: {
             sessionID: "session-bound",
             status: {
                 type: "idle",
@@ -500,7 +509,7 @@ test("session.status idle does not send a completion message to bound chats", as
     assert.deepEqual(messages, []);
 });
 
-test("session.error still notifies bound chats when the session is not foreground", async () => {
+test("session.execution.failed still notifies bound chats when the session is not foreground", async () => {
     const { runtime, sessionRepo, messages } = createRuntime();
 
     await sessionRepo.setCurrent({
@@ -517,14 +526,12 @@ test("session.error still notifies bound chats when the session is not foregroun
     });
 
     await handleTelegramBotPluginEvent(runtime, {
-        type: "session.error",
-        properties: {
+        type: "session.execution.failed",
+        data: {
             sessionID: "session-bound",
             error: {
-                name: "APIError",
-                data: {
-                    message: "boom",
-                },
+                type: "provider.invalid-request",
+                message: "boom",
             },
         },
     });
@@ -534,4 +541,22 @@ test("session.error still notifies bound chats when the session is not foregroun
         text: "Session failed.\n\nSession: session-bound\nError: boom",
         options: undefined,
     }]);
+});
+
+test("V2 event handlers ignore malformed permission requests and replies", async () => {
+    const { runtime, messages, edits, permissionApprovalRepo } = createRuntime();
+    runtime.container.foregroundSessionTracker.begin(888, "session-foreground");
+
+    await handleTelegramBotPluginEvent(runtime, {
+        type: "permission.asked",
+        data: { id: "request-invalid", sessionID: "session-foreground", resources: [] },
+    });
+    await handleTelegramBotPluginEvent(runtime, {
+        type: "permission.replied",
+        data: { requestID: "request-invalid", sessionID: "session-foreground", reply: "allow" },
+    });
+
+    assert.deepEqual(messages, []);
+    assert.deepEqual(edits, []);
+    assert.deepEqual(await permissionApprovalRepo.listByRequestId("request-invalid"), []);
 });

@@ -94,7 +94,7 @@ export function createAppContainer(
     client: OpenCodeSdkClientLike,
 ): AppContainer {
     const runtimeId = randomUUID();
-    const logger = createOpenCodeAppLogger(client, {
+    const logger = createOpenCodeAppLogger({
         file: {
             dir: config.loggingFileDir,
             retention: {

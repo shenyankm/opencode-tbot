@@ -17,6 +17,7 @@ import {
     clearStoredSessionContext,
 } from "./binding-update.js";
 import { createAndBindCurrentProjectSession } from "./session-creation.js";
+import { hasMatchingProject } from "./project-binding.js";
 
 export type ActiveChatBinding = ChatSessionBinding & {
     directory: string;
@@ -56,14 +57,13 @@ export class PromptContextResolver {
         }
 
         let binding = await this.sessionRepo.getByChatId(input.chatId);
+        const sessions = binding?.sessionId && binding.projectId
+            ? await this.opencodeClient.listSessions()
+            : undefined;
 
         if (binding?.projectId && binding.directory) {
             const projects = await this.opencodeClient.listProjects();
-            const selectedProject = projects.find((project) =>
-                project.id === binding?.projectId && project.worktree === binding.directory,
-            );
-
-            if (!selectedProject) {
+            if (!(await hasMatchingProject(projects, binding, this.opencodeClient, sessions))) {
                 binding = await this.clearInvalidSessionContext(
                     input.chatId,
                     binding,
@@ -73,8 +73,7 @@ export class PromptContextResolver {
         }
 
         if (binding?.sessionId && binding.projectId) {
-            const sessions = await this.opencodeClient.listSessions();
-            const selectedSession = sessions.find((session) =>
+            const selectedSession = sessions?.find((session) =>
                 session.id === binding?.sessionId && session.projectID === binding.projectId,
             );
 

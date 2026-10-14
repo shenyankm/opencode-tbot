@@ -1,15 +1,13 @@
-import type { ChatSessionBinding } from "../domain/session/session.entity.js";
 import type { SessionRepository } from "../domain/session/session.repository.js";
-import type {
-    OpenCodeMcpStatus,
-    OpenCodeProject,
-} from "../services/opencode/opencode.client.js";
+import type { OpenCodeMcpStatus } from "../services/opencode/opencode.client.js";
 import type {
     OpenCodeCurrentProjectReader,
     OpenCodeMcpCatalog,
     OpenCodeProjectCatalog,
+    OpenCodeSessionCatalog,
 } from "../services/opencode/opencode.ports.js";
 import { clearStoredSessionContext } from "./binding-update.js";
+import { hasMatchingProject } from "./project-binding.js";
 
 export interface ListMcpEntry {
     name: string;
@@ -28,7 +26,10 @@ export interface ListMcpInput {
 export class ListMcpUseCase {
     constructor(
         private readonly sessionRepo: SessionRepository,
-        private readonly opencodeClient: OpenCodeCurrentProjectReader & OpenCodeMcpCatalog & OpenCodeProjectCatalog,
+        private readonly opencodeClient: OpenCodeCurrentProjectReader
+            & OpenCodeMcpCatalog
+            & OpenCodeProjectCatalog
+            & Pick<OpenCodeSessionCatalog, "listSessions">,
     ) { }
 
     async execute(input: ListMcpInput): Promise<ListMcpResult> {
@@ -37,7 +38,7 @@ export class ListMcpUseCase {
         if (binding?.projectId && binding.directory) {
             const projects = await this.opencodeClient.listProjects();
 
-            if (!hasMatchingProject(projects, binding)) {
+            if (!(await hasMatchingProject(projects, binding, this.opencodeClient))) {
                 binding = await clearStoredSessionContext(this.sessionRepo, binding);
             }
         }
@@ -66,10 +67,4 @@ export class ListMcpUseCase {
             directory: currentProject.worktree,
         };
     }
-}
-
-function hasMatchingProject(projects: OpenCodeProject[], binding: ChatSessionBinding): boolean {
-    return projects.some((project) =>
-        project.id === binding.projectId && project.worktree === binding.directory,
-    );
 }

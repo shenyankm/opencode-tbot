@@ -455,6 +455,7 @@ function formatMcpStatusBadge(status: OpenCodeMcpStatus, layout: StatusLayoutCop
         case "disabled":
             return "\u26AA";
         case "needs_auth":
+        case "pending":
             return "\uD83D\uDFE1";
         case "failed":
             return layout.mcpFailedStatus;
@@ -501,6 +502,8 @@ function formatMcpStatusNotes(status: OpenCodeMcpStatus, copy: BotCopy, layout: 
             return null;
         case "needs_auth":
             return copy.mcp.needsAuth;
+        case "pending":
+            return copy.mcp.pending;
         case "failed":
             return status.error;
         case "needs_client_registration":
@@ -842,6 +845,8 @@ function formatMcpStatus(status: OpenCodeMcpStatus, copy: BotCopy): string {
             return copy.mcp.disabled;
         case "needs_auth":
             return copy.mcp.needsAuth;
+        case "pending":
+            return copy.mcp.pending;
         case "failed":
             return copy.mcp.failed(status.error);
         case "needs_client_registration":

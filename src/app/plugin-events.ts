@@ -11,7 +11,7 @@ import {
 import type { TelegramBotRuntime } from "./runtime.js";
 
 type OpenCodePluginEvent = {
-    properties?: unknown;
+    data?: unknown;
     type: string;
 };
 
@@ -44,15 +44,11 @@ const PLUGIN_EVENT_HANDLERS: Record<string, PluginEventHandlerDefinition> = {
         normalizePermissionRequestEvent,
         handlePermissionAsked,
     ),
-    "permission.updated": createPluginEventHandler(
-        normalizePermissionRequestEvent,
-        handlePermissionAsked,
-    ),
     "permission.replied": createPluginEventHandler(
         normalizePermissionReplyEvent,
         handlePermissionReplied,
     ),
-    "session.error": createPluginEventHandler(
+    "session.execution.failed": createPluginEventHandler(
         normalizeSessionErrorEvent,
         handleSessionError,
     ),
@@ -76,7 +72,7 @@ export async function handleTelegramBotPluginEvent(
         return;
     }
 
-    const normalizedEvent = handler.normalize(event.properties);
+    const normalizedEvent = handler.normalize(event.data);
 
     if (!normalizedEvent) {
         return;
@@ -329,21 +325,23 @@ function normalizePermissionRequestEvent(properties: unknown): OpenCodePermissio
 
     const id = asNonEmptyString(properties.id);
     const sessionID = asNonEmptyString(properties.sessionID);
-    const permission = asNonEmptyString(properties.permission) ?? asNonEmptyString(properties.type);
+    const permission = asNonEmptyString(properties.action);
 
     if (!id || !sessionID || !permission) {
         return null;
     }
 
     return {
-        always: Array.isArray(properties.always)
-            ? properties.always.filter((value): value is string => typeof value === "string")
+        always: Array.isArray(properties.save)
+            ? properties.save.filter((value): value is string => typeof value === "string")
             : [],
         id,
         metadata: isPlainRecord(properties.metadata)
             ? properties.metadata
             : {},
-        patterns: normalizePermissionPatterns(properties),
+        patterns: Array.isArray(properties.resources)
+            ? properties.resources.filter((value): value is string => typeof value === "string")
+            : [],
         permission,
         sessionID,
     };
@@ -354,10 +352,8 @@ function normalizePermissionReplyEvent(properties: unknown): NormalizedPermissio
         return null;
     }
 
-    const requestId = asNonEmptyString(properties.requestID) ?? asNonEmptyString(properties.permissionID);
-    const reply = normalizePermissionReply(
-        asNonEmptyString(properties.reply) ?? asNonEmptyString(properties.response),
-    );
+    const requestId = asNonEmptyString(properties.requestID);
+    const reply = normalizePermissionReply(asNonEmptyString(properties.reply));
     const sessionId = asNonEmptyString(properties.sessionID);
 
     if (!requestId || !reply || !sessionId) {
@@ -418,22 +414,6 @@ function normalizeSessionStatusEvent(properties: unknown): NormalizedSessionStat
     };
 }
 
-function normalizePermissionPatterns(properties: Record<string, unknown>): string[] {
-    if (Array.isArray(properties.patterns)) {
-        return properties.patterns.filter((value): value is string => typeof value === "string");
-    }
-
-    if (typeof properties.pattern === "string" && properties.pattern.trim().length > 0) {
-        return [properties.pattern];
-    }
-
-    if (Array.isArray(properties.pattern)) {
-        return properties.pattern.filter((value): value is string => typeof value === "string");
-    }
-
-    return [];
-}
-
 function normalizePermissionReply(value: string | null): PermissionApprovalReply | null {
     if (value === "once" || value === "always" || value === "reject") {
         return value;
@@ -455,11 +435,7 @@ function extractSessionErrorMessage(error: unknown): string | null {
         return error.message.trim();
     }
 
-    if (isPlainRecord(error.data) && typeof error.data.message === "string" && error.data.message.trim().length > 0) {
-        return error.data.message.trim();
-    }
-
-    return asNonEmptyString(error.name);
+    return asNonEmptyString(error.type);
 }
 
 function normalizeForegroundSessionError(error: unknown): Error {
@@ -468,18 +444,14 @@ function normalizeForegroundSessionError(error: unknown): Error {
     }
 
     if (isPlainRecord(error)) {
-        const normalized = new Error(extractSessionErrorMessage(error) ?? "Unknown session error.") as Error & {
-            data?: Record<string, unknown>;
-        };
-
-        const normalizedName = asNonEmptyString(error.name);
+        const normalized = Object.assign(
+            new Error(extractSessionErrorMessage(error) ?? "Unknown session error."),
+            error,
+        );
+        const normalizedName = asNonEmptyString(error.type);
 
         if (normalizedName) {
             normalized.name = normalizedName;
-        }
-
-        if (isPlainRecord(error.data)) {
-            normalized.data = error.data;
         }
 
         return normalized;

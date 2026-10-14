@@ -3,6 +3,13 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
+import { setImmediate } from "node:timers/promises";
+import type { Plugin } from "@opencode/plugin";
+import { Service } from "@opencode/client/service";
+import type { PermissionEvaluation } from "@opencode/plugin/promise/permission";
+import { InMemoryPermissionApprovalRepository } from "../src/repositories/permission-approval.repo.js";
+import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
+import { ForegroundSessionTracker } from "../src/services/session-activity/foreground-session-tracker.js";
 import type { AppContainer } from "../src/app/container.js";
 import {
     loadAppConfig,
@@ -36,74 +43,8 @@ function createConfig(overrides: PluginConfigSource = {}): PluginConfigSource {
     }, overrides);
 }
 
-function createSdkClientStub(hostLogCalls: Array<Record<string, unknown>> = []): OpenCodeSdkClientLike {
-    return {
-        app: {
-            agents: async () => [],
-            log: async (input: Record<string, unknown>) => {
-                hostLogCalls.push(input);
-                return true;
-            },
-        },
-        config: {
-            get: async () => ({ provider: {} }),
-            providers: async () => ({ providers: [], default: {} }),
-        },
-        global: {
-            health: async () => ({ healthy: true, version: "1.0.0" }),
-        },
-        lsp: {
-            status: async () => [],
-        },
-        mcp: {
-            status: async () => ({}),
-        },
-        path: {
-            get: async () => ({
-                home: "E:/Users/demo",
-                state: "E:/Users/demo/.opencode",
-                config: "E:/repo/opencode.json",
-                worktree: "E:/repo",
-                directory: "E:/repo",
-            }),
-        },
-        project: {
-            current: async () => ({
-                id: "project-1",
-                worktree: "E:/repo",
-                time: { created: 1, updated: 1 },
-                sandboxes: [],
-            }),
-            list: async () => [],
-        },
-        session: {
-            abort: async () => false,
-            create: async () => ({
-                id: "session-1",
-                slug: "session-1",
-                projectID: "project-1",
-                directory: "E:/repo",
-                title: "Session",
-                version: "1",
-                time: { created: 1, updated: 1 },
-            }),
-            list: async () => [],
-            prompt: async () => ({
-                info: {} as never,
-                parts: [],
-            }),
-            status: async () => ({}),
-            update: async () => ({
-                id: "session-1",
-                slug: "session-1",
-                projectID: "project-1",
-                directory: "E:/repo",
-                title: "Session",
-                version: "1",
-                time: { created: 1, updated: 1 },
-            }),
-        },
-    } as never;
+function createSdkClientStub(): OpenCodeSdkClientLike {
+    return {} as never;
 }
 
 function createContainerStub(cwd = "E:/workspace") {
@@ -114,6 +55,9 @@ function createContainerStub(cwd = "E:/workspace") {
     };
     const container = {
         __cwd: cwd,
+        sessionRepo: new InMemorySessionRepository(),
+        permissionApprovalRepo: new InMemoryPermissionApprovalRepository(),
+        foregroundSessionTracker: new ForegroundSessionTracker(),
         logger: {
             child() {
                 return this;
@@ -434,6 +378,8 @@ test("package root only exports the plugin entrypoint at runtime", () => {
     assert.deepEqual(Object.keys(entryModule), ["default"]);
     assert.equal(entryModule.default, entryPlugin);
     assert.equal(entryPlugin, TelegramBotPlugin);
+    assert.equal(entryPlugin.id, "opencode-tbot");
+    assert.equal(typeof entryPlugin.setup, "function");
 });
 
 test("ensureTelegramBotPluginRuntime starts the Telegram runtime only once per worktree", async () => {
@@ -476,20 +422,16 @@ test("ensureTelegramBotPluginRuntime starts the Telegram runtime only once per w
         };
 
         const first = await ensureTelegramBotPluginRuntime({
-            context: {
-                client: sdkClient,
-                worktree: "E:/workspace",
-            },
+            context: { location: { directory: "E:/workspace" } } as never,
+            client: sdkClient,
             config: configSource,
             bootstrapApp,
             prepareConfiguration: async ({ cwd, config }) => createPreparedConfiguration(cwd, config, configSource),
             startRuntime,
         });
         const second = await ensureTelegramBotPluginRuntime({
-            context: {
-                client: sdkClient,
-                worktree: "E:/workspace",
-            },
+            context: { location: { directory: "E:/workspace" } } as never,
+            client: sdkClient,
             config: configSource,
             bootstrapApp,
             prepareConfiguration: async ({ cwd, config }) => createPreparedConfiguration(cwd, config, configSource),
@@ -516,10 +458,8 @@ test("ensureTelegramBotPluginRuntime reuses the active runtime when a later plug
         let started = 0;
 
         const first = await ensureTelegramBotPluginRuntime({
-            context: {
-                client: sdkClient,
-                worktree: "E:/workspace-reuse",
-            },
+            context: { location: { directory: "E:/workspace-reuse" } } as never,
+            client: sdkClient,
             config: configSource,
             bootstrapApp: (
                 client: OpenCodeSdkClientLike,
@@ -585,10 +525,8 @@ test("ensureTelegramBotPluginRuntime starts when only directory is provided", as
         let startedCwd: string | null = null;
 
         const runtime = await ensureTelegramBotPluginRuntime({
-            context: {
-                client: sdkClient,
-                directory: "E:/workspace-directory-only",
-            },
+            context: { location: { directory: "E:/workspace-directory-only" } } as never,
+            client: sdkClient,
             config: configSource,
             bootstrapApp: (
                 client: OpenCodeSdkClientLike,
@@ -624,52 +562,49 @@ test("ensureTelegramBotPluginRuntime starts when only directory is provided", as
     }
 });
 
-test("ensureTelegramBotPluginRuntime throws a readable error when the first plugin call is missing client", async () => {
+test("ensureTelegramBotPluginRuntime throws a readable error when the first runtime call lacks context and client", async () => {
     await resetTelegramBotPluginRuntimeForTests();
 
     try {
         await assert.rejects(
             ensureTelegramBotPluginRuntime({
-                context: {
-                    worktree: "E:/workspace-missing-client",
-                },
                 config: createConfig(),
             }),
-            /OpenCode plugin context\.client is required\./u,
+            /OpenCode plugin context is required\./u,
         );
     } finally {
         await resetTelegramBotPluginRuntimeForTests();
     }
 });
 
-test("TelegramBotPlugin returns inert hooks and logs the failure when startup cannot build the runtime", async () => {
+test("TelegramBotPlugin logs a non-fatal startup failure without registering hooks", async (t) => {
+    t.mock.method(Service, "discover", async () => undefined);
     await resetTelegramBotPluginRuntimeForTests();
 
     const originalHome = process.env.HOME;
     const originalUserProfile = process.env.USERPROFILE;
-    const hostLogCalls: Array<Record<string, unknown>> = [];
+    const logCalls: string[] = [];
+    const originalConsoleError = console.error;
+    console.error = (message: string) => logCalls.push(message);
     const tempHome = mkdtempSync(join(tmpdir(), "opencode-tbot-plugin-inert-"));
 
     process.env.HOME = tempHome;
     process.env.USERPROFILE = tempHome;
 
     try {
-        const hooks = await TelegramBotPlugin({
-            client: createSdkClientStub(hostLogCalls),
-            worktree: "E:/workspace-plugin-inert",
+        const cleanup = await TelegramBotPlugin.setup({
+            location: { directory: "E:/workspace-plugin-inert" },
+            permission: { hook: () => assert.fail("Startup failure must not register hooks.") },
         } as never);
 
-        assert.deepEqual(hooks, {});
-        assert.equal(hostLogCalls.length, 1);
-        assert.equal(
-            (((hostLogCalls[0]?.body as { extra?: { reason?: unknown } } | undefined)?.extra)?.reason),
-            "config_invalid",
-        );
-        assert.equal(
-            (((hostLogCalls[0]?.body as { message?: unknown } | undefined)?.message)),
-            "telegram bot plugin disabled during startup",
-        );
+        assert.equal(cleanup, undefined);
+        assert.equal(logCalls.length, 1);
+        const event = JSON.parse(logCalls[0] ?? "{}");
+        assert.equal(event.reason, "startup_failed");
+        assert.match(event.error?.message ?? "", /OpenCode V2 service is unavailable/u);
+        assert.equal(event.message, "telegram bot plugin disabled during startup");
     } finally {
+        console.error = originalConsoleError;
         if (typeof originalHome === "string") {
             process.env.HOME = originalHome;
         } else {
@@ -710,10 +645,8 @@ test("ensureTelegramBotPluginRuntime clears the singleton and disposes the conta
 
         await assert.rejects(
             ensureTelegramBotPluginRuntime({
-                context: {
-                    client: sdkClient,
-                    directory: "E:/workspace",
-                },
+                context: { location: { directory: "E:/workspace" } } as never,
+                client: sdkClient,
                 config: configSource,
                 bootstrapApp,
                 prepareConfiguration: async ({ cwd, config }) => createPreparedConfiguration(cwd, config, configSource),
@@ -726,10 +659,8 @@ test("ensureTelegramBotPluginRuntime clears the singleton and disposes the conta
         );
 
         const runtime = await ensureTelegramBotPluginRuntime({
-            context: {
-                client: sdkClient,
-                directory: "E:/workspace",
-            },
+            context: { location: { directory: "E:/workspace" } } as never,
+            client: sdkClient,
             config: configSource,
             bootstrapApp,
             prepareConfiguration: async ({ cwd, config }) => createPreparedConfiguration(cwd, config, configSource),
@@ -797,20 +728,16 @@ test("ensureTelegramBotPluginRuntime rebuilds the runtime when the worktree chan
         };
 
         const first = await ensureTelegramBotPluginRuntime({
-            context: {
-                client: sdkClient,
-                worktree: "E:/workspace-a",
-            },
+            context: { location: { directory: "E:/workspace-a" } } as never,
+            client: sdkClient,
             config: configSource,
             bootstrapApp,
             prepareConfiguration: async ({ cwd, config }) => createPreparedConfiguration(cwd, config, configSource),
             startRuntime,
         });
         const second = await ensureTelegramBotPluginRuntime({
-            context: {
-                client: sdkClient,
-                worktree: "E:/workspace-b",
-            },
+            context: { location: { directory: "E:/workspace-b" } } as never,
+            client: sdkClient,
             config: configSource,
             bootstrapApp,
             prepareConfiguration: async ({ cwd, config }) => createPreparedConfiguration(cwd, config, configSource),
@@ -836,10 +763,8 @@ test("resetTelegramBotPluginRuntimeForTests disposes the active runtime", async 
     };
 
     await ensureTelegramBotPluginRuntime({
-        context: {
-            client: sdkClient,
-            worktree: "E:/workspace",
-        },
+        context: { location: { directory: "E:/workspace" } } as never,
+        client: sdkClient,
         config: configSource,
         bootstrapApp: (
             _client: OpenCodeSdkClientLike,
@@ -864,4 +789,199 @@ test("resetTelegramBotPluginRuntimeForTests disposes the active runtime", async 
     await resetTelegramBotPluginRuntimeForTests();
 
     assert.equal(runtimeCalls.dispose, 1);
+});
+
+test("TelegramBotPlugin registers V2 permission and event handlers and releases them when the worktree changes", async () => {
+    await resetTelegramBotPluginRuntimeForTests();
+    const firstStub = createContainerStub("E:/workspace-events");
+    const secondStub = createContainerStub("E:/workspace-next");
+    const configSource = createConfig();
+    const messages: string[] = [];
+    let permissionHook: ((event: PermissionEvaluation) => Promise<void> | void) | undefined;
+    let eventSignal: AbortSignal | undefined;
+    let registrationDisposals = 0;
+    let eventStreamStopped = false;
+    const context = {
+        location: { directory: "E:/workspace-events" },
+        permission: {
+            async hook(name: string, callback: typeof permissionHook) {
+                assert.equal(name, "evaluate");
+                permissionHook = callback;
+                return {
+                    async dispose() {
+                        registrationDisposals += 1;
+                    },
+                };
+            },
+        },
+        event: {
+            async *subscribe({ signal }: { signal: AbortSignal }) {
+                eventSignal = signal;
+                yield {
+                    id: "event-permission-1",
+                    created: 1,
+                    type: "permission.asked",
+                    data: {
+                        id: "request-1",
+                        sessionID: "session-foreground",
+                        action: "read",
+                        resources: ["README.md"],
+                    },
+                };
+                await new Promise<void>((resolve) => {
+                    signal.addEventListener("abort", () => resolve(), { once: true });
+                });
+                eventStreamStopped = true;
+            },
+        },
+    } as unknown as Plugin.Context;
+    const start = (stub: typeof firstStub, pluginContext: Plugin.Context) => ensureTelegramBotPluginRuntime({
+        context: pluginContext,
+        client: createSdkClientStub(),
+        config: configSource,
+        prepareConfiguration: async ({ cwd, config }) => createPreparedConfiguration(cwd, config, configSource),
+        bootstrapApp: (_client, config, options) => ({
+            config: loadAppConfig(config, options),
+            container: stub.container,
+        }),
+        startRuntime: async () => ({
+            bot: {
+                api: {
+                    async sendMessage(_chatId: number, text: string) {
+                        messages.push(text);
+                        return { message_id: 1 };
+                    },
+                },
+            } as never,
+            container: stub.container,
+            stop() { },
+            async dispose() {
+                await stub.container.dispose();
+            },
+        }),
+    });
+
+    try {
+        await start(firstStub, context);
+        firstStub.container.foregroundSessionTracker.begin(777, "session-foreground");
+        const cleanup = await TelegramBotPlugin.setup(context);
+        assert.equal(typeof cleanup, "function");
+        await setImmediate();
+        assert.equal(messages.length, 1);
+        assert.match(messages[0] ?? "", /Permission Request/u);
+        assert.equal(eventSignal?.aborted, false);
+        assert.ok(permissionHook);
+
+        const foreground: PermissionEvaluation = {
+            sessionID: "session-foreground" as never,
+            action: "read",
+            resources: ["README.md"],
+            effect: "allow",
+        };
+        await permissionHook(foreground);
+        assert.equal(foreground.effect, "ask");
+        const denied = { ...foreground, effect: "deny" as const };
+        await permissionHook(denied);
+        assert.equal(denied.effect, "deny");
+        const unrelated = { ...foreground, sessionID: "session-unrelated" as never, effect: "allow" as const };
+        await permissionHook(unrelated);
+        assert.equal(unrelated.effect, "allow");
+
+        await start(secondStub, { location: { directory: "E:/workspace-next" } } as never);
+        assert.equal(eventSignal?.aborted, true);
+        assert.equal(eventStreamStopped, true);
+        assert.equal(registrationDisposals, 1);
+        assert.equal(firstStub.calls.dispose, 1);
+        assert.equal(secondStub.calls.dispose, 0);
+        await cleanup?.();
+        assert.equal(firstStub.calls.dispose, 1);
+        assert.equal(secondStub.calls.dispose, 0);
+
+        const secondCleanup = await TelegramBotPlugin.setup({
+            ...context,
+            location: { directory: "E:/workspace-next" },
+        } as Plugin.Context);
+        await setImmediate();
+        assert.equal(eventSignal?.aborted, false);
+        await secondCleanup?.();
+        await secondCleanup?.();
+        assert.equal(eventSignal?.aborted, true);
+        assert.equal(registrationDisposals, 2);
+        assert.equal(secondStub.calls.dispose, 1);
+    } finally {
+        await resetTelegramBotPluginRuntimeForTests();
+    }
+
+    assert.equal(secondStub.calls.dispose, 1);
+});
+
+
+test("TelegramBotPlugin releases resources when permission registration is delayed or fails", async (t) => {
+    await resetTelegramBotPluginRuntimeForTests();
+    const configSource = createConfig();
+    const containers = new Map<string, ReturnType<typeof createContainerStub>>();
+    let enteredHook: () => void = () => { };
+    const hookEntered = new Promise<void>((resolve) => { enteredHook = resolve; });
+    let releaseHook: (registration: { dispose(): Promise<void> }) => void = () => { };
+    const hookRegistration = new Promise<{ dispose(): Promise<void> }>((resolve) => { releaseHook = resolve; });
+    let registrationDisposals = 0;
+    let subscriptionCalls = 0;
+    const start = (directory: string) => ensureTelegramBotPluginRuntime({
+        context: { location: { directory } } as never,
+        client: createSdkClientStub(),
+        config: configSource,
+        prepareConfiguration: async ({ cwd, config }) => createPreparedConfiguration(cwd, config, configSource),
+        bootstrapApp: (_client, config, options) => {
+            const stub = createContainerStub(options?.cwd);
+            containers.set(String(options?.cwd), stub);
+            return { config: loadAppConfig(config, options), container: stub.container };
+        },
+        startRuntime: async ({ container }) => ({
+            bot: {} as never,
+            container,
+            stop() { },
+            async dispose() { await container.dispose(); },
+        }),
+    });
+
+    try {
+        await start("E:/workspace-registering");
+        const setup = TelegramBotPlugin.setup({
+            location: { directory: "E:/workspace-registering" },
+            permission: {
+                hook() {
+                    enteredHook();
+                    return hookRegistration;
+                },
+            },
+            event: {
+                subscribe() {
+                    subscriptionCalls += 1;
+                    assert.fail("A replaced runtime must not subscribe to events.");
+                },
+            },
+        } as never);
+        await hookEntered;
+        await start("E:/workspace-current");
+        releaseHook({ async dispose() { registrationDisposals += 1; } });
+        assert.equal(await setup, undefined);
+        assert.equal(subscriptionCalls, 0);
+        assert.equal(registrationDisposals, 1);
+        assert.equal(containers.get("E:/workspace-registering")?.calls.dispose, 1);
+        assert.equal(containers.get("E:/workspace-current")?.calls.dispose, 0);
+
+        const errors: string[] = [];
+        t.mock.method(console, "error", (message: string) => errors.push(message));
+        const cleanup = await TelegramBotPlugin.setup({
+            location: { directory: "E:/workspace-current" },
+            permission: {
+                async hook() { throw new Error("registration failed"); },
+            },
+        } as never);
+        assert.equal(cleanup, undefined);
+        assert.equal(containers.get("E:/workspace-current")?.calls.dispose, 1);
+        assert.equal(JSON.parse(errors[0] ?? "{}").error?.message, "registration failed");
+    } finally {
+        await resetTelegramBotPluginRuntimeForTests();
+    }
 });

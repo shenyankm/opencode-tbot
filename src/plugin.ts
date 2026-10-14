@@ -1,5 +1,5 @@
-import type { Hooks, Plugin, PluginInput } from "@opencode-ai/plugin";
-import { bootstrapPluginApp } from "./app/bootstrap.js";
+import { Plugin } from "@opencode/plugin";
+import { bootstrapPluginApp, createPluginSdkClient } from "./app/bootstrap.js";
 import { handleTelegramBotPluginEvent } from "./app/plugin-events.js";
 import {
     preparePluginConfiguration,
@@ -13,16 +13,14 @@ import {
 import type { PluginConfigSource } from "./app/config.js";
 import type { OpenCodeSdkClientLike } from "./services/opencode/opencode.client.js";
 import { TelegramStartupError } from "./services/telegram/telegram-bot-access.js";
+import { createOpenCodeAppLogger } from "./infra/logger/index.js";
 
-export interface OpenCodePluginContextLike {
-    client?: OpenCodeSdkClientLike;
-    directory?: string | null;
-    worktree?: string | null;
-}
+export type OpenCodePluginContextLike = Plugin.Context;
 
 export interface EnsureTelegramBotPluginRuntimeOptions {
     context?: OpenCodePluginContextLike | null;
     config?: PluginConfigSource;
+    client?: OpenCodeSdkClientLike;
     bootstrapApp?: typeof bootstrapPluginApp;
     prepareConfiguration?: (input: {
         cwd: string;
@@ -35,6 +33,8 @@ interface TelegramBotPluginRuntimeState {
     cwd: string;
     runtime: TelegramBotRuntime | null;
     runtimePromise: Promise<TelegramBotRuntime>;
+    cleanup?: Plugin.Cleanup;
+    disposePromise?: Promise<void>;
 }
 
 interface TelegramBotPluginRuntimeStateHolder {
@@ -61,7 +61,6 @@ export async function ensureTelegramBotPluginRuntime(
         const runtimePromise = startPluginRuntime(
             options,
             resolvePluginRuntimeCwd(options.context),
-            requirePluginClient(options.context),
         )
             .then((runtime) => {
                 if (runtimeStateHolder.state?.runtimePromise === runtimePromise) {
@@ -88,21 +87,84 @@ export async function ensureTelegramBotPluginRuntime(
     return runtimeStateHolder.state.runtimePromise;
 }
 
-export const TelegramBotPlugin: Plugin = async (context) => {
-    try {
-        const runtime = await ensureTelegramBotPluginRuntime({
-            context: context as unknown as OpenCodePluginContextLike | undefined,
-        });
+export const TelegramBotPlugin = Plugin.define({
+    id: "opencode-tbot",
+    async setup(context) {
+        let state: TelegramBotPluginRuntimeState | null = null;
 
-        return createHooks(runtime);
-    } catch (error) {
-        await logPluginStartupFailure(
-            context as unknown as OpenCodePluginContextLike | undefined,
-            error,
-        );
-        return {};
-    }
-};
+        try {
+            const runtime = await ensureTelegramBotPluginRuntime({
+                context,
+                config: context.options as PluginConfigSource,
+            });
+            state = getTelegramBotPluginRuntimeStateHolder().state;
+
+            if (!state || state.runtime !== runtime) {
+                return;
+            }
+
+            await state.cleanup?.();
+            const registration = await context.permission.hook("evaluate", async (event) => {
+                if (event.effect === "deny") {
+                    return;
+                }
+
+                const bindings = await runtime.container.sessionRepo.listBySessionId(event.sessionID);
+                const foregroundChatIds = runtime.container.foregroundSessionTracker.listChatIds(event.sessionID);
+
+                if (bindings.length > 0 || foregroundChatIds.length > 0) {
+                    event.effect = "ask";
+                }
+            });
+            if (getTelegramBotPluginRuntimeStateHolder().state !== state) {
+                await registration.dispose();
+                return;
+            }
+
+            const controller = new AbortController();
+            const eventTask = consumePluginEvents(context, runtime, controller.signal);
+            const cleanup = async () => {
+                controller.abort();
+
+                try {
+                    await registration.dispose();
+                } finally {
+                    await eventTask;
+                }
+            };
+
+            state.cleanup = cleanup;
+
+            const ownedState = state;
+
+            return async () => {
+                if (ownedState.cleanup !== cleanup) {
+                    return;
+                }
+
+                const holder = getTelegramBotPluginRuntimeStateHolder();
+
+                if (holder.state === ownedState) {
+                    holder.state = null;
+                }
+
+                await disposeTelegramBotPluginRuntimeState(ownedState);
+            };
+        } catch (error) {
+            if (state) {
+                const holder = getTelegramBotPluginRuntimeStateHolder();
+
+                if (holder.state === state) {
+                    holder.state = null;
+                }
+
+                await disposeTelegramBotPluginRuntimeState(state).catch(logPluginStartupFailure);
+            }
+
+            await logPluginStartupFailure(error);
+        }
+    },
+});
 
 export async function resetTelegramBotPluginRuntimeForTests() {
     const runtimeStateHolder = getTelegramBotPluginRuntimeStateHolder();
@@ -121,7 +183,6 @@ export default TelegramBotPlugin;
 async function startPluginRuntime(
     options: EnsureTelegramBotPluginRuntimeOptions,
     cwd: string,
-    client: OpenCodeSdkClientLike,
 ): Promise<TelegramBotRuntime> {
     const bootstrapApp = options.bootstrapApp ?? bootstrapPluginApp;
     const prepareConfiguration = options.prepareConfiguration ?? preparePluginConfiguration;
@@ -131,7 +192,7 @@ async function startPluginRuntime(
         config: options.config,
     });
     const { config, container } = bootstrapApp(
-        client,
+        await requirePluginClient(options),
         preparedConfiguration.config,
         {
             cwd: preparedConfiguration.cwd,
@@ -164,16 +225,19 @@ function resolvePluginRuntimeCwd(context?: OpenCodePluginContextLike | null): st
 }
 
 function resolveExplicitPluginRuntimeCwd(context?: OpenCodePluginContextLike | null): string | null {
-    return normalizePluginRuntimePath(context?.worktree)
-        ?? normalizePluginRuntimePath(context?.directory);
+    return normalizePluginRuntimePath(context?.location?.directory);
 }
 
-function requirePluginClient(context?: OpenCodePluginContextLike | null): OpenCodeSdkClientLike {
-    if (context?.client) {
-        return context.client;
+async function requirePluginClient(options: EnsureTelegramBotPluginRuntimeOptions): Promise<OpenCodeSdkClientLike> {
+    if (options.client) {
+        return options.client;
     }
 
-    throw new Error("OpenCode plugin context.client is required.");
+    if (options.context) {
+        return createPluginSdkClient(options.context);
+    }
+
+    throw new Error("OpenCode plugin context is required.");
 }
 
 function normalizePluginRuntimePath(value: string | null | undefined): string | null {
@@ -191,25 +255,43 @@ function normalizePluginRuntimePath(value: string | null | undefined): string | 
 async function disposeTelegramBotPluginRuntimeState(
     state: TelegramBotPluginRuntimeState,
 ): Promise<void> {
-    const runtime = state.runtime ?? await state.runtimePromise.catch(() => null);
+    state.disposePromise ??= (async () => {
+        const runtime = state.runtime ?? await state.runtimePromise.catch(() => null);
 
-    await runtime?.dispose();
+        try {
+            await state.cleanup?.();
+        } finally {
+            await runtime?.dispose();
+        }
+    })();
+
+    await state.disposePromise;
 }
 
-function createHooks(runtime: TelegramBotRuntime): Hooks {
-    return {
-        async event({ event }) {
-            await handleTelegramBotPluginEvent(runtime, event);
-        },
-        async "permission.ask"(input, output) {
-            const bindings = await runtime.container.sessionRepo.listBySessionId(input.sessionID);
-            const foregroundChatIds = runtime.container.foregroundSessionTracker.listChatIds(input.sessionID);
-
-            if (bindings.length > 0 || foregroundChatIds.length > 0) {
-                output.status = "ask";
+async function consumePluginEvents(
+    context: Plugin.Context,
+    runtime: TelegramBotRuntime,
+    signal: AbortSignal,
+): Promise<void> {
+    try {
+        for await (const event of context.event.subscribe({ signal })) {
+            try {
+                await handleTelegramBotPluginEvent(runtime, event);
+            } catch (error) {
+                runtime.container.logger.error(
+                    { error, event: "plugin-event.delivery_failed", type: event.type },
+                    "failed to handle OpenCode plugin event",
+                );
             }
-        },
-    };
+        }
+    } catch (error) {
+        if (!signal.aborted) {
+            runtime.container.logger.error(
+                { error, event: "plugin-event.subscription_failed" },
+                "OpenCode plugin event subscription failed",
+            );
+        }
+    }
 }
 
 function getTelegramBotPluginRuntimeStateHolder(): TelegramBotPluginRuntimeStateHolder {
@@ -224,36 +306,17 @@ function getTelegramBotPluginRuntimeStateHolder(): TelegramBotPluginRuntimeState
     return globalScope.__opencodeTbotPluginRuntimeState__;
 }
 
-async function logPluginStartupFailure(
-    context: OpenCodePluginContextLike | undefined,
-    error: unknown,
-): Promise<void> {
-    const logger = context?.client?.app?.log;
+async function logPluginStartupFailure(error: unknown): Promise<void> {
+    const logger = createOpenCodeAppLogger({ sinks: { file: false } });
 
-    if (typeof logger !== "function") {
-        return;
-    }
-
-    try {
-        await logger({
-            body: {
-                service: "opencode-tbot",
-                level: "error",
-                message: "telegram bot plugin disabled during startup",
-                extra: {
-                    component: "runtime",
-                    event: "runtime.plugin.disabled",
-                    mode: "plugin",
-                    reason: classifyPluginStartupFailureReason(error),
-                    error: serializePluginStartupError(error),
-                },
-            },
-            responseStyle: "data",
-            throwOnError: true,
-        });
-    } catch {
-        // Best effort only. Startup should stay non-fatal even if host logging fails.
-    }
+    logger.error({
+        component: "runtime",
+        event: "runtime.plugin.disabled",
+        mode: "plugin",
+        reason: classifyPluginStartupFailureReason(error),
+        error: serializePluginStartupError(error),
+    }, "telegram bot plugin disabled during startup");
+    await logger.flush();
 }
 
 function classifyPluginStartupFailureReason(error: unknown): string {
@@ -265,7 +328,7 @@ function classifyPluginStartupFailureReason(error: unknown): string {
         error instanceof Error
         && (
             error.message.includes("Invalid plugin configuration:")
-            || error.message.includes("OpenCode plugin context.client is required.")
+            || error.message.includes("OpenCode plugin context is required.")
             || error.message.includes("Telegram bot token is required.")
         )
     ) {

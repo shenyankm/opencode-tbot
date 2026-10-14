@@ -1,7 +1,7 @@
 # opencode-tbot
 
 A Telegram plugin for driving [OpenCode](https://opencode.ai) from chat.
-Built on [grammY](https://grammy.dev) and `@opencode-ai/sdk`.
+Built on [grammY](https://grammy.dev), `@opencode/client`, and `@opencode/plugin`.
 
 [English](./README.md) | [简体中文](./README.zh-CN.md) | [日本語](./README.ja.md)
 
@@ -19,7 +19,7 @@ Built on [grammY](https://grammy.dev) and `@opencode-ai/sdk`.
 
 ## Requirements
 
-- A running OpenCode host process that loads the plugin.
+- An OpenCode V2 host compatible with `@opencode/client` and `@opencode/plugin` `2.0.29` that loads the plugin. OpenCode V1 is not supported.
 - A Telegram bot token.
 - Node.js `>=22.12.0` for the CLI.
 
@@ -40,7 +40,7 @@ The installer:
 
 - prompts for the Telegram bot token when running interactively
 - validates the Telegram bot token with `getMe` before writing any config files
-- writes or updates `~/.config/opencode/opencode.json` so `plugin` contains `opencode-tbot`
+- writes or updates `~/.config/opencode/opencode.json` so `plugins` contains `opencode-tbot`
 - writes or merges `~/.config/opencode/opencode-tbot/config.json`
 - creates missing parent directories automatically
 - prints a minimal success message on completion
@@ -75,6 +75,7 @@ Notes:
 - `install` updates both `opencode.json` and the global plugin config file.
 - `update` only refreshes `opencode.json` and leaves the existing plugin config contents untouched.
 - `uninstall` removes `opencode-tbot` from `opencode.json` and keeps `~/.config/opencode/opencode-tbot/config.json` in place.
+- Existing V1 `plugin` entries are migrated to V2 `plugins`, including package-and-options tuples. Other plugin options are preserved. `install` and `update` reject conflicting options for duplicate packages before writing config.
 
 ### CLI Options
 
@@ -111,6 +112,28 @@ OpenCode loads the npm plugin registration from:
 
 This plugin does not read runtime settings from `.env`.
 
+Runtime logs are redacted JSON in the host console. File logs are stored in `~/.local/share/opencode/log/plugins/opencode-tbot/` by default. `logging.sinks.host` and `logging.sinks.file` control these outputs.
+
+### Example `opencode.json`
+
+The installer writes `"plugins": ["opencode-tbot"]`. Use the object form to override global file settings through plugin options. The Telegram token can remain in `config.json`.
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [
+    {
+      "package": "opencode-tbot",
+      "options": {
+        "telegram": {
+          "allowedChatIds": ["123456789"]
+        }
+      }
+    }
+  ]
+}
+```
+
 ### Example `config.json`
 
 ```json
@@ -135,17 +158,22 @@ This plugin does not read runtime settings from `.env`.
 
 ## Quick Start
 
-1. Install the plugin with `npm exec -- opencode-tbot@latest`.
-2. Set `telegram.allowedChatIds` in `~/.config/opencode/opencode-tbot/config.json` if you want to restrict the bot to specific chats.
-3. In Telegram, run `/status` to verify the connection.
-4. Run `/new [title]`, or send a text or image message directly to start working.
+1. Install the [OpenCode V2 CLI](https://opencode.ai/v2/docs/cli/commands) with `npm install -g @opencode/cli`.
+2. Install the plugin with `npm exec -- opencode-tbot@latest`.
+3. Set `telegram.allowedChatIds` in `~/.config/opencode/opencode-tbot/config.json` if you want to restrict the bot to specific chats.
+4. Start the shared host with `opencode serve --service`, or run `opencode reload` if the V2 shared server is already running. Keep the host running.
+5. In another terminal in your project directory, load its location and plugin with `opencode api location.get --header "x-opencode-directory:$(node -p 'encodeURIComponent(process.cwd())')"`.
+6. In Telegram, run `/status` to verify the connection.
+7. Run `/new [title]`, or send a text or image message directly to start working.
+
+The plugin uses the shared V2 service. A standalone `opencode serve` does not expose the service discovery information it needs. Starting the shared host alone does not load a project; step 5 selects the project directory and starts the plugin.
 
 ## Commands
 
 | Command | What it does |
 | --- | --- |
 | `/start` | Show a short welcome message and quick-start steps. |
-| `/status` | Show aggregated OpenCode health, version, workspace paths, plugin list, LSP status, and MCP status. |
+| `/status` | Show aggregated OpenCode health, version, workspace paths, plugin list, and MCP status. LSP status is unavailable in the current V2 HTTP API. |
 | `/new [title]` | Create a new OpenCode session in the current project. |
 | `/agents` or `/agent` | List available agents and switch the active one. |
 | `/sessions` | List available sessions, switch the active one, and offer rename actions. |
@@ -163,11 +191,13 @@ This plugin does not read runtime settings from `.env`.
 - `/cancel` aborts both the OpenCode session and the local Telegram wait state, so the next prompt can start immediately.
 - Telegram voice message support was removed. Telegram voice uses OGG by default, and usable speech models would require transcoding. Given the added bundle size and maintenance cost, the feature was dropped, and voice messages now receive a localized rejection reply.
 
+OpenCode V2 stores Agent and model choices on the session. Chats and TUI clients sharing one session can affect each other's choices; use separate sessions for independent selections.
+
 ## FAQ
 
 ### Do I need a running OpenCode instance?
 
-Yes. This repository provides a Telegram integration layer and depends on the OpenCode host process that loads the plugin.
+Yes. This repository provides a Telegram integration layer and depends on the OpenCode V2 host process that loads the plugin.
 
 ### Do I need to install `opencode-tbot` globally?
 
