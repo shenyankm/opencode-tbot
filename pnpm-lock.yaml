@@ -10,7 +10,7 @@ importers:
     dependencies:
       '@grammyjs/runner':
         specifier: ^2.0.3
-        version: 2.0.3(grammy@1.41.1)
+        version: 2.0.3(grammy@1.46.0)
       '@opencode/client':
         specifier: 2.0.29
         version: 2.0.29(effect@4.0.1)
@@ -18,8 +18,8 @@ importers:
         specifier: 2.0.29
         version: 2.0.29(@opentelemetry/semantic-conventions@1.43.0)(redis@6.3.0(@opentelemetry/api@1.9.0))
       grammy:
-        specifier: ^1.38.0
-        version: 1.41.1
+        specifier: ^1.46.0
+        version: 1.46.0
       zod:
         specifier: ^3.23.8
         version: 3.25.76
@@ -356,8 +356,8 @@ packages:
     peerDependencies:
       grammy: ^1.13.1
 
-  '@grammyjs/types@3.25.0':
-    resolution: {integrity: sha512-iN9i5p+8ZOu9OMxWNcguojQfz4K/PDyMPOnL7PPCON+SoA/F8OKMH3uR7CVUkYfdNe0GCz8QOzAWrnqusQYFOg==}
+  '@grammyjs/types@5.0.0':
+    resolution: {integrity: sha512-iq1Qrq1iPKkB8yAa0qSuIURMZOCuqTY5pWy5gHpCeL1oQ+GPadGhw/cDTVE8waJwuCzacUzuIjRv1sESvk7u7A==}
 
   '@isaacs/cliui@8.0.2':
     resolution: {integrity: sha512-O8jcjabXaleOG9DQ0+ARXWZBTfnP4WNAqzuiJK7ll44AmxGKv/J2M4TPjxjY3znBCfvBXFzucm1twdyFybFqEA==}
@@ -1021,8 +1021,8 @@ packages:
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
 
-  grammy@1.41.1:
-    resolution: {integrity: sha512-wcHAQ1e7svL3fJMpDchcQVcWUmywhuepOOjHUHmMmWAwUJEIyK5ea5sbSjZd+Gy1aMpZeP8VYJa+4tP+j1YptQ==}
+  grammy@1.46.0:
+    resolution: {integrity: sha512-/8Qw+iisrUdOMk+p2mjEHouMm/BBdBEN1DHh16wiTpRUZkxDG3PxexdjCvR+wvK3LWPdrEvnQbdrwpU954sPhg==}
     engines: {node: ^12.20.0 || >=14.13.1}
 
   gtoken@8.0.0:
@@ -1983,12 +1983,12 @@ snapshots:
 
   '@gar/promise-retry@1.0.3': {}
 
-  '@grammyjs/runner@2.0.3(grammy@1.41.1)':
+  '@grammyjs/runner@2.0.3(grammy@1.46.0)':
     dependencies:
       abort-controller: 3.0.0
-      grammy: 1.41.1
+      grammy: 1.46.0
 
-  '@grammyjs/types@3.25.0': {}
+  '@grammyjs/types@5.0.0': {}
 
   '@isaacs/cliui@8.0.2':
     dependencies:
@@ -2733,9 +2733,9 @@ snapshots:
 
   graceful-fs@4.2.11: {}
 
-  grammy@1.41.1:
+  grammy@1.46.0:
     dependencies:
-      '@grammyjs/types': 3.25.0
+      '@grammyjs/types': 5.0.0
       abort-controller: 3.0.0
       debug: 4.4.3
       node-fetch: 2.7.0
