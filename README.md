@@ -154,7 +154,7 @@ The installer writes `"plugins": ["opencode-tbot"]`. Use the object form to over
 | --- | --- | --- | --- |
 | `telegram.botToken` | Yes | - | Telegram bot token. Normally written by the installer into the global plugin config after `getMe` validation succeeds. |
 | `telegram.allowedChatIds` | No | `[]` | Allowed Telegram chat IDs. If empty, the bot accepts messages from any chat. |
-| `tokens.showBreakdown` | No | `false` | Global `/token` switch for showing a second footer line with `request input`, `output`, `reasoning`, `cache.read`, and `cache.write`. The first-line displayed total is always recalculated from those five metrics and is not stored in the worktree state file. |
+| `tokens.showBreakdown` | No | `false` | Legacy setting accepted for compatibility; a separate context message now shows only remaining percentage and capacity. |
 
 ## Quick Start
 
@@ -179,10 +179,19 @@ The plugin uses the shared V2 service. A standalone `opencode serve` does not ex
 | `/sessions` | List available sessions, switch the active one, and offer rename actions. |
 | `/cancel` | Cancel pending session rename input or abort the running request for the current session. |
 | `/model` or `/models` | Show models exposed by OpenCode for connected providers, switch the active one, and choose a reasoning level when available. |
-| `/token` | Enable or disable the second footer line with the full token breakdown. This setting is global for the plugin. |
+| `/token` | Show the current context capacity and remaining percentage. |
 | `/language` | Switch the bot display language for the current chat and resync command descriptions. |
 
 ### Message Behavior
+
+- A compact, separate final status message shows the session workspace, provider/model, reasoning level, agent, remaining context percentage, model capacity, and whole-request duration (`s`, `m`, or `h`). Labels are bold and the workspace path is monospaced, with a plain-text fallback. Model/agent switches, workspace moves and compression refresh the same message while preserving that request’s duration. After compression, usage is unavailable until the next assistant step reports tokens; old or cumulative usage is never reused.
+- Thinking is shown in full, with long content split into numbered, independently expandable quotes. Existing messages are updated during streaming; earlier thinking is never dropped. Each part uses a compact heading, with a plain-text fallback if formatting is rejected. Thinking and reply text are shown in separate messages; the streamed reply becomes the final answer without duplication. Tool summaries are not shown.
+- Thinking and answers target about 1,024 visible characters per message, allowing small length variations to keep paragraphs and sentences intact. Only overlong sentences or unbroken text require a fallback split; all content is preserved.
+- Context compression has its own status message, separate from thinking and answers. It updates from running to completed or failed and keeps Stop available while running; compression summaries never appear as answers.
+- Requests show live previews of provider-supplied thinking and answers, with updates coalesced at most once per second.
+- The Stop button targets its own request; `/cancel` remains available. Stopping preserves the generated preview.
+- Long answers are sent completely in multiple messages, using plain text to avoid Markdown escaping expansion.
+- Model and reasoning-level buttons use stable identities. Reopen `/model` to replace numeric buttons created before upgrading.
 
 - Non-command text is treated as a prompt and sent to OpenCode.
 - Telegram photos and image documents are forwarded as OpenCode file parts.
@@ -206,6 +215,10 @@ No. `npm exec -- opencode-tbot@latest` is the recommended path. A global install
 ### What happens if the Telegram token is invalid?
 
 `install` fails before writing `opencode.json` or `~/.config/opencode/opencode-tbot/config.json`. If the runtime later becomes invalid, the plugin is disabled and OpenCode should continue to start without crashing.
+
+### What happens during a Telegram network outage?
+
+The runtime waits for reconnection when startup validation hits a network error. Polling automatically resumes after network retry exhaustion. Safe reads and edits use bounded retries; message sends retry only failures confirmed before connection, avoiding duplicates after a lost response. TLS verification stays enabled. Invalid tokens and competing pollers still stop instead of retrying forever.
 
 ### Is this an official OpenCode project?
 
