@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { getModelCallbackKey, getVariantCallbackKey, buildModelsKeyboard } from "../src/bot/presenters/keyboard.presenter.js";
 import { handleModelsCommand } from "../src/bot/commands/models.js";
 import { handleModelsCallback } from "../src/bot/handlers/callback.handler.js";
 import type { BotDependencies } from "../src/bot/types.js";
@@ -163,7 +164,7 @@ test("/model only shows configured models with numeric inline buttons", async ()
         keyboard.inline_keyboard[0].map((button) => button.text),
         ["1", "2", "3", "4", "5"],
     );
-    assert.equal(keyboard.inline_keyboard[0][0].callback_data, "model:pick:1");
+    assert.equal(keyboard.inline_keyboard[0][0].callback_data, `model:pick:${getModelCallbackKey(models[0])}`);
     assert.equal(keyboard.inline_keyboard.at(-1)?.at(-1)?.callback_data, "model:page:1");
 });
 
@@ -260,7 +261,7 @@ test("picking a model with variants opens a second numeric choice list", async (
     await handleModelsCallback(
         {
             chat: { id: 1 },
-            callbackQuery: { data: "model:pick:2" },
+            callbackQuery: { data: `model:pick:${getModelCallbackKey(models[1])}` },
             async answerCallbackQuery() {
                 return {};
             },
@@ -286,7 +287,7 @@ test("picking a model with variants opens a second numeric choice list", async (
         keyboard.inline_keyboard[0].map((button) => button.text),
         ["1", "2", "3"],
     );
-    assert.equal(keyboard.inline_keyboard[0][0].callback_data, "model:variant:2:1");
+    assert.equal(keyboard.inline_keyboard[0][0].callback_data, `model:variant:${getModelCallbackKey(models[1])}:${getVariantCallbackKey("low")}`);
 });
 
 test("picking a model without variants switches immediately", async () => {
@@ -318,7 +319,7 @@ test("picking a model without variants switches immediately", async () => {
     await handleModelsCallback(
         {
             chat: { id: 9 },
-            callbackQuery: { data: "model:pick:1" },
+            callbackQuery: { data: `model:pick:${getModelCallbackKey(models[0])}` },
             async answerCallbackQuery() {
                 return {};
             },
@@ -382,7 +383,7 @@ test("variant selection updates the binding and later prompts use the selected m
     await handleModelsCallback(
         {
             chat: { id: 12 },
-            callbackQuery: { data: "model:variant:1:3" },
+            callbackQuery: { data: `model:variant:${getModelCallbackKey(models[0])}:${getVariantCallbackKey("high")}` },
             async answerCallbackQuery() {
                 return {};
             },
@@ -500,4 +501,24 @@ test("ListModelsUseCase clears stale model selections during listing", async () 
         language: null,
         updatedAt: binding?.updatedAt,
     });
+});
+
+test("model buttons preserve identity after the catalog order changes and reject legacy numbers", async () => {
+    const original = createConfiguredModel("provider", "model-" + "x".repeat(100), "Original", "Provider");
+    const other = createConfiguredModel("provider", "other", "Other", "Provider");
+    const button = buildModelsKeyboard([original, other], 0).keyboard.inline_keyboard[0][0];
+    assert.ok("callback_data" in button);
+    assert.ok(Buffer.byteLength(button.callback_data) <= 64);
+    const { dependencies, repo } = createDependencies({ async listModels() { return [other, original]; } });
+    const context = {
+        chat: { id: 1 }, callbackQuery: { data: button.callback_data! },
+        async answerCallbackQuery() {}, async editMessageText() {},
+    };
+    await handleModelsCallback(context, dependencies);
+    assert.equal((await repo.getByChatId(1))?.modelId, original.id);
+    await handleModelsCallback({ ...context, callbackQuery: { data: "model:pick:1" } }, dependencies);
+    assert.equal((await repo.getByChatId(1))?.modelId, original.id);
+    const { dependencies: missing, repo: missingRepo } = createDependencies({ async listModels() { return [other]; } });
+    await handleModelsCallback(context, missing);
+    assert.equal(await missingRepo.getByChatId(1), null);
 });

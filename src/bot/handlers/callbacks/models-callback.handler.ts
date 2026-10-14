@@ -6,6 +6,8 @@ import { scopeDependenciesToTelegramContext } from "../../logger-context.js";
 import {
     buildModelsKeyboard,
     buildModelVariantsKeyboard,
+    getModelCallbackKey,
+    getVariantCallbackKey,
 } from "../../presenters/keyboard.presenter.js";
 import { presentError } from "../../presenters/error.presenter.js";
 import {
@@ -71,11 +73,12 @@ export async function handleModelsCallback(ctx: CallbackContext, dependencies: M
         }
 
         if (data.startsWith(MODEL_PICK_PREFIX)) {
-            const modelIndex = Number(data.slice(MODEL_PICK_PREFIX.length));
+            const modelKey = data.slice(MODEL_PICK_PREFIX.length);
             const result = await dependencies.listModelsUseCase.execute({
                 chatId: ctx.chat.id,
             });
-            const model = result.models[modelIndex - 1];
+            const matches = result.models.filter((candidate) => getModelCallbackKey(candidate) === modelKey);
+            const model = matches.length === 1 ? matches[0] : undefined;
 
             if (!model) {
                 await ctx.editMessageText(copy.models.expired);
@@ -101,9 +104,9 @@ export async function handleModelsCallback(ctx: CallbackContext, dependencies: M
             }
 
             await ctx.editMessageText(
-                presentModelVariantsMessage(model, modelIndex, copy),
+                presentModelVariantsMessage(model, result.models.indexOf(model) + 1, copy),
                 {
-                    reply_markup: buildModelVariantsKeyboard(variants, modelIndex),
+                    reply_markup: buildModelVariantsKeyboard(variants, model),
                 },
             );
 
@@ -112,13 +115,12 @@ export async function handleModelsCallback(ctx: CallbackContext, dependencies: M
 
         if (data.startsWith(MODEL_VARIANT_PREFIX)) {
             const suffix = data.slice(MODEL_VARIANT_PREFIX.length);
-            const [modelIndexRaw, variantIndexRaw] = suffix.split(":");
-            const modelIndex = Number(modelIndexRaw);
-            const variantIndex = Number(variantIndexRaw);
+            const [modelKey, variantKey] = suffix.split(":");
             const result = await dependencies.listModelsUseCase.execute({
                 chatId: ctx.chat.id,
             });
-            const model = result.models[modelIndex - 1];
+            const matches = result.models.filter((candidate) => getModelCallbackKey(candidate) === modelKey);
+            const model = matches.length === 1 ? matches[0] : undefined;
 
             if (!model) {
                 await ctx.editMessageText(copy.models.expired);
@@ -126,7 +128,8 @@ export async function handleModelsCallback(ctx: CallbackContext, dependencies: M
             }
 
             const variants = getModelVariants(model);
-            const variant = variants[variantIndex - 1];
+            const matchingVariants = variants.filter((candidate) => getVariantCallbackKey(candidate) === variantKey);
+            const variant = matchingVariants.length === 1 ? matchingVariants[0] : undefined;
 
             if (!variant) {
                 await ctx.editMessageText(copy.models.reasoningLevelExpired);

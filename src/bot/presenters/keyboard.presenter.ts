@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { InlineKeyboard } from "grammy";
 import {
     BOT_COPY,
@@ -47,7 +48,7 @@ export function buildModelsKeyboard(
     const keyboard = buildNumberedKeyboard(
         page.items,
         page.startIndex,
-        (_, index) => `model:pick:${page.startIndex + index + 1}`,
+        (model) => `model:pick:${getModelCallbackKey(model)}`,
     );
 
     appendPaginationButtons(keyboard, page.page, page.totalPages, "model:page", copy);
@@ -101,11 +102,11 @@ export function buildSessionActionKeyboard(
         .text(copy.sessions.backToList, `sessions:back:${page}`);
 }
 
-export function buildModelVariantsKeyboard(variants: string[], modelIndex: number) {
+export function buildModelVariantsKeyboard(variants: string[], model: OpenCodeConfiguredModel) {
     return buildNumberedKeyboard(
         variants,
         0,
-        (_, index) => `model:variant:${modelIndex}:${index + 1}`,
+        (variant) => `model:variant:${getModelCallbackKey(model)}:${getVariantCallbackKey(variant)}`,
     );
 }
 
@@ -216,4 +217,12 @@ function clampPage(page: number, totalPages: number): number {
     }
 
     return Math.min(page, totalPages - 1);
+}
+
+export function getModelCallbackKey(model: Pick<OpenCodeConfiguredModel, "providerID" | "id">): string {
+    return createHash("sha256").update(JSON.stringify([model.providerID, model.id])).digest("hex").slice(0, 20);
+}
+
+export function getVariantCallbackKey(variant: string): string {
+    return createHash("sha256").update(variant).digest("hex").slice(0, 20);
 }

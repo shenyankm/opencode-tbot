@@ -134,8 +134,8 @@ export type SessionsCallbackData =
     | `sessions:back:${number}`;
 export type ModelCallbackData =
     | `model:page:${number}`
-    | `model:pick:${number}`
-    | `model:variant:${number}:${number}`;
+    | `model:pick:${string}`
+    | `model:variant:${string}:${string}`;
 export type TokenCallbackData = "token:breakdown:on" | "token:breakdown:off";
 export type PermissionApprovalCallbackData =
     | `permission:once:${string}`
