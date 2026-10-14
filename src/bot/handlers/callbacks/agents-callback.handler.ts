@@ -85,6 +85,7 @@ export async function handleAgentsCallback(ctx: CallbackContext, dependencies: A
             }
 
             await ctx.editMessageText(presentAgentSwitchMessage(switchResult.agent, copy));
+            await dependencies.contextFooter?.refreshChat(ctx.chat.id);
         }
     } catch (error) {
         dependencies.logger.error({ error }, "failed to handle agent callback");

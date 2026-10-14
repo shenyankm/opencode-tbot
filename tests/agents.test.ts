@@ -222,6 +222,8 @@ test("agent selection callbacks use the filtered index and show plain agent name
         },
     } as never);
     const edits: string[] = [];
+    const refreshed: number[] = [];
+    dependencies.contextFooter = { async refreshChat(chatId: number) { refreshed.push(chatId); } } as never;
     let answered = 0;
 
     await handleAgentsCallback(
@@ -247,6 +249,7 @@ test("agent selection callbacks use the filtered index and show plain agent name
         "Agent switched.\nCurrent agent: plan",
     ]);
     assert.equal(binding?.agentName, "plan");
+    assert.deepEqual(refreshed, [6]);
 });
 
 test("handleAgentsCallback falls back to the default locale when chat state lookup fails", async () => {

@@ -17,6 +17,7 @@ export interface AbortPromptResult {
 
 export interface AbortPromptInput {
     chatId: number;
+    requestId?: string;
 }
 
 export class AbortPromptUseCase {
@@ -27,6 +28,9 @@ export class AbortPromptUseCase {
     ) { }
 
     async execute(input: AbortPromptInput): Promise<AbortPromptResult> {
+        if (input.requestId && this.foregroundSessionTracker.getRequestId(input.chatId) !== input.requestId) {
+            return { sessionId: null, status: "not_running", sessionStatus: null };
+        }
         const hasForegroundRequest = this.foregroundSessionTracker.hasActiveRequest(input.chatId);
         const activeSessionId = this.foregroundSessionTracker.getActiveSessionId(input.chatId);
         const binding = activeSessionId
@@ -49,6 +53,10 @@ export class AbortPromptUseCase {
             ? (sessionStatuses[sessionId] ?? null)
             : null;
 
+        if (input.requestId && this.foregroundSessionTracker.getRequestId(input.chatId) !== input.requestId) {
+            return { sessionId, status: "not_running", sessionStatus };
+        }
+
         if (hasForegroundRequest) {
             if (sessionId && sessionStatus && sessionStatus.type !== "idle") {
                 await this.opencodeClient.abortSession(sessionId);
@@ -57,6 +65,7 @@ export class AbortPromptUseCase {
             this.foregroundSessionTracker.abort(
                 input.chatId,
                 createMessageAbortedError(),
+                input.requestId,
             );
 
             return {

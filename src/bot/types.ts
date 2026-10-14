@@ -35,6 +35,7 @@ import type {
 } from "../use-cases/toggle-token-setting.usecase.js";
 import type { UploadFileInput } from "../use-cases/upload-file.usecase.js";
 import type { BotLanguage } from "./copy.js";
+import type { TelegramContextFooter } from "../services/telegram/context-footer.js";
 
 export interface UseCaseExecutor<TInput, TResult> {
     execute(input: TInput): Promise<TResult>;
@@ -46,6 +47,7 @@ export interface LoggerDependencies {
 
 export interface ChatStateDependencies extends LoggerDependencies {
     sessionRepo: SessionRepository;
+    contextFooter?: TelegramContextFooter;
 }
 
 export interface PendingActionDependencies extends ChatStateDependencies {
@@ -100,6 +102,7 @@ export interface UploadFeatureDependencies {
 }
 
 export interface BotDependencies {
+    contextFooter?: TelegramContextFooter;
     abortPromptUseCase: UseCaseExecutor<AbortPromptInput, AbortPromptResult>;
     createSessionUseCase: UseCaseExecutor<CreateSessionInput, CreateSessionResult>;
     foregroundSessionTracker: ForegroundSessionTrackerLike;

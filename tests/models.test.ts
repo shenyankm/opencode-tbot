@@ -96,12 +96,14 @@ function createPromptReply(text: string): PromptSessionResult {
 function createDependencies(client: Partial<OpenCodeClientLike>) {
     const repo = new InMemorySessionRepository();
     const typedClient = client as OpenCodeClientLike;
+    const refreshed: number[] = [];
     const dependencies = {
         abortPromptUseCase: {
             async execute() {
                 return { sessionId: null, sessionStatus: null, status: "no_session" as const };
             },
         } as unknown as BotDependencies["abortPromptUseCase"],
+        contextFooter: { async refreshChat(chatId: number) { refreshed.push(chatId); } },
         logger,
         listModelsUseCase: new ListModelsUseCase(repo, typedClient),
         sessionRepo: repo,
@@ -109,7 +111,7 @@ function createDependencies(client: Partial<OpenCodeClientLike>) {
         switchModelUseCase: new SwitchModelUseCase(repo, typedClient, logger),
     } as unknown as BotDependencies;
 
-    return { dependencies, repo };
+    return { dependencies, repo, refreshed };
 }
 
 test("/model only shows configured models with numeric inline buttons", async () => {
@@ -294,7 +296,7 @@ test("picking a model without variants switches immediately", async () => {
     const models = [
         createConfiguredModel("openai", "gpt-5", "GPT-5", "OpenAI"),
     ];
-    const { dependencies, repo } = createDependencies({
+    const { dependencies, repo, refreshed } = createDependencies({
         async createSessionForDirectory(directory) {
             return createSession("session-1", "project-1", directory);
         },
@@ -333,6 +335,7 @@ test("picking a model without variants switches immediately", async () => {
 
     const binding = await repo.getByChatId(9);
 
+    assert.deepEqual(refreshed, [9]);
     assert.equal(edits[0], "Model switched.\nCurrent model: OpenAI / GPT-5\nCurrent reasoning level: default");
     assert.deepEqual(binding, {
         chatId: 9,
@@ -357,7 +360,7 @@ test("variant selection updates the binding and later prompts use the selected m
         }),
     ];
     const promptCalls: unknown[] = [];
-    const { dependencies, repo } = createDependencies({
+    const { dependencies, repo, refreshed } = createDependencies({
         async createSessionForDirectory(directory) {
             return createSession("session-1", "project-1", directory);
         },
@@ -402,6 +405,7 @@ test("variant selection updates the binding and later prompts use the selected m
     });
     const bindingAfterPrompt = await repo.getByChatId(12);
 
+    assert.deepEqual(refreshed, [12]);
     assert.equal(edits[0], "Model switched.\nCurrent model: OpenAI / GPT-5 Thinking\nCurrent reasoning level: high");
     assert.deepEqual(bindingAfterSwitch, {
         chatId: 12,

@@ -48,6 +48,10 @@ const PLUGIN_EVENT_HANDLERS: Record<string, PluginEventHandlerDefinition> = {
         normalizePermissionReplyEvent,
         handlePermissionReplied,
     ),
+    "session.execution.interrupted": createPluginEventHandler(
+        normalizeSessionIdleEvent,
+        handleSessionInterrupted,
+    ),
     "session.execution.failed": createPluginEventHandler(
         normalizeSessionErrorEvent,
         handleSessionError,
@@ -66,6 +70,11 @@ export async function handleTelegramBotPluginEvent(
     runtime: TelegramBotRuntime,
     event: OpenCodePluginEvent,
 ): Promise<void> {
+    runtime.container.foregroundSessionTracker.publish(event);
+    if (["session.compaction.ended", "session.model.selected", "session.agent.selected", "session.moved", "session.usage.updated", "session.revert.committed", "session.revert.cleared"].includes(event.type)
+        && event.data && typeof event.data === "object" && "sessionID" in event.data && typeof event.data.sessionID === "string") {
+        await runtime.container.contextFooter?.refreshSession(event.data.sessionID);
+    }
     const handler = PLUGIN_EVENT_HANDLERS[event.type];
 
     if (!handler) {
@@ -203,6 +212,24 @@ async function handleSessionError(
 
         return copy.sessionEvents.failed(event.sessionId, message);
     });
+}
+
+async function handleSessionInterrupted(
+    runtime: TelegramBotRuntime,
+    event: NormalizedSessionIdleEvent,
+): Promise<void> {
+    const approvals = await runtime.container.permissionApprovalRepo.listBySessionId(event.sessionId);
+    for (const approval of approvals.filter((item) => item.status === "pending")) {
+        const copy = await getSafeChatCopy(runtime.container.sessionRepo, approval.chatId, runtime.container.logger);
+        await runtime.container.permissionApprovalRepo.set(toResolvedApproval(approval, "reject"));
+        try {
+            await runtime.bot.api.editMessageText(approval.chatId, approval.messageId, copy.status.stopped, {
+                reply_markup: { inline_keyboard: [] },
+            });
+        } catch (error) {
+            runtime.container.logger.warn({ error }, "failed to remove interrupted permission buttons");
+        }
+    }
 }
 
 async function handleSessionIdle(

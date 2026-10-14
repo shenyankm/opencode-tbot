@@ -10,6 +10,10 @@ function buildApprovalKey(requestId: string, chatId: number): string {
 export class InMemoryPermissionApprovalRepository implements PermissionApprovalRepository {
     private readonly approvalsByKey = new Map<string, PendingPermissionApproval>();
 
+    async listBySessionId(sessionId: string): Promise<PendingPermissionApproval[]> {
+        return [...this.approvalsByKey.values()].filter((approval) => approval.sessionId === sessionId);
+    }
+
     async listByRequestId(requestId: string): Promise<PendingPermissionApproval[]> {
         return [...this.approvalsByKey.values()].filter((approval) => approval.requestId === requestId);
     }
@@ -21,6 +25,11 @@ export class InMemoryPermissionApprovalRepository implements PermissionApprovalR
 
 export class FilePermissionApprovalRepository implements PermissionApprovalRepository {
     constructor(private readonly store: JsonStateStore<OpencodeTbotState>) { }
+
+    async listBySessionId(sessionId: string): Promise<PendingPermissionApproval[]> {
+        const state = await this.store.read();
+        return Object.values(state.pendingPermissions).filter((approval) => approval.sessionId === sessionId);
+    }
 
     async listByRequestId(requestId: string): Promise<PendingPermissionApproval[]> {
         const state = await this.store.read();

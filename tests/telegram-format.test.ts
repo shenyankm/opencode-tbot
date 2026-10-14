@@ -5,9 +5,67 @@ import { getBotCopy } from "../src/bot/copy.js";
 import {
     buildTelegramStaticReply,
     buildTelegramPromptReply,
+    buildTelegramPromptReplies,
     renderMarkdownToTelegramMarkdownV2,
+    splitTelegramText,
     stripMarkdownToPlainText,
 } from "../src/services/telegram/telegram-format.js";
+
+test("readable chunks allow a sentence to finish on either side of the target and keep closing quotes", () => {
+    for (const size of [950, 1060]) {
+        const sentence = "甲".repeat(size) + "。”";
+        const text = sentence + "乙".repeat(600) + "。";
+        const chunks = splitTelegramText(text);
+        assert.equal(chunks[0], sentence);
+        assert.equal(chunks.join(""), text);
+        assert.ok(chunks.every((chunk) => chunk.length <= 1152));
+    }
+    const english = "A".repeat(980) + " costs 1.25 units. " + "The next sentence is complete. ".repeat(20);
+    const chunks = splitTelegramText(english);
+    assert.ok(chunks[0].includes("1.25 units."));
+    assert.ok(chunks.slice(0, -1).every((chunk) => chunk.endsWith(". ")));
+    assert.equal(chunks.join(""), english);
+});
+
+test("readable chunks prefer a paragraph boundary and preserve blank lines and CRLF", () => {
+    const first = "甲".repeat(995) + "。\r\n\r\n";
+    const text = first + "乙".repeat(600) + "。";
+    const chunks = splitTelegramText(text);
+    assert.equal(chunks[0], first);
+    assert.equal(chunks.join(""), text);
+});
+
+test("numbered list markers stay with their sentence instead of forming a closer split point", () => {
+    const first = `1. ${"a".repeat(1016)}.\n`;
+    const text = first + `2. ${"b".repeat(400)}.\n3. ${"c".repeat(500)}.\n`;
+    const chunks = splitTelegramText(text);
+    assert.equal(chunks[0], first);
+    assert.ok(chunks[1].startsWith("2. "));
+    assert.equal(chunks.join(""), text);
+});
+
+test("overlong sentences split at words while unbroken text stays bounded without losing Unicode", () => {
+    const prose = "word ".repeat(600);
+    const chunks = splitTelegramText(prose);
+    assert.ok(chunks.slice(0, -1).every((chunk) => chunk.endsWith(" ")));
+    for (const text of [prose, "😀".repeat(2500), "文".repeat(5000)]) {
+        const parts = splitTelegramText(text);
+        assert.equal(parts.join(""), text);
+        assert.ok(parts.every((part) => part.length > 0 && part.length <= 1152));
+        assert.ok(parts.every((part) => !/[\uD800-\uDBFF]$/u.test(part) && !/^[\uDC00-\uDFFF]/u.test(part)));
+    }
+});
+
+test("readable chunks balance an otherwise tiny remainder and leave short replies intact", () => {
+    const text = "文".repeat(1200);
+    assert.deepEqual(splitTelegramText(text), [text.slice(0, 600), text.slice(600)]);
+    const short = "句子完整。".repeat(180);
+    assert.deepEqual(splitTelegramText(short), [short]);
+    assert.deepEqual(splitTelegramText(""), []);
+    for (const invalid of [0, 1, -1, NaN, Infinity, 4097, 2.5]) {
+        assert.throws(() => splitTelegramText("text", invalid), /target must be an integer/);
+    }
+});
 
 function createPromptReply(overrides: Partial<PromptSessionResult> = {}): PromptSessionResult {
     return {
@@ -153,62 +211,55 @@ test("buildTelegramPromptReply falls back to plain text when markdown is unsuppo
 
     assert.deepEqual(result, {
         preferred: {
-            text: "bad\n\nDuration: n/a | Displayed Tokens: n/a",
+            text: "bad",
         },
         fallback: {
-            text: "bad\n\nDuration: n/a | Displayed Tokens: n/a",
+            text: "bad",
         },
     });
 });
 
-test("buildTelegramPromptReply appends a compact metrics footer to markdown replies", () => {
+test("buildTelegramPromptReply keeps context information out of markdown replies", () => {
     const result = buildTelegramPromptReply(createPromptReply({
         bodyMd: "## Hello",
         fallbackText: "Hello",
     }));
 
     assert.deepEqual(result.preferred, {
-        text: "*Hello*\n\nDuration: 120 ms \\| Displayed Tokens: 42",
+        text: "*Hello*",
         options: {
             parse_mode: "MarkdownV2",
         },
     });
     assert.deepEqual(result.fallback, {
-        text: "Hello\n\nDuration: 120 ms | Displayed Tokens: 42",
+        text: "Hello",
     });
 });
 
-test("buildTelegramPromptReply appends the full token breakdown when enabled", () => {
-    const result = buildTelegramPromptReply(
-        createPromptReply({
-            bodyMd: "## Hello",
-            fallbackText: "Hello",
-        }),
-        getBotCopy("en"),
-        {
-            showBreakdown: true,
-        },
-    );
+test("long replies use readable chunks without reserving space for context information", () => {
+    const body = "x".repeat(4096);
+    const replies = buildTelegramPromptReplies(createPromptReply({ bodyMd: null, fallbackText: body }));
+    assert.ok(replies.length > 1);
+    assert.equal(replies.map((reply) => reply.preferred.text).join(""), body);
+    assert.ok(replies.every((reply) => reply.preferred.text.length <= 1152));
+});
 
-    assert.deepEqual(result.preferred, {
-        text: [
-            "*Hello*",
-            "",
-            "Duration: 120 ms \\| Displayed Tokens: 42",
-            "request input: 10 \\| output: 12 \\| reasoning: 5 \\| cache\\.read: 15 \\| cache\\.write: 0",
-        ].join("\n"),
-        options: {
-            parse_mode: "MarkdownV2",
-        },
-    });
-    assert.deepEqual(result.fallback, {
-        text: [
-            "Hello",
-            "",
-            "Duration: 120 ms | Displayed Tokens: 42",
-            "request input: 10 | output: 12 | reasoning: 5 | cache.read: 15 | cache.write: 0",
-        ].join("\n"),
-    });
+test("table padding cannot expand a short reply into an oversized message", () => {
+    const table = [
+        "| Column | Value |",
+        "| --- | --- |",
+        ...Array.from({ length: 18 }, (_, index) => `| ${index === 0 ? "a".repeat(80) : "short"} | value${index} |`),
+    ].join("\n");
+    const replies = buildTelegramPromptReplies(createPromptReply({ bodyMd: table, fallbackText: table }));
+    assert.ok(replies.every((reply) => reply.preferred.options === undefined && reply.preferred.text.length <= 1152));
+    assert.match(replies.map((reply) => reply.preferred.text).join(""), /value17/);
+});
+
+test("formatting expansion falls back to a readable plain message", () => {
+    const body = "!".repeat(1000);
+    const replies = buildTelegramPromptReplies(createPromptReply({ bodyMd: body, fallbackText: body }));
+    assert.equal(replies.length, 1);
+    assert.deepEqual(replies[0].preferred, { text: body });
 });
 
 test("buildTelegramPromptReply keeps MarkdownV2 enabled for table content", () => {
@@ -227,7 +278,7 @@ test("buildTelegramPromptReply keeps MarkdownV2 enabled for table content", () =
     assert.doesNotMatch(result.preferred.text, /^table fallback$/m);
 });
 
-test("buildTelegramPromptReply localizes the metrics footer", () => {
+test("buildTelegramPromptReply keeps context information out of localized replies", () => {
     const copy = getBotCopy("zh-CN");
     const result = buildTelegramPromptReply(
         createPromptReply({
@@ -238,13 +289,13 @@ test("buildTelegramPromptReply localizes the metrics footer", () => {
     );
 
     assert.deepEqual(result.preferred, {
-        text: `*Hello*\n\n${copy.replyMetrics.durationLabel}: 120 ms \\| ${copy.replyMetrics.tokensLabel}: 42`,
+        text: `*Hello*`,
         options: {
             parse_mode: "MarkdownV2",
         },
     });
     assert.deepEqual(result.fallback, {
-        text: `Hello\n\n${copy.replyMetrics.durationLabel}: 120 ms | ${copy.replyMetrics.tokensLabel}: 42`,
+        text: `Hello`,
     });
 });
 

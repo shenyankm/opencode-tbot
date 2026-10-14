@@ -49,7 +49,7 @@ test("TELEGRAM_COMMANDS only advertises implemented commands", () => {
         },
         {
             command: "token",
-            description: "Show or hide token breakdown details",
+            description: "Show context capacity and remaining percentage",
         },
         {
             command: "language",
@@ -142,7 +142,7 @@ test("getTelegramCommands returns Japanese descriptions when requested", () => {
         },
         {
             command: "token",
-            description: "トークン明細の表示を切り替え",
+            description: "コンテキスト容量と残りの割合を表示",
         },
         {
             command: "language",
@@ -183,7 +183,7 @@ test("getTelegramCommands returns standardized Chinese descriptions when request
         },
         {
             command: "token",
-            description: "开启/关闭令牌明细显示",
+            description: "查看上下文窗口和剩余比例",
         },
         {
             command: "language",

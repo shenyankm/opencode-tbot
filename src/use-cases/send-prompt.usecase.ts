@@ -18,6 +18,7 @@ import { TemporaryImageSessionManager } from "./temporary-image-session-manager.
 export interface SendPromptInput {
     chatId: number;
     files?: PromptSessionFilePartInput[];
+    onInputReady?: (messageId: string) => void;
     onExecutionSession?: (sessionId: string) => void;
     signal?: AbortSignal;
     text?: string | null;
@@ -71,6 +72,7 @@ export class SendPromptUseCase {
                 const assistantReply = await this.opencodeClient.promptSession({
                     sessionId: executionSessionId,
                     prompt: context.promptText,
+                    ...(input.onInputReady ? { onInputReady: input.onInputReady } : {}),
                     ...(files.length > 0 ? { files } : {}),
                     ...(context.selectedAgent ? { agent: context.selectedAgent.name } : {}),
                     format: {

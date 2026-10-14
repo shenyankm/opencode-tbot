@@ -560,3 +560,20 @@ test("V2 event handlers ignore malformed permission requests and replies", async
     assert.deepEqual(edits, []);
     assert.deepEqual(await permissionApprovalRepo.listByRequestId("request-invalid"), []);
 });
+
+test("interrupted sessions remove pending permission controls without changing other sessions", async () => {
+    const { runtime, permissionApprovalRepo, edits } = createRuntime();
+    for (const sessionId of ["session-1", "session-other"]) {
+        await permissionApprovalRepo.set({
+            requestId: sessionId, sessionId, chatId: 101, messageId: 55,
+            status: "pending", updatedAt: new Date(0).toISOString(),
+        });
+    }
+    await handleTelegramBotPluginEvent(runtime, {
+        type: "session.execution.interrupted", data: { sessionID: "session-1" },
+    });
+    assert.equal(edits.length, 1);
+    assert.equal(edits[0].text, "Stopped");
+    assert.equal((await permissionApprovalRepo.listByRequestId("session-1"))[0].status, "reject");
+    assert.equal((await permissionApprovalRepo.listByRequestId("session-other"))[0].status, "pending");
+});

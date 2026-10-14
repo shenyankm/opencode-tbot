@@ -25,6 +25,8 @@ import {
     GetStatusUseCase,
 } from "../use-cases/get-status.usecase.js";
 import { GetTokenSettingsUseCase } from "../use-cases/get-token-settings.usecase.js";
+import { GetContextUsageUseCase } from "../use-cases/get-context-usage.usecase.js";
+import { TelegramContextFooter } from "../services/telegram/context-footer.js";
 import { ListAgentsUseCase } from "../use-cases/list-agents.usecase.js";
 import { ListLspUseCase } from "../use-cases/list-lsp.usecase.js";
 import { ListMcpUseCase } from "../use-cases/list-mcp.usecase.js";
@@ -40,6 +42,7 @@ import { UploadFileUseCase } from "../use-cases/upload-file.usecase.js";
 import type { AppConfig } from "./config.js";
 
 export interface AppContainer extends BotDependencies {
+    contextFooter: TelegramContextFooter;
     getHealthUseCase: GetHealthUseCase;
     getPathUseCase: GetPathUseCase;
     tokenSettingsRepo: TokenSettingsRepository;
@@ -140,9 +143,15 @@ function createContainer(
         opencodeClient,
     });
     let disposed = false;
+    const contextFooter = new TelegramContextFooter(
+        new GetContextUsageUseCase(repositories.sessionRepo, opencodeClient),
+        repositories.sessionRepo,
+        logger,
+    );
 
     return {
         ...useCases,
+        contextFooter,
         logger,
         ...repositories,
         ...runtimeServices,
@@ -153,6 +162,7 @@ function createContainer(
             }
 
             disposed = true;
+            contextFooter.clear();
             storageLogger.info(
                 {
                     event: "storage.container.disposed",

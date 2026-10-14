@@ -49,6 +49,7 @@ export interface PromptSessionInput {
     };
     variant?: string | null;
     files?: PromptSessionFilePartInput[];
+    onInputReady?: (messageId: string) => void;
 }
 
 export interface PromptSessionFilePartInput {
@@ -69,6 +70,18 @@ export interface PromptSessionTokenMetrics {
 export interface PromptSessionMetrics {
     durationMs: number | null;
     tokens: PromptSessionTokenMetrics;
+}
+
+export interface OpenCodeContextUsage {
+    capacity: number | null;
+    used: number | null;
+    session?: {
+        directory: string | null;
+        modelName: string | null;
+        providerID: string | null;
+        variant: string | null;
+        agentName: string | null;
+    };
 }
 
 export interface PromptSessionResult {
@@ -262,6 +275,7 @@ export interface OpenCodeClientLike {
     listLspStatuses(directory?: string): Promise<OpenCodeLspStatus[]>;
     listMcpStatuses(directory?: string): Promise<Record<string, OpenCodeMcpStatus>>;
     getSessionStatuses(): Promise<Record<string, OpenCodeSessionStatus>>;
+    getSessionContext(sessionId: string, model?: { providerID: string; id: string }): Promise<OpenCodeContextUsage>;
     listProjects(): Promise<OpenCodeProject[]>;
     listSessions(): Promise<OpenCodeSession[]>;
     getCurrentProject(): Promise<OpenCodeProject>;
@@ -315,6 +329,58 @@ export class OpenCodeClient implements OpenCodeClientLike {
         const info = await this.client.server.info();
 
         return { healthy: true, version: info.version };
+    }
+
+    async getSessionContext(sessionId: string, selectedModel?: { providerID: string; id: string }): Promise<OpenCodeContextUsage> {
+        const options = { signal: AbortSignal.timeout(5_000) };
+        const session = await this.client.session.get({ sessionID: sessionId }, options);
+        const model = selectedModel ?? session.model ?? (await this.client.model.default(undefined, options)).data;
+        const [catalog, agents] = await Promise.all([
+            this.client.model.list(undefined, options),
+            this.client.agent.list(undefined, options).catch(() => ({ data: [] })),
+        ]);
+        const selected = catalog.data.find((item) => item.providerID === model?.providerID && item.id === model?.id);
+        const capacity = selected?.limit.context;
+        const result: OpenCodeContextUsage = {
+            capacity: capacity && Number.isFinite(capacity) ? capacity : null,
+            used: null,
+            session: {
+                directory: session.location?.directory ?? null,
+                modelName: selected?.name ?? model?.id ?? null,
+                providerID: model?.providerID ?? null,
+                variant: model && "variant" in model && typeof model.variant === "string" ? model.variant : null,
+                agentName: agents.data.find((agent) => agent.id === session.agent)?.name ?? session.agent ?? null,
+            },
+        };
+        let cursor: string | undefined;
+        let beforeBoundary = !session.revert;
+        do {
+            const page = await this.client.message.list({ sessionID: sessionId, limit: 100, ...(cursor ? { cursor } : { order: "desc" as const }) }, options);
+            for (const message of page.data) {
+                if (!beforeBoundary) {
+                    beforeBoundary = message.id === session.revert?.messageID;
+                    continue;
+                }
+                if (message.type === "compaction" && message.status === "completed") {
+                    return result;
+                }
+                if (message.type === "assistant" && message.tokens) {
+                    const tokens = message.tokens;
+                    const used = tokens.input + tokens.output + tokens.reasoning + tokens.cache.read + tokens.cache.write;
+                    return {
+                        ...result,
+                        used: Number.isFinite(used) && used >= 0 ? used : null,
+                        session: {
+                            ...result.session!,
+                            agentName: agents.data.find((agent) => agent.id === (session.agent ?? message.agent))?.name
+                                ?? session.agent ?? message.agent ?? null,
+                        },
+                    };
+                }
+            }
+            cursor = page.cursor.next ?? undefined;
+        } while (cursor);
+        return result;
     }
 
     async abortSession(sessionId: string): Promise<boolean> {
@@ -446,6 +512,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
 
         throwIfAborted(input.signal);
         const messageId = `msg_${randomUUID()}`;
+        input.onInputReady?.(messageId);
         const request = {
             sessionID: input.sessionId,
             id: messageId,

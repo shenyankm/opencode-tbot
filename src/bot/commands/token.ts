@@ -1,9 +1,8 @@
 import type { Bot } from "grammy";
 import { getSafeChatCopy } from "../i18n.js";
 import { scopeDependenciesToTelegramContext } from "../logger-context.js";
-import { buildTokenSettingsKeyboard } from "../presenters/keyboard.presenter.js";
 import { presentError } from "../presenters/error.presenter.js";
-import { presentTokenSettingsMessage } from "../presenters/message.presenter.js";
+import { formatContextFooter } from "../../services/telegram/telegram-format.js";
 import type { BotDependencies, TokenFeatureDependencies } from "../types.js";
 import type { TelegramCommandDefinition } from "./registry.js";
 
@@ -16,16 +15,10 @@ export async function handleTokenCommand(ctx: TokenCommandContext, dependencies:
     const copy = await getSafeChatCopy(dependencies.sessionRepo, ctx.chat.id, dependencies.logger);
 
     try {
-        const settings = await dependencies.getTokenSettingsUseCase.execute();
-
-        await ctx.reply(
-            presentTokenSettingsMessage(settings.showBreakdown, copy),
-            {
-                reply_markup: buildTokenSettingsKeyboard(settings.showBreakdown, copy),
-            },
-        );
+        const context = await dependencies.contextFooter?.read(ctx.chat.id);
+        await ctx.reply(formatContextFooter(context, copy));
     } catch (error) {
-        dependencies.logger.error({ error }, "failed to show token settings");
+        dependencies.logger.error({ error }, "failed to show context usage");
         await ctx.reply(presentError(error, copy));
     }
 }

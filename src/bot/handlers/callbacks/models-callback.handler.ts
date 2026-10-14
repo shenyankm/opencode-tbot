@@ -100,6 +100,7 @@ export async function handleModelsCallback(ctx: CallbackContext, dependencies: M
                 }
 
                 await ctx.editMessageText(presentModelSwitchMessage(switchResult.model, switchResult.variant, copy));
+                await dependencies.contextFooter?.refreshChat(ctx.chat.id);
                 return;
             }
 
@@ -149,6 +150,7 @@ export async function handleModelsCallback(ctx: CallbackContext, dependencies: M
             }
 
             await ctx.editMessageText(presentModelSwitchMessage(switchResult.model, switchResult.variant, copy));
+            await dependencies.contextFooter?.refreshChat(ctx.chat.id);
         }
     } catch (error) {
         dependencies.logger.error({ error }, "failed to handle model callback");

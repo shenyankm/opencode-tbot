@@ -1,4 +1,5 @@
 import type { Bot } from "grammy";
+import { registerPromptStopRoute } from "./callbacks/prompt-stop.handler.js";
 import type { PermissionApprovalRepository } from "../../domain/permission/approval.repository.js";
 import type { OpenCodePermissionResponder } from "../../services/opencode/opencode.ports.js";
 import type { BotDependencies } from "../types.js";
@@ -35,6 +36,7 @@ type CallbackRegistrationDependencies = BotDependencies & {
 const CALLBACK_ROUTE_REGISTRARS: Array<
     (bot: Pick<Bot, "callbackQuery">, dependencies: CallbackRegistrationDependencies) => void
 > = [
+    registerPromptStopRoute,
     registerAgentsCallbackRoute,
     registerSessionsCallbackRoute,
     registerModelsCallbackRoute,

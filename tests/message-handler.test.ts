@@ -14,6 +14,14 @@ import { InMemoryPendingActionRepository } from "../src/repositories/pending-act
 import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
 import { ForegroundSessionTracker } from "../src/services/session-activity/foreground-session-tracker.js";
 
+function processingMarkup(reply: { other?: unknown }): unknown {
+    const other = reply.other as { reply_markup?: { inline_keyboard: Array<Array<{ callback_data?: string; text: string }>> } };
+    const button = other.reply_markup?.inline_keyboard[0]?.[0];
+    assert.match(button?.callback_data ?? "", /^prompt:stop:[a-f0-9-]+$/u);
+    assert.ok(button?.text);
+    return reply.other;
+}
+
 function createPromptReply(overrides: Partial<PromptSessionResult> = {}): PromptSessionResult {
     return {
         assistantError: null,
@@ -163,9 +171,9 @@ test("handleTextMessage sends MarkdownV2 replies with metrics and deletes the pr
     );
 
     assert.deepEqual(replies, [
-        { text: "Processing...", other: undefined },
+        { text: "Processing...", other: processingMarkup(replies[0]) },
         {
-            text: "*Hello*\n\nDuration: 120 ms \\| Displayed Tokens: 42",
+            text: "*Hello*",
             other: { parse_mode: "MarkdownV2" },
         },
     ]);
@@ -183,9 +191,9 @@ test("handleTextMessage sends MarkdownV2 replies with metrics and deletes the pr
     return;
 
     assert.deepEqual(replies, [
-        { text: "Processing...", other: undefined },
+        { text: "Processing...", other: processingMarkup(replies[0]) },
         {
-            text: "*Hello*\n\nDuration: 120 ms \\| Displayed Tokens: 42",
+            text: "*Hello*",
             other: { parse_mode: "MarkdownV2" },
         },
     ]);
@@ -229,13 +237,13 @@ test("handleTextMessage falls back to plain text when the preferred Telegram mar
     );
 
     assert.deepEqual(replies, [
-        { text: "Processing...", other: undefined },
+        { text: "Processing...", other: processingMarkup(replies[0]) },
         {
-            text: "*Hello*\n\nDuration: 120 ms \\| Displayed Tokens: 42",
+            text: "*Hello*",
             other: { parse_mode: "MarkdownV2" },
         },
         {
-            text: "Hello\n\nDuration: 120 ms | Displayed Tokens: 42",
+            text: "Hello",
             other: undefined,
         },
     ]);
@@ -243,7 +251,7 @@ test("handleTextMessage falls back to plain text when the preferred Telegram mar
     assert.deepEqual(deleted, [{ chatId: 2, messageId: 200 }]);
 });
 
-test("handleTextMessage appends the full token breakdown when it is enabled globally", async () => {
+test("handleTextMessage does not append statistics even when legacy token breakdown is enabled", async () => {
     const replies: Array<{ text: string; other?: unknown }> = [];
     const deleted: Array<{ chatId: number; messageId: number }> = [];
     let nextMessageId = 225;
@@ -276,13 +284,10 @@ test("handleTextMessage appends the full token breakdown when it is enabled glob
     );
 
     assert.deepEqual(replies, [
-        { text: "Processing...", other: undefined },
+        { text: "Processing...", other: processingMarkup(replies[0]) },
         {
             text: [
                 "*Hello*",
-                "",
-                "Duration: 120 ms \\| Displayed Tokens: 42",
-                "request input: 10 \\| output: 12 \\| reasoning: 5 \\| cache\\.read: 15 \\| cache\\.write: 0",
             ].join("\n"),
             other: { parse_mode: "MarkdownV2" },
         },
@@ -327,9 +332,9 @@ test("handleTextMessage shows recovered assistant text instead of the empty-resp
     );
 
     assert.deepEqual(replies, [
-        { text: "Processing...", other: undefined },
+        { text: "Processing...", other: processingMarkup(replies[0]) },
         {
-            text: "Recovered reply\n\nDuration: 120 ms | Displayed Tokens: 42",
+            text: "Recovered reply",
             other: undefined,
         },
     ]);
@@ -368,7 +373,7 @@ test("handleTextMessage also deletes the processing placeholder after sending an
     );
 
     assert.deepEqual(replies, [
-        { text: "Processing...", other: undefined },
+        { text: "Processing...", other: processingMarkup(replies[0]) },
         { text: "Unexpected error.\nCause: boom", other: undefined },
     ]);
     assert.deepEqual(deleted, [{ chatId: 9, messageId: 300 }]);
@@ -421,11 +426,11 @@ test("handleTextMessage releases the active chat lock and deletes the placeholde
     await handleTextMessage(ctx, dependencies);
 
     assert.deepEqual(replies, [
-        { text: "Processing...", other: undefined },
+        { text: "Processing...", other: processingMarkup(replies[0]) },
         { text: "OpenCode request timed out.", other: undefined },
-        { text: "Processing...", other: undefined },
+        { text: "Processing...", other: processingMarkup(replies[2]) },
         {
-            text: "*Hello*\n\nDuration: 120 ms \\| Displayed Tokens: 42",
+            text: "*Hello*",
             other: { parse_mode: "MarkdownV2" },
         },
     ]);
@@ -511,20 +516,20 @@ test("handleTextMessage rejects a second plain-text prompt while one is already 
     await firstCall;
 
     assert.deepEqual(replies, [
-        { text: "Processing...", other: undefined },
+        { text: "Processing...", other: processingMarkup(replies[0]) },
         {
             text: "Another request is still running. Wait for it to finish before sending a new prompt.",
             other: undefined,
         },
         {
-            text: "*Hello*\n\nDuration: 120 ms \\| Displayed Tokens: 42",
+            text: "*Hello*",
             other: { parse_mode: "MarkdownV2" },
         },
     ]);
     assert.deepEqual(deleted, [{ chatId: 11, messageId: 500 }]);
 });
 
-test("handleTextMessage renders assistant-side prompt errors with metrics and deletes the processing placeholder", async () => {
+test("handleTextMessage renders assistant-side prompt errors without inline statistics and deletes the processing placeholder", async () => {
     const replies: Array<{ text: string; other?: unknown }> = [];
     const deleted: Array<{ chatId: number; messageId: number }> = [];
     let nextMessageId = 700;
@@ -567,13 +572,11 @@ test("handleTextMessage renders assistant-side prompt errors with metrics and de
     );
 
     assert.deepEqual(replies, [
-        { text: "Processing...", other: undefined },
+        { text: "Processing...", other: processingMarkup(replies[0]) },
         {
             text: [
                 "Structured output validation failed.",
                 "Cause: Schema validation failed | retries: 2",
-                "",
-                "Duration: 120 ms | Displayed Tokens: 42",
             ].join("\n"),
             other: undefined,
         },
@@ -624,13 +627,11 @@ test("handleTextMessage shows assistant-side prompt errors even when text parts 
     );
 
     assert.deepEqual(replies, [
-        { text: "Processing...", other: undefined },
+        { text: "Processing...", other: processingMarkup(replies[0]) },
         {
             text: [
                 "Structured output validation failed.",
                 "Cause: Model did not produce structured output | retries: 0",
-                "",
-                "Duration: 120 ms | Displayed Tokens: 42",
             ].join("\n"),
             other: undefined,
         },
@@ -639,7 +640,7 @@ test("handleTextMessage shows assistant-side prompt errors even when text parts 
     assert.deepEqual(deleted, [{ chatId: 18, messageId: 800 }]);
 });
 
-test("handleTextMessage localizes bot-generated status text and metrics footer for Chinese chats", async () => {
+test("handleTextMessage localizes bot-generated status text and reply body for Chinese chats", async () => {
     const replies: Array<{ text: string; other?: unknown }> = [];
     const deleted: Array<{ chatId: number; messageId: number }> = [];
     let nextMessageId = 900;
@@ -685,9 +686,9 @@ test("handleTextMessage localizes bot-generated status text and metrics footer f
     );
 
     assert.deepEqual(replies, [
-        { text: copy.status.processing, other: undefined },
+        { text: copy.status.processing, other: processingMarkup(replies[0]) },
         {
-            text: `*Hello*\n\n${copy.replyMetrics.durationLabel}: 120 ms \\| ${copy.replyMetrics.tokensLabel}: 42`,
+            text: `*Hello*`,
             other: { parse_mode: "MarkdownV2" },
         },
     ]);

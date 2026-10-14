@@ -28,6 +28,16 @@ export interface BotCopy {
     };
     status: {
         processing: string;
+        thinking: string;
+        thinkingInProgress: string;
+        compacting: string;
+        compacted: string;
+        compactionFailed: string;
+        completed: string;
+        stopped: string;
+        failed: string;
+        stop: string;
+        expiredStop: string;
         alreadyProcessing: string;
     };
     auth: {
@@ -37,14 +47,14 @@ export interface BotCopy {
         emptyResponse: string;
     };
     replyMetrics: {
+        contextLabel: string;
         durationLabel: string;
-        tokensLabel: string;
-        totalLabel: string;
-        inputLabel: string;
-        outputLabel: string;
+        workspaceLabel: string;
+        modelLabel: string;
         reasoningLabel: string;
-        cacheReadLabel: string;
-        cacheWriteLabel: string;
+        agentLabel: string;
+        defaultReasoning: string;
+        remaining(percent: number): string;
         notAvailable: string;
     };
     abort: {
@@ -166,16 +176,6 @@ export interface BotCopy {
         reasoningLevelExpired: string;
         defaultReasoningLevel: string;
     };
-    token: {
-        title: string;
-        description: string;
-        scopeNotice: string;
-        currentStatus(status: string): string;
-        footerSummary: string;
-        footerBreakdown: string;
-        enabledLabel: string;
-        disabledLabel: string;
-    };
     language: {
         title: string;
         choose: string;
@@ -199,7 +199,7 @@ const EN_BOT_COPY: BotCopy = {
         sessions: "Show and switch sessions",
         cancel: "Cancel rename or abort running request",
         model: "Show and switch models",
-        token: "Show or hide token breakdown details",
+        token: "Show context capacity and remaining percentage",
         language: "Show and switch language",
     },
     start: {
@@ -229,6 +229,16 @@ const EN_BOT_COPY: BotCopy = {
     },
     status: {
         processing: "Processing...",
+        thinking: "Thinking",
+        thinkingInProgress: "Thinking…",
+        compacting: "Compressing context… Please wait.",
+        compacted: "Context compressed.",
+        compactionFailed: "Context compression failed.",
+        completed: "Completed",
+        stopped: "Stopped",
+        failed: "Failed",
+        stop: "Stop",
+        expiredStop: "This request is no longer running.",
         alreadyProcessing: "Another request is still running. Wait for it to finish before sending a new prompt.",
     },
     auth: {
@@ -238,14 +248,14 @@ const EN_BOT_COPY: BotCopy = {
         emptyResponse: "OpenCode returned empty response.",
     },
     replyMetrics: {
+        contextLabel: "Context",
         durationLabel: "Duration",
-        tokensLabel: "Displayed Tokens",
-        totalLabel: "total",
-        inputLabel: "request input",
-        outputLabel: "output",
-        reasoningLabel: "reasoning",
-        cacheReadLabel: "cache.read",
-        cacheWriteLabel: "cache.write",
+        workspaceLabel: "Workspace",
+        modelLabel: "Model",
+        reasoningLabel: "Reasoning",
+        agentLabel: "Agent",
+        defaultReasoning: "default",
+        remaining: (percent) => `${percent}% left`,
         notAvailable: "n/a",
     },
     abort: {
@@ -427,18 +437,6 @@ const EN_BOT_COPY: BotCopy = {
         reasoningLevelExpired: "The reasoning level is no longer available. Run /model again.",
         defaultReasoningLevel: "default",
     },
-    token: {
-        title: "Token Breakdown",
-        description: "Control whether replies show a second footer line with the full token breakdown.",
-        scopeNotice: "This is a global plugin setting and affects future reply footers shown in every chat.",
-        currentStatus(status: string) {
-            return `Current status: ${status}`;
-        },
-        footerSummary: "Replies always show Duration | Displayed Tokens.",
-        footerBreakdown: "When enabled, a second line shows request input, output, reasoning, cache.read, and cache.write.",
-        enabledLabel: "Enabled",
-        disabledLabel: "Disabled",
-    },
     language: {
         title: "Language",
         choose: "Choose the display language for bot menus and replies.",
@@ -465,7 +463,7 @@ const ZH_CN_BOT_COPY: BotCopy = {
         sessions: "查看并切换会话",
         cancel: "取消重命名或中止当前请求",
         model: "查看并切换模型",
-        token: "\u5f00\u542f/\u5173\u95ed\u4ee4\u724c\u660e\u7ec6\u663e\u793a",
+        token: "查看上下文窗口和剩余比例",
         language: "查看并切换语言",
     },
     start: {
@@ -495,6 +493,16 @@ const ZH_CN_BOT_COPY: BotCopy = {
     },
     status: {
         processing: "处理中...",
+        thinking: "思考",
+        thinkingInProgress: "思考中…",
+        compacting: "正在压缩上下文，请稍候…",
+        compacted: "上下文已压缩。",
+        compactionFailed: "上下文压缩失败。",
+        completed: "已完成",
+        stopped: "已停止",
+        failed: "失败",
+        stop: "停止",
+        expiredStop: "该请求已结束。",
         alreadyProcessing: "另一个请求仍在运行。请等待其完成后再发送新的提示词。",
     },
     auth: {
@@ -504,14 +512,14 @@ const ZH_CN_BOT_COPY: BotCopy = {
         emptyResponse: "OpenCode 返回了空响应。",
     },
     replyMetrics: {
+        contextLabel: "上下文",
         durationLabel: "耗时",
-        tokensLabel: "\u663e\u793a\u4ee4\u724c\u6570",
-        totalLabel: "总计",
-        inputLabel: "本次请求总输入",
-        outputLabel: "输出",
-        reasoningLabel: "推理",
-        cacheReadLabel: "缓存读取",
-        cacheWriteLabel: "缓存写入",
+        workspaceLabel: "工作区",
+        modelLabel: "模型",
+        reasoningLabel: "思考强度",
+        agentLabel: "Agent",
+        defaultReasoning: "默认",
+        remaining: (percent) => `剩余 ${percent}%`,
         notAvailable: "不可用",
     },
     abort: {
@@ -693,18 +701,6 @@ const ZH_CN_BOT_COPY: BotCopy = {
         reasoningLevelExpired: "该推理级别已不可用。请重新运行 /model。",
         defaultReasoningLevel: "默认",
     },
-    token: {
-        title: "\u4ee4\u724c\u660e\u7ec6\u663e\u793a",
-        description: "\u63a7\u5236\u662f\u5426\u5728\u56de\u590d\u9875\u811a\u7b2c\u4e8c\u884c\u663e\u793a\u5b8c\u6574 token \u660e\u7ec6\u3002",
-        scopeNotice: "\u8fd9\u662f\u5168\u5c40\u63d2\u4ef6\u8bbe\u7f6e\uff0c\u4f1a\u5f71\u54cd\u6240\u6709\u804a\u5929\u540e\u7eed\u56de\u590d\u9875\u811a\u7684 token \u663e\u793a\u3002",
-        currentStatus(status: string) {
-            return `\u5f53\u524d\u72b6\u6001: ${status}`;
-        },
-        footerSummary: "\u56de\u590d\u4f1a\u59cb\u7ec8\u663e\u793a\uff1a\u8017\u65f6 | \u663e\u793a\u4ee4\u724c\u6570\u3002",
-        footerBreakdown: "\u5f00\u542f\u540e\uff0c\u7b2c\u4e8c\u884c\u4f1a\u663e\u793a\u672c\u6b21\u8bf7\u6c42\u603b\u8f93\u5165\u3001\u8f93\u51fa\u3001\u63a8\u7406\u3001\u7f13\u5b58\u8bfb\u53d6\u548c\u7f13\u5b58\u5199\u5165\u3002",
-        enabledLabel: "\u5df2\u5f00\u542f",
-        disabledLabel: "\u5df2\u5173\u95ed"
-    },
     language: {
         title: "语言",
         choose: "选择 Bot 菜单和回复的显示语言。",
@@ -731,7 +727,7 @@ const JA_BOT_COPY: BotCopy = {
         sessions: "セッションを表示して切り替え",
         cancel: "名前変更を取り消すか実行中のリクエストを中止",
         model: "モデルを表示して切り替え",
-        token: "\u30c8\u30fc\u30af\u30f3\u660e\u7d30\u306e\u8868\u793a\u3092\u5207\u308a\u66ff\u3048",
+        token: "コンテキスト容量と残りの割合を表示",
         language: "言語を表示して切り替え",
     },
     start: {
@@ -761,6 +757,16 @@ const JA_BOT_COPY: BotCopy = {
     },
     status: {
         processing: "処理中...",
+        thinking: "思考",
+        thinkingInProgress: "思考中…",
+        compacting: "コンテキストを圧縮中です。しばらくお待ちください…",
+        compacted: "コンテキストを圧縮しました。",
+        compactionFailed: "コンテキストの圧縮に失敗しました。",
+        completed: "完了",
+        stopped: "停止済み",
+        failed: "失敗",
+        stop: "停止",
+        expiredStop: "このリクエストは終了しました。",
         alreadyProcessing: "別のリクエストがまだ実行中です。完了するまで新しいプロンプトを送信しないでください。",
     },
     auth: {
@@ -770,14 +776,14 @@ const JA_BOT_COPY: BotCopy = {
         emptyResponse: "OpenCode から空の応答が返されました。",
     },
     replyMetrics: {
+        contextLabel: "コンテキスト",
         durationLabel: "所要時間",
-        tokensLabel: "\u8868\u793a\u30c8\u30fc\u30af\u30f3\u6570",
-        totalLabel: "合計",
-        inputLabel: "今回のリクエスト総入力",
-        outputLabel: "出力",
-        reasoningLabel: "推論",
-        cacheReadLabel: "キャッシュ読込",
-        cacheWriteLabel: "キャッシュ書込",
+        workspaceLabel: "ワークスペース",
+        modelLabel: "モデル",
+        reasoningLabel: "推論レベル",
+        agentLabel: "Agent",
+        defaultReasoning: "既定",
+        remaining: (percent) => `残り ${percent}%`,
         notAvailable: "該当なし",
     },
     abort: {
@@ -958,18 +964,6 @@ const JA_BOT_COPY: BotCopy = {
         expired: "このモデルはもう利用できません。/model を再実行してください。",
         reasoningLevelExpired: "この推論レベルはもう利用できません。/model を再実行してください。",
         defaultReasoningLevel: "デフォルト",
-    },
-    token: {
-        title: "\u30c8\u30fc\u30af\u30f3\u660e\u7d30\u8868\u793a",
-        description: "\u8fd4\u4fe1\u30d5\u30c3\u30bf\u30fc\u306e2\u884c\u76ee\u306b\u5b8c\u5168\u306a token \u660e\u7d30\u3092\u8868\u793a\u3059\u308b\u304b\u3092\u5236\u5fa1\u3057\u307e\u3059\u3002",
-        scopeNotice: "\u3053\u308c\u306f\u30d7\u30e9\u30b0\u30a4\u30f3\u5168\u4f53\u306e\u8a2d\u5b9a\u3067\u3001\u3059\u3079\u3066\u306e chat \u306e\u4ee5\u5f8c\u306e\u8fd4\u4fe1\u30d5\u30c3\u30bf\u30fc\u306e token \u8868\u793a\u306b\u9069\u7528\u3055\u308c\u307e\u3059\u3002",
-        currentStatus(status: string) {
-            return `\u73fe\u5728\u306e\u72b6\u614b: ${status}`;
-        },
-        footerSummary: "\u8fd4\u4fe1\u306f\u5e38\u306b\u300c\u6240\u8981\u6642\u9593 | \u8868\u793a\u30c8\u30fc\u30af\u30f3\u6570\u300d\u3092\u8868\u793a\u3057\u307e\u3059\u3002",
-        footerBreakdown: "\u6709\u52b9\u306b\u3059\u308b\u30682\u884c\u76ee\u306b\u4eca\u56de\u306e\u30ea\u30af\u30a8\u30b9\u30c8\u7dcf\u5165\u529b\u3001\u51fa\u529b\u3001\u63a8\u8ad6\u3001cache.read\u3001cache.write \u3092\u8868\u793a\u3057\u307e\u3059\u3002",
-        enabledLabel: "\u6709\u52b9",
-        disabledLabel: "\u7121\u52b9"
     },
     language: {
         title: "言語",

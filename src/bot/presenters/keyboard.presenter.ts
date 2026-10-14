@@ -128,21 +128,6 @@ export function buildLanguageKeyboard(currentLanguage: BotLanguage, copy: BotCop
     return keyboard;
 }
 
-export function buildTokenSettingsKeyboard(
-    showBreakdown: boolean,
-    copy: BotCopy = BOT_COPY,
-) {
-    return new InlineKeyboard()
-        .text(
-            showBreakdown ? `✓ ${copy.token.enabledLabel}` : copy.token.enabledLabel,
-            "token:breakdown:on",
-        )
-        .text(
-            showBreakdown ? copy.token.disabledLabel : `✓ ${copy.token.disabledLabel}`,
-            "token:breakdown:off",
-        );
-}
-
 export function getModelsPage(models: OpenCodeConfiguredModel[], requestedPage: number): ModelsPage {
     return getPagedItems(models, requestedPage, MODELS_PAGE_SIZE);
 }

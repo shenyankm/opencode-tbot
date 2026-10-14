@@ -1,18 +1,23 @@
+import { homedir } from "node:os";
 import { BOT_COPY, type BotCopy } from "../../bot/copy.js";
 import { stripMarkdownToPlainText } from "../../infra/utils/markdown-text.js";
+import { redactSensitiveText } from "../../infra/utils/redact.js";
 import type {
-    PromptSessionMetrics,
+    OpenCodeContextUsage,
     PromptSessionResult,
 } from "../opencode/opencode.client.js";
 
 const MAX_TELEGRAM_MESSAGE_LENGTH = 4096;
+export const TELEGRAM_MESSAGE_TARGET_LENGTH = 1024;
+const MESSAGE_LENGTH_TOLERANCE = 128;
+const SENTENCE_SEGMENTER = new Intl.Segmenter(undefined, { granularity: "sentence" });
 const TRUNCATED_SUFFIX = "...";
 const MARKDOWN_SPECIAL_CHARACTERS = /([_*\[\]()~`>#+\-=|{}.!\\])/g;
 export { stripMarkdownToPlainText } from "../../infra/utils/markdown-text.js";
 
-export interface TelegramReplyPayload {
+export interface TelegramReplyPayload<ParseMode extends "MarkdownV2" | "HTML" = "MarkdownV2"> {
     options?: {
-        parse_mode: "MarkdownV2";
+        parse_mode: ParseMode;
     };
     text: string;
 }
@@ -22,28 +27,19 @@ export interface TelegramPromptReply {
     preferred: TelegramReplyPayload;
 }
 
-export interface TelegramPromptReplyOptions {
-    showBreakdown?: boolean;
-}
-
-export interface TelegramStaticReply {
-    fallback: TelegramReplyPayload;
-    preferred: TelegramReplyPayload;
+export interface TelegramStaticReply<ParseMode extends "MarkdownV2" | "HTML" = "MarkdownV2"> {
+    fallback: TelegramReplyPayload<ParseMode>;
+    preferred: TelegramReplyPayload<ParseMode>;
 }
 
 export function buildTelegramPromptReply(
     result: PromptSessionResult,
     copy: BotCopy = BOT_COPY,
-    options: TelegramPromptReplyOptions = {},
 ): TelegramPromptReply {
     const renderedMarkdown = result.bodyMd ? renderMarkdownToTelegramMarkdownV2(result.bodyMd) : null;
-    const footerPlain = formatPlainMetricsFooter(result.metrics, copy, options);
     const plainBody = normalizePlainBody(result, copy);
     const fallback = {
-        text: joinBodyAndFooter(
-            truncatePlainBody(plainBody, footerPlain),
-            footerPlain,
-        ),
+        text: truncateStaticText(plainBody),
     };
 
     if (!renderedMarkdown) {
@@ -53,8 +49,7 @@ export function buildTelegramPromptReply(
         };
     }
 
-    const footerMarkdown = formatMarkdownMetricsFooter(result.metrics, copy, options);
-    const markdownText = joinBodyAndFooter(renderedMarkdown, footerMarkdown);
+    const markdownText = renderedMarkdown;
 
     if (markdownText.length > MAX_TELEGRAM_MESSAGE_LENGTH) {
         return {
@@ -72,6 +67,82 @@ export function buildTelegramPromptReply(
         },
         fallback,
     };
+}
+
+export function buildTelegramPromptReplies(
+    result: PromptSessionResult,
+    copy: BotCopy = BOT_COPY,
+): TelegramPromptReply[] {
+    const body = normalizePlainBody(result, copy);
+    const chunks = splitTelegramText(body);
+    if (chunks.length === 1) {
+        const reply = buildTelegramPromptReply(result, copy);
+        return [reply.preferred.text.length <= TELEGRAM_MESSAGE_TARGET_LENGTH + MESSAGE_LENGTH_TOLERANCE
+            ? reply
+            : { preferred: reply.fallback, fallback: reply.fallback }];
+    }
+    return chunks.map((text) => ({
+        preferred: { text },
+        fallback: { text },
+    }));
+}
+
+export function splitTelegramText(text: string, target = TELEGRAM_MESSAGE_TARGET_LENGTH): string[] {
+    if (!Number.isInteger(target) || target < 2 || target > MAX_TELEGRAM_MESSAGE_LENGTH) {
+        throw new Error("Telegram message target must be an integer between 2 and 4096.");
+    }
+    const tolerance = Math.min(MESSAGE_LENGTH_TOLERANCE, Math.floor(target / 8));
+    const upper = Math.min(MAX_TELEGRAM_MESSAGE_LENGTH, target + tolerance);
+    if (text.length <= upper) {
+        return text ? [text] : [];
+    }
+    const sentenceEnds = Array.from(SENTENCE_SEGMENTER.segment(text))
+        .filter(({ segment }) => !/^\s*\d+[.)]\s*$/u.test(segment))
+        .map(({ index, segment }) => index + segment.length);
+    const chunks: string[] = [];
+    let offset = 0;
+    let sentenceIndex = 0;
+    while (text.length - offset > upper) {
+        const remaining = text.length - offset;
+        const aim = remaining < target * 1.5 ? Math.ceil(remaining / 2) : target;
+        const lower = Math.max(1, aim - tolerance);
+        const window = text.slice(offset, offset + upper);
+        const paragraphs = [...window.matchAll(/\n[\t ]*\n+/gu)].map((match) => match.index + match[0].length);
+        const lines = [...window.matchAll(/\n/gu)].map((match) => match.index + 1);
+        const sentences: number[] = [];
+        while (sentenceEnds[sentenceIndex] <= offset) {
+            sentenceIndex += 1;
+        }
+        for (let index = sentenceIndex; sentenceEnds[index] <= offset + upper; index += 1) {
+            sentences.push(sentenceEnds[index] - offset);
+        }
+        let end = closestBoundary(paragraphs, aim, lower)
+            ?? closestBoundary(sentences, aim, lower)
+            ?? closestBoundary(lines, aim, lower)
+            ?? sentences.at(-1)
+            ?? lines.at(-1)
+            ?? closestBoundary([...window.matchAll(/[\t ]+/gu)].map((match) => match.index + match[0].length), aim, lower)
+            ?? aim;
+        if (/[\uD800-\uDBFF]/u.test(text[offset + end - 1])) {
+            end -= 1;
+        }
+        chunks.push(text.slice(offset, offset + end));
+        offset += end;
+    }
+    if (offset < text.length) {
+        chunks.push(text.slice(offset));
+    }
+    return chunks;
+}
+
+function closestBoundary(boundaries: number[], target: number, lower: number): number | undefined {
+    let closest: number | undefined;
+    for (const boundary of boundaries) {
+        if (boundary >= lower && (closest === undefined || Math.abs(boundary - target) < Math.abs(closest - target))) {
+            closest = boundary;
+        }
+    }
+    return closest;
 }
 
 export function buildTelegramStaticReply(markdown: string): TelegramStaticReply {
@@ -228,27 +299,12 @@ function normalizePlainBody(
     return body.trim() || result.fallbackText || copy.prompt.emptyResponse;
 }
 
-function truncatePlainBody(body: string, footer: string): string {
-    const reservedLength = footer.length + 2;
-    const maxBodyLength = Math.max(0, MAX_TELEGRAM_MESSAGE_LENGTH - reservedLength);
-
-    if (body.length <= maxBodyLength) {
-        return body;
-    }
-
-    return `${body.slice(0, Math.max(0, maxBodyLength - TRUNCATED_SUFFIX.length))}${TRUNCATED_SUFFIX}`;
-}
-
 function truncateStaticText(text: string): string {
     if (text.length <= MAX_TELEGRAM_MESSAGE_LENGTH) {
         return text;
     }
 
     return `${text.slice(0, Math.max(0, MAX_TELEGRAM_MESSAGE_LENGTH - TRUNCATED_SUFFIX.length))}${TRUNCATED_SUFFIX}`;
-}
-
-function joinBodyAndFooter(body: string, footer: string): string {
-    return `${body}\n\n${footer}`;
 }
 
 function preprocessMarkdownForTelegram(markdown: string): string {
@@ -290,58 +346,62 @@ function preprocessMarkdownForTelegram(markdown: string): string {
     return processed.join("\n");
 }
 
-function formatPlainMetricsFooter(
-    metrics: PromptSessionMetrics,
-    copy: BotCopy,
-    options: TelegramPromptReplyOptions,
-): string {
-    const lines = [
-        `${copy.replyMetrics.durationLabel}: ${formatDuration(metrics.durationMs, copy)} | ${copy.replyMetrics.tokensLabel}: ${formatMetricValue(metrics.tokens.total, copy)}`,
-    ];
-
-    if (options.showBreakdown) {
-        lines.push(formatPlainTokenBreakdown(metrics, copy));
+export function formatContextFooter(context: OpenCodeContextUsage | null | undefined, copy: BotCopy = BOT_COPY, durationMs?: number | null): string {
+    const capacity = context?.capacity;
+    const used = context?.used;
+    const validCapacity = typeof capacity === "number" && Number.isFinite(capacity) && capacity > 0;
+    const remaining = validCapacity && typeof used === "number" && Number.isFinite(used) && used >= 0
+        ? copy.replyMetrics.remaining(Math.round(Math.max(0, Math.min(1, 1 - used / capacity)) * 100))
+        : copy.replyMetrics.notAvailable;
+    const length = validCapacity
+        ? new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(capacity)
+        : copy.replyMetrics.notAvailable;
+    const contextText = `${copy.replyMetrics.contextLabel}: ${remaining} | ${length}`;
+    if (durationMs === undefined) {
+        return contextText;
     }
-
-    return lines.join("\n");
+    if (durationMs === null || !Number.isFinite(durationMs) || durationMs < 0) {
+        return `${contextText}\n${copy.replyMetrics.durationLabel}: ${copy.replyMetrics.notAvailable}`;
+    }
+    const seconds = Math.round(durationMs / 100) / 10;
+    const [value, unit] = seconds >= 3_600 ? [seconds / 3_600, "h"] : seconds >= 60 ? [seconds / 60, "m"] : [seconds, "s"];
+    return `${contextText}\n${copy.replyMetrics.durationLabel}: ${Number(value.toFixed(1))}${unit}`;
 }
 
-function formatMarkdownMetricsFooter(
-    metrics: PromptSessionMetrics,
-    copy: BotCopy,
-    options: TelegramPromptReplyOptions,
-): string {
-    return escapeMarkdownText(formatPlainMetricsFooter(metrics, copy, options));
+export function buildTelegramSessionFooter(context: OpenCodeContextUsage | null | undefined, copy: BotCopy, durationMs: number | null): TelegramStaticReply<"HTML"> {
+    const session = context?.session;
+    const safe = (value: string | null | undefined) => value ? redactSensitiveText(value).replace(/[\r\n\t]/gu, " ").trim() || copy.replyMetrics.notAvailable : copy.replyMetrics.notAvailable;
+    const directory = safe(session?.directory);
+    const home = homedir();
+    const workspace = directory.startsWith(`${home}/`) ? `~${directory.slice(home.length)}` : directory;
+    const model = session?.modelName ? safe([session.providerID, session.modelName].filter(Boolean).join(" / ")) : copy.replyMetrics.notAvailable;
+    const variant = session ? safe(session.variant ?? copy.replyMetrics.defaultReasoning) : copy.replyMetrics.notAvailable;
+    const agent = safe(session?.agentName);
+    const metrics = formatContextFooter(context, copy, durationMs).split("\n");
+    const field = (label: string, value: string) => `<b>${escapeTelegramHtml(label)}</b>: ${escapeTelegramHtml(value)}`;
+    return {
+        preferred: {
+            text: [
+                `<b>${escapeTelegramHtml(copy.replyMetrics.workspaceLabel)}</b>: <code>${escapeTelegramHtml(workspace)}</code>`,
+                field(copy.replyMetrics.modelLabel, `${model}(${variant})`),
+                field(copy.replyMetrics.agentLabel, agent),
+                ...metrics.map((line) => field(line.slice(0, line.indexOf(":")), line.slice(line.indexOf(":") + 2))),
+            ].join("\n"),
+            options: { parse_mode: "HTML" },
+        },
+        fallback: {
+            text: [
+                `${copy.replyMetrics.workspaceLabel}: ${workspace}`,
+                `${copy.replyMetrics.modelLabel}: ${model}(${variant})`,
+                `${copy.replyMetrics.agentLabel}: ${agent}`,
+                ...metrics,
+            ].join("\n"),
+        },
+    };
 }
 
-function formatPlainTokenBreakdown(metrics: PromptSessionMetrics, copy: BotCopy): string {
-    return [
-        `${copy.replyMetrics.inputLabel}: ${formatMetricValue(metrics.tokens.input, copy)}`,
-        `${copy.replyMetrics.outputLabel}: ${formatMetricValue(metrics.tokens.output, copy)}`,
-        `${copy.replyMetrics.reasoningLabel}: ${formatMetricValue(metrics.tokens.reasoning, copy)}`,
-        `${copy.replyMetrics.cacheReadLabel}: ${formatMetricValue(metrics.tokens.cacheRead, copy)}`,
-        `${copy.replyMetrics.cacheWriteLabel}: ${formatMetricValue(metrics.tokens.cacheWrite, copy)}`,
-    ].join(" | ");
-}
-
-function formatDuration(durationMs: number | null, copy: BotCopy): string {
-    if (durationMs === null || !Number.isFinite(durationMs)) {
-        return copy.replyMetrics.notAvailable;
-    }
-
-    if (durationMs < 1000) {
-        return `${Math.round(durationMs)} ms`;
-    }
-
-    return `${(durationMs / 1000).toFixed(1)} s`;
-}
-
-function formatMetricValue(value: number | null, copy: BotCopy): string {
-    if (value === null || !Number.isFinite(value)) {
-        return copy.replyMetrics.notAvailable;
-    }
-
-    return `${Math.round(value)}`;
+export function escapeTelegramHtml(text: string): string {
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 interface ConsumedTable {

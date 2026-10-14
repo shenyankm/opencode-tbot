@@ -8,6 +8,14 @@ import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
 import { ForegroundSessionTracker } from "../src/services/session-activity/foreground-session-tracker.js";
 import { ImageMessageUnsupportedError } from "../src/use-cases/upload-file.usecase.js";
 
+function processingMarkup(reply: { other?: unknown }): unknown {
+    const other = reply.other as { reply_markup?: { inline_keyboard: Array<Array<{ callback_data?: string; text: string }>> } };
+    const button = other.reply_markup?.inline_keyboard[0]?.[0];
+    assert.match(button?.callback_data ?? "", /^prompt:stop:[a-f0-9-]+$/u);
+    assert.ok(button?.text);
+    return reply.other;
+}
+
 function createPromptReply(overrides: Partial<PromptSessionResult> = {}): PromptSessionResult {
     return {
         assistantError: null,
@@ -155,9 +163,9 @@ test("handleImageMessage forwards image captions and file parts to OpenCode", as
     );
 
     assert.deepEqual(replies, [
-        { text: "Processing...", other: undefined },
+        { text: "Processing...", other: processingMarkup(replies[0]) },
         {
-            text: "*Hello*\n\nDuration: 120 ms \\| Displayed Tokens: 42",
+            text: "*Hello*",
             other: { parse_mode: "MarkdownV2" },
         },
     ]);
@@ -255,7 +263,7 @@ test("handleImageMessage presents localized image errors", async () => {
     );
 
     assert.deepEqual(replies, [
-        { text: "处理中...", other: undefined },
+        { text: "处理中...", other: processingMarkup(replies[0]) },
         {
             text: "图片文件过大或不受支持。\n原因: Unsupported image MIME type: application/pdf",
             other: undefined,

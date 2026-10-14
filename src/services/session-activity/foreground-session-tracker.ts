@@ -1,14 +1,19 @@
+import { randomUUID } from "node:crypto";
 import { createMessageAbortedError } from "../opencode/opencode.client.js";
 
 export interface ForegroundSessionLease {
     readonly signal: AbortSignal;
+    readonly id: string;
+    attachInput(messageId: string): void;
     attachSession(sessionId: string): void;
     dispose(): void;
 }
 
 export interface ForegroundSessionTrackerLike {
-    acquire(chatId: number): ForegroundSessionLease | null;
-    abort(chatId: number, reason?: unknown): boolean;
+    acquire(chatId: number, onProgress?: (event: PromptProgressEvent) => void): ForegroundSessionLease | null;
+    publish(event: { type: string; data?: unknown }): void;
+    getRequestId(chatId: number): string | null;
+    abort(chatId: number, reason?: unknown, requestId?: string): boolean;
     begin(chatId: number, sessionId: string): () => void;
     clear(sessionId: string): boolean;
     fail(sessionId: string, error: unknown): boolean;
@@ -18,7 +23,18 @@ export interface ForegroundSessionTrackerLike {
     listChatIds(sessionId: string): number[];
 }
 
+export interface PromptProgressEvent {
+    type: string;
+    data: Record<string, unknown>;
+}
+
 interface ForegroundRequestState {
+    id: string;
+    inputId: string | null;
+    delivered: boolean;
+    compacting: boolean;
+    assistantIds: Set<string>;
+    onProgress?: (event: PromptProgressEvent) => void;
     chatId: number;
     controller: AbortController;
     sessionId: string | null;
@@ -28,12 +44,18 @@ export class ForegroundSessionTracker implements ForegroundSessionTrackerLike {
     private readonly requests = new Map<number, ForegroundRequestState>();
     private readonly sessionChats = new Map<string, Set<number>>();
 
-    acquire(chatId: number): ForegroundSessionLease | null {
+    acquire(chatId: number, onProgress?: (event: PromptProgressEvent) => void): ForegroundSessionLease | null {
         if (this.requests.has(chatId)) {
             return null;
         }
 
         const state: ForegroundRequestState = {
+            id: randomUUID(),
+            inputId: null,
+            delivered: false,
+            compacting: false,
+            assistantIds: new Set(),
+            onProgress,
             chatId,
             controller: new AbortController(),
             sessionId: null,
@@ -43,19 +65,69 @@ export class ForegroundSessionTracker implements ForegroundSessionTrackerLike {
 
         return {
             signal: state.controller.signal,
+            id: state.id,
+            attachInput: (messageId: string) => { state.inputId = messageId; },
             attachSession: (sessionId: string) => {
                 this.attachSession(chatId, sessionId);
             },
             dispose: () => {
-                this.release(chatId);
+                if (this.requests.get(chatId) === state) {
+                    this.release(chatId);
+                }
             },
         };
     }
 
-    abort(chatId: number, reason: unknown = createMessageAbortedError()): boolean {
+    getRequestId(chatId: number): string | null {
+        return this.requests.get(chatId)?.id ?? null;
+    }
+
+    publish(event: { type: string; data?: unknown }): void {
+        if (!event.data || typeof event.data !== "object" || Array.isArray(event.data)) {
+            return;
+        }
+        const data = event.data as Record<string, unknown>;
+        if (typeof data.sessionID !== "string") {
+            return;
+        }
+        for (const chatId of this.listChatIds(data.sessionID)) {
+            const state = this.requests.get(chatId);
+            if (!state || state.controller.signal.aborted) {
+                continue;
+            }
+            if (event.type === "session.inbox.delivered") {
+                state.delivered = data.inboxID === state.inputId;
+                continue;
+            }
+            if (event.type === "session.compaction.started") {
+                // Compression affects the shared session and may run before input delivery.
+                state.compacting = true;
+                state.onProgress?.({ type: event.type, data });
+                continue;
+            }
+            if (event.type === "session.compaction.ended" || event.type === "session.compaction.failed") {
+                if (state.compacting) {
+                    state.compacting = false;
+                    state.onProgress?.({ type: event.type, data });
+                }
+                continue;
+            }
+            if (!state.delivered) {
+                continue;
+            }
+            if (event.type === "session.step.started" && typeof data.assistantMessageID === "string") {
+                state.assistantIds.add(data.assistantMessageID);
+            }
+            if (typeof data.assistantMessageID === "string" && state.assistantIds.has(data.assistantMessageID)) {
+                state.onProgress?.({ type: event.type, data });
+            }
+        }
+    }
+
+    abort(chatId: number, reason: unknown = createMessageAbortedError(), requestId?: string): boolean {
         const state = this.requests.get(chatId);
 
-        if (!state) {
+        if (!state || (requestId && state.id !== requestId)) {
             return false;
         }
 
@@ -190,6 +262,8 @@ export const NOOP_FOREGROUND_SESSION_TRACKER: ForegroundSessionTrackerLike = {
     acquire() {
         return null;
     },
+    publish() {},
+    getRequestId() { return null; },
     abort() {
         return false;
     },
