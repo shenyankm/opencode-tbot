@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { GrammyError } from "grammy";
+import { GrammyError, HttpError } from "grammy";
+import { setImmediate } from "node:timers/promises";
+import { createServer } from "node:http";
+import { run } from "@grammyjs/runner";
 import {
     resetTelegramBotRuntimeRegistryForTests,
     startTelegramBotRuntime,
@@ -258,4 +261,159 @@ test("startTelegramBotRuntime throws a readable error when telegram token valida
     assert.equal(calls.error.length, 1);
     assert.match(calls.error[0]?.message ?? "", /startup validation failed/u);
     resetTelegramBotRuntimeRegistryForTests();
+});
+
+test("plugin polling waits for event registration and cannot restart after disposal", async () => {
+    resetTelegramBotRuntimeRegistryForTests();
+    const { container } = createContainer();
+    let runs = 0;
+    const runtime = await startTelegramBotRuntime({
+        config: createConfig(), container, deferPolling: true, syncCommands: false,
+        botFactory: () => createBotStub() as never,
+        registerBotHandlers: () => undefined,
+        runBot: () => { runs += 1; return createRunnerHandle(); },
+    });
+    assert.equal(runs, 0);
+    runtime.startPolling?.();
+    runtime.startPolling?.();
+    assert.equal(runs, 1);
+    await runtime.dispose();
+    runtime.startPolling?.();
+    assert.equal(runs, 1);
+    resetTelegramBotRuntimeRegistryForTests();
+});
+
+test("a startup network outage keeps the runtime available for polling to validate after reconnecting", async (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    resetTelegramBotRuntimeRegistryForTests();
+    const { calls, container } = createContainer();
+    const bot = createBotStub();
+    let validations = 0;
+    let runs = 0;
+    bot.api.getMe = async () => { validations += 1; throw new HttpError("getMe failed", Object.assign(new Error("reset"), { code: "ECONNRESET" })); };
+    const starting = startTelegramBotRuntime({
+        config: createConfig(), container, botFactory: () => bot as never,
+        registerBotHandlers: () => undefined, syncCommands: false,
+        runBot: () => { runs += 1; return createRunnerHandle(); },
+    });
+    await setImmediate();
+    for (const ms of [1000, 2000, 4000]) { t.mock.timers.tick(ms); await setImmediate(); }
+    const runtime = await starting;
+    assert.equal(validations, 4);
+    assert.equal(runs, 1);
+    assert.ok(calls.warn.some((call) => (call.input as { event?: string }).event === "runtime.telegram.auth.deferred"));
+    assert.equal(calls.error.length, 0);
+    await runtime.dispose();
+    resetTelegramBotRuntimeRegistryForTests();
+});
+
+test("polling resumes on the same runner after retry exhaustion and never restarts after disposal", async (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    resetTelegramBotRuntimeRegistryForTests();
+    const { container } = createContainer();
+    let rejectTask!: (error: unknown) => void;
+    let resolveTask!: () => void;
+    let starts = 0;
+    let runs = 0;
+    let task = new Promise<void>((resolve, reject) => { resolveTask = resolve; rejectTask = reject; });
+    const handle = {
+        ...createRunnerHandle(),
+        task: () => task,
+        async stop() { resolveTask(); },
+        start() { starts += 1; task = new Promise<void>((resolve, reject) => { resolveTask = resolve; rejectTask = reject; }); },
+    };
+    const runtime = await startTelegramBotRuntime({
+        config: createConfig(), container, botFactory: () => createBotStub() as never,
+        registerBotHandlers: () => undefined, syncCommands: false,
+        runBot: () => { runs += 1; return handle; },
+    });
+    rejectTask(new HttpError("getUpdates failed", new Error("offline")));
+    await setImmediate();
+    t.mock.timers.tick(5000);
+    await setImmediate();
+    assert.equal(starts, 1);
+    assert.equal(runs, 1);
+    rejectTask(new HttpError("getUpdates failed", new Error("offline again")));
+    await setImmediate();
+    await runtime.dispose();
+    t.mock.timers.tick(10000);
+    await setImmediate();
+    assert.equal(starts, 1);
+    resetTelegramBotRuntimeRegistryForTests();
+});
+
+test("polling stops on invalid tokens or competing pollers instead of restarting forever", async (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    for (const code of [401, 409]) {
+        resetTelegramBotRuntimeRegistryForTests();
+        const { calls, container } = createContainer();
+        let rejectTask!: (error: unknown) => void;
+        const task = new Promise<void>((_resolve, reject) => { rejectTask = reject; });
+        let starts = 0;
+        const runtime = await startTelegramBotRuntime({
+            config: createConfig(), container, botFactory: () => createBotStub() as never,
+            registerBotHandlers: () => undefined, syncCommands: false,
+            runBot: () => ({ ...createRunnerHandle(), task: () => task, start() { starts += 1; } }),
+        });
+        rejectTask(new GrammyError("failed", { ok: false, error_code: code, description: "Unauthorized or conflict" }, "getUpdates", {}));
+        await setImmediate();
+        t.mock.timers.tick(10000);
+        assert.equal(starts, 0);
+        assert.equal(calls.error.length, 1);
+        await runtime.dispose();
+    }
+    resetTelegramBotRuntimeRegistryForTests();
+});
+
+test("the real runner recovers after a dropped HTTP connection without replaying consumed updates", { timeout: 15000 }, async (t) => {
+    resetTelegramBotRuntimeRegistryForTests();
+    const { container } = createContainer();
+    const consumed: number[] = [];
+    const offsets: number[] = [];
+    let sent = 0;
+    let dropConnection = true;
+    const server = createServer(async (request, response) => {
+        const chunks: Buffer[] = [];
+        for await (const chunk of request) { chunks.push(Buffer.from(chunk)); }
+        const payload = JSON.parse(Buffer.concat(chunks).toString() || "{}");
+        const method = request.url?.split("/").at(-1);
+        let result: unknown = { id: 42, username: "test_bot", first_name: "Test", is_bot: true };
+        if (method === "getUpdates") {
+            offsets.push(payload.offset ?? 0);
+            if (sent === 1 && dropConnection) {
+                dropConnection = false;
+                request.socket.destroy();
+                return;
+            }
+            result = sent < 2 ? [{
+                update_id: 100 + sent,
+                message: { message_id: 100 + sent++, date: 1, chat: { id: 1, type: "private" }, text: "test" },
+            }] : [];
+            if (sent >= 2) { await new Promise((resolve) => setTimeout(resolve, 20)); }
+        }
+        response.setHeader("content-type", "application/json");
+        response.end(JSON.stringify({ ok: true, result }));
+    });
+    let runtime: Awaited<ReturnType<typeof startTelegramBotRuntime>> | undefined;
+    t.after(async () => {
+        await runtime?.dispose();
+        server.closeAllConnections();
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+        resetTelegramBotRuntimeRegistryForTests();
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    assert.ok(address && typeof address !== "string");
+    runtime = await startTelegramBotRuntime({
+        config: { ...createConfig(), telegramApiRoot: `http://127.0.0.1:${address.port}` },
+        container, syncCommands: false,
+        registerBotHandlers: (bot) => { bot.on("message", (ctx) => { consumed.push(ctx.update.update_id); }); },
+        runBot: (bot) => run(bot, { runner: { maxRetryTime: 0, silent: true, fetch: { timeout: 0 } } }),
+    });
+    const deadline = Date.now() + 12000;
+    while (consumed.length < 2 && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    assert.deepEqual(consumed, [100, 101]);
+    assert.deepEqual(offsets.slice(0, 3), [0, 101, 101]);
 });

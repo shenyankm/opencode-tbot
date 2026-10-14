@@ -5,7 +5,8 @@ import { extractTelegramUpdateContext } from "../bot/error-boundary.js";
 import { registerBot } from "../bot/index.js";
 import type { AppConfig } from "./config.js";
 import type { AppContainer } from "./container.js";
-import { validateTelegramBotAccessWithBot } from "../services/telegram/telegram-bot-access.js";
+import { TelegramStartupError, validateTelegramBotAccessWithBot } from "../services/telegram/telegram-bot-access.js";
+import { telegramNetworkCode, telegramNetworkRecovery } from "../services/telegram/network-recovery.js";
 
 export interface StartTelegramBotRuntimeInput {
     botFactory?: (token: string, options: ConstructorParameters<typeof Bot>[1]) => Bot;
@@ -14,12 +15,14 @@ export interface StartTelegramBotRuntimeInput {
     registerBotHandlers?: typeof registerBot;
     runBot?: typeof run;
     syncCommands?: boolean;
+    deferPolling?: boolean;
     syncCommandsHandler?: typeof syncTelegramCommands;
 }
 
 export interface TelegramBotRuntime {
     bot: Bot;
     container: AppContainer;
+    startPolling?(): void;
     stop(): void;
     dispose(): Promise<void>;
 }
@@ -92,12 +95,14 @@ async function startTelegramBotRuntimeInternal(
     const bot = botFactory(input.config.telegramBotToken, {
         client: {
             apiRoot: input.config.telegramApiRoot,
+            timeoutSeconds: 45,
         },
     });
     const runtimeLogger = input.container.logger.child({
         component: "runtime",
     });
 
+    bot.api.config?.use(telegramNetworkRecovery(runtimeLogger));
     await verifyTelegramBotAccess(bot, input.config.telegramApiRoot, runtimeKey, runtimeLogger);
     wrapTelegramGetUpdates(bot, input.container);
     const registerBotHandlers = input.registerBotHandlers ?? registerBot;
@@ -148,17 +153,44 @@ async function startTelegramBotRuntimeInternal(
         );
     });
 
-    runtimeLogger.info(
-        {
-            event: "runtime.polling.starting",
-            runtimeKey,
-        },
-        "telegram bot polling starting",
-    );
     const runBot = input.runBot ?? run;
-    const runner = runBot(bot, TELEGRAM_RUNNER_OPTIONS);
+    let runner: ReturnType<typeof run> | null = null;
     let stopped = false;
     let disposed = false;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    const watchRunner = () => {
+        void runner?.task()?.catch((error: unknown) => {
+            if (stopped || disposed) {
+                return;
+            }
+            if (!(error instanceof HttpError)) {
+                runtimeLogger.error({ event: "runtime.polling.failed", error }, "telegram polling stopped after a non-network error");
+                return;
+            }
+            runtimeLogger.warn({ event: "runtime.polling.reconnecting", code: telegramNetworkCode(error) }, "telegram polling will reconnect in 5 seconds");
+            reconnectTimer = setTimeout(() => {
+                reconnectTimer = null;
+                // Reset the source on the same runner to preserve its Telegram update offset.
+                void (runner!.stop() ?? Promise.resolve()).catch(() => undefined).then(() => {
+                    if (!stopped && !disposed) {
+                        runner!.start();
+                        watchRunner();
+                    }
+                }).catch((error) => runtimeLogger.error({ error }, "failed to restart telegram polling"));
+            }, 5_000);
+        });
+    };
+    const startPolling = () => {
+        if (stopped || disposed || runner) {
+            return;
+        }
+        runtimeLogger.info({ event: "runtime.polling.starting", runtimeKey }, "telegram bot polling starting");
+        runner = runBot(bot, TELEGRAM_RUNNER_OPTIONS);
+        watchRunner();
+    };
+    if (!input.deferPolling) {
+        startPolling();
+    }
 
     if (input.syncCommands ?? true) {
         const syncCommandsHandler = input.syncCommandsHandler ?? syncTelegramCommands;
@@ -182,7 +214,11 @@ async function startTelegramBotRuntimeInternal(
         }
 
         stopped = true;
-        stopPromise = runner.stop().catch((error) => {
+        if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
+        stopPromise = (runner?.stop() ?? Promise.resolve()).catch((error) => {
             runtimeLogger.warn(
                 {
                     event: "runtime.stop.failed",
@@ -214,6 +250,7 @@ async function startTelegramBotRuntimeInternal(
 
     return {
         bot,
+        startPolling,
         container: input.container,
         stop,
         dispose,
@@ -240,6 +277,7 @@ function wrapTelegramGetUpdates(bot: Bot, container: AppContainer): void {
                 {
                     event: "runtime.telegram.get_updates_failed",
                     error,
+                    code: telegramNetworkCode(error),
                     limit: requestOptions.limit,
                     offset: requestOptions.offset,
                     timeout: requestOptions.timeout,
@@ -258,7 +296,7 @@ async function verifyTelegramBotAccess(
     runtimeLogger: AppContainer["logger"],
 ): Promise<void> {
     try {
-        const botProfile = await validateTelegramBotAccessWithBot(bot, telegramApiRoot);
+        const botProfile = await validateTelegramBotAccessWithBot(bot, telegramApiRoot, runtimeLogger);
 
         runtimeLogger.info(
             {
@@ -270,6 +308,10 @@ async function verifyTelegramBotAccess(
             "telegram bot access verified",
         );
     } catch (error) {
+        if (error instanceof TelegramStartupError && error.code === "telegram_api_unreachable") {
+            runtimeLogger.warn({ event: "runtime.telegram.auth.deferred", error }, "telegram is temporarily unreachable; polling will validate access after reconnecting");
+            return;
+        }
         runtimeLogger.error(
             {
                 event: "runtime.telegram.auth.failed",

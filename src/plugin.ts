@@ -123,6 +123,7 @@ export const TelegramBotPlugin = Plugin.define({
 
             const controller = new AbortController();
             const eventTask = consumePluginEvents(context, runtime, controller.signal);
+            runtime.startPolling?.();
             const cleanup = async () => {
                 controller.abort();
 
@@ -201,7 +202,7 @@ async function startPluginRuntime(
     );
 
     try {
-        const runtime = await startRuntime({ config, container });
+        const runtime = await startRuntime({ config, container, deferPolling: Boolean(options.context) });
 
         container.logger.child({ component: "runtime" }).info(
             {

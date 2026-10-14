@@ -1,4 +1,6 @@
 import { Bot, GrammyError, HttpError } from "grammy";
+import type { AppLogger } from "../../infra/logger/index.js";
+import { retryTelegramNetworkRequest, telegramNetworkCode } from "./network-recovery.js";
 
 export type TelegramStartupErrorCode =
     | "invalid_token"
@@ -89,6 +91,7 @@ export async function validateTelegramBotAccess(
     const bot = botFactory(botToken, {
         client: {
             apiRoot,
+            timeoutSeconds: 10,
         },
     });
     const botProfile = await validateTelegramBotAccessWithBot(bot, apiRoot);
@@ -103,11 +106,12 @@ export async function validateTelegramBotAccess(
 export async function validateTelegramBotAccessWithBot(
     bot: Bot,
     apiRoot: string,
+    logger?: Pick<AppLogger, "warn" | "info">,
 ): Promise<TelegramBotProfile> {
     const normalizedApiRoot = normalizeTelegramApiRoot(apiRoot);
 
     try {
-        const botProfile = await bot.api.getMe();
+        const botProfile = await retryTelegramNetworkRequest("getMe", () => bot.api.getMe(), undefined, logger);
 
         return {
             id: botProfile.id,
@@ -145,9 +149,8 @@ export function createTelegramStartupError(error: unknown, apiRoot: string): Err
     }
 
     if (error instanceof HttpError) {
-        const cause = error.error instanceof Error && error.error.message.trim().length > 0
-            ? ` ${error.error.message.trim()}`
-            : "";
+        const code = telegramNetworkCode(error);
+        const cause = code ? ` (${code})` : "";
 
         return new TelegramStartupError(
             "telegram_api_unreachable",
