@@ -11,7 +11,7 @@ import { hasMatchingProject } from "./project-binding.js";
 
 export interface ListLspResult {
     currentDirectory: string;
-    statuses: OpenCodeLspStatus[];
+    statuses: OpenCodeLspStatus[] | null;
 }
 
 export interface ListLspInput {
@@ -48,7 +48,7 @@ export class ListLspUseCase {
 
         return {
             currentDirectory: projectContext.directory,
-            statuses: [...statuses].sort(compareLspStatuses),
+            statuses: statuses === null ? null : [...statuses].sort(compareLspStatuses),
         };
     }
 

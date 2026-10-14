@@ -29,7 +29,7 @@ export interface OpenCodeHealthReader {
 }
 
 export interface OpenCodeLspCatalog {
-    listLspStatuses(directory?: string): Promise<OpenCodeLspStatus[]>;
+    listLspStatuses(directory?: string): Promise<OpenCodeLspStatus[] | null>;
 }
 
 export interface OpenCodeMcpCatalog {

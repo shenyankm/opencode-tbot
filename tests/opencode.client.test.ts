@@ -182,7 +182,7 @@ test("listLspStatuses reports the missing V2 capability and listMcpStatuses pres
         },
     });
 
-    await assert.rejects(client.listLspStatuses("/repo"), /V2 does not expose LSP status/);
+    assert.equal(await client.listLspStatuses("/repo"), null);
     assert.deepEqual(await client.listMcpStatuses("/repo"), { filesystem: { status: "pending" } });
     assert.deepEqual(request, { location: { directory: "/repo" } });
 });

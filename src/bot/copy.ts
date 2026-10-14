@@ -137,6 +137,7 @@ export interface BotCopy {
     };
     lsp: {
         none: string;
+        unavailable: string;
         title: string;
         currentProject(worktree: string): string;
         connected: string;
@@ -378,6 +379,7 @@ const EN_BOT_COPY: BotCopy = {
     },
     lsp: {
         none: "No LSP servers detected for the current project.",
+        unavailable: "Status unavailable: the OpenCode V2 API does not expose LSP status.",
         title: "LSP Servers",
         currentProject(worktree: string) {
             return `Current project: ${worktree}`;
@@ -642,6 +644,7 @@ const ZH_CN_BOT_COPY: BotCopy = {
     },
     lsp: {
         none: "当前项目未检测到 LSP。",
+        unavailable: "状态不可查询：OpenCode V2 API 暂未提供 LSP 状态。",
         title: "LSP 服务",
         currentProject(worktree: string) {
             return `当前项目: ${worktree}`;
@@ -906,6 +909,7 @@ const JA_BOT_COPY: BotCopy = {
     },
     lsp: {
         none: "現在のプロジェクトで LSP サーバーは検出されませんでした。",
+        unavailable: "状態を取得できません：OpenCode V2 API は LSP 状態を公開していません。",
         title: "LSP サーバー",
         currentProject(worktree: string) {
             return `現在のプロジェクト: ${worktree}`;

@@ -272,7 +272,7 @@ export interface OpenCodeClientLike {
     forkSession(sessionId: string, messageId?: string): Promise<OpenCodeSession>;
     getHealth(): Promise<OpenCodeHealth>;
     getPath(): Promise<OpenCodePath>;
-    listLspStatuses(directory?: string): Promise<OpenCodeLspStatus[]>;
+    listLspStatuses(directory?: string): Promise<OpenCodeLspStatus[] | null>;
     listMcpStatuses(directory?: string): Promise<Record<string, OpenCodeMcpStatus>>;
     getSessionStatuses(): Promise<Record<string, OpenCodeSessionStatus>>;
     getSessionContext(sessionId: string, model?: { providerID: string; id: string }): Promise<OpenCodeContextUsage>;
@@ -408,8 +408,9 @@ export class OpenCodeClient implements OpenCodeClientLike {
         return { directory: location.directory, worktree: location.project.directory };
     }
 
-    async listLspStatuses(_directory?: string): Promise<OpenCodeLspStatus[]> {
-        throw new Error("OpenCode V2 does not expose LSP status through its HTTP API.");
+    async listLspStatuses(_directory?: string): Promise<OpenCodeLspStatus[] | null> {
+        // V2 has no LSP status endpoint; null distinguishes unavailable data from no servers.
+        return null;
     }
 
     async listMcpStatuses(directory?: string): Promise<Record<string, OpenCodeMcpStatus>> {

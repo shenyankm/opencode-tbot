@@ -41,6 +41,7 @@ test("ListLspUseCase returns the current project and sorts statuses", async () =
 
     assert.deepEqual(calls, ["E:/repo-1"]);
     assert.equal(result.currentDirectory, "E:/repo-1");
+    assert.ok(result.statuses);
     assert.deepEqual(result.statuses.map((status) => status.id), ["go-1", "ts-1", "ts-2"]);
 });
 

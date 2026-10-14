@@ -173,7 +173,7 @@ OpenCode は次のパスから npm プラグイン登録を読み込みます。
 | コマンド | 動作 |
 | --- | --- |
 | `/start` | 短いウェルカムメッセージとクイックスタートの案内を表示します。 |
-| `/status` | OpenCode の health、version、workspace path、plugin list、MCP 状態をまとめて表示します。現在の V2 HTTP API では LSP 状態を取得できません。 |
+| `/status` | OpenCode の health、version、workspace path、plugin list、MCP 状態をまとめて表示します。現在の V2 HTTP API では LSP 状態を取得できないため、中立の「状態を取得できません」と表示し、エラーやサーバー未検出と区別します。 |
 | `/new [title]` | 現在のプロジェクトに新しい OpenCode セッションを作成します。 |
 | `/agents` または `/agent` | 利用可能なエージェントを一覧表示し、現在のエージェントを切り替えます。 |
 | `/sessions` | 利用可能なセッションを一覧表示し、切り替えや名前変更操作を提供します。 |

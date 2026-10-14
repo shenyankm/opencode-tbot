@@ -53,7 +53,7 @@ interface McpMessageInput {
 
 interface LspMessageInput {
     currentDirectory: string;
-    statuses: OpenCodeLspStatus[];
+    statuses: OpenCodeLspStatus[] | null;
 }
 
 interface StatusLayoutCopy {
@@ -147,6 +147,11 @@ export function presentLspMessage(input: LspMessageInput, copy: BotCopy = BOT_CO
         copy.lsp.currentProject(input.currentDirectory),
         "",
     ];
+
+    if (input.statuses === null) {
+        lines.push(copy.lsp.unavailable);
+        return lines.join("\n");
+    }
 
     if (input.statuses.length === 0) {
         lines.push(copy.lsp.none);
@@ -283,6 +288,10 @@ function presentStatusPlainLspLines(input: GetStatusResult, copy: BotCopy, layou
         return presentStatusPlainErrorLines(input.lsp.error, copy, layout);
     }
 
+    if (input.lsp.data.statuses === null) {
+        return presentPlainEmptyStatusLines(copy.lsp.unavailable, layout);
+    }
+
     if (input.lsp.data.statuses.length === 0) {
         return presentPlainEmptyStatusLines(copy.lsp.none, layout);
     }
@@ -298,6 +307,10 @@ function presentStatusPlainLspLines(input: GetStatusResult, copy: BotCopy, layou
 function presentStatusMarkdownLspLines(input: GetStatusResult, copy: BotCopy, layout: StatusLayoutCopy): string[] {
     if (input.lsp.status === "error") {
         return presentStatusMarkdownErrorLines(input.lsp.error, copy, layout);
+    }
+
+    if (input.lsp.data.statuses === null) {
+        return presentMarkdownEmptyStatusLines(copy.lsp.unavailable, layout);
     }
 
     if (input.lsp.data.statuses.length === 0) {

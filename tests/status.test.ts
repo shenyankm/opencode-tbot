@@ -4,7 +4,7 @@ import { OPENCODE_TBOT_VERSION } from "../src/app/package-info.js";
 import { getChatCopy } from "../src/bot/i18n.js";
 import { getBotCopy } from "../src/bot/copy.js";
 import { handleStatusCommand } from "../src/bot/commands/status.js";
-import { presentMcpMessage, presentStatusMarkdownMessage } from "../src/bot/presenters/message.presenter.js";
+import { presentLspMessage, presentMcpMessage, presentStatusMarkdownMessage, presentStatusMessage } from "../src/bot/presenters/message.presenter.js";
 import type { AppLogger } from "../src/infra/logger/index.js";
 import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
 import type {
@@ -110,6 +110,48 @@ test("MCP pending connections show localized progress in all supported languages
             statuses: [{ name: "pending-server", status: { status: "pending" } }],
         }, copy);
         assert.ok(message.includes(copy.mcp.pending));
+    }
+});
+
+test("/status distinguishes unavailable LSP data from empty catalogs and genuine errors in every language", async () => {
+    let lspState: "unavailable" | "empty" | "error" = "unavailable";
+    const { getStatusUseCase } = createDependencies({
+        async getCurrentProject() { return createProject("p", "/repo"); },
+        async getHealth() { return { healthy: true, version: "2" }; },
+        async getPath() { return { directory: "/repo", worktree: "/repo" }; },
+        async listConfiguredPlugins() { return []; },
+        async listSessions() { return []; },
+        async listMcpStatuses() { return {}; },
+        async listLspStatuses() {
+            if (lspState === "error") {
+                throw new Error("LSP query failed");
+            }
+            return lspState === "unavailable" ? null : [];
+        },
+    } as never);
+
+    for (const state of ["unavailable", "empty", "error"] as const) {
+        lspState = state;
+        const result = await getStatusUseCase.execute({ chatId: 1 });
+        assert.equal(result.lsp.status, state === "error" ? "error" : "ok");
+        for (const language of ["en", "zh-CN", "ja"] as const) {
+            const copy = getBotCopy(language);
+            for (const present of [presentStatusMessage, presentStatusMarkdownMessage]) {
+                const section = present(result, copy).split("🧠 LSP")[1];
+                assert.ok(section);
+                if (state === "error") {
+                    assert.ok(section.includes("🔴"));
+                    assert.ok(section.includes("LSP query failed"));
+                    assert.ok(!section.includes(copy.lsp.unavailable));
+                } else {
+                    assert.ok(section.includes("⚪"));
+                    assert.ok(section.includes(state === "unavailable" ? copy.lsp.unavailable : copy.lsp.none));
+                    assert.ok(!section.includes(state === "unavailable" ? copy.lsp.none : copy.lsp.unavailable));
+                    assert.ok(!section.includes("🔴"));
+                }
+            }
+            assert.ok(presentLspMessage({ currentDirectory: "/repo", statuses: null }, copy).includes(copy.lsp.unavailable));
+        }
     }
 });
 

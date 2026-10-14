@@ -173,7 +173,7 @@ OpenCode 会从以下路径读取 npm 插件注册：
 | 命令 | 作用 |
 | --- | --- |
 | `/start` | 显示简短欢迎信息和快速开始步骤。 |
-| `/status` | 汇总显示 OpenCode 健康状态、版本、工作区路径、插件列表和 MCP 状态。当前 V2 HTTP API 不提供 LSP 状态。 |
+| `/status` | 汇总显示 OpenCode 健康状态、版本、工作区路径、插件列表和 MCP 状态。当前 V2 HTTP API 不提供 LSP 状态查询，显示为灰色“状态不可查询”，不视为异常或未检测到服务。 |
 | `/new [title]` | 在当前项目中创建一个新的 OpenCode 会话。 |
 | `/agents` 或 `/agent` | 列出可用 Agent，并切换当前 Agent。 |
 | `/sessions` | 列出可用会话、切换当前会话，并提供重命名操作。 |

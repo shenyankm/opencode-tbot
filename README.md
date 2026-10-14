@@ -173,7 +173,7 @@ The plugin uses the shared V2 service. A standalone `opencode serve` does not ex
 | Command | What it does |
 | --- | --- |
 | `/start` | Show a short welcome message and quick-start steps. |
-| `/status` | Show aggregated OpenCode health, version, workspace paths, plugin list, and MCP status. LSP status is unavailable in the current V2 HTTP API. |
+| `/status` | Show aggregated OpenCode health, version, workspace paths, plugin list, and MCP status. The current V2 HTTP API cannot query LSP status; this appears as neutral "Status unavailable", rather than an error or an empty server list. |
 | `/new [title]` | Create a new OpenCode session in the current project. |
 | `/agents` or `/agent` | List available agents and switch the active one. |
 | `/sessions` | List available sessions, switch the active one, and offer rename actions. |
