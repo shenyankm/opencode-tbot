@@ -54,7 +54,10 @@ jobs:
           cache: true
           require-lockfile: true
       - name: Install matching OpenCode host
-        run: npm install --global @opencode/cli@2.0.29
+        run: |
+          npm install --global --prefix "$RUNNER_TEMP/opencode-host" @opencode/cli@2.0.29
+          echo "$RUNNER_TEMP/opencode-host/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/opencode-host/bin/opencode" --version
       - name: Test packed plugin in the host
         run: pnpm exec tsx --test tests/opencode-host.integration.test.ts
         env:
