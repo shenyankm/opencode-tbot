@@ -1,5 +1,6 @@
-import { GrammyError, type Bot } from "grammy";
+import type { Bot } from "grammy";
 import type { InlineKeyboardMarkup } from "grammy/types";
+import { isTelegramFormattingError } from "../../services/telegram/rich-messages.js";
 import { getSafeChatCopy } from "../i18n.js";
 import { scopeDependenciesToTelegramContext } from "../logger-context.js";
 import type { BotDependencies, ModelsFeatureDependencies } from "../types.js";
@@ -39,7 +40,7 @@ export async function handleModelsCommand(ctx: ModelsCommandContext, dependencie
         try {
             await ctx.reply(reply.preferred.text, { ...reply.preferred.options, reply_markup: keyboard });
         } catch (error) {
-            if (!(error instanceof GrammyError) || error.error_code !== 400) {
+            if (!isTelegramFormattingError(error)) {
                 throw error;
             }
             await ctx.reply(reply.fallback.text, { reply_markup: keyboard });

@@ -10,7 +10,7 @@ import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
 import { ForegroundSessionTracker } from "../src/services/session-activity/foreground-session-tracker.js";
 import { createThinkingMessages } from "./helpers/thinking.js";
 
-for (const outcome of ["completed", "stopped", "failed", "group", "rejected-draft", "draft-network-error"] as const) {
+for (const outcome of ["completed", "stopped", "failed", "provider-error", "group", "rejected-draft", "draft-network-error"] as const) {
     test(`native answer streams preserve separate thinking and status when ${outcome}`, async (t) => {
         t.mock.timers.enable({ apis: ["setTimeout"] });
         const tracker = new ForegroundSessionTracker();
@@ -54,7 +54,7 @@ for (const outcome of ["completed", "stopped", "failed", "group", "rejected-draf
                     await setImmediate();
                     if (outcome === "stopped") tracker.abort(1);
                     if (outcome === "stopped" || outcome === "failed") throw new Error("test interrupted");
-                    return { sessionId: "ses_test", assistantReply: { bodyMd: "ANSWER_COMPLETE", fallbackText: "ANSWER_COMPLETE", assistantError: null } };
+                    return { sessionId: "ses_test", assistantReply: { bodyMd: "ANSWER_COMPLETE", fallbackText: "ANSWER_COMPLETE", assistantError: outcome === "provider-error" ? { type: "APIError", message: "Provider disconnected" } : null } };
                 },
             },
         } as unknown as ForegroundPromptDependencies, async () => ({ text: "test" }));
@@ -76,6 +76,9 @@ for (const outcome of ["completed", "stopped", "failed", "group", "rejected-draf
         }
         if (outcome === "completed" || outcome === "group") assert.match(replies.at(-1)!, /Context/);
         assert.equal(tracker.hasActiveRequest(1), false);
+        if (outcome === "provider-error") {
+            assert.ok(replies.some((text) => text.includes("Provider disconnected")));
+        }
     });
 }
 

@@ -388,6 +388,8 @@ test("an old stop button cannot cancel a newer request", async () => {
     const old = tracker.acquire(1)!;
     old.dispose();
     const current = tracker.acquire(1)!;
+    old.attachSession("expired");
+    assert.equal(tracker.getActiveSessionId(1), null);
     let cancellations = 0;
     const replies: unknown[] = [];
     const dependencies = {

@@ -212,10 +212,12 @@ async function startTelegramBotRuntimeInternal(
     let stopPromise: Promise<void> | null = null;
     const requestStop = async () => {
         if (stopped) {
+            await stopPromise;
             return;
         }
 
         stopped = true;
+        input.container.foregroundSessionTracker.dispose();
         if (reconnectTimer) {
             clearTimeout(reconnectTimer);
             reconnectTimer = null;

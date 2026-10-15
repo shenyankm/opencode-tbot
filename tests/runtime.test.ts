@@ -11,6 +11,7 @@ import {
 import type { AppConfig } from "../src/app/config.js";
 import { DEFAULT_TOKEN_SHOW_BREAKDOWN } from "../src/domain/token/token-settings.entity.js";
 import type { AppContainer } from "../src/app/container.js";
+import { ForegroundSessionTracker } from "../src/services/session-activity/foreground-session-tracker.js";
 
 interface BotStub {
     api: {
@@ -51,6 +52,7 @@ function createContainer() {
         warn: [] as Array<{ input: unknown; message?: string }>,
     };
     const container = {
+        foregroundSessionTracker: new ForegroundSessionTracker(),
         logger: {
             child() {
                 return this;
@@ -118,6 +120,56 @@ function createRunnerHandle() {
         task: () => undefined,
     };
 }
+
+test("runtime shutdown cancels foreground waits before stopping the runner", async () => {
+    resetTelegramBotRuntimeRegistryForTests();
+    const { container } = createContainer();
+    const preparing = container.foregroundSessionTracker.acquire(1)!;
+    const running = container.foregroundSessionTracker.acquire(2)!;
+    running.attachSession("session");
+    let stoppedWithActiveWaits = false;
+    const runtime = await startTelegramBotRuntime({
+        config: createConfig(), container, syncCommands: false,
+        botFactory: () => createBotStub() as never,
+        registerBotHandlers: () => undefined,
+        runBot: () => ({ ...createRunnerHandle(), async stop() {
+            stoppedWithActiveWaits = !preparing.signal.aborted || !running.signal.aborted;
+        } }),
+    });
+    await runtime.dispose();
+    assert.equal(stoppedWithActiveWaits, false);
+    assert.equal(preparing.signal.aborted, true);
+    assert.equal(running.signal.aborted, true);
+    assert.equal(container.foregroundSessionTracker.isForeground("session"), false);
+    assert.equal(container.foregroundSessionTracker.acquire(3), null);
+    preparing.dispose();
+    running.dispose();
+    resetTelegramBotRuntimeRegistryForTests();
+});
+
+test("disposing after stop waits for the same runner stop before disposing the container", async () => {
+    resetTelegramBotRuntimeRegistryForTests();
+    const { calls, container } = createContainer();
+    let releaseStop!: () => void;
+    const stopping = new Promise<void>((resolve) => { releaseStop = resolve; });
+    let stopCalls = 0;
+    const runtime = await startTelegramBotRuntime({
+        config: createConfig(), container, syncCommands: false,
+        botFactory: () => createBotStub() as never,
+        registerBotHandlers: () => undefined,
+        runBot: () => ({ ...createRunnerHandle(), async stop() { stopCalls += 1; await stopping; } }),
+    });
+    runtime.stop();
+    const disposing = runtime.dispose();
+    await setImmediate();
+    const disposedEarly = calls.dispose > 0;
+    releaseStop();
+    await disposing;
+    assert.equal(disposedEarly, false);
+    assert.equal(calls.dispose, 1);
+    assert.equal(stopCalls, 1);
+    resetTelegramBotRuntimeRegistryForTests();
+});
 
 test("startTelegramBotRuntime starts polling before command sync and only warns when command sync fails", async () => {
     resetTelegramBotRuntimeRegistryForTests();

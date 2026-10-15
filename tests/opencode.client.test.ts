@@ -75,6 +75,38 @@ function createClient(
     return new OpenCodeClient(undefined, sdk, policy);
 }
 
+test("status, inbox cancellation, and interruption time out so cancelling a stalled host can finish", async () => {
+    const stalled = (options: { signal: AbortSignal }) => new Promise<never>((_resolve, reject) => {
+        options.signal.addEventListener("abort", () => reject(options.signal.reason), { once: true });
+    });
+    const client = createClient({ session: {
+        active: stalled,
+        inbox: { cancel: (_input: unknown, options: { signal: AbortSignal }) => stalled(options) },
+        interrupt: (_input: unknown, options: { signal: AbortSignal }) => stalled(options),
+    } }, { pollRequestTimeoutMs: 20 });
+    // Keep the test alive while the native timeout signals use unreferenced timers.
+    const keepAlive = setInterval(() => {}, 1_000);
+    try {
+        await Promise.all([
+            assert.rejects(client.getSessionStatuses(), { name: "TimeoutError" }),
+            assert.rejects(client.cancelSessionInput("ses_1", "msg_1"), { name: "TimeoutError" }),
+            assert.rejects(client.abortSession("ses_1"), { name: "TimeoutError" }),
+        ]);
+    } finally {
+        clearInterval(keepAlive);
+    }
+});
+
+test("cancelSessionInput forwards the original V2 inbox identity and preserves its void response", async () => {
+    const calls: unknown[] = [];
+    const client = createClient({ session: { inbox: { async cancel(input: unknown, options: { signal: AbortSignal }) {
+        assert.ok(options.signal instanceof AbortSignal);
+        calls.push(input);
+    } } } });
+    assert.equal(await client.cancelSessionInput("ses_1", "msg_1"), undefined);
+    assert.deepEqual(calls, [{ sessionID: "ses_1", inboxID: "msg_1" }]);
+});
+
 test("buildOpenCodeSdkConfig forwards trimmed V2 bearer tokens and omits blank tokens", () => {
     assert.deepEqual(buildOpenCodeSdkConfig({ baseUrl: "http://localhost:4096", apiKey: " secret " }), {
         baseUrl: "http://localhost:4096",

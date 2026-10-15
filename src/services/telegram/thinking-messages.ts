@@ -1,4 +1,5 @@
-import { GrammyError, InlineKeyboard } from "grammy";
+import { InlineKeyboard } from "grammy";
+import { isTelegramFormattingError } from "./rich-messages.js";
 import type { BotCopy } from "../../bot/copy.js";
 import type { ThinkingContent, ThinkingMessage } from "../../domain/thinking/thinking-message.entity.js";
 import type { ThinkingMessageRepository } from "../../domain/thinking/thinking-message.repository.js";
@@ -94,7 +95,7 @@ export class TelegramThinkingMessages {
         try {
             await retryTelegramRequest(() => write(reply.preferred, keyboard));
         } catch (error) {
-            if (!(error instanceof GrammyError) || error.error_code !== 400) throw error;
+            if (!isTelegramFormattingError(error)) throw error;
             const fallbackKeyboard = new InlineKeyboard().text(
                 message.expanded ? copy.status.collapseThinking : copy.status.expandThinking,
                 `thinking:${message.expanded ? "collapse" : "expand"}`,

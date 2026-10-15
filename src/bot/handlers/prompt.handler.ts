@@ -1,6 +1,7 @@
 import { randomInt } from "node:crypto";
-import { GrammyError, InlineKeyboard } from "grammy";
+import { InlineKeyboard } from "grammy";
 import type { InputRichMessage } from "grammy/types";
+import { isTelegramFormattingError } from "../../services/telegram/rich-messages.js";
 import type { ThinkingContent } from "../../domain/thinking/thinking-message.entity.js";
 import { retryTelegramRequest } from "../../services/telegram/telegram-message-queue.js";
 import { TelegramPromptProgress } from "../../services/telegram/prompt-progress.js";
@@ -68,7 +69,7 @@ export async function executePromptRequest(
             try {
                 await writeAnswerPart(index, reply.preferred);
             } catch (error) {
-                if (!reply.preferred.options?.parse_mode || !(error instanceof GrammyError) || error.error_code !== 400) {
+                if (!reply.preferred.options?.parse_mode || !isTelegramFormattingError(error)) {
                     throw error;
                 }
                 dependencies.logger.warn({ error }, "failed to format reply, falling back to plain text");
@@ -87,8 +88,7 @@ export async function executePromptRequest(
                         : { blocks: [{ type: "paragraph", text: payload.text }] },
                 ));
             } catch (error) {
-                if (!payload.options?.parse_mode || !(error instanceof GrammyError) || error.error_code !== 400
-                    || !/pars|format|entit|tag|markdown/iu.test(error.description)) throw error;
+                if (!payload.options?.parse_mode || !isTelegramFormattingError(error)) throw error;
                 await retryTelegramRequest(() => ctx.api.sendRichMessageDraft!(ctx.chat.id, draftId,
                     { blocks: [{ type: "paragraph", text: draft.fallback.text }] },
                 ));
@@ -146,7 +146,7 @@ export async function executePromptRequest(
                 try {
                     await write(reply.preferred);
                 } catch (error) {
-                    if (!reply.preferred.options?.parse_mode || !(error instanceof GrammyError) || error.error_code !== 400) {
+                    if (!reply.preferred.options?.parse_mode || !isTelegramFormattingError(error)) {
                         throw error;
                     }
                     dependencies.logger.warn({ error }, "failed to format thinking, falling back to plain text");
@@ -187,13 +187,16 @@ export async function executePromptRequest(
         const durationMs = performance.now() - startedAt;
         terminalStatus = result.assistantReply.assistantError ? "failed" : "completed";
         await progress.finish(terminalStatus);
-        const promptReply = result.assistantReply.assistantError ? {
-            ...result.assistantReply,
-            bodyMd: null,
-            fallbackText: presentError(result.assistantReply.assistantError, copy),
-        } : result.assistantReply;
+        const promptReply = result.assistantReply.assistantError
+            ? { bodyMd: result.assistantReply.bodyMd || latestAnswer, fallbackText: result.assistantReply.fallbackText }
+            : result.assistantReply;
         finalAnswerAttempted = true;
-        await writeReplies(buildTelegramPromptReplies(promptReply, copy));
+        if (!result.assistantReply.assistantError || promptReply.bodyMd) {
+            await writeReplies(buildTelegramPromptReplies(promptReply, copy));
+        }
+        if (result.assistantReply.assistantError) {
+            await ctx.reply(presentError(result.assistantReply.assistantError, copy));
+        }
         sentTerminalReply = true;
         if (dependencies.contextFooter) {
             try {
@@ -214,7 +217,7 @@ export async function executePromptRequest(
                     try {
                         contextMessage = await write(reply.preferred);
                     } catch (error) {
-                        if (!(error instanceof GrammyError) || error.error_code !== 400) {
+                        if (!isTelegramFormattingError(error)) {
                             throw error;
                         }
                         dependencies.logger.warn({ error }, "failed to format session footer, falling back to plain text");

@@ -1,7 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { Api, Bot, HttpError } from "grammy";
-import { telegramRichMessages } from "../src/services/telegram/rich-messages.js";
+import { Api, Bot, GrammyError, HttpError } from "grammy";
+import { isTelegramFormattingError, telegramRichMessages } from "../src/services/telegram/rich-messages.js";
+
+test("literal fallback requires an explicit Telegram formatting rejection", () => {
+    for (const description of ["Cannot parse entities", "unsupported HTML tag", "bad format", "invalid markdown"]) {
+        assert.equal(isTelegramFormattingError(new GrammyError(description, { ok: false, error_code: 400, description }, "sendRichMessage", {})), true);
+    }
+    for (const description of ["chat not found", "message to edit not found", "message is not modified", "message is too long"]) {
+        assert.equal(isTelegramFormattingError(new GrammyError(description, { ok: false, error_code: 400, description }, "editMessageText", {})), false);
+    }
+    assert.equal(isTelegramFormattingError(new HttpError("connection lost", new Error("ECONNRESET"))), false);
+    assert.equal(isTelegramFormattingError(new GrammyError("Cannot parse entities", { ok: false, error_code: 500, description: "Cannot parse entities" }, "sendRichMessage", {})), false);
+});
 
 function createApi() {
     const calls: Array<{ method: string; payload: unknown; signal?: Parameters<Api["sendMessage"]>[3] }> = [];
