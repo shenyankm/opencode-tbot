@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DEFAULT_TOKEN_SHOW_BREAKDOWN } from "../src/domain/token/token-settings.entity.js";
 import type { PromptSessionFilePartInput, PromptSessionResult } from "../src/services/opencode/opencode.client.js";
 import { handleImageMessage } from "../src/bot/handlers/file.handler.js";
 import { InMemoryPendingActionRepository } from "../src/repositories/pending-action.repo.js";
@@ -71,13 +70,7 @@ function createDependencies(options: {
                 warn() { },
             },
             foregroundSessionTracker: new ForegroundSessionTracker(),
-            getTokenSettingsUseCase: {
-                async execute() {
-                    return {
-                        showBreakdown: DEFAULT_TOKEN_SHOW_BREAKDOWN,
-                    };
-                },
-            },
+
             pendingActionRepo,
             sessionRepo,
             sendPromptUseCase: {

@@ -10,7 +10,6 @@ export interface BotCopy {
         sessions: string;
         cancel: string;
         model: string;
-        token: string;
         language: string;
     };
     start: {
@@ -200,7 +199,6 @@ const EN_BOT_COPY: BotCopy = {
         sessions: "Show and switch sessions",
         cancel: "Cancel rename or abort running request",
         model: "Show and switch models",
-        token: "Show context capacity and remaining percentage",
         language: "Show and switch language",
     },
     start: {
@@ -465,7 +463,6 @@ const ZH_CN_BOT_COPY: BotCopy = {
         sessions: "查看并切换会话",
         cancel: "取消重命名或中止当前请求",
         model: "查看并切换模型",
-        token: "查看上下文窗口和剩余比例",
         language: "查看并切换语言",
     },
     start: {
@@ -730,7 +727,6 @@ const JA_BOT_COPY: BotCopy = {
         sessions: "セッションを表示して切り替え",
         cancel: "名前変更を取り消すか実行中のリクエストを中止",
         model: "モデルを表示して切り替え",
-        token: "コンテキスト容量と残りの割合を表示",
         language: "言語を表示して切り替え",
     },
     start: {

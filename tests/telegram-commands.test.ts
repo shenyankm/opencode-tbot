@@ -48,10 +48,6 @@ test("TELEGRAM_COMMANDS only advertises implemented commands", () => {
             description: "Show and switch models",
         },
         {
-            command: "token",
-            description: "Show context capacity and remaining percentage",
-        },
-        {
             command: "language",
             description: "Show and switch language",
         },
@@ -141,10 +137,6 @@ test("getTelegramCommands returns Japanese descriptions when requested", () => {
             description: "モデルを表示して切り替え",
         },
         {
-            command: "token",
-            description: "コンテキスト容量と残りの割合を表示",
-        },
-        {
             command: "language",
             description: "言語を表示して切り替え",
         },
@@ -180,10 +172,6 @@ test("getTelegramCommands returns standardized Chinese descriptions when request
         {
             command: "model",
             description: "查看并切换模型",
-        },
-        {
-            command: "token",
-            description: "查看上下文窗口和剩余比例",
         },
         {
             command: "language",

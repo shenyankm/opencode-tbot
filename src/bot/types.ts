@@ -12,7 +12,6 @@ import type {
     CreateSessionResult,
 } from "../use-cases/create-session.usecase.js";
 import type { GetStatusInput, GetStatusResult } from "../use-cases/get-status.usecase.js";
-import type { GetTokenSettingsResult } from "../use-cases/get-token-settings.usecase.js";
 import type { ListAgentsInput, ListAgentsResult } from "../use-cases/list-agents.usecase.js";
 import type { ListLspInput, ListLspResult } from "../use-cases/list-lsp.usecase.js";
 import type { ListMcpInput, ListMcpResult } from "../use-cases/list-mcp.usecase.js";
@@ -29,10 +28,6 @@ import type {
 import type { SwitchAgentInput, SwitchAgentResult } from "../use-cases/switch-agent.usecase.js";
 import type { SwitchModelInput, SwitchModelResult } from "../use-cases/switch-model.usecase.js";
 import type { SwitchSessionInput, SwitchSessionResult } from "../use-cases/switch-session.usecase.js";
-import type {
-    ToggleTokenSettingInput,
-    ToggleTokenSettingResult,
-} from "../use-cases/toggle-token-setting.usecase.js";
 import type { UploadFileInput } from "../use-cases/upload-file.usecase.js";
 import type { BotLanguage } from "./copy.js";
 import type { TelegramContextFooter } from "../services/telegram/context-footer.js";
@@ -56,9 +51,6 @@ export interface PendingActionDependencies extends ChatStateDependencies {
 
 export interface ForegroundPromptDependencies extends ChatStateDependencies {
     foregroundSessionTracker: ForegroundSessionTrackerLike;
-    getTokenSettingsUseCase: {
-        execute(): Promise<GetTokenSettingsResult>;
-    };
     sendPromptUseCase: UseCaseExecutor<SendPromptInput, SendPromptResult>;
 }
 
@@ -82,13 +74,6 @@ export interface StatusFeatureDependencies extends ChatStateDependencies {
     getStatusUseCase: UseCaseExecutor<GetStatusInput, GetStatusResult>;
 }
 
-export interface TokenFeatureDependencies extends ChatStateDependencies {
-    getTokenSettingsUseCase: {
-        execute(): Promise<GetTokenSettingsResult>;
-    };
-    toggleTokenSettingUseCase: UseCaseExecutor<ToggleTokenSettingInput, ToggleTokenSettingResult>;
-}
-
 export interface SessionCreationDependencies extends ChatStateDependencies {
     createSessionUseCase: UseCaseExecutor<CreateSessionInput, CreateSessionResult>;
 }
@@ -107,9 +92,6 @@ export interface BotDependencies {
     createSessionUseCase: UseCaseExecutor<CreateSessionInput, CreateSessionResult>;
     foregroundSessionTracker: ForegroundSessionTrackerLike;
     getStatusUseCase: UseCaseExecutor<GetStatusInput, GetStatusResult>;
-    getTokenSettingsUseCase: {
-        execute(): Promise<GetTokenSettingsResult>;
-    };
     listAgentsUseCase: UseCaseExecutor<ListAgentsInput, ListAgentsResult>;
     listLspUseCase: UseCaseExecutor<ListLspInput, ListLspResult>;
     listMcpUseCase: UseCaseExecutor<ListMcpInput, ListMcpResult>;
@@ -123,7 +105,6 @@ export interface BotDependencies {
     switchAgentUseCase: UseCaseExecutor<SwitchAgentInput, SwitchAgentResult>;
     switchModelUseCase: UseCaseExecutor<SwitchModelInput, SwitchModelResult>;
     switchSessionUseCase: UseCaseExecutor<SwitchSessionInput, SwitchSessionResult>;
-    toggleTokenSettingUseCase: UseCaseExecutor<ToggleTokenSettingInput, ToggleTokenSettingResult>;
     uploadFileUseCase: UseCaseExecutor<UploadFileInput, PromptSessionFilePartInput>;
 }
 
@@ -139,7 +120,6 @@ export type ModelCallbackData =
     | `model:page:${number}`
     | `model:pick:${string}`
     | `model:variant:${string}:${string}`;
-export type TokenCallbackData = "token:breakdown:on" | "token:breakdown:off";
 export type PermissionApprovalCallbackData =
     | `permission:once:${string}`
     | `permission:always:${string}`

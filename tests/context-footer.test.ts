@@ -242,7 +242,6 @@ test("context changes edit only the separate context message and preserve the du
         logger: handlerLogger,
         foregroundSessionTracker: new ForegroundSessionTracker(),
         contextFooter: footer,
-        getTokenSettingsUseCase: { async execute() { throw new Error("Legacy setting must not be read"); } },
         sendPromptUseCase: { async execute() { now = 40_000; return {
             sessionId: "ses_test", projectId: "p",
             assistantReply: { bodyMd: null, fallbackText: "ANSWER", assistantError: null, info: null, parts: [], structured: null,
@@ -286,7 +285,6 @@ test("a failed context message does not turn a successful answer into an error r
             async read() { return { capacity: 1000, used: 100 }; },
             watch() { throw new Error("Failed sends must not be watched"); },
         } as never,
-        getTokenSettingsUseCase: { async execute() { return { showBreakdown: false }; } },
         sendPromptUseCase: { async execute() { return {
             sessionId: "ses_test", projectId: "p", assistantReply: {
                 bodyMd: null, fallbackText: "ANSWER", assistantError: null, info: null, parts: [], structured: null,
@@ -328,7 +326,6 @@ test("formatted footer rejection falls back to plain text and refreshes only the
             async read() { return { capacity: 1000, used: 100 }; },
             watch(_chatId: number, _sessionId: string, update: typeof refresh) { refresh = update; },
         } as never,
-        getTokenSettingsUseCase: { async execute() { return { showBreakdown: false }; } },
         sendPromptUseCase: { async execute() { now = 19_100; return {
             sessionId: "ses_test", projectId: "p", assistantReply: {
                 bodyMd: null, fallbackText: "ANSWER", assistantError: null, info: null, parts: [], structured: null,

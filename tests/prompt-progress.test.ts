@@ -78,7 +78,6 @@ test("streaming thinking reuses unchanged messages, replaces final text and remo
             },
         }, {
             foregroundSessionTracker: tracker, sessionRepo: new InMemorySessionRepository(), logger,
-            getTokenSettingsUseCase: { async execute() { return { showBreakdown: false }; } },
             contextFooter: { async read() { return { capacity: 1000, used: 100 }; }, watch() {} } as never,
             sendPromptUseCase: { async execute(input) {
                 input.onExecutionSession?.("ses_test");
@@ -362,7 +361,6 @@ test("expandable thinking stays separate from the streamed answer and context wi
         }, {
             foregroundSessionTracker: tracker, sessionRepo: new InMemorySessionRepository(), logger,
             contextFooter: { async read() { return { capacity: 1000, used: 100 }; }, watch() {} } as never,
-            getTokenSettingsUseCase: { async execute() { return { showBreakdown: false }; } },
             sendPromptUseCase: {
                 async execute(input: SendPromptInput) {
                     input.onExecutionSession?.("ses_test");
@@ -425,7 +423,6 @@ test("compression has a separate message and survives cleanup when the model ret
         },
     }, {
         foregroundSessionTracker: tracker, sessionRepo: new InMemorySessionRepository(), logger,
-        getTokenSettingsUseCase: { async execute() { return { showBreakdown: false }; } },
         sendPromptUseCase: { async execute(input) {
             input.onExecutionSession?.("ses_test");
             tracker.publish({ type: "session.compaction.started", data: { sessionID: "ses_test", reason: "auto" } });

@@ -6,10 +6,6 @@ export interface TokenMetricValues {
     cacheWrite: number | null;
 }
 
-export interface TokenSettings {
-    showBreakdown: boolean;
-}
-
 export const DEFAULT_TOKEN_SHOW_BREAKDOWN = false;
 
 export function calculateDisplayedTokenTotal(

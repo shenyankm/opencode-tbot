@@ -3,9 +3,6 @@ import test from "node:test";
 import { getBotCopy } from "../src/bot/copy.js";
 import type { BotDependencies } from "../src/bot/types.js";
 import {
-    DEFAULT_TOKEN_SHOW_BREAKDOWN,
-} from "../src/domain/token/token-settings.entity.js";
-import {
     OpenCodePromptTimeoutError,
     type PromptSessionResult,
 } from "../src/services/opencode/opencode.client.js";
@@ -79,7 +76,6 @@ function createDependencies(options: {
         };
     }>;
     sendPrompt: (input: { chatId: number; text: string }) => Promise<{ assistantReply: PromptSessionResult }>;
-    showBreakdown?: boolean;
 }) {
     const errors: unknown[] = [];
     const pendingActionRepo = new InMemoryPendingActionRepository();
@@ -97,13 +93,7 @@ function createDependencies(options: {
                 })),
             },
             foregroundSessionTracker: new ForegroundSessionTracker(),
-            getTokenSettingsUseCase: {
-                async execute() {
-                    return {
-                        showBreakdown: options.showBreakdown ?? DEFAULT_TOKEN_SHOW_BREAKDOWN,
-                    };
-                },
-            },
+
             logger: {
                 child() {
                     return this;
@@ -251,7 +241,7 @@ test("handleTextMessage falls back to plain text when the preferred Telegram mar
     assert.deepEqual(deleted, [{ chatId: 2, messageId: 200 }]);
 });
 
-test("handleTextMessage does not append statistics even when legacy token breakdown is enabled", async () => {
+test("handleTextMessage keeps answer text and context statistics in separate messages", async () => {
     const replies: Array<{ text: string; other?: unknown }> = [];
     const deleted: Array<{ chatId: number; messageId: number }> = [];
     let nextMessageId = 225;
@@ -259,7 +249,6 @@ test("handleTextMessage does not append statistics even when legacy token breakd
         sendPrompt: async () => ({
             assistantReply: createPromptReply(),
         }),
-        showBreakdown: true,
     });
 
     await handleTextMessage(
