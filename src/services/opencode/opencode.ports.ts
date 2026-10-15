@@ -68,6 +68,7 @@ export interface OpenCodeSessionCatalog {
 
 export interface OpenCodeSessionManager {
     abortSession(sessionId: string): Promise<boolean>;
+    cancelSessionInput(sessionId: string, messageId: string): Promise<void>;
     createSessionForDirectory(directory: string, title?: string): Promise<OpenCodeSession>;
     deleteSession(sessionId: string): Promise<boolean>;
     forkSession(sessionId: string, messageId?: string): Promise<OpenCodeSession>;

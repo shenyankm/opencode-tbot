@@ -12,6 +12,10 @@ import { Service, type Endpoint } from "@opencode/client/service";
 import { installPlugin } from "../src/cli.js";
 import { getGlobalOpenCodeConfigFilePath } from "../src/app/plugin-config.js";
 import { BOT_COPY } from "../src/bot/copy.js";
+import { createOpenCodeClientFromSdkClient } from "../src/services/opencode/opencode.client.js";
+import { ForegroundSessionTracker } from "../src/services/session-activity/foreground-session-tracker.js";
+import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
+import { AbortPromptUseCase } from "../src/use-cases/abort-prompt.usecase.js";
 
 const SHOULD_RUN = process.env.OPENCODE_HOST_E2E === "1";
 
@@ -254,7 +258,14 @@ test("OpenCode v2 loads the locally built plugin, handles Telegram commands, and
         name: attachment.name,
         source: { type: "inline" },
     }]);
-    await client.session.inbox.cancel({ sessionID: session.id, inboxID: messageId });
+    const tracker = new ForegroundSessionTracker();
+    const lease = tracker.acquire(101)!;
+    lease.attachSession(session.id);
+    lease.attachInput(messageId);
+    const abort = new AbortPromptUseCase(new InMemorySessionRepository(), createOpenCodeClientFromSdkClient(client), tracker);
+    assert.equal((await abort.execute({ chatId: 101, requestId: lease.id })).status, "aborted");
+    assert.equal(lease.signal.aborted, true);
+    lease.dispose();
     assert.ok((await client.session.inbox.list({ sessionID: session.id }))
         .every((entry) => entry.id !== messageId));
 

@@ -10,6 +10,7 @@ export interface ForegroundSessionLease {
 }
 
 export interface ForegroundSessionTrackerLike {
+    dispose(): void;
     acquire(chatId: number, onProgress?: (event: PromptProgressEvent) => void): ForegroundSessionLease | null;
     publish(event: { type: string; data?: unknown }): void;
     getRequestId(chatId: number): string | null;
@@ -18,6 +19,7 @@ export interface ForegroundSessionTrackerLike {
     clear(sessionId: string): boolean;
     fail(sessionId: string, error: unknown): boolean;
     getActiveSessionId(chatId: number): string | null;
+    getActiveInputId(chatId: number): string | null;
     hasActiveRequest(chatId: number): boolean;
     isForeground(sessionId: string): boolean;
     listChatIds(sessionId: string): number[];
@@ -43,9 +45,20 @@ interface ForegroundRequestState {
 export class ForegroundSessionTracker implements ForegroundSessionTrackerLike {
     private readonly requests = new Map<number, ForegroundRequestState>();
     private readonly sessionChats = new Map<string, Set<number>>();
+    private disposed = false;
+
+    dispose(): void {
+        this.disposed = true;
+        const requests = [...this.requests.values()];
+        this.requests.clear();
+        this.sessionChats.clear();
+        for (const request of requests) {
+            request.controller.abort(createMessageAbortedError());
+        }
+    }
 
     acquire(chatId: number, onProgress?: (event: PromptProgressEvent) => void): ForegroundSessionLease | null {
-        if (this.requests.has(chatId)) {
+        if (this.disposed || this.requests.has(chatId)) {
             return null;
         }
 
@@ -192,6 +205,10 @@ export class ForegroundSessionTracker implements ForegroundSessionTrackerLike {
         return this.requests.get(chatId)?.sessionId ?? null;
     }
 
+    getActiveInputId(chatId: number): string | null {
+        return this.requests.get(chatId)?.inputId ?? null;
+    }
+
     hasActiveRequest(chatId: number): boolean {
         return this.requests.has(chatId);
     }
@@ -261,6 +278,7 @@ export class ForegroundSessionTracker implements ForegroundSessionTrackerLike {
 }
 
 export const NOOP_FOREGROUND_SESSION_TRACKER: ForegroundSessionTrackerLike = {
+    dispose() {},
     acquire() {
         return null;
     },
@@ -279,6 +297,9 @@ export const NOOP_FOREGROUND_SESSION_TRACKER: ForegroundSessionTrackerLike = {
         return false;
     },
     getActiveSessionId() {
+        return null;
+    },
+    getActiveInputId() {
         return null;
     },
     hasActiveRequest() {

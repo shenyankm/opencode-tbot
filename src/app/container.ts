@@ -157,6 +157,7 @@ function createContainer(
             }
 
             disposed = true;
+            runtimeServices.foregroundSessionTracker.dispose();
             contextFooter.clear();
             storageLogger.info(
                 {

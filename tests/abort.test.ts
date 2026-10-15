@@ -16,6 +16,43 @@ const logger = {
     warn() { },
 } as unknown as AppLogger;
 
+for (const outcome of ["idle", "busy", "failed", "replaced"] as const) {
+    test(`cancel removes the original pending input when ${outcome}`, async () => {
+        const tracker = new ForegroundSessionTracker();
+        const lease = tracker.acquire(1)!;
+        lease.attachSession("session");
+        lease.attachInput("input");
+        let next: ReturnType<typeof tracker.acquire>;
+        const calls: string[] = [];
+        const useCase = new AbortPromptUseCase(new InMemorySessionRepository(), {
+            async getSessionStatuses() { return outcome === "idle" ? {} : { session: { type: "busy" } }; },
+            async cancelSessionInput(sessionId: string, inputId: string) {
+                calls.push(`${sessionId}:${inputId}`);
+                if (outcome === "failed") throw new Error("Cancellation failed");
+                if (outcome === "replaced") {
+                    lease.dispose();
+                    next = tracker.acquire(1)!;
+                    next.attachSession("session");
+                }
+            },
+            async abortSession() { calls.push("interrupt"); return true; },
+        } as never, tracker);
+        if (outcome === "failed") {
+            await assert.rejects(useCase.execute({ chatId: 1 }), /Cancellation failed/u);
+        } else {
+            assert.equal((await useCase.execute({ chatId: 1 })).status, outcome === "replaced" ? "not_running" : "aborted");
+        }
+        assert.deepEqual(calls, outcome === "busy" || outcome === "idle" ? ["session:input", "interrupt"] : ["session:input"]);
+        if (outcome === "replaced") {
+            assert.equal(next!.signal.aborted, false);
+            next!.dispose();
+        } else {
+            assert.equal(lease.signal.aborted, true);
+        }
+        lease.dispose();
+    });
+}
+
 test("cancelling preparation leaves the previously bound session running", async () => {
     const repo = new InMemorySessionRepository();
     await repo.setCurrent({ chatId: 1, sessionId: "previous", projectId: "p", directory: "/repo", agentName: null, modelProviderId: null, modelId: null, modelVariant: null, language: null, updatedAt: "" });
@@ -30,36 +67,31 @@ test("cancelling preparation leaves the previously bound session running", async
     lease.dispose();
 });
 
-test("cancel rechecks the captured request after loading remote status", async () => {
+test("cancel uses the native interruption result without a racy status preflight", async () => {
     const tracker = new ForegroundSessionTracker();
-    const old = tracker.acquire(1)!;
-    old.attachSession("old");
-    let current: ReturnType<typeof tracker.acquire>;
+    const lease = tracker.acquire(1)!;
+    lease.attachSession("session");
+    let interruptions = 0;
     const useCase = new AbortPromptUseCase(new InMemorySessionRepository(), {
-        async getSessionStatuses() {
-            old.dispose();
-            current = tracker.acquire(1)!;
-            current.attachSession("current");
-            return { old: { type: "busy" } };
-        },
-        async abortSession() { assert.fail("An expired cancel must not interrupt a session"); },
+        async getSessionStatuses() { assert.fail("Interruption itself handles idle sessions"); },
+        async abortSession() { interruptions += 1; return false; },
     } as never, tracker);
-    assert.equal((await useCase.execute({ chatId: 1 })).status, "not_running");
-    assert.equal(current!.signal.aborted, false);
-    current!.dispose();
+    assert.equal((await useCase.execute({ chatId: 1 })).status, "aborted");
+    assert.equal(interruptions, 1);
+    assert.equal(lease.signal.aborted, true);
+    lease.dispose();
 });
 
-test("cancelling a bound session does not interrupt a request started during the status lookup", async () => {
-    const repo = new InMemorySessionRepository();
-    await repo.setCurrent({ chatId: 1, sessionId: "session", projectId: "p", directory: "/repo", agentName: null, modelProviderId: null, modelId: null, modelVariant: null, language: null, updatedAt: "" });
+test("cancelling a bound session does not interrupt a request started during the binding lookup", async () => {
     const tracker = new ForegroundSessionTracker();
     let current: ReturnType<typeof tracker.acquire>;
-    const useCase = new AbortPromptUseCase(repo, {
-        async getSessionStatuses() {
+    const useCase = new AbortPromptUseCase({
+        async getByChatId() {
             current = tracker.acquire(1)!;
             current.attachSession("session");
-            return { session: { type: "busy" } };
+            return { sessionId: "session" };
         },
+    } as never, {
         async abortSession() { assert.fail("Cancel must preserve the newer request"); },
     } as never, tracker);
     assert.equal((await useCase.execute({ chatId: 1 })).status, "not_running");
@@ -67,24 +99,18 @@ test("cancelling a bound session does not interrupt a request started during the
     current!.dispose();
 });
 
-for (const stage of ["status", "interrupt"] as const) {
-    test(`cancel releases the local wait when the remote ${stage} request fails`, async () => {
-        const tracker = new ForegroundSessionTracker();
-        const lease = tracker.acquire(1)!;
-        lease.attachSession("session");
-        const failure = new Error("Host unavailable");
-        const useCase = new AbortPromptUseCase(new InMemorySessionRepository(), {
-            async getSessionStatuses() {
-                if (stage === "status") throw failure;
-                return { session: { type: "busy" } };
-            },
-            async abortSession() { throw failure; },
-        } as never, tracker);
-        await assert.rejects(useCase.execute({ chatId: 1 }), (error) => error === failure);
-        assert.equal(lease.signal.aborted, true);
-        lease.dispose();
-    });
-}
+test("cancel releases the local wait when the remote interruption request fails", async () => {
+    const tracker = new ForegroundSessionTracker();
+    const lease = tracker.acquire(1)!;
+    lease.attachSession("session");
+    const failure = new Error("Host unavailable");
+    const useCase = new AbortPromptUseCase(new InMemorySessionRepository(), {
+        async abortSession() { throw failure; },
+    } as never, tracker);
+    await assert.rejects(useCase.execute({ chatId: 1 }), (error) => error === failure);
+    assert.equal(lease.signal.aborted, true);
+    lease.dispose();
+});
 
 test("AbortPromptUseCase reports no_session when the chat has no bound session", async () => {
     const repo = new InMemorySessionRepository();
@@ -125,7 +151,7 @@ test("AbortPromptUseCase reports not_running when the current session is idle", 
         repo,
         {
             async abortSession() {
-                return true;
+                return false;
             },
             async getSessionStatuses() {
                 return {

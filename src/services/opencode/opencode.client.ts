@@ -206,6 +206,7 @@ const DEFAULT_OPENCODE_PROMPT_TIMEOUT_POLICY: OpenCodePromptTimeoutPolicy = {
 export interface OpenCodeClientLike {
     readonly client?: OpenCodeSdkClientLike;
     abortSession(sessionId: string): Promise<boolean>;
+    cancelSessionInput(sessionId: string, messageId: string): Promise<void>;
     deleteSession(sessionId: string): Promise<boolean>;
     forkSession(sessionId: string, messageId?: string): Promise<OpenCodeSession>;
     getHealth(): Promise<OpenCodeHealth>;
@@ -334,6 +335,12 @@ export class OpenCodeClient implements OpenCodeClientLike {
         });
 
         return result.interrupted;
+    }
+
+    async cancelSessionInput(sessionId: string, messageId: string): Promise<void> {
+        await this.client.session.inbox.cancel({ sessionID: sessionId, inboxID: messageId }, {
+            signal: AbortSignal.timeout(this.promptTimeoutPolicy.pollRequestTimeoutMs),
+        });
     }
 
     async deleteSession(sessionId: string): Promise<boolean> {
