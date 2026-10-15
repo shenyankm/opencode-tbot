@@ -1,225 +1,101 @@
 # opencode-tbot
 
-Telegram から [OpenCode](https://opencode.ai) を操作するためのプラグインです。
-[grammY](https://grammy.dev) と `@opencode/client` と `@opencode/plugin` を基盤として実装しています。
+Telegram から [OpenCode](https://opencode.ai/v2/docs) を操作するプラグインです。会話、画像、セッション、モデル、Agent、権限承認に対応します。grammY と OpenCode V2 SDK を使用し、OpenCode 公式チームとは関係ありません。
 
 [English](./README.md) | [简体中文](./README.zh-CN.md) | [日本語](./README.ja.md)
 
-> このプロジェクトは OpenCode チームによる公式開発ではなく、OpenCode の公式プロジェクトでもありません。
+## クイックスタート
 
-## 概要
+SDK `2.0.29` と互換性のある OpenCode V2、および Node.js `>=22.12.0` が必要です。OpenCode V1 には対応しません。
 
-`opencode-tbot` を使うと、Telegram から OpenCode を操作し、chat ごとに独立したアクティブなバインディング状態を保持できます。
+1. Telegram の `@BotFather` で `/newbot` を実行して bot を作成します。`@userinfobot` で自分の数値 ID を取得し、プライベートチャットのアクセス制限に使います。
+2. OpenCode とプラグインをインストールし、案内に従って bot token を入力します。
 
-- プレーンテキストメッセージは現在の OpenCode セッションに転送されます。
-- Telegram の写真や画像ドキュメントは OpenCode の file part としてアップロードされます。
-- OpenCode が発行した権限リクエストは Telegram のインラインボタンから承認または拒否できます。
-- セッションエラーイベントは、バインド済みの Telegram chat に通知できます。
-- chat のバインド、言語設定、モデルやエージェントの選択は JSON 状態ファイルに保存されます。
+   ```bash
+   npm install -g @opencode/cli@2.0.29
+   npm exec -- opencode-tbot@latest
+   ```
 
-## 要件
+3. 下記の設定で `telegram.allowedChatIds` を指定し、共有サービスを起動してプロジェクトの場所を読み込みます。
 
-- `@opencode/client` と `@opencode/plugin` `2.0.29` に対応し、このプラグインを読み込む OpenCode V2 Host。OpenCode V1 はサポートしません。
-- Telegram bot token
-- CLI 用の Node.js `>=22.12.0`
+   ```bash
+   opencode serve --service
+   # 別のターミナルでプロジェクトディレクトリから実行：
+   opencode api location.get --header "x-opencode-directory:$(node -p 'encodeURIComponent(process.cwd())')"
+   ```
 
-## Telegram 認証情報の取得
+4. OpenCode を起動したまま Telegram で bot を開き、`/status`、続いて `/new [タイトル]` またはメッセージを送ります。
 
-- `botToken`: Telegram で `@BotFather` を開き、`/newbot` を実行して、返された token をコピーします。
-- `userId` / `chatId`: Telegram で `@userinfobot` を開き、返された数値 ID をコピーします。bot とのダイレクトチャットでは、その値を `telegram.allowedChatIds` に使えます。
-
-## インストール、更新、アンインストール
-
-推奨インストール方法:
-
-```bash
-npm exec -- opencode-tbot@latest
-```
-
-インストーラーは次を行います。
-
-- 対話実行時には Telegram bot token の入力を促します
-- 設定ファイルを書き込む前に `getMe` で Telegram bot token を検証します
-- `~/.config/opencode/opencode.json` を書き換え、`plugins` に `opencode-tbot` が含まれるようにします
-- `~/.config/opencode/opencode-tbot/config.json` を書き込み、または既存内容とマージします
-- 足りない親ディレクトリを自動作成します
-- 完了時には最小限の成功メッセージだけを表示します
-
-既存のプラグイン設定を変更せずに OpenCode のプラグイン登録だけを更新する場合:
-
-```bash
-npm exec -- opencode-tbot@latest update
-```
-
-OpenCode のプラグイン登録を削除し、既存のプラグイン設定ファイルは残す場合:
-
-```bash
-npm exec -- opencode-tbot@latest uninstall
-```
-
-CLI バージョンを表示:
-
-```bash
-npm exec -- opencode-tbot@latest --version
-```
-
-ヘルプを表示:
-
-```bash
-npm exec -- opencode-tbot@latest --help
-```
-
-補足:
-
-- `install` は Telegram token のリモート検証に成功したあとでだけ設定を書き込みます。検証に失敗した場合、新しい設定は書き込まれません。
-- `install` は `opencode.json` とグローバルプラグイン設定ファイルの両方を更新します。
-- `update` は `opencode.json` だけを更新し、既存のプラグイン設定内容は変更しません。
-- `uninstall` は `opencode.json` から `opencode-tbot` を削除し、`~/.config/opencode/opencode-tbot/config.json` はそのまま残します。
-- 既存の V1 `plugin` 登録は、options 付きのタプルを含め V2 `plugins` に移行します。他のプラグインの options は保持します。`install` と `update` は、同じパッケージの重複登録で options が競合すると、設定を書き込む前にエラーになります。
-
-### CLI オプション
-
-共通オプション:
-
-- `--help`
-- `--version`
-
-`install` がサポートするオプション:
-
-- `--bot-token <token>` Telegram bot token を非対話で設定
-- `--telegram-api-root <url>` Telegram Bot API の root URL を上書き
-- `--home-dir <path>` カスタム home ディレクトリを使用
-
-`update` がサポートするオプション:
-
-- `--home-dir <path>`
-
-`uninstall` がサポートするオプション:
-
-- `--home-dir <path>`
+共有サービスの起動だけではプロジェクトのプラグインは読み込まれません。単独の `opencode serve` には必要なサービス検出情報がありません。設定変更後は `opencode reload` で既存の共有サービスを再読み込みできます。
 
 ## 設定
 
-実行時設定は次のパスから読み込まれます。
-
-- `~/.config/opencode/opencode-tbot/config.json`
-
-プログラムから設定を明示的に渡すこともできます。渡した値はファイル値を上書きします。
-
-OpenCode は次のパスから npm プラグイン登録を読み込みます。
-
-- `~/.config/opencode/opencode.json`
-
-このプラグインは `.env` から実行時設定を読み込みません。
-
-実行ログは機密情報を除いた JSON として Host コンソールに出力します。ファイルログの既定の保存先は `~/.local/share/opencode/log/plugins/opencode-tbot/` です。`logging.sinks.host` と `logging.sinks.file` で各出力を制御します。
-
-### `opencode.json` の例
-
-インストーラーは `"plugins": ["opencode-tbot"]` を書き込みます。オブジェクト形式のプラグイン options でグローバル設定ファイルの値を上書きできます。Telegram token は `config.json` に残せます。
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugins": [
-    {
-      "package": "opencode-tbot",
-      "options": {
-        "telegram": {
-          "allowedChatIds": ["123456789"]
-        }
-      }
-    }
-  ]
-}
-```
-
-### `config.json` の例
+インストーラーは token を検証してから `~/.config/opencode/opencode-tbot/config.json` に書き込みます。
 
 ```json
 {
   "telegram": {
     "botToken": "your_telegram_bot_token",
     "allowedChatIds": ["123456789"]
-  },
-  "tokens": {
-    "showBreakdown": false
   }
 }
 ```
 
-### フィールド
+`allowedChatIds` が空または省略された場合は、すべてのチャットを許可します。`~/.config/opencode/opencode.json` への `"plugins": ["opencode-tbot"]` の登録も自動です。プラグインの options はファイル設定より優先されます。既存の V1 登録は options を保持して移行します。実行時に `.env` は読み込みません。
 
-| フィールド | 必須 | 既定値 | 説明 |
-| --- | --- | --- | --- |
-| `telegram.botToken` | はい | - | Telegram bot token。通常は `getMe` 検証に成功したあとでインストーラーがグローバルプラグイン設定へ書き込みます。 |
-| `telegram.allowedChatIds` | いいえ | `[]` | 許可する Telegram chat ID。空の場合は任意の chat からのメッセージを受け付けます。 |
-| `tokens.showBreakdown` | いいえ | `false` | 旧設定との互換性のため受け付けます。独立したコンテキストメッセージに残りの割合と容量のみ表示します。 |
+チャット設定は JSON 状態ファイルに保存します。機密情報をマスクしたログはホストコンソールと `~/.local/share/opencode/log/plugins/opencode-tbot/` に出力します。
 
-## クイックスタート
-
-1. `npm install -g @opencode/cli` で [OpenCode V2 CLI](https://opencode.ai/v2/docs/cli/commands) をインストールします。
-2. `npm exec -- opencode-tbot@latest` でプラグインをインストールします。
-3. 特定の chat のみを許可したい場合は、`~/.config/opencode/opencode-tbot/config.json` で `telegram.allowedChatIds` を設定します。
-4. `opencode serve --service` で共有 Host を起動します。V2 共有サーバーが起動済みなら `opencode reload` で設定を読み込みます。Host は起動したままにしてください。
-5. 別のターミナルでプロジェクトディレクトリに移動し、`opencode api location.get --header "x-opencode-directory:$(node -p 'encodeURIComponent(process.cwd())')"` でプロジェクトとプラグインを読み込みます。
-6. Telegram で `/status` を実行して接続を確認します。
-7. `/new [title]` を実行するか、テキストまたは画像メッセージを直接送って使い始めます。
-
-プラグインは V2 共有サービスを通じて Host に接続します。独立した `opencode serve` は必要なサービス検出情報を提供しません。共有 Host の起動だけではプロジェクトを読み込まないため、手順 5 でプロジェクトディレクトリを指定してプラグインを起動します。
+思考内容と展開状態は `<状態ファイルのパス>.thinking/` の非公開ファイルに保存します。再起動後も過去の思考を開くには、これらのファイルを保持してください。
 
 ## コマンド
 
 | コマンド | 動作 |
 | --- | --- |
-| `/start` | 短いウェルカムメッセージとクイックスタートの案内を表示します。 |
-| `/status` | OpenCode の health、version、workspace path、plugin list、MCP 状態をまとめて表示します。現在の V2 HTTP API では LSP 状態を取得できないため、中立の「状態を取得できません」と表示し、エラーやサーバー未検出と区別します。 |
-| `/new [title]` | 現在のプロジェクトに新しい OpenCode セッションを作成します。 |
-| `/agents` または `/agent` | 利用可能なエージェントを一覧表示し、現在のエージェントを切り替えます。 |
-| `/sessions` | 利用可能なセッションを一覧表示し、切り替えや名前変更操作を提供します。 |
-| `/cancel` | 保留中のセッション名変更入力を取り消すか、現在のセッションで実行中のリクエストを中止します。 |
-| `/model` または `/models` | OpenCode が接続済み provider 向けに公開しているモデルを表示し、現在のモデルや推論レベルを切り替えます。 |
-| `/token` | 現在のコンテキスト容量と残りの割合を表示します。 |
-| `/language` | 現在の chat の bot 表示言語を切り替え、コマンド説明を再同期します。 |
+| `/start` | クイックスタートを表示。 |
+| `/status` | ホスト、ワークスペース、プラグイン、MCP の状態を表示。 |
+| `/new [タイトル]` | 現在のプロジェクトにセッションを作成。 |
+| `/sessions` | セッションの切り替えと名前変更。 |
+| `/model`、`/models` | プロバイダー別にモデルと推論レベルを選択し、現在の選択を表示。 |
+| `/agents`、`/agent` | Agent を選択。 |
+| `/cancel` | リクエストを停止、または名前変更を取り消し。 |
+| `/language` | 英語、簡体字中国語、日本語を切り替え。 |
 
-### メッセージの挙動
+V2 HTTP API は LSP 状態を公開していないため、取得不可と表示します。
 
-- 最後の独立した状態メッセージにワークスペース、プロバイダー/モデル、推論レベル、Agent、コンテキストの残りの割合、容量、リクエスト全体の所要時間（`s`、`m`、`h`）を簡潔に表示します。ラベルは太字、パスは等幅フォントにし、書式が拒否された場合はプレーンテキストに切り替えます。モデル・Agent の変更、ワークスペース移動、圧縮時は同じメッセージを更新し、所要時間を保持します。圧縮後の使用量は次の応答で取得するまで未取得と表示し、古い値や累計値を再利用しません。
-- 思考は全文を表示し、長い内容は番号付きの個別に展開できる引用メッセージに分割します。ストリーミング中は既存のメッセージを更新し、以前の思考を切り捨てません。各部分に簡潔な見出しを付け、書式が拒否された場合はプレーンテキストに切り替えます。思考と回答は別々のメッセージに表示します。回答のプレビューを最終回答に更新し、重複送信しません。ツールの要約は表示しません。
-- 思考と回答は各メッセージ約 1,024 文字を目安に、段落や文を保つため長さに多少の幅を持たせます。長すぎる文や区切りのないテキストだけを分割し、内容はすべて保持します。
-- コンテキスト圧縮の状態は思考・回答とは別のメッセージに表示し、実行中から完了・失敗に更新します。実行中は停止でき、圧縮の要約は回答に表示しません。
-- モデルが提供した思考と回答のプレビューを表示し、更新は最大毎秒1回にまとめます。
-- 停止ボタンは対応するリクエストだけを停止します。`/cancel` も利用でき、生成済みのプレビューは残ります。
-- 長い回答は複数のメッセージで全文を送信します。長文にはプレーンテキストを使います。
-- モデルと推論レベルのボタンは安定した識別子を使います。更新前の数字ボタンは `/model` で再作成してください。
+## メッセージの動作
 
-- コマンド以外のテキストは prompt として OpenCode に送信されます。
-- Telegram の写真と画像ドキュメントは OpenCode の file part として転送されます。
-- 画像添付は現在のアクティブセッションの一時 fork 内で処理されるため、後続のテキスト専用コンテキストを汚しません。
-- 権限承認は Telegram のインラインボタンから処理できます。
-- `/cancel` は OpenCode セッションの処理と Telegram 側の待機状態を同時に中止し、次の prompt をすぐ開始できるようにします。
-- Telegram の音声メッセージ機能は廃止しました。Telegram の音声は既定で OGG 形式であり、利用可能な音声モデルを使うには追加のトランスコードが必要です。トランスコードによるサイズ増加と保守コストが大きいため、総合判断で機能を削除し、音声メッセージにはローカライズされた拒否案内を返します。
+- コマンドメニュー、権限承認、リアルタイム応答、状態を含むすべてのテキストは Telegram Rich Messages を使用します。ネイティブ Markdown で見出し、リスト、コード、表を保持します。新しい Telegram クライアントをご利用ください。
+- 個人チャットの回答はネイティブ Rich Message ドラフトで配信し、完成した分割部分と最終回答をメッセージとして保存します。他のチャットではメッセージを編集します。表は行の間で分割し、各部分にヘッダーを繰り返します。未完成の行は次の出力を待ちます。長い単一行は約1,024文字の目安を超える場合があり、安全な長さを超えた行は内容を失わずプレーンテキストで送信します。
+- 思考は「💭 思考 · 展開」のインラインボタンで同じメッセージ内で展開・折りたたみでき、展開中も更新されます。回答と状態は別に表示します。長い思考と回答は約 1,024 文字に分割し、文や段落の境界を優先して全文を保持します。ツールの要約は表示しません。
+- 停止ボタンは対応するリクエストのみ停止し、生成済みの内容を保持します。コンテキスト圧縮の進捗も独立して表示します。
+- 最後にワークスペース、`provider / model(推論レベル)`、Agent、コンテキストの残りの割合、容量、所要時間（`s`/`m`/`h`）を表示します。モデル・Agent の変更、場所の移動、圧縮時に同じメッセージを更新します。圧縮後の使用量は新しい値を取得するまで不明と表示します。
+- 写真と画像ファイルは一時的なセッションのフォークで処理します。権限はボタンで承認できます。音声メッセージには対応しません。
+- 一時的なネットワーク障害では自動再接続します。無効な token やポーリングの競合では停止します。更新後は `/model` で古いモデルメニューを開き直してください。
 
-OpenCode V2 のエージェントとモデルの選択はセッション設定です。同じセッションを共有する chat と TUI クライアントは互いの選択に影響するため、個別の選択が必要なら別のセッションを使ってください。
+モデルと Agent の選択は OpenCode セッションに属します。チャットや TUI ごとに独立した選択が必要な場合は、別のセッションを使ってください。
 
-## FAQ
+## 更新とアンインストール
 
-### 実行中の OpenCode インスタンスは必要ですか？
+```bash
+npm exec -- opencode-tbot@latest update
+npm exec -- opencode-tbot@latest uninstall
+```
 
-はい。このリポジトリは Telegram 連携レイヤーのみを提供し、プラグインを読み込む OpenCode V2 Host プロセスに依存します。
+どちらも設定ファイルを保持します。`update` は登録を更新し、`uninstall` は登録を削除します。その他の CLI オプションは `--help` を参照してください。
 
-### `opencode-tbot` をグローバルインストールする必要はありますか？
+## 開発と CI
 
-いいえ。推奨フローは `npm exec -- opencode-tbot@latest` です。グローバルインストールは CLI を入れるだけで、OpenCode 側のプラグイン登録は引き続き `opencode.json` から読み込まれます。
+```bash
+pnpm install --frozen-lockfile
+pnpm typecheck
+pnpm test
+pnpm build
+```
 
-### Telegram token が無効な場合はどうなりますか？
+[CI](./.github/workflows/ci.yml) は PR と `main` への push で実行します。Node 22.12.0／24 で型、単体テスト、ビルド、CLI の成果物を検証します。独立したジョブでパッケージを OpenCode `2.0.29` に読み込み、ローカルの Telegram API モックで検証します。実際の認証情報やモデルへのリクエストは不要です。
 
-`install` は `opencode.json` と `~/.config/opencode/opencode-tbot/config.json` を書き込む前に失敗します。実行中に token が無効化された場合でも、プラグインは無効化されるだけで、OpenCode 本体はクラッシュせずに起動を続ける想定です。
+ローカルでホスト統合テストを実行するには、対応する OpenCode CLI を `PATH` に追加してください。
 
-### Telegram のネットワークが切断された場合は？
-
-起動時の検証でネットワーク障害が発生した場合は接続の復旧を待ちます。ポーリングの再試行が尽きても自動的に再接続します。読み取りと編集は回数を制限して再試行し、送信は接続前の失敗が確認できた場合のみ再試行して重複を防ぎます。TLS 証明書の検証は維持し、無効な token やポーリングの競合では停止します。
-
-### これは OpenCode の公式プロジェクトですか？
-
-いいえ。OpenCode と連携しますが、OpenCode チームが開発したものではありません。
+```bash
+OPENCODE_HOST_E2E=1 pnpm exec tsx --test tests/opencode-host.integration.test.ts
+```

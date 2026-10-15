@@ -20,7 +20,7 @@ Guidance for coding agents working in `opencode-tbot`.
 - Static check: `tsc` via `pnpm typecheck`.
 - Test runner: `tsx --test tests/**/*.test.ts`.
 - The env-gated host integration path requires the V2 `@opencode/cli` binary on PATH before setting `OPENCODE_HOST_E2E=1`. It builds and packs this checkout, starts an isolated shared service, and verifies Telegram commands and plugin cleanup.
-- There is no committed GitHub Actions workflow in this repo right now; rely on the local verification commands below.
+- `.github/workflows/ci.yml` runs typecheck, tests, build, and packaged CLI checks on Node 22.12.0 and 24. An isolated OpenCode 2.0.29 host integration job uses a local Telegram API stub without real credentials.
 
 ## Repo Map
 

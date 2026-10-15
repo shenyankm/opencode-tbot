@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check / Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["22.12.0", "24"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/setup@7baa639cc3f69d4a4fbff1272f024a8393e12c21 # v3
+        with:
+          runtime: node@${{ matrix.node }}
+          cache: true
+          require-lockfile: true
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Test
+        run: pnpm test
+      - name: Build
+        run: pnpm build
+      - name: Check CLI bundle
+        run: node bin/opencode-tbot.js --version
+
+  host-integration:
+    name: OpenCode host integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/setup@7baa639cc3f69d4a4fbff1272f024a8393e12c21 # v3
+        with:
+          runtime: node@24
+          cache: true
+          require-lockfile: true
+      - name: Install matching OpenCode host
+        run: npm install --global @opencode/cli@2.0.29
+      - name: Test packed plugin in the host
+        run: pnpm exec tsx --test tests/opencode-host.integration.test.ts
+        env:
+          OPENCODE_HOST_E2E: "1"
