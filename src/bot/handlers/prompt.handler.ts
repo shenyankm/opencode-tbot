@@ -1,9 +1,11 @@
+import { randomInt } from "node:crypto";
 import { GrammyError, InlineKeyboard } from "grammy";
+import type { InputRichMessage } from "grammy/types";
 import { retryTelegramRequest } from "../../services/telegram/telegram-message-queue.js";
 import { TelegramPromptProgress } from "../../services/telegram/prompt-progress.js";
 import { getSafeChatCopy } from "../i18n.js";
 import { presentError } from "../presenters/error.presenter.js";
-import { buildTelegramPromptReplies, buildTelegramSessionFooter, splitTelegramText, type TelegramReplyPayload, type TelegramStaticReply } from "../../services/telegram/telegram-format.js";
+import { buildTelegramPromptReplies, buildTelegramSessionFooter, type TelegramReplyPayload, type TelegramStaticReply } from "../../services/telegram/telegram-format.js";
 import type { ForegroundPromptDependencies } from "../types.js";
 import type { PromptSessionFilePartInput } from "../../services/opencode/opencode.client.js";
 
@@ -12,12 +14,13 @@ interface SentMessage {
 }
 
 export interface PromptExecutionContext {
-    chat: { id: number };
+    chat: { id: number; type?: string };
     api: {
         deleteMessage(chatId: number, messageId: number): Promise<unknown>;
-        editMessageText?(chatId: number, messageId: number, text: string, other?: { reply_markup?: InlineKeyboard; parse_mode?: "MarkdownV2" | "HTML" }): Promise<unknown>;
+        sendRichMessageDraft?(chatId: number, draftId: number, message: InputRichMessage): Promise<unknown>;
+        editMessageText?(chatId: number, messageId: number, text: string, other?: { reply_markup?: InlineKeyboard; parse_mode?: "Markdown" | "HTML" }): Promise<unknown>;
     };
-    reply(text: string, other?: { parse_mode?: "MarkdownV2" | "HTML"; reply_markup?: InlineKeyboard }): Promise<SentMessage>;
+    reply(text: string, other?: { parse_mode?: "Markdown" | "HTML"; reply_markup?: InlineKeyboard }): Promise<SentMessage>;
 }
 
 export interface PromptExecutionInput {
@@ -40,6 +43,10 @@ export async function executePromptRequest(
     }
 
     const answerMessages: Array<SentMessage & TelegramReplyPayload> = [];
+    const draftId = randomInt(1, 2_147_483_647);
+    const nativeStream = ctx.chat.type === "private" && Boolean(ctx.api.sendRichMessageDraft);
+    let latestAnswer = "";
+    let finalAnswerAttempted = false;
     const writeAnswerPart = async (index: number, payload: TelegramReplyPayload) => {
         const existing = answerMessages[index];
         if (existing && ctx.api.editMessageText) {
@@ -52,22 +59,40 @@ export async function executePromptRequest(
             answerMessages[index] = { ...message, ...payload };
         }
     };
-    const writeReplies = async (replies: ReturnType<typeof buildTelegramPromptReplies>) => {
-        for (const [index, reply] of replies.entries()) {
+    const writeReplies = async (replies: ReturnType<typeof buildTelegramPromptReplies>, streaming = false) => {
+        // Persist completed chunks; only the current tail remains an ephemeral draft.
+        const draft = streaming && nativeStream ? replies.at(-1) : undefined;
+        const persisted = draft ? replies.slice(0, -1) : replies;
+        for (const [index, reply] of persisted.entries()) {
             try {
                 await writeAnswerPart(index, reply.preferred);
             } catch (error) {
-                if (!reply.preferred.options?.parse_mode) {
+                if (!reply.preferred.options?.parse_mode || !(error instanceof GrammyError) || error.error_code !== 400) {
                     throw error;
                 }
                 dependencies.logger.warn({ error }, "failed to format reply, falling back to plain text");
                 await writeAnswerPart(index, reply.fallback);
             }
         }
-        for (const extra of answerMessages.slice(replies.length)) {
+        for (const extra of answerMessages.slice(persisted.length)) {
             await retryTelegramRequest(() => ctx.api.deleteMessage(ctx.chat.id, extra.message_id));
         }
-        answerMessages.length = replies.length;
+        answerMessages.length = persisted.length;
+        if (draft) {
+            const payload = draft.preferred;
+            try {
+                await retryTelegramRequest(() => ctx.api.sendRichMessageDraft!(ctx.chat.id, draftId,
+                    payload.options?.parse_mode === "Markdown" ? { markdown: payload.text }
+                        : { blocks: [{ type: "paragraph", text: payload.text }] },
+                ));
+            } catch (error) {
+                if (!payload.options?.parse_mode || !(error instanceof GrammyError) || error.error_code !== 400
+                    || !/pars|format|entit|tag|markdown/iu.test(error.description)) throw error;
+                await retryTelegramRequest(() => ctx.api.sendRichMessageDraft!(ctx.chat.id, draftId,
+                    { blocks: [{ type: "paragraph", text: draft.fallback.text }] },
+                ));
+            }
+        }
     };
     let processingMessage: SentMessage | null = null;
     let compactionMessage: SentMessage | null = null;
@@ -83,7 +108,23 @@ export async function executePromptRequest(
         progress = new TelegramPromptProgress(copy, async (replies, terminal) => {
             const replyMarkup = terminal ? new InlineKeyboard() : keyboard;
             for (const [index, reply] of replies.entries()) {
-                const existing = thinkingMessages[index];
+                let existing = thinkingMessages[index];
+                if (reply.thinking) {
+                    if (!existing) {
+                        const message = await retryTelegramRequest(() => ctx.reply(copy.status.thinkingInProgress, { reply_markup: replyMarkup }));
+                        existing = { ...message, text: copy.status.thinkingInProgress, terminal: false };
+                    }
+                    const messageId = existing.message_id;
+                    await dependencies.thinkingMessages.update(
+                        ctx.chat.id, messageId, reply.thinking, foregroundRequest.id, copy,
+                        (payload, keyboard) => ctx.api.editMessageText?.(ctx.chat.id, messageId, payload.text, {
+                            ...payload.options,
+                            reply_markup: keyboard,
+                        }) ?? Promise.resolve(),
+                    );
+                    thinkingMessages[index] = { message_id: messageId, ...reply.preferred, terminal };
+                    continue;
+                }
                 const write = async (payload: TelegramReplyPayload<"HTML">) => {
                     const options = { ...payload.options, reply_markup: replyMarkup };
                     if (existing) {
@@ -107,13 +148,15 @@ export async function executePromptRequest(
                 }
             }
             for (const extra of thinkingMessages.slice(replies.length)) {
-                await retryTelegramRequest(() => ctx.api.deleteMessage(ctx.chat.id, extra.message_id));
+                await dependencies.thinkingMessages.remove(ctx.chat.id, extra.message_id, () => retryTelegramRequest(() => ctx.api.deleteMessage(ctx.chat.id, extra.message_id)));
             }
             thinkingMessages.length = replies.length;
         }, (error) => dependencies.logger.warn?.({ error }, "failed to update prompt progress"), async (text) => {
-            for (const [index, chunk] of splitTelegramText(text).entries()) {
-                await writeAnswerPart(index, { text: chunk });
-            }
+            latestAnswer = text;
+            await writeReplies(buildTelegramPromptReplies({
+                bodyMd: text,
+                fallbackText: text,
+            }, copy, true), true);
         }, async (text, terminal) => {
             const options = { reply_markup: terminal ? new InlineKeyboard() : keyboard };
             if (!compactionMessage) {
@@ -143,6 +186,7 @@ export async function executePromptRequest(
             bodyMd: null,
             fallbackText: presentError(result.assistantReply.assistantError, copy),
         } : result.assistantReply;
+        finalAnswerAttempted = true;
         await writeReplies(buildTelegramPromptReplies(promptReply, copy));
         sentTerminalReply = true;
         if (dependencies.contextFooter) {
@@ -185,6 +229,14 @@ export async function executePromptRequest(
         }
     } catch (error) {
         terminalStatus = foregroundRequest.signal.aborted ? "stopped" : "failed";
+        await progress?.finish(terminalStatus);
+        if (nativeStream && latestAnswer && !finalAnswerAttempted) {
+            try {
+                await writeReplies(buildTelegramPromptReplies({ bodyMd: latestAnswer, fallbackText: latestAnswer }, copy));
+            } catch (deliveryError) {
+                dependencies.logger.warn({ error: deliveryError }, "failed to preserve partial answer");
+            }
+        }
         dependencies.logger.error({ error }, "failed to handle prompt request");
         await ctx.reply(presentError(error, copy));
         sentTerminalReply = true;
@@ -193,7 +245,7 @@ export async function executePromptRequest(
         foregroundRequest.dispose();
         if (processingMessage && sentTerminalReply && !progress?.hasContent) {
             try {
-                await ctx.api.deleteMessage(ctx.chat.id, processingMessage.message_id);
+                await dependencies.thinkingMessages.remove(ctx.chat.id, processingMessage.message_id, () => ctx.api.deleteMessage(ctx.chat.id, processingMessage!.message_id));
             } catch (error) {
                 dependencies.logger.warn?.({ error }, "failed to delete processing message");
             }

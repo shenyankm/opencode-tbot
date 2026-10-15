@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { FileThinkingMessageRepository } from "../repositories/thinking-message.repo.js";
+import { TelegramThinkingMessages } from "../services/telegram/thinking-messages.js";
 import type { BotDependencies } from "../bot/types.js";
 import type { PermissionApprovalRepository } from "../domain/permission/approval.repository.js";
 import { createOpenCodeAppLogger } from "../infra/logger/index.js";
@@ -58,7 +60,7 @@ type ContainerRepositories = Pick<
 
 type ContainerRuntimeServices = Pick<
     AppContainer,
-    "foregroundSessionTracker" | "uploadFileUseCase"
+    "foregroundSessionTracker" | "uploadFileUseCase" | "thinkingMessages"
 >;
 
 type ContainerUseCases = Pick<
@@ -189,6 +191,7 @@ function createContainerRuntimeServices(config: AppConfig): ContainerRuntimeServ
 
     return {
         foregroundSessionTracker: new ForegroundSessionTracker(),
+        thinkingMessages: new TelegramThinkingMessages(new FileThinkingMessageRepository(`${config.stateFilePath}.thinking`)),
         uploadFileUseCase: new UploadFileUseCase(telegramFileClient),
     };
 }

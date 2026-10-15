@@ -1,3 +1,4 @@
+import { GrammyError } from "grammy";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { getChatCopy } from "../src/bot/i18n.js";
@@ -30,9 +31,9 @@ function createDependencies() {
     };
 }
 
-test("/start sends the simplified quick-start welcome message with MarkdownV2", async () => {
+test("/start sends the simplified quick-start welcome message with Markdown", async () => {
     const { dependencies, sessionRepo } = createDependencies();
-    const replies: Array<{ other?: { parse_mode: "MarkdownV2" }; text: string }> = [];
+    const replies: Array<{ other?: { parse_mode: "Markdown" }; text: string }> = [];
 
     await handleStartCommand(
         {
@@ -52,22 +53,22 @@ test("/start sends the simplified quick-start welcome message with MarkdownV2", 
         text: expected.text,
         other: expected.options,
     }]);
-    assert.match(replies[0]?.text ?? "", /\*Welcome to opencode\\-tbot\*/);
+    assert.match(replies[0]?.text ?? "", /^# Welcome to opencode-tbot/m);
     assert.match(replies[0]?.text ?? "", /`\/status`/);
-    assert.match(replies[0]?.text ?? "", /Send a text or image message directly\\\./);
+    assert.match(replies[0]?.text ?? "", /Send a text or image message directly\./);
     assert.doesNotMatch(replies[0]?.text ?? "", /`\/help`/);
 });
 
 test("/start falls back to plain text when the markdown reply cannot be sent", async () => {
     const { dependencies } = createDependencies();
-    const replies: Array<{ other?: { parse_mode: "MarkdownV2" }; text: string }> = [];
+    const replies: Array<{ other?: { parse_mode: "Markdown" }; text: string }> = [];
 
     await handleStartCommand(
         {
             chat: { id: 2 },
             async reply(text, other) {
-                if (other?.parse_mode === "MarkdownV2") {
-                    throw new Error("markdown send failed");
+                if (other?.parse_mode === "Markdown") {
+                    throw new GrammyError("bad format", { ok: false, error_code: 400, description: "bad format" }, "sendRichMessage", {});
                 }
 
                 replies.push({ text, other });
@@ -85,7 +86,7 @@ test("/start falls back to plain text when the markdown reply cannot be sent", a
 });
 
 test("/start falls back to the default copy when chat localization state cannot be loaded", async () => {
-    const replies: Array<{ other?: { parse_mode: "MarkdownV2" }; text: string }> = [];
+    const replies: Array<{ other?: { parse_mode: "Markdown" }; text: string }> = [];
 
     await handleStartCommand(
         {
@@ -114,6 +115,6 @@ test("/start falls back to the default copy when chat localization state cannot 
     );
 
     assert.equal(replies.length, 1);
-    assert.deepEqual(replies[0]?.other, { parse_mode: "MarkdownV2" });
-    assert.match(replies[0]?.text ?? "", /\*Welcome to opencode\\-tbot\*/);
+    assert.deepEqual(replies[0]?.other, { parse_mode: "Markdown" });
+    assert.match(replies[0]?.text ?? "", /^# Welcome to opencode-tbot/m);
 });

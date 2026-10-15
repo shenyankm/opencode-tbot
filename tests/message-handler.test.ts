@@ -1,5 +1,7 @@
+import { GrammyError } from "grammy";
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createThinkingMessages } from "./helpers/thinking.js";
 import { getBotCopy } from "../src/bot/copy.js";
 import type { BotDependencies } from "../src/bot/types.js";
 import {
@@ -92,8 +94,8 @@ function createDependencies(options: {
                     sessions: [],
                 })),
             },
+            thinkingMessages: createThinkingMessages().service,
             foregroundSessionTracker: new ForegroundSessionTracker(),
-
             logger: {
                 child() {
                     return this;
@@ -124,7 +126,7 @@ function createDependencies(options: {
     };
 }
 
-test("handleTextMessage sends MarkdownV2 replies with metrics and deletes the processing placeholder", async () => {
+test("handleTextMessage sends Markdown replies with metrics and deletes the processing placeholder", async () => {
     const replies: Array<{ text: string; other?: unknown }> = [];
     const deleted: Array<{ chatId: number; messageId: number }> = [];
     let nextMessageId = 100;
@@ -163,8 +165,8 @@ test("handleTextMessage sends MarkdownV2 replies with metrics and deletes the pr
     assert.deepEqual(replies, [
         { text: "Processing...", other: processingMarkup(replies[0]) },
         {
-            text: "*Hello*",
-            other: { parse_mode: "MarkdownV2" },
+            text: "## Hello",
+            other: { parse_mode: "Markdown" },
         },
     ]);
     assert.deepEqual(deleted, [{ chatId: 1, messageId: 100 }]);
@@ -174,7 +176,7 @@ test("handleTextMessage sends MarkdownV2 replies with metrics and deletes the pr
         { text: "澶勭悊涓?..", other: undefined },
         {
             text: "*Hello*\n\n鑰楁椂: 120 ms \\| 浠ょ墝鏁? 37",
-            other: { parse_mode: "MarkdownV2" },
+            other: { parse_mode: "Markdown" },
         },
     ]);
     assert.deepEqual(deleted, [{ chatId: 21, messageId: 900 }]);
@@ -183,8 +185,8 @@ test("handleTextMessage sends MarkdownV2 replies with metrics and deletes the pr
     assert.deepEqual(replies, [
         { text: "Processing...", other: processingMarkup(replies[0]) },
         {
-            text: "*Hello*",
-            other: { parse_mode: "MarkdownV2" },
+            text: "## Hello",
+            other: { parse_mode: "Markdown" },
         },
     ]);
     assert.deepEqual(deleted, [{ chatId: 1, messageId: 100 }]);
@@ -217,7 +219,7 @@ test("handleTextMessage falls back to plain text when the preferred Telegram mar
                 replies.push({ text, other });
 
                 if (other && "parse_mode" in (other as Record<string, unknown>)) {
-                    throw new Error("parse failed");
+                    throw new GrammyError("bad format", { ok: false, error_code: 400, description: "bad format" }, "sendRichMessage", {});
                 }
 
                 return { message_id: nextMessageId++ };
@@ -229,8 +231,8 @@ test("handleTextMessage falls back to plain text when the preferred Telegram mar
     assert.deepEqual(replies, [
         { text: "Processing...", other: processingMarkup(replies[0]) },
         {
-            text: "*Hello*",
-            other: { parse_mode: "MarkdownV2" },
+            text: "## Hello",
+            other: { parse_mode: "Markdown" },
         },
         {
             text: "Hello",
@@ -276,9 +278,9 @@ test("handleTextMessage keeps answer text and context statistics in separate mes
         { text: "Processing...", other: processingMarkup(replies[0]) },
         {
             text: [
-                "*Hello*",
+                "## Hello",
             ].join("\n"),
-            other: { parse_mode: "MarkdownV2" },
+            other: { parse_mode: "Markdown" },
         },
     ]);
     assert.deepEqual(deleted, [{ chatId: 22, messageId: 225 }]);
@@ -419,8 +421,8 @@ test("handleTextMessage releases the active chat lock and deletes the placeholde
         { text: "OpenCode request timed out.", other: undefined },
         { text: "Processing...", other: processingMarkup(replies[2]) },
         {
-            text: "*Hello*",
-            other: { parse_mode: "MarkdownV2" },
+            text: "## Hello",
+            other: { parse_mode: "Markdown" },
         },
     ]);
     assert.deepEqual(deleted, [
@@ -511,8 +513,8 @@ test("handleTextMessage rejects a second plain-text prompt while one is already 
             other: undefined,
         },
         {
-            text: "*Hello*",
-            other: { parse_mode: "MarkdownV2" },
+            text: "## Hello",
+            other: { parse_mode: "Markdown" },
         },
     ]);
     assert.deepEqual(deleted, [{ chatId: 11, messageId: 500 }]);
@@ -677,8 +679,8 @@ test("handleTextMessage localizes bot-generated status text and reply body for C
     assert.deepEqual(replies, [
         { text: copy.status.processing, other: processingMarkup(replies[0]) },
         {
-            text: `*Hello*`,
-            other: { parse_mode: "MarkdownV2" },
+            text: `## Hello`,
+            other: { parse_mode: "Markdown" },
         },
     ]);
     assert.deepEqual(deleted, [{ chatId: 21, messageId: 900 }]);

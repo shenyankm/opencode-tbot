@@ -73,7 +73,7 @@ async function writeStateFile<TState>(filePath: string, state: TState): Promise<
     const temporaryFilePath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
     const serialized = `${JSON.stringify(state, null, 2)}\n`;
 
-    await writeFile(temporaryFilePath, serialized, "utf8");
+    await writeFile(temporaryFilePath, serialized, { encoding: "utf8", mode: 0o600 });
     await rename(temporaryFilePath, filePath);
 }
 

@@ -2,14 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { GrammyError } from "grammy";
 import { setImmediate } from "node:timers/promises";
+import { createThinkingMessages } from "./helpers/thinking.js";
 import { executePromptRequest } from "../src/bot/handlers/prompt.handler.js";
 import type { SendPromptInput } from "../src/use-cases/send-prompt.usecase.js";
 import { getBotCopy } from "../src/bot/copy.js";
 import { ForegroundSessionTracker } from "../src/services/session-activity/foreground-session-tracker.js";
-import { TelegramPromptProgress } from "../src/services/telegram/prompt-progress.js";
+import { TelegramPromptProgress, type TelegramProgressReply } from "../src/services/telegram/prompt-progress.js";
 import { splitTelegramText, buildTelegramPromptReplies } from "../src/services/telegram/telegram-format.js";
 import { retryTelegramRequest } from "../src/services/telegram/telegram-message-queue.js";
-import type { TelegramStaticReply } from "../src/services/telegram/telegram-format.js";
+
 import { handlePromptStopCallback } from "../src/bot/handlers/callbacks/prompt-stop.handler.js";
 import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
 import type { PromptSessionResult } from "../src/services/opencode/opencode.client.js";
@@ -20,7 +21,7 @@ const logger = { child() { return this; }, warn() {}, error() {} } as unknown as
 test("thinking uses localized expandable quotes and escapes provider text without changing the plain fallback", async () => {
     for (const language of ["en", "zh-CN", "ja"] as const) {
         const copy = getBotCopy(language);
-        const writes: TelegramStaticReply<"HTML">[][] = [];
+        const writes: TelegramProgressReply[][] = [];
         const progress = new TelegramPromptProgress(copy, async (replies) => { writes.push(replies); }, (error) => { throw error; });
         const reasoning = "<b>literal</b> &lt; & 😀\n".repeat(20);
         progress.accept({ type: "session.reasoning.delta", data: { assistantMessageID: "a", ordinal: 0, delta: reasoning } });
@@ -28,20 +29,18 @@ test("thinking uses localized expandable quotes and escapes provider text withou
         await setImmediate();
         const streaming = writes.at(-1)![0];
         assert.equal(streaming.preferred.options?.parse_mode, "HTML");
-        assert.ok(streaming.preferred.text.startsWith(`<b>💭 ${copy.status.thinkingInProgress}</b>\n<blockquote expandable>`));
-        assert.match(streaming.preferred.text, /&lt;b&gt;literal&lt;\/b&gt; &amp;lt; &amp; 😀/u);
-        assert.doesNotMatch(streaming.preferred.text, /<b>literal/);
-        assert.ok(streaming.fallback.text.length < 4096);
-        assert.match(streaming.fallback.text, /<b>literal<\/b> &lt; & 😀/u);
-        assert.doesNotMatch(streaming.fallback.text, /[\uD800-\uDBFF]$/u);
+        assert.ok(streaming.preferred.text.startsWith(`<p>💭 ${copy.status.thinkingInProgress} · `));
+        assert.ok(streaming.preferred.text.includes(`>${copy.status.expandThinking}</tg-button>`));
+        assert.doesNotMatch(streaming.preferred.text, /literal|<details>|<br/);
+        assert.equal(streaming.thinking?.text, reasoning);
         await progress.finish("completed");
-        assert.ok(writes.at(-1)![0].preferred.text.startsWith(`<b>💭 ${copy.status.thinking}</b>\n`));
+        assert.ok(writes.at(-1)![0].preferred.text.startsWith(`<p>💭 ${copy.status.thinking} · `));
         assert.doesNotMatch(writes.at(-1)![0].preferred.text, /Context:|Completed|已完成/);
     }
 });
 
 test("long thinking preserves every part in expandable messages without leaking secrets or breaking Unicode", async () => {
-    const writes: TelegramStaticReply<"HTML">[][] = [];
+    const writes: TelegramProgressReply[][] = [];
     const progress = new TelegramPromptProgress(getBotCopy("en"), async (replies) => { writes.push(replies); }, (error) => { throw error; });
     const reasoning = "BEGIN\n" + "中文😀<&>\n".repeat(2_000) + "token=syntheticsecret\nEND";
     progress.accept({ type: "session.reasoning.ended", data: { assistantMessageID: "a", ordinal: 0, text: reasoning } });
@@ -49,15 +48,15 @@ test("long thinking preserves every part in expandable messages without leaking 
     await progress.finish("completed");
     const replies = writes.at(-1)!;
     assert.ok(replies.length > 3);
-    assert.equal(replies.map((reply) => reply.fallback.text.slice(reply.fallback.text.indexOf("\n") + 1)).join(""), reasoning.replace("syntheticsecret", "[REDACTED]") + "\nSECOND STEP");
+    assert.equal(replies.map((reply) => reply.thinking!.text).join(""), reasoning.replace("syntheticsecret", "[REDACTED]") + "\nSECOND STEP");
     for (const [index, reply] of replies.entries()) {
         assert.equal(reply.preferred.options?.parse_mode, "HTML");
-        assert.ok(reply.preferred.text.startsWith(`<b>💭 Thinking · ${index + 1}</b>\n<blockquote expandable>`));
-        assert.ok(reply.preferred.text.endsWith("</blockquote>"));
+        assert.ok(reply.preferred.text.startsWith(`<p>💭 Thinking · ${index + 1} · `));
+        assert.ok(reply.preferred.text.endsWith("</p>"));
         assert.ok(reply.fallback.text.length <= 1_152);
         assert.doesNotMatch(reply.preferred.text, /syntheticsecret/);
-        assert.doesNotMatch(reply.fallback.text, /[\uD800-\uDBFF]$/u);
-        assert.doesNotMatch(reply.fallback.text.split("\n").slice(1).join("\n"), /^[\uDC00-\uDFFF]/u);
+        assert.doesNotMatch(reply.thinking!.text, /[\uD800-\uDBFF]$/u);
+        assert.doesNotMatch(reply.thinking!.text, /^[\uDC00-\uDFFF]/u);
     }
 });
 
@@ -65,6 +64,7 @@ test("streaming thinking reuses unchanged messages, replaces final text and remo
     t.mock.timers.enable({ apis: ["setTimeout"] });
     for (const outcome of ["completed", "stopped", "failed"] as const) {
         const tracker = new ForegroundSessionTracker();
+        const thinking = createThinkingMessages();
         const messages = new Map<number, { text: string; other?: { parse_mode?: string; reply_markup?: { inline_keyboard: unknown[][] } } }>();
         const edits: number[] = [];
         const deleted: number[] = [];
@@ -77,7 +77,7 @@ test("streaming thinking reuses unchanged messages, replaces final text and remo
                 async editMessageText(_chatId, id, text, other) { messages.set(id, { text, other }); edits.push(id); },
             },
         }, {
-            foregroundSessionTracker: tracker, sessionRepo: new InMemorySessionRepository(), logger,
+            thinkingMessages: thinking.service, foregroundSessionTracker: tracker, sessionRepo: new InMemorySessionRepository(), logger,
             contextFooter: { async read() { return { capacity: 1000, used: 100 }; }, watch() {} } as never,
             sendPromptUseCase: { async execute(input) {
                 input.onExecutionSession?.("ses_test");
@@ -109,14 +109,16 @@ test("streaming thinking reuses unchanged messages, replaces final text and remo
         }, async () => ({ text: "test" }));
         if (outcome === "completed") {
             assert.deepEqual(deleted, [2, 3]);
-            assert.equal(messages.get(1)!.text, "<b>💭 Thinking</b>\n<blockquote expandable>FINAL THINKING</blockquote>");
+            assert.equal((await thinking.repository.get(1, 1))!.text, "FINAL THINKING");
+            assert.doesNotMatch(messages.get(1)!.text, /FINAL THINKING|<details>/);
+            assert.equal(thinking.messages.size, 1);
             assert.equal(messages.get(4)!.text, "ANSWER");
-            assert.match(messages.get(5)!.text, /<b>Context<\/b>: 90% left \| 1K\n<b>Duration<\/b>: \d+(?:\.\d+)?s$/u);
+            assert.match(messages.get(5)!.text, /<b>Context<\/b>: 90% left \| 1K<br\/><b>Duration<\/b>: \d+(?:\.\d+)?s$/u);
         } else {
             assert.deepEqual(deleted, []);
-            const thinking = [...messages.entries()].filter(([id]) => id <= 3).map(([, message]) => message);
-            assert.ok(thinking.every((message) => message.text.includes(getBotCopy("en").status[outcome])));
-            assert.equal(thinking.map((message) => message.text.match(/<blockquote expandable>([\s\S]*)<\/blockquote>/u)![1]).join(""), "A".repeat(2_500) + "B".repeat(100));
+            const cards = [...messages.entries()].filter(([id]) => id <= 3).map(([, message]) => message);
+            assert.ok(cards.every((message) => message.text.includes(getBotCopy("en").status[outcome])));
+            assert.equal([1, 2, 3].map((id) => thinking.messages.get(`1:${id}`)!.text).join(""), "A".repeat(2_500) + "B".repeat(100));
         }
         assert.ok([...messages.entries()].filter(([id]) => id <= 3).every(([, message]) => message.other!.reply_markup!.inline_keyboard.flat().length === 0));
         assert.equal(tracker.hasActiveRequest(1), false);
@@ -150,7 +152,7 @@ test("context compression is localized, keeps existing output and never sends it
         const writes: Array<{ text: string; terminal: boolean }> = [];
         const answers: string[] = [];
         const compactions: Array<{ text: string; terminal: boolean }> = [];
-        const progress = new TelegramPromptProgress(copy, async (replies, terminal) => { writes.push({ text: replies[0].fallback.text, terminal }); }, (error) => { throw error; }, async (text) => { answers.push(text); }, async (text, terminal) => { compactions.push({ text, terminal }); });
+        const progress = new TelegramPromptProgress(copy, async (replies, terminal) => { writes.push({ text: replies[0].thinking?.text ?? replies[0].fallback.text, terminal }); }, (error) => { throw error; }, async (text) => { answers.push(text); }, async (text, terminal) => { compactions.push({ text, terminal }); });
         progress.accept({ type: "session.reasoning.delta", data: { assistantMessageID: "a", ordinal: 0, delta: "existing thinking" } });
         progress.accept({ type: "session.text.delta", data: { assistantMessageID: "a", ordinal: 0, delta: "existing answer" } });
         progress.accept({ type: "session.compaction.started", data: {} });
@@ -220,7 +222,7 @@ test("progress streams reasoning and answers without displaying tool details or 
     const writes: Array<{ text: string; terminal: boolean }> = [];
     const answers: string[] = [];
     const progress = new TelegramPromptProgress(getBotCopy("zh-CN"), async (replies, terminal) => {
-        writes.push({ text: replies[0].fallback.text, terminal });
+        writes.push({ text: replies[0].thinking?.text ?? replies[0].fallback.text, terminal });
     }, (error) => { throw error; }, async (text) => { answers.push(text); });
     const emit = (type: string, extra: Record<string, unknown> = {}) => progress.accept({
         type,
@@ -248,7 +250,7 @@ test("progress streams reasoning and answers without displaying tool details or 
     await progress.finish("completed");
     const final = writes.at(-1)!;
     assert.equal(final.terminal, true);
-    assert.match(final.text, /^💭 思考/);
+    assert.equal(final.text, "完整思考");
     assert.doesNotMatch(final.text, /已完成|\d+\.\d+s/);
     assert.match(final.text, /完整思考/);
     assert.doesNotMatch(final.text, /bash/);
@@ -308,7 +310,7 @@ test("an old stop button cannot cancel a newer request", async () => {
     let cancellations = 0;
     const replies: unknown[] = [];
     const dependencies = {
-        foregroundSessionTracker: tracker, sessionRepo: new InMemorySessionRepository(), logger,
+        thinkingMessages: createThinkingMessages().service, foregroundSessionTracker: tracker, sessionRepo: new InMemorySessionRepository(), logger,
         abortPromptUseCase: { async execute() { cancellations += 1; return { status: "aborted" as const, sessionId: null, sessionStatus: null }; } },
     };
     const context = {
@@ -345,6 +347,7 @@ test("expandable thinking stays separate from the streamed answer and context wi
     t.mock.timers.enable({ apis: ["setTimeout"] });
     for (const rejectHtml of [false, true]) {
         const tracker = new ForegroundSessionTracker();
+        const thinking = createThinkingMessages();
         const replies: string[] = [];
         const edits: Array<{ id: number; text: string; other?: { parse_mode?: string; reply_markup?: { inline_keyboard: unknown[][] } } }> = [];
         const metrics = { durationMs: 100, tokens: { total: 0, input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 } };
@@ -359,7 +362,7 @@ test("expandable thinking stays separate from the streamed answer and context wi
             },
             async reply(text) { replies.push(text); return { message_id: replies.length }; },
         }, {
-            foregroundSessionTracker: tracker, sessionRepo: new InMemorySessionRepository(), logger,
+            thinkingMessages: thinking.service, foregroundSessionTracker: tracker, sessionRepo: new InMemorySessionRepository(), logger,
             contextFooter: { async read() { return { capacity: 1000, used: 100 }; }, watch() {} } as never,
             sendPromptUseCase: {
                 async execute(input: SendPromptInput) {
@@ -380,19 +383,18 @@ test("expandable thinking stays separate from the streamed answer and context wi
             },
         }, async () => ({ text: "test" }));
         assert.equal(replies.length, 3);
-        assert.match(replies[2], /<b>Context<\/b>: 90% left \| 1K\n<b>Duration<\/b>: \d+(?:\.\d+)?s$/u);
+        assert.match(replies[2], /<b>Context<\/b>: 90% left \| 1K<br\/><b>Duration<\/b>: \d+(?:\.\d+)?s$/u);
         assert.equal(replies[1], "ANSWERONLY");
         const thinkingEdits = edits.filter((edit) => edit.id === 1);
-        assert.ok(thinkingEdits.some((edit) => edit.text.includes("THINKINGONLY")));
+        assert.equal((await thinking.repository.get(1, 1))!.text, "THINKINGONLY");
+        assert.ok(thinkingEdits.every((edit) => !edit.text.includes("THINKINGONLY")));
         assert.ok(thinkingEdits.every((edit) => !/ANSWERONLY|Context:/.test(edit.text)));
         assert.ok(thinkingEdits.every((edit) => edit.other?.parse_mode === (rejectHtml ? undefined : "HTML")));
         assert.ok(thinkingEdits[0].other!.reply_markup!.inline_keyboard.flat().length > 0);
-        assert.equal(thinkingEdits.at(-1)!.other!.reply_markup!.inline_keyboard.flat().length, 0);
-        assert.ok(thinkingEdits.at(-1)!.text.startsWith(rejectHtml ? "💭 Thinking\n" : "<b>💭 Thinking</b>\n<blockquote expandable>"));
+        assert.equal(thinkingEdits.at(-1)!.other!.reply_markup!.inline_keyboard.flat().length, rejectHtml ? 1 : 0);
+        assert.ok(thinkingEdits.at(-1)!.text.startsWith(rejectHtml ? "💭 Thinking" : "<p>💭 Thinking · "));
         const answerEdits = edits.filter((edit) => edit.id === 2);
-        assert.equal(answerEdits.length, 1);
-        assert.match(answerEdits[0].text, /ANSWERONLY/);
-        assert.doesNotMatch(answerEdits[0].text, /THINKINGONLY/);
+        assert.equal(answerEdits.length, 0); // The streamed Rich Markdown is already the final answer.
         assert.equal(tracker.hasActiveRequest(1), false);
     }
 });
@@ -422,9 +424,13 @@ test("compression has a separate message and survives cleanup when the model ret
             async editMessageText(_chatId, id, text, other) { edits.push({ id, text, other }); },
         },
     }, {
-        foregroundSessionTracker: tracker, sessionRepo: new InMemorySessionRepository(), logger,
+        thinkingMessages: createThinkingMessages().service, foregroundSessionTracker: tracker, sessionRepo: new InMemorySessionRepository(), logger,
         sendPromptUseCase: { async execute(input) {
             input.onExecutionSession?.("ses_test");
+            input.onInputReady?.("msg_input");
+            tracker.publish({ type: "session.inbox.delivered", data: { sessionID: "ses_test", inboxID: "msg_input" } });
+            tracker.publish({ type: "session.step.started", data: { sessionID: "ses_test", assistantMessageID: "assistant" } });
+            tracker.publish({ type: "session.reasoning.ended", data: { sessionID: "ses_test", assistantMessageID: "assistant", ordinal: 0, text: "" } });
             tracker.publish({ type: "session.compaction.started", data: { sessionID: "ses_test", reason: "auto" } });
             await setImmediate();
             tracker.publish({ type: "session.compaction.ended", data: { sessionID: "ses_test", text: "PRIVATE SUMMARY" } });

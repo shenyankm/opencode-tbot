@@ -1,3 +1,4 @@
+import { GrammyError } from "grammy";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { handlePermissionApprovalCallback } from "../src/bot/handlers/callback.handler.js";
@@ -190,7 +191,7 @@ test("permission.asked also routes foreground child-session approvals back to th
     stopTracking();
 });
 
-test("permission.asked retries with plain text when Telegram rejects the MarkdownV2 payload", async () => {
+test("permission.asked retries with plain text when Telegram rejects the Markdown payload", async () => {
     const { runtime, sessionRepo, permissionApprovalRepo, messages } = createRuntime();
 
     await sessionRepo.setCurrent({
@@ -209,8 +210,8 @@ test("permission.asked retries with plain text when Telegram rejects the Markdow
     const originalSendMessage = runtime.bot.api.sendMessage;
 
     runtime.bot.api.sendMessage = async (chatId, text, options) => {
-        if ((options as { parse_mode?: string } | undefined)?.parse_mode === "MarkdownV2") {
-            throw new Error("can't parse entities");
+        if ((options as { parse_mode?: string } | undefined)?.parse_mode === "HTML") {
+            throw new GrammyError("bad format", { ok: false, error_code: 400, description: "bad format" }, "sendRichMessage", {});
         }
 
         return originalSendMessage(chatId, text, options);

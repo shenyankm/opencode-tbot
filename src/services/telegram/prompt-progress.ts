@@ -1,7 +1,14 @@
 import type { BotCopy } from "../../bot/copy.js";
 import { redactSensitiveText } from "../../infra/utils/redact.js";
 import type { PromptProgressEvent } from "../session-activity/foreground-session-tracker.js";
-import { escapeTelegramHtml, splitTelegramText, TELEGRAM_MESSAGE_TARGET_LENGTH, type TelegramStaticReply } from "./telegram-format.js";
+import { splitTelegramText, TELEGRAM_MESSAGE_TARGET_LENGTH, type TelegramStaticReply } from "./telegram-format.js";
+
+import type { ThinkingContent } from "../../domain/thinking/thinking-message.entity.js";
+import { buildThinkingMessageReply } from "./thinking-messages.js";
+
+export interface TelegramProgressReply extends TelegramStaticReply<"HTML"> {
+    thinking?: ThinkingContent;
+}
 
 export class TelegramPromptProgress {
     private readonly reasoning = new Map<string, string>();
@@ -12,14 +19,17 @@ export class TelegramPromptProgress {
     private lastAnswer = "";
     private lastCompaction = "";
     private finished = false;
+    private outcome: "completed" | "stopped" | "failed" | null = null;
     private compacting = false;
     private compactionStatus: string | null = null;
     private phase: string;
-    hasContent = false;
+    get hasContent(): boolean {
+        return [...this.reasoning.values()].some((text) => Boolean(text.trim()));
+    }
 
     constructor(
         private readonly copy: BotCopy,
-        private readonly write: (replies: TelegramStaticReply<"HTML">[], terminal: boolean) => Promise<unknown>,
+        private readonly write: (replies: TelegramProgressReply[], terminal: boolean) => Promise<unknown>,
         private readonly onError: (error: unknown) => void,
         private readonly writeAnswer?: (text: string) => Promise<void>,
         private readonly writeCompaction?: (text: string, terminal: boolean) => Promise<unknown>,
@@ -48,7 +58,6 @@ export class TelegramPromptProgress {
             } else if (typeof data.delta === "string") {
                 parts.set(key, (parts.get(key) ?? "") + data.delta);
             }
-            this.hasContent ||= isReasoning;
         } else {
             return;
         }
@@ -65,6 +74,7 @@ export class TelegramPromptProgress {
             return this.writes;
         }
         this.finished = true;
+        this.outcome = status;
         this.phase = this.copy.status[status];
         if (this.timer) {
             clearTimeout(this.timer);
@@ -81,7 +91,7 @@ export class TelegramPromptProgress {
                 this.lastCompaction = compaction;
             }
             const replies = this.render();
-            const texts = replies.map((reply) => reply.preferred.text);
+            const texts = replies.map((reply) => JSON.stringify(reply.thinking ?? reply.preferred.text));
             if (texts.length !== this.lastTexts.length || texts.some((text, index) => text !== this.lastTexts[index]) || terminal) {
                 await this.write(replies, terminal || this.finished);
                 this.lastTexts = texts;
@@ -95,26 +105,21 @@ export class TelegramPromptProgress {
         return this.writes;
     }
 
-    private render(): TelegramStaticReply<"HTML">[] {
+    private render(): TelegramProgressReply[] {
         const reasoning = [...this.reasoning.values()].join("\n");
         const status = this.finished && this.phase !== this.copy.status.completed ? this.phase : null;
-        if (!reasoning) {
+        if (!reasoning.trim()) {
             const fallback = { text: status ?? this.copy.status.processing };
             return [{ preferred: fallback, fallback }];
         }
-        const title = `💭 ${this.finished ? this.copy.status.thinking : this.copy.status.thinkingInProgress}`;
-        // Reserve space for localized headings, part numbers and terminal status.
         const chunks = splitTelegramText(redactSensitiveText(reasoning), TELEGRAM_MESSAGE_TARGET_LENGTH - 64);
-        return chunks.map((chunk, index) => {
-            const heading = chunks.length > 1 ? `${title} · ${index + 1}` : title;
-            return {
-                preferred: {
-                    text: `${status ? `${escapeTelegramHtml(status)}\n` : ""}<b>${escapeTelegramHtml(heading)}</b>\n<blockquote expandable>${escapeTelegramHtml(chunk)}</blockquote>`,
-                    options: { parse_mode: "HTML" },
-                },
-                fallback: { text: [status, heading, chunk].filter(Boolean).join("\n") },
+        return chunks.map((text, index) => {
+            const thinking: ThinkingContent = {
+                text,
+                ...(chunks.length > 1 ? { part: index + 1 } : {}),
+                phase: this.outcome ?? "running",
             };
+            return { ...buildThinkingMessageReply(thinking, false, this.copy), thinking };
         });
     }
-
 }

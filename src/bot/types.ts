@@ -1,3 +1,4 @@
+import type { TelegramThinkingMessages } from "../services/telegram/thinking-messages.js";
 import type { PendingActionRepository } from "../domain/pending-action/pending-action.repository.js";
 import type { SessionRepository } from "../domain/session/session.repository.js";
 import type { AppLogger } from "../infra/logger/index.js";
@@ -50,6 +51,7 @@ export interface PendingActionDependencies extends ChatStateDependencies {
 }
 
 export interface ForegroundPromptDependencies extends ChatStateDependencies {
+    thinkingMessages: TelegramThinkingMessages;
     foregroundSessionTracker: ForegroundSessionTrackerLike;
     sendPromptUseCase: UseCaseExecutor<SendPromptInput, SendPromptResult>;
 }
@@ -87,6 +89,7 @@ export interface UploadFeatureDependencies {
 }
 
 export interface BotDependencies {
+    thinkingMessages: TelegramThinkingMessages;
     contextFooter?: TelegramContextFooter;
     abortPromptUseCase: UseCaseExecutor<AbortPromptInput, AbortPromptResult>;
     createSessionUseCase: UseCaseExecutor<CreateSessionInput, CreateSessionResult>;

@@ -9,7 +9,6 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { OpenCode } from "@opencode/client";
 import { Service, type Endpoint } from "@opencode/client/service";
-import { Host } from "@opencode/plugin/host";
 import { installPlugin } from "../src/cli.js";
 import { getGlobalOpenCodeConfigFilePath } from "../src/app/plugin-config.js";
 import { BOT_COPY } from "../src/bot/copy.js";
@@ -20,6 +19,7 @@ test("OpenCode v2 loads the locally built plugin, handles Telegram commands, and
     skip: !SHOULD_RUN,
     timeout: 120_000,
 }, async (t) => {
+    const { Host } = await import("@opencode/plugin/host");
     const temporaryDirectory = realpathSync(mkdtempSync(join(tmpdir(), "opencode-tbot-host-")));
     const homeDir = join(temporaryDirectory, "home");
     const worktree = join(temporaryDirectory, "worktree");
@@ -70,6 +70,7 @@ test("OpenCode v2 loads the locally built plugin, handles Telegram commands, and
     const requests: string[] = [];
     const replies: string[] = [];
     const replyMessages: Array<{
+        rich_message?: { html?: string; markdown?: string; blocks?: Array<{ text?: string }> };
         text?: string;
         reply_markup?: { inline_keyboard: Array<Array<{ callback_data: string }>> };
     }> = [];
@@ -96,8 +97,9 @@ test("OpenCode v2 loads the locally built plugin, handles Telegram commands, and
         } else if (method === "getUpdates") {
             await new Promise((resolve) => setTimeout(resolve, 100));
             result = updates.splice(0, 1);
-        } else if (method === "sendMessage" || method === "editMessageText") {
-            if (method === "sendMessage") {
+        } else if (method === "sendRichMessage" || method === "editMessageText") {
+            body.text = body.rich_message?.markdown ?? body.rich_message?.html ?? body.rich_message?.blocks?.map((block) => block.text ?? "").join("\n") ?? "";
+            if (method === "sendRichMessage") {
                 replies.push(body.text ?? "");
                 replyMessages.push(body);
             } else {
@@ -107,7 +109,7 @@ test("OpenCode v2 loads the locally built plugin, handles Telegram commands, and
                 message_id: replies.length,
                 date: Math.floor(Date.now() / 1000),
                 chat: { id: 101, type: "private" },
-                text: body.text,
+                rich_message: body.rich_message,
             };
         }
 
@@ -178,6 +180,8 @@ test("OpenCode v2 loads the locally built plugin, handles Telegram commands, and
     }
 
     const status = await sendCommand("/status", "Connectivity");
+    assert.ok(requests.includes("sendRichMessage"), failureContext());
+    assert.ok(!requests.includes("sendMessage"), "Text delivery must use Rich Messages.");
     assert.ok(status.includes("🟢"), failureContext());
     await sendCommand("/new V2 integration session", "V2 integration session");
     const sessions = await client.session.list({ directory: worktree });

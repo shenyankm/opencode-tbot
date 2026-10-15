@@ -102,7 +102,7 @@ Guidance for coding agents working in `opencode-tbot`.
 - Centralize user-facing copy in `src/bot/copy.ts`; do not scatter reply strings through handlers.
 - Preserve localization support for English, Simplified Chinese, and Japanese.
 - Keep `README.md`, `README.zh-CN.md`, and `README.ja.md` aligned when docs describe the same user-facing behavior.
-- Keep MarkdownV2 handling conservative; the repo already falls back to plain text when Telegram markdown is rejected.
+- All text delivery uses the Rich Messages API transformer in `src/services/telegram/rich-messages.ts`. `parse_mode: "Markdown"` is an internal hint for native Rich Markdown, not legacy Markdown. Fall back to literal Rich text only after an explicit formatting rejection; never retry ambiguous sends.
 - If you add or change a command, update command registration, localized copy, presenters, and tests together.
 - Do not introduce voice transcription; the current behavior explicitly rejects voice messages.
 - Preserve the repo's pattern of separating use-case results from presenter formatting.

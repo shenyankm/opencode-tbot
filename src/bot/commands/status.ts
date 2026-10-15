@@ -6,7 +6,7 @@ import {
     presentStatusMarkdownMessage,
     presentStatusMessage,
 } from "../presenters/message.presenter.js";
-import { renderMarkdownToTelegramMarkdownV2 } from "../../services/telegram/telegram-format.js";
+import { prepareTelegramRichMarkdown } from "../../services/telegram/telegram-format.js";
 import type { BotDependencies, StatusFeatureDependencies } from "../types.js";
 import type { TelegramCommandDefinition } from "./registry.js";
 
@@ -15,7 +15,7 @@ interface StatusCommandContext {
     reply(
         text: string,
         options?: {
-            parse_mode: "MarkdownV2";
+            parse_mode: "Markdown";
         },
     ): Promise<unknown>;
 }
@@ -28,10 +28,10 @@ export async function handleStatusCommand(ctx: StatusCommandContext, dependencie
             chatId: ctx.chat?.id ?? 0,
         });
 
-        const renderedMarkdown = renderMarkdownToTelegramMarkdownV2(presentStatusMarkdownMessage(result, copy));
+        const renderedMarkdown = prepareTelegramRichMarkdown(presentStatusMarkdownMessage(result, copy));
 
         if (renderedMarkdown) {
-            await ctx.reply(renderedMarkdown, { parse_mode: "MarkdownV2" });
+            await ctx.reply(renderedMarkdown, { parse_mode: "Markdown" });
             return;
         }
 

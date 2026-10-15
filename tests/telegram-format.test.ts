@@ -6,9 +6,8 @@ import {
     buildTelegramStaticReply,
     buildTelegramPromptReply,
     buildTelegramPromptReplies,
-    renderMarkdownToTelegramMarkdownV2,
+    prepareTelegramRichMarkdown,
     splitTelegramText,
-    stripMarkdownToPlainText,
 } from "../src/services/telegram/telegram-format.js";
 
 test("readable chunks allow a sentence to finish on either side of the target and keep closing quotes", () => {
@@ -92,101 +91,15 @@ function createPromptReply(overrides: Partial<PromptSessionResult> = {}): Prompt
     };
 }
 
-test("renderMarkdownToTelegramMarkdownV2 supports the constrained markdown subset", () => {
-    const markdown = [
-        "## Title",
-        "- Item",
-        "1. Step",
-        "> Quote",
-        "Use `cmd`, **bold**, and _italic_.",
-        "[OpenCode](https://opencode.ai)",
-    ].join("\n");
-
-    assert.equal(
-        renderMarkdownToTelegramMarkdownV2(markdown),
-        [
-            "*Title*",
-            "\\- Item",
-            "1\\. Step",
-            "> Quote",
-            "Use `cmd`, *bold*, and _italic_\\.",
-            "[OpenCode](https://opencode.ai)",
-        ].join("\n"),
-    );
-    assert.equal(
-        stripMarkdownToPlainText(markdown),
-        [
-            "Title",
-            "- Item",
-            "1. Step",
-            "Quote",
-            "Use cmd, bold, and italic.",
-            "OpenCode (https://opencode.ai)",
-        ].join("\n"),
-    );
+test("native Markdown keeps headings, lists, quotes, links and tables without legacy escapes", () => {
+    const markdown = "## Title\n- Item\n1. Step\n> Quote\nUse `cmd`, **bold**, and _italic_.\n[OpenCode](https://opencode.ai)\n\n| Language | Runtime |\n| --- | --- |\n| Java | JVM |";
+    assert.equal(prepareTelegramRichMarkdown(markdown), markdown);
 });
 
-test("renderMarkdownToTelegramMarkdownV2 unwraps markdown code fences and renders the inner markdown", () => {
-    const markdown = [
-        "# Markdown Test",
-        "",
-        "```md",
-        "## Title",
-        "- Item 1",
-        "This is **Markdown** text.",
-        "```",
-    ].join("\n");
-
-    assert.equal(
-        renderMarkdownToTelegramMarkdownV2(markdown),
-        [
-            "*Markdown Test*",
-            "",
-            "*Title*",
-            "\\- Item 1",
-            "This is *Markdown* text\\.",
-        ].join("\n"),
-    );
-    assert.equal(
-        stripMarkdownToPlainText(markdown),
-        [
-            "Markdown Test",
-            "",
-            "Title",
-            "- Item 1",
-            "This is Markdown text.",
-        ].join("\n"),
-    );
-});
-
-test("renderMarkdownToTelegramMarkdownV2 renders markdown tables as preformatted tables", () => {
-    const markdown = [
-        "| Language | Runtime |",
-        "| --- | --- |",
-        "| Java | JVM |",
-        "| Python | CPython |",
-    ].join("\n");
-
-    assert.equal(
-        renderMarkdownToTelegramMarkdownV2(markdown),
-        [
-            "```",
-            "Language | Runtime",
-            "---------+--------",
-            "Java     | JVM    ",
-            "Python   | CPython",
-            "```",
-        ].join("\n"),
-    );
-    assert.equal(
-        stripMarkdownToPlainText(markdown),
-        [
-            "Language | Runtime",
-            "---------+--------",
-            "Java     | JVM    ",
-            "Python   | CPython",
-        ].join("\n"),
-    );
+test("Markdown wrapper fences are removed while actual code fences remain intact", () => {
+    assert.equal(prepareTelegramRichMarkdown("```md\n## Title\n- Item\n```"), "## Title\n- Item");
+    assert.equal(prepareTelegramRichMarkdown("```ts\nconst x = 1;\n```"), "```ts\nconst x = 1;\n```");
+    assert.equal(prepareTelegramRichMarkdown("![remote](https://example.com/a.png)"), null);
 });
 
 test("buildTelegramPromptReply falls back to plain text when markdown is unsupported", () => {
@@ -211,10 +124,10 @@ test("buildTelegramPromptReply falls back to plain text when markdown is unsuppo
 
     assert.deepEqual(result, {
         preferred: {
-            text: "bad",
+            text: "<b>bad</b>",
         },
         fallback: {
-            text: "bad",
+            text: "<b>bad</b>",
         },
     });
 });
@@ -226,9 +139,9 @@ test("buildTelegramPromptReply keeps context information out of markdown replies
     }));
 
     assert.deepEqual(result.preferred, {
-        text: "*Hello*",
+        text: "## Hello",
         options: {
-            parse_mode: "MarkdownV2",
+            parse_mode: "Markdown",
         },
     });
     assert.deepEqual(result.fallback, {
@@ -251,18 +164,65 @@ test("table padding cannot expand a short reply into an oversized message", () =
         ...Array.from({ length: 18 }, (_, index) => `| ${index === 0 ? "a".repeat(80) : "short"} | value${index} |`),
     ].join("\n");
     const replies = buildTelegramPromptReplies(createPromptReply({ bodyMd: table, fallbackText: table }));
-    assert.ok(replies.every((reply) => reply.preferred.options === undefined && reply.preferred.text.length <= 1152));
+    assert.ok(replies.every((reply) => reply.preferred.options?.parse_mode === "Markdown" && reply.preferred.text.length <= 1152));
     assert.match(replies.map((reply) => reply.preferred.text).join(""), /value17/);
 });
 
-test("formatting expansion falls back to a readable plain message", () => {
+test("long tables repeat their header and preserve every complete row alongside surrounding prose", () => {
+    const header = "| 编号 | 说明 |\n| :--- | ---: |\n";
+    const rows = Array.from({ length: 100 }, (_, i) => `| ${i} | 完整内容 ${"文字".repeat(18)} |\n`);
+    const body = `Before\n\n${header}${rows.join("")}\nAfter`;
+    const replies = buildTelegramPromptReplies({ bodyMd: body, fallbackText: body });
+    const tables = replies.map((reply) => reply.preferred.text).filter((text) => text.startsWith(header));
+    assert.ok(tables.length > 2);
+    assert.equal(tables.map((table) => table.slice(header.length)).join(""), rows.join(""));
+    assert.ok(tables.every((table) => table.length <= 1152 && table.endsWith("|\n")));
+    assert.ok(replies[0].preferred.text.includes("Before"));
+    assert.ok(replies.at(-1)!.preferred.text.includes("After"));
+});
+
+test("streaming tables buffer incomplete rows and final output includes the unterminated last row", () => {
+    const header = "Name | Value\n--- | ---\n";
+    const body = header + "first | `a\\|b`\nlast | **incomplete";
+    const snapshot = buildTelegramPromptReplies({ bodyMd: body, fallbackText: body }, getBotCopy("en"), true);
+    assert.equal(snapshot.map((x) => x.preferred.text).join(""), header + "first | `a\\|b`\n");
+    const completeRow = header + "first | value\n";
+    assert.equal(buildTelegramPromptReplies({ bodyMd: completeRow, fallbackText: completeRow }, getBotCopy("en"), true)[0].preferred.text, completeRow);
+    const final = buildTelegramPromptReplies({ bodyMd: body, fallbackText: body });
+    assert.equal(final.map((x) => x.preferred.text).join(""), body);
+    const fenced = "```text\n" + header + "last | value\n```";
+    assert.equal(buildTelegramPromptReply({ bodyMd: fenced, fallbackText: fenced }).preferred.text, fenced);
+});
+
+test("an oversized table row stays intact above the soft target and uses literal chunks above the safe size", () => {
+    for (const size of [1500, 5000]) {
+        const table = "| Name | Value |\n| --- | --- |\n| row | " + "字".repeat(size) + " |";
+        const replies = buildTelegramPromptReplies({ bodyMd: table, fallbackText: table });
+        assert.equal(replies.map((x) => x.preferred.text).join(""), table);
+        if (size === 1500) assert.equal(replies.length, 1);
+        else assert.ok(replies.every((x) => !x.preferred.options && x.preferred.text.length <= 1152));
+    }
+});
+
+test("single-column tables repeat their header and escaped pipes do not create extra columns", () => {
+    for (const header of ["| Name |\n| --- |\n", "| Name\\|Alias | Value |\n| --- | --- |\n"]) {
+        const row = header.includes("Value") ? `| a\\|b | ${"text ".repeat(20)} |\n` : `| ${"text ".repeat(20)} |\n`;
+        const body = header + row.repeat(30);
+        const chunks = buildTelegramPromptReplies({ bodyMd: body, fallbackText: body });
+        assert.ok(chunks.length > 1);
+        assert.ok(chunks.every((chunk) => chunk.preferred.text.startsWith(header)));
+        assert.equal(chunks.map((chunk) => chunk.preferred.text.slice(header.length)).join("").trimEnd(), row.repeat(30).trimEnd());
+    }
+});
+
+test("punctuation stays readable without MarkdownV2 escape expansion", () => {
     const body = "!".repeat(1000);
     const replies = buildTelegramPromptReplies(createPromptReply({ bodyMd: body, fallbackText: body }));
     assert.equal(replies.length, 1);
-    assert.deepEqual(replies[0].preferred, { text: body });
+    assert.deepEqual(replies[0].preferred, { text: body, options: { parse_mode: "Markdown" } });
 });
 
-test("buildTelegramPromptReply keeps MarkdownV2 enabled for table content", () => {
+test("buildTelegramPromptReply keeps Markdown enabled for table content", () => {
     const result = buildTelegramPromptReply(createPromptReply({
         bodyMd: [
             "| Language | Runtime |",
@@ -273,8 +233,8 @@ test("buildTelegramPromptReply keeps MarkdownV2 enabled for table content", () =
         fallbackText: "table fallback",
     }));
 
-    assert.equal(result.preferred.options?.parse_mode, "MarkdownV2");
-    assert.match(result.preferred.text, /^```\nLanguage \| Runtime\n/m);
+    assert.equal(result.preferred.options?.parse_mode, "Markdown");
+    assert.match(result.preferred.text, /^\| Language \| Runtime \|/m);
     assert.doesNotMatch(result.preferred.text, /^table fallback$/m);
 });
 
@@ -289,9 +249,9 @@ test("buildTelegramPromptReply keeps context information out of localized replie
     );
 
     assert.deepEqual(result.preferred, {
-        text: `*Hello*`,
+        text: `## Hello`,
         options: {
-            parse_mode: "MarkdownV2",
+            parse_mode: "Markdown",
         },
     });
     assert.deepEqual(result.fallback, {
@@ -299,7 +259,7 @@ test("buildTelegramPromptReply keeps context information out of localized replie
     });
 });
 
-test("buildTelegramStaticReply prefers MarkdownV2 when the markdown is supported", () => {
+test("buildTelegramStaticReply prefers Markdown when the markdown is supported", () => {
     const result = buildTelegramStaticReply([
         "# Welcome",
         "",
@@ -309,13 +269,13 @@ test("buildTelegramStaticReply prefers MarkdownV2 when the markdown is supported
 
     assert.deepEqual(result.preferred, {
         text: [
-            "*Welcome*",
+            "# Welcome",
             "",
-            "\\- Text",
-            "\\- Image",
+            "- Text",
+            "- Image",
         ].join("\n"),
         options: {
-            parse_mode: "MarkdownV2",
+            parse_mode: "Markdown",
         },
     });
     assert.deepEqual(result.fallback, {
@@ -339,4 +299,13 @@ test("buildTelegramStaticReply falls back to plain text when markdown is unsuppo
             text: "bad",
         },
     });
+});
+
+
+test("long fenced code stays formatted across rich chunks and preserves the source in fallbacks", () => {
+    const code = "```ts\n" + "console.log(123);\n".repeat(180) + "```";
+    const replies = buildTelegramPromptReplies(createPromptReply({ bodyMd: code }));
+    assert.ok(replies.length > 2);
+    assert.ok(replies.every((reply) => reply.preferred.text.startsWith("```ts\n") && reply.preferred.text.endsWith("```")));
+    assert.equal(replies.map((reply) => reply.preferred.text.replace(/^```ts\n/u, "").replace(/\n?```$/u, "")).join(""), code.slice(6, -3).replace(/\n$/u, ""));
 });

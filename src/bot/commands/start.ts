@@ -1,4 +1,4 @@
-import type { Bot } from "grammy";
+import { GrammyError, type Bot } from "grammy";
 import { buildTelegramStaticReply } from "../../services/telegram/telegram-format.js";
 import { getSafeChatCopy } from "../i18n.js";
 import { scopeDependenciesToTelegramContext } from "../logger-context.js";
@@ -12,7 +12,7 @@ interface StartCommandContext {
     reply(
         text: string,
         other?: {
-            parse_mode: "MarkdownV2";
+            parse_mode: "Markdown";
         },
     ): Promise<unknown>;
 }
@@ -24,7 +24,7 @@ export async function handleStartCommand(ctx: StartCommandContext, dependencies:
     try {
         await ctx.reply(reply.preferred.text, reply.preferred.options);
     } catch (error) {
-        if (reply.preferred.options) {
+        if (reply.preferred.options && error instanceof GrammyError && error.error_code === 400) {
             dependencies.logger.error({ error }, "failed to send start markdown reply, falling back to plain text");
             await ctx.reply(reply.fallback.text);
             return;

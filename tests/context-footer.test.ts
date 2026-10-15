@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { homedir } from "node:os";
 import { GrammyError } from "grammy";
+import { createThinkingMessages } from "./helpers/thinking.js";
 import { getBotCopy } from "../src/bot/copy.js";
 import type { AppLogger } from "../src/infra/logger/index.js";
 import { OpenCodeClient } from "../src/services/opencode/opencode.client.js";
@@ -240,6 +241,7 @@ test("context changes edit only the separate context message and preserve the du
     }, {
         sessionRepo: repo,
         logger: handlerLogger,
+        thinkingMessages: createThinkingMessages().service,
         foregroundSessionTracker: new ForegroundSessionTracker(),
         contextFooter: footer,
         sendPromptUseCase: { async execute() { now = 40_000; return {
@@ -279,6 +281,7 @@ test("a failed context message does not turn a successful answer into an error r
         api: { async deleteMessage() {}, async editMessageText() {} },
     }, {
         sessionRepo: new InMemorySessionRepository(),
+        thinkingMessages: createThinkingMessages().service,
         foregroundSessionTracker: tracker,
         logger: { child() { return this; }, error() {}, warn(_data: unknown, message: string) { warnings.push(message); } } as unknown as AppLogger,
         contextFooter: {
@@ -320,7 +323,8 @@ test("formatted footer rejection falls back to plain text and refreshes only the
             },
         },
     }, {
-        sessionRepo: new InMemorySessionRepository(), foregroundSessionTracker: new ForegroundSessionTracker(),
+        sessionRepo: new InMemorySessionRepository(), thinkingMessages: createThinkingMessages().service,
+            foregroundSessionTracker: new ForegroundSessionTracker(),
         logger: { child() { return this; }, warn() {}, error() {} } as unknown as AppLogger,
         contextFooter: {
             async read() { return { capacity: 1000, used: 100 }; },

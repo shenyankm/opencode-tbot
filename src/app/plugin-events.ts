@@ -1,3 +1,4 @@
+import { GrammyError } from "grammy";
 import { getSafeChatCopy } from "../bot/i18n.js";
 import type { PendingPermissionApproval, PermissionApprovalReply } from "../domain/permission/approval.entity.js";
 import type { AppLogger } from "../infra/logger/index.js";
@@ -314,6 +315,9 @@ async function sendPermissionApprovalMessage(
             },
         );
     } catch (error) {
+        if (!(error instanceof GrammyError) || error.error_code !== 400) {
+            throw error;
+        }
         logger.warn(
             {
                 error,
@@ -321,7 +325,7 @@ async function sendPermissionApprovalMessage(
                 event: "plugin-event.permission.ask.markdown_delivery_failed",
                 requestId: request.id,
             },
-            "failed to deliver MarkdownV2 permission request; retrying with plain text",
+            "failed to format rich permission request; retrying with plain rich text",
         );
 
         return runtime.bot.api.sendMessage(

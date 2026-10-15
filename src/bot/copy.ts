@@ -29,6 +29,10 @@ export interface BotCopy {
         processing: string;
         thinking: string;
         thinkingInProgress: string;
+        expandThinking: string;
+        collapseThinking: string;
+        thinkingUnavailable: string;
+        thinkingToggleFailed: string;
         compacting: string;
         compacted: string;
         compactionFailed: string;
@@ -230,6 +234,10 @@ const EN_BOT_COPY: BotCopy = {
         processing: "Processing...",
         thinking: "Thinking",
         thinkingInProgress: "Thinking…",
+        expandThinking: "Expand",
+        collapseThinking: "Collapse",
+        thinkingUnavailable: "This thinking message is no longer available.",
+        thinkingToggleFailed: "Could not update thinking. Please try again.",
         compacting: "Compressing context… Please wait.",
         compacted: "Context compressed.",
         compactionFailed: "Context compression failed.",
@@ -494,6 +502,10 @@ const ZH_CN_BOT_COPY: BotCopy = {
         processing: "处理中...",
         thinking: "思考",
         thinkingInProgress: "思考中…",
+        expandThinking: "展开",
+        collapseThinking: "收起",
+        thinkingUnavailable: "这条思考内容已不可用。",
+        thinkingToggleFailed: "无法更新思考消息，请重试。",
         compacting: "正在压缩上下文，请稍候…",
         compacted: "上下文已压缩。",
         compactionFailed: "上下文压缩失败。",
@@ -758,6 +770,10 @@ const JA_BOT_COPY: BotCopy = {
         processing: "処理中...",
         thinking: "思考",
         thinkingInProgress: "思考中…",
+        expandThinking: "展開",
+        collapseThinking: "折りたたむ",
+        thinkingUnavailable: "この思考の内容は利用できません。",
+        thinkingToggleFailed: "思考を更新できませんでした。もう一度お試しください。",
         compacting: "コンテキストを圧縮中です。しばらくお待ちください…",
         compacted: "コンテキストを圧縮しました。",
         compactionFailed: "コンテキストの圧縮に失敗しました。",

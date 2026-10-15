@@ -5,12 +5,12 @@ import {
 import type { PermissionApprovalReply } from "../../domain/permission/approval.entity.js";
 import type { PermissionApprovalCallbackData } from "../../bot/types.js";
 import type { OpenCodePermissionRequest } from "../opencode/opencode.client.js";
-import type { TelegramStaticReply } from "../telegram/telegram-format.js";
+import { escapeTelegramHtml, type TelegramStaticReply } from "../telegram/telegram-format.js";
 
 export function buildPermissionApprovalMessage(
     request: OpenCodePermissionRequest,
     copy: BotCopy = BOT_COPY,
-): TelegramStaticReply {
+): TelegramStaticReply<"HTML"> {
     const patternLines = request.patterns.length > 0
         ? request.patterns
         : [copy.permission.noPatterns];
@@ -27,16 +27,14 @@ export function buildPermissionApprovalMessage(
     return {
         preferred: {
             text: [
-                `*${escapeMarkdownV2(copy.permission.requestTitle)}*`,
-                "",
-                `${escapeMarkdownV2(copy.permission.permissionLabel)}: ${escapeMarkdownV2(request.permission)}`,
-                `${escapeMarkdownV2(copy.permission.sessionLabel)}: ${escapeMarkdownV2(request.sessionID)}`,
-                "",
-                `${escapeMarkdownV2(copy.permission.patternsLabel)}:`,
-                ...patternLines.map((pattern) => `\\- ${escapeMarkdownV2(pattern)}`),
-            ].join("\n"),
+                `<h2>${escapeTelegramHtml(copy.permission.requestTitle)}</h2>`,
+                `<p>${escapeTelegramHtml(copy.permission.permissionLabel)}: ${escapeTelegramHtml(request.permission)}</p>`,
+                `<p>${escapeTelegramHtml(copy.permission.sessionLabel)}: <code>${escapeTelegramHtml(request.sessionID)}</code></p>`,
+                `<h3>${escapeTelegramHtml(copy.permission.patternsLabel)}</h3>`,
+                `<ul>${patternLines.map((pattern) => `<li><code>${escapeTelegramHtml(pattern)}</code></li>`).join("")}</ul>`,
+            ].join(""),
             options: {
-                parse_mode: "MarkdownV2",
+                parse_mode: "HTML",
             },
         },
         fallback: {
@@ -104,8 +102,4 @@ export function parsePermissionApprovalCallbackData(data: string): {
 
 function isPermissionApprovalReply(value: string): value is PermissionApprovalReply {
     return value === "once" || value === "always" || value === "reject";
-}
-
-function escapeMarkdownV2(value: string): string {
-    return value.replaceAll(/([_*\[\]()~`>#+\-=|{}.!\\])/g, "\\$1");
 }

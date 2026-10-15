@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createThinkingMessages } from "./helpers/thinking.js";
 import type { PromptSessionFilePartInput, PromptSessionResult } from "../src/services/opencode/opencode.client.js";
 import { handleImageMessage } from "../src/bot/handlers/file.handler.js";
 import { InMemoryPendingActionRepository } from "../src/repositories/pending-action.repo.js";
@@ -69,8 +70,8 @@ function createDependencies(options: {
                 async flush() { },
                 warn() { },
             },
+            thinkingMessages: createThinkingMessages().service,
             foregroundSessionTracker: new ForegroundSessionTracker(),
-
             pendingActionRepo,
             sessionRepo,
             sendPromptUseCase: {
@@ -158,8 +159,8 @@ test("handleImageMessage forwards image captions and file parts to OpenCode", as
     assert.deepEqual(replies, [
         { text: "Processing...", other: processingMarkup(replies[0]) },
         {
-            text: "*Hello*",
-            other: { parse_mode: "MarkdownV2" },
+            text: "## Hello",
+            other: { parse_mode: "Markdown" },
         },
     ]);
     assert.deepEqual(deleted, [{ chatId: 20, messageId: 1500 }]);

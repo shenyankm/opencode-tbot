@@ -11,7 +11,7 @@ import type {
     OpenCodeClientLike,
     OpenCodeProject,
 } from "../src/services/opencode/opencode.client.js";
-import { renderMarkdownToTelegramMarkdownV2 } from "../src/services/telegram/telegram-format.js";
+import { prepareTelegramRichMarkdown } from "../src/services/telegram/telegram-format.js";
 import { GetHealthUseCase } from "../src/use-cases/get-health.usecase.js";
 import { GetPathUseCase } from "../src/use-cases/get-path.usecase.js";
 import {
@@ -34,7 +34,7 @@ const logger = {
 
 interface StatusReply {
     options?: {
-        parse_mode: "MarkdownV2";
+        parse_mode: "Markdown";
     };
     text: string;
 }
@@ -87,7 +87,7 @@ function renderExpectedStatusMarkdown(
     result: Awaited<ReturnType<GetStatusUseCase["execute"]>>,
     copy: Awaited<ReturnType<typeof getChatCopy>>,
 ): string {
-    const rendered = renderMarkdownToTelegramMarkdownV2(renderStatusMarkdown(result, copy));
+    const rendered = prepareTelegramRichMarkdown(renderStatusMarkdown(result, copy));
 
     assert.ok(rendered);
 
@@ -250,7 +250,7 @@ test("/status aggregates health, path, plugins, LSP, and MCP into one reply", as
     const expected = renderExpectedStatusMarkdown(result, copy);
 
     assert.equal(replies[0]?.text, expected);
-    assert.deepEqual(replies[0]?.options, { parse_mode: "MarkdownV2" });
+    assert.deepEqual(replies[0]?.options, { parse_mode: "Markdown" });
     expectLine(markdown, "## \uD83D\uDDA5\uFE0F Overview");
     expectLine(markdown, "## \uD83D\uDCC1 Workspace");
     expectLine(markdown, "## \uD83E\uDDE9 Plugins");
@@ -326,7 +326,7 @@ test("/status keeps successful sections when one section fails", async () => {
     const result = await getStatusUseCase.execute({ chatId: 2 });
     const markdown = renderStatusMarkdown(result, copy);
 
-    assert.deepEqual(replies[0]?.options, { parse_mode: "MarkdownV2" });
+    assert.deepEqual(replies[0]?.options, { parse_mode: "Markdown" });
     expectLine(markdown, "- **Connectivity:** \uD83D\uDD34");
     expectLine(markdown, "- **Current Project:** `E:/repo`");
     expectLine(markdown, "- **Current Session:** OpenCode Default");
@@ -404,7 +404,7 @@ test("/status uses the selected chat language", async () => {
     const expected = renderExpectedStatusMarkdown(result, copy);
 
     assert.equal(replies[0]?.text, expected);
-    assert.deepEqual(replies[0]?.options, { parse_mode: "MarkdownV2" });
+    assert.deepEqual(replies[0]?.options, { parse_mode: "Markdown" });
     expectLine(markdown, "## \uD83D\uDDA5\uFE0F \u6982\u89C8");
     expectLine(markdown, "## \uD83D\uDCC1 \u5DE5\u4F5C\u533A");
     expectLine(markdown, "## \uD83E\uDDE9 \u63D2\u4EF6");

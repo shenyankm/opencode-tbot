@@ -7,6 +7,7 @@ import type { AppConfig } from "./config.js";
 import type { AppContainer } from "./container.js";
 import { TelegramStartupError, validateTelegramBotAccessWithBot } from "../services/telegram/telegram-bot-access.js";
 import { telegramNetworkCode, telegramNetworkRecovery } from "../services/telegram/network-recovery.js";
+import { telegramRichMessages } from "../services/telegram/rich-messages.js";
 
 export interface StartTelegramBotRuntimeInput {
     botFactory?: (token: string, options: ConstructorParameters<typeof Bot>[1]) => Bot;
@@ -103,6 +104,7 @@ async function startTelegramBotRuntimeInternal(
     });
 
     bot.api.config?.use(telegramNetworkRecovery(runtimeLogger));
+    bot.api.config?.use(telegramRichMessages());
     await verifyTelegramBotAccess(bot, input.config.telegramApiRoot, runtimeKey, runtimeLogger);
     wrapTelegramGetUpdates(bot, input.container);
     const registerBotHandlers = input.registerBotHandlers ?? registerBot;
