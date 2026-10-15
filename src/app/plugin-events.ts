@@ -1,3 +1,4 @@
+import type { OpenCodeEvent } from "@opencode/client";
 import { GrammyError } from "grammy";
 import { getSafeChatCopy } from "../bot/i18n.js";
 import type { PendingPermissionApproval, PermissionApprovalReply } from "../domain/permission/approval.entity.js";
@@ -40,7 +41,7 @@ interface PluginEventHandlerDefinition {
     normalize(properties: unknown): unknown | null;
 }
 
-const PLUGIN_EVENT_HANDLERS: Record<string, PluginEventHandlerDefinition> = {
+const PLUGIN_EVENT_HANDLERS: Partial<Record<OpenCodeEvent["type"], PluginEventHandlerDefinition>> = {
     "permission.asked": createPluginEventHandler(
         normalizePermissionRequestEvent,
         handlePermissionAsked,
@@ -78,7 +79,7 @@ export async function handleTelegramBotPluginEvent(
             runtime.container.logger.warn({ error }, "failed to refresh context footer after plugin event");
         });
     }
-    const handler = PLUGIN_EVENT_HANDLERS[event.type];
+    const handler = PLUGIN_EVENT_HANDLERS[event.type as OpenCodeEvent["type"]];
 
     if (!handler) {
         return;
@@ -358,24 +359,21 @@ function normalizePermissionRequestEvent(properties: unknown): OpenCodePermissio
 
     const id = asNonEmptyString(properties.id);
     const sessionID = asNonEmptyString(properties.sessionID);
-    const permission = asNonEmptyString(properties.action);
+    const action = asNonEmptyString(properties.action);
 
-    if (!id || !sessionID || !permission) {
+    if (!id || !sessionID || !action) {
         return null;
     }
 
     return {
-        always: Array.isArray(properties.save)
+        save: Array.isArray(properties.save)
             ? properties.save.filter((value): value is string => typeof value === "string")
             : [],
         id,
-        metadata: isPlainRecord(properties.metadata)
-            ? properties.metadata
-            : {},
-        patterns: Array.isArray(properties.resources)
+        resources: Array.isArray(properties.resources)
             ? properties.resources.filter((value): value is string => typeof value === "string")
             : [],
-        permission,
+        action,
         sessionID,
     };
 }

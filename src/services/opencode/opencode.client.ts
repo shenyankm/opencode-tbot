@@ -11,6 +11,7 @@ import {
     type OpenCodeClient as SdkClient,
     type Project,
     type ProviderInfo,
+    type PermissionRequest,
     type SessionStatus,
     type SessionInfo,
     type SessionMessageAssistant,
@@ -129,14 +130,7 @@ type OpenCodePromptTurn = {
     assistants: SessionMessageAssistant[];
     idle: SessionMessageIdle | null;
 };
-export interface OpenCodePermissionRequest {
-    always: string[];
-    id: string;
-    metadata: Record<string, unknown>;
-    patterns: string[];
-    permission: string;
-    sessionID: string;
-}
+export type OpenCodePermissionRequest = PermissionRequest;
 export interface OpenCodeHealth {
     healthy: boolean;
     version: string;

@@ -209,6 +209,8 @@ test("OpenCode v2 loads the locally built plugin, handles Telegram commands, and
         15_000, failureContext);
     const approvalMessageIndex = replyMessages.findIndex((message) => message.text?.includes(BOT_COPY.permission.requestTitle));
     const approvalMessage = replyMessages[approvalMessageIndex]!;
+    assert.ok(approvalMessage.text?.includes("tbot.integration"));
+    assert.ok(approvalMessage.text?.includes("integration-resource"));
     const callbackData = approvalMessage.reply_markup?.inline_keyboard[0]?.[1]?.callback_data;
     assert.ok(callbackData?.startsWith("permission:always:"));
     updates.push({

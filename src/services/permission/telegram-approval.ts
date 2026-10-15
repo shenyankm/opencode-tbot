@@ -11,13 +11,13 @@ export function buildPermissionApprovalMessage(
     request: OpenCodePermissionRequest,
     copy: BotCopy = BOT_COPY,
 ): TelegramStaticReply<"HTML"> {
-    const patternLines = request.patterns.length > 0
-        ? request.patterns
+    const patternLines = request.resources.length > 0
+        ? request.resources
         : [copy.permission.noPatterns];
     const plainText = [
         copy.permission.requestTitle,
         "",
-        `${copy.permission.permissionLabel}: ${request.permission}`,
+        `${copy.permission.permissionLabel}: ${request.action}`,
         `${copy.permission.sessionLabel}: ${request.sessionID}`,
         "",
         `${copy.permission.patternsLabel}:`,
@@ -28,7 +28,7 @@ export function buildPermissionApprovalMessage(
         preferred: {
             text: [
                 `<h2>${escapeTelegramHtml(copy.permission.requestTitle)}</h2>`,
-                `<p>${escapeTelegramHtml(copy.permission.permissionLabel)}: ${escapeTelegramHtml(request.permission)}</p>`,
+                `<p>${escapeTelegramHtml(copy.permission.permissionLabel)}: ${escapeTelegramHtml(request.action)}</p>`,
                 `<p>${escapeTelegramHtml(copy.permission.sessionLabel)}: <code>${escapeTelegramHtml(request.sessionID)}</code></p>`,
                 `<h3>${escapeTelegramHtml(copy.permission.patternsLabel)}</h3>`,
                 `<ul>${patternLines.map((pattern) => `<li><code>${escapeTelegramHtml(pattern)}</code></li>`).join("")}</ul>`,
