@@ -75,6 +75,26 @@ function createClient(
     return new OpenCodeClient(undefined, sdk, policy);
 }
 
+test("status and interruption requests time out so cancelling a stalled host can finish", async () => {
+    const stalled = (options: { signal: AbortSignal }) => new Promise<never>((_resolve, reject) => {
+        options.signal.addEventListener("abort", () => reject(options.signal.reason), { once: true });
+    });
+    const client = createClient({ session: {
+        active: stalled,
+        interrupt: (_input: unknown, options: { signal: AbortSignal }) => stalled(options),
+    } }, { pollRequestTimeoutMs: 20 });
+    // Keep the test alive while the native timeout signals use unreferenced timers.
+    const keepAlive = setInterval(() => {}, 1_000);
+    try {
+        await Promise.all([
+            assert.rejects(client.getSessionStatuses(), { name: "TimeoutError" }),
+            assert.rejects(client.abortSession("ses_1"), { name: "TimeoutError" }),
+        ]);
+    } finally {
+        clearInterval(keepAlive);
+    }
+});
+
 test("buildOpenCodeSdkConfig forwards trimmed V2 bearer tokens and omits blank tokens", () => {
     assert.deepEqual(buildOpenCodeSdkConfig({ baseUrl: "http://localhost:4096", apiKey: " secret " }), {
         baseUrl: "http://localhost:4096",

@@ -28,11 +28,16 @@ export class AbortPromptUseCase {
     ) { }
 
     async execute(input: AbortPromptInput): Promise<AbortPromptResult> {
-        if (input.requestId && this.foregroundSessionTracker.getRequestId(input.chatId) !== input.requestId) {
+        const requestId = input.requestId ?? this.foregroundSessionTracker.getRequestId(input.chatId);
+        if (input.requestId && this.foregroundSessionTracker.getRequestId(input.chatId) !== requestId) {
             return { sessionId: null, status: "not_running", sessionStatus: null };
         }
         const hasForegroundRequest = this.foregroundSessionTracker.hasActiveRequest(input.chatId);
         const activeSessionId = this.foregroundSessionTracker.getActiveSessionId(input.chatId);
+        if (hasForegroundRequest && !activeSessionId) {
+            this.foregroundSessionTracker.abort(input.chatId, createMessageAbortedError(), requestId ?? undefined);
+            return { sessionId: null, status: "aborted", sessionStatus: null };
+        }
         const binding = activeSessionId
             ? null
             : await this.sessionRepo.getByChatId(input.chatId);
@@ -46,33 +51,32 @@ export class AbortPromptUseCase {
             };
         }
 
-        const sessionStatuses = sessionId
-            ? await this.opencodeClient.getSessionStatuses()
-            : {};
-        const sessionStatus = sessionId
-            ? (sessionStatuses[sessionId] ?? null)
-            : null;
-
-        if (input.requestId && this.foregroundSessionTracker.getRequestId(input.chatId) !== input.requestId) {
-            return { sessionId, status: "not_running", sessionStatus };
-        }
-
+        let sessionStatus: OpenCodeSessionStatus | null = null;
         if (hasForegroundRequest) {
-            if (sessionId && sessionStatus && sessionStatus.type !== "idle") {
-                await this.opencodeClient.abortSession(sessionId);
+            try {
+                const statuses = await this.opencodeClient.getSessionStatuses();
+                sessionStatus = sessionId ? statuses[sessionId] ?? null : null;
+                if (this.foregroundSessionTracker.getRequestId(input.chatId) !== requestId) {
+                    return { sessionId, status: "not_running", sessionStatus };
+                }
+                if (sessionId && sessionStatus && sessionStatus.type !== "idle") {
+                    await this.opencodeClient.abortSession(sessionId);
+                }
+            } finally {
+                this.foregroundSessionTracker.abort(input.chatId, createMessageAbortedError(), requestId ?? undefined);
             }
-
-            this.foregroundSessionTracker.abort(
-                input.chatId,
-                createMessageAbortedError(),
-                input.requestId,
-            );
 
             return {
                 sessionId,
                 status: "aborted",
                 sessionStatus,
             };
+        }
+
+        const sessionStatuses = sessionId ? await this.opencodeClient.getSessionStatuses() : {};
+        sessionStatus = sessionId ? sessionStatuses[sessionId] ?? null : null;
+        if (this.foregroundSessionTracker.getRequestId(input.chatId) !== requestId) {
+            return { sessionId, status: "not_running", sessionStatus };
         }
 
         if (!sessionStatus || sessionStatus.type === "idle") {

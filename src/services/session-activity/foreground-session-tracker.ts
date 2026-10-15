@@ -68,7 +68,9 @@ export class ForegroundSessionTracker implements ForegroundSessionTrackerLike {
             id: state.id,
             attachInput: (messageId: string) => { state.inputId = messageId; },
             attachSession: (sessionId: string) => {
-                this.attachSession(chatId, sessionId);
+                if (this.requests.get(chatId) === state) {
+                    this.attachSession(chatId, sessionId);
+                }
             },
             dispose: () => {
                 if (this.requests.get(chatId) === state) {

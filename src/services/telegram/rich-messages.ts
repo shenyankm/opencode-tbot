@@ -1,5 +1,10 @@
-import type { Transformer } from "grammy";
+import { GrammyError, type Transformer } from "grammy";
 import type { InputRichMessage } from "grammy/types";
+
+export function isTelegramFormattingError(error: unknown): boolean {
+    return error instanceof GrammyError && error.error_code === 400
+        && /pars|format|entit|tag|markdown/iu.test(error.description);
+}
 
 function richContent(text: string, parseMode?: string): InputRichMessage {
     if (parseMode === "HTML") {

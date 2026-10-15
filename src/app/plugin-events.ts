@@ -1,5 +1,5 @@
 import type { OpenCodeEvent } from "@opencode/client";
-import { GrammyError } from "grammy";
+import { isTelegramFormattingError } from "../services/telegram/rich-messages.js";
 import { getSafeChatCopy } from "../bot/i18n.js";
 import type { PendingPermissionApproval, PermissionApprovalReply } from "../domain/permission/approval.entity.js";
 import type { AppLogger } from "../infra/logger/index.js";
@@ -318,7 +318,7 @@ async function sendPermissionApprovalMessage(
             },
         );
     } catch (error) {
-        if (!(error instanceof GrammyError) || error.error_code !== 400) {
+        if (!isTelegramFormattingError(error)) {
             throw error;
         }
         logger.warn(

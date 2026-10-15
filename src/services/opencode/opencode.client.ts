@@ -329,7 +329,9 @@ export class OpenCodeClient implements OpenCodeClientLike {
     }
 
     async abortSession(sessionId: string): Promise<boolean> {
-        const result = await this.client.session.interrupt({ sessionID: sessionId });
+        const result = await this.client.session.interrupt({ sessionID: sessionId }, {
+            signal: AbortSignal.timeout(this.promptTimeoutPolicy.pollRequestTimeoutMs),
+        });
 
         return result.interrupted;
     }
@@ -365,7 +367,9 @@ export class OpenCodeClient implements OpenCodeClientLike {
     }
 
     async getSessionStatuses(): Promise<Record<string, OpenCodeSessionStatus>> {
-        const active = await this.client.session.active();
+        const active = await this.client.session.active({
+            signal: AbortSignal.timeout(this.promptTimeoutPolicy.pollRequestTimeoutMs),
+        });
 
         return Object.fromEntries(Object.keys(active).map((sessionId) => [sessionId, { type: "busy" as const }]));
     }
