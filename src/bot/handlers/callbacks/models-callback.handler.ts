@@ -1,4 +1,5 @@
-import type { Bot } from "grammy";
+import { GrammyError, type Bot } from "grammy";
+import type { InlineKeyboardMarkup } from "grammy/types";
 import {
     getSafeChatCopy,
 } from "../../i18n.js";
@@ -27,7 +28,11 @@ const MODEL_PAGE_PREFIX = "model:page:";
 const MODEL_PICK_PREFIX = "model:pick:";
 const MODEL_VARIANT_PREFIX = "model:variant:";
 
-export async function handleModelsCallback(ctx: CallbackContext, dependencies: ModelsFeatureDependencies) {
+interface ModelsCallbackContext extends Omit<CallbackContext, "editMessageText"> {
+    editMessageText(text: string, other?: { reply_markup?: InlineKeyboardMarkup; parse_mode?: "HTML" }): Promise<unknown>;
+}
+
+export async function handleModelsCallback(ctx: ModelsCallbackContext, dependencies: ModelsFeatureDependencies) {
     const data = ctx.callbackQuery.data as ModelCallbackData;
 
     if (!data.startsWith("model:")) {
@@ -54,20 +59,24 @@ export async function handleModelsCallback(ctx: CallbackContext, dependencies: M
                 return;
             }
 
-            const { keyboard, page } = buildModelsKeyboard(result.models, requestedPage, copy);
+            const selected = result.models.find((model) => model.id === result.currentModelId && model.providerID === result.currentModelProviderId);
+            const { keyboard, page } = buildModelsKeyboard(result.models, requestedPage, copy, selected);
 
-            await ctx.editMessageText(
-                presentModelsMessage({
-                    currentModelId: result.currentModelId,
-                    currentModelProviderId: result.currentModelProviderId,
-                    currentModelVariant: result.currentModelVariant,
-                    models: result.models,
-                    page: page.page,
-                }, copy),
-                {
-                    reply_markup: keyboard,
-                },
-            );
+            const reply = presentModelsMessage({
+                currentModelId: result.currentModelId,
+                currentModelProviderId: result.currentModelProviderId,
+                currentModelVariant: result.currentModelVariant,
+                models: result.models,
+                page: page.page,
+            }, copy);
+            try {
+                await ctx.editMessageText(reply.preferred.text, { ...reply.preferred.options, reply_markup: keyboard });
+            } catch (error) {
+                if (!(error instanceof GrammyError) || error.error_code !== 400) {
+                    throw error;
+                }
+                await ctx.editMessageText(reply.fallback.text, { reply_markup: keyboard });
+            }
 
             return;
         }

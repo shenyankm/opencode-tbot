@@ -1,4 +1,5 @@
-import type { Bot } from "grammy";
+import { GrammyError, type Bot } from "grammy";
+import type { InlineKeyboardMarkup } from "grammy/types";
 import { getSafeChatCopy } from "../i18n.js";
 import { scopeDependenciesToTelegramContext } from "../logger-context.js";
 import type { BotDependencies, ModelsFeatureDependencies } from "../types.js";
@@ -9,7 +10,7 @@ import type { TelegramCommandDefinition } from "./registry.js";
 
 interface ModelsCommandContext {
     chat: { id: number };
-    reply(text: string, other?: { reply_markup?: unknown }): Promise<unknown>;
+    reply(text: string, other?: { reply_markup?: InlineKeyboardMarkup; parse_mode?: "HTML" }): Promise<unknown>;
 }
 
 export async function handleModelsCommand(ctx: ModelsCommandContext, dependencies: ModelsFeatureDependencies) {
@@ -25,20 +26,24 @@ export async function handleModelsCommand(ctx: ModelsCommandContext, dependencie
             return;
         }
 
-        const { keyboard, page } = buildModelsKeyboard(result.models, 0, copy);
+        const selected = result.models.find((model) => model.id === result.currentModelId && model.providerID === result.currentModelProviderId);
+        const { keyboard, page } = buildModelsKeyboard(result.models, 0, copy, selected);
 
-        await ctx.reply(
-            presentModelsMessage({
-                currentModelId: result.currentModelId,
-                currentModelProviderId: result.currentModelProviderId,
-                currentModelVariant: result.currentModelVariant,
-                models: result.models,
-                page: page.page,
-            }, copy),
-            {
-                reply_markup: keyboard,
-            },
-        );
+        const reply = presentModelsMessage({
+            currentModelId: result.currentModelId,
+            currentModelProviderId: result.currentModelProviderId,
+            currentModelVariant: result.currentModelVariant,
+            models: result.models,
+            page: page.page,
+        }, copy);
+        try {
+            await ctx.reply(reply.preferred.text, { ...reply.preferred.options, reply_markup: keyboard });
+        } catch (error) {
+            if (!(error instanceof GrammyError) || error.error_code !== 400) {
+                throw error;
+            }
+            await ctx.reply(reply.fallback.text, { reply_markup: keyboard });
+        }
     } catch (error) {
         dependencies.logger.error({ error }, "failed to list models");
         await ctx.reply(presentError(error, copy));

@@ -30,6 +30,7 @@ export class ListModelsUseCase {
             this.sessionRepo.getByChatId(input.chatId),
             this.opencodeClient.listModels(),
         ]);
+        models = [...models].sort((left, right) => left.providerID.localeCompare(right.providerID));
 
         if (binding?.modelProviderId && binding?.modelId) {
             const selectedModel = models.find((model) =>

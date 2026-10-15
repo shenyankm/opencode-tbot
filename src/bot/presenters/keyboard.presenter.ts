@@ -43,14 +43,21 @@ export function buildModelsKeyboard(
     models: OpenCodeConfiguredModel[],
     requestedPage: number,
     copy: BotCopy = BOT_COPY,
+    currentModel?: Pick<OpenCodeConfiguredModel, "providerID" | "id"> | null,
 ) {
     const page = getModelsPage(models, requestedPage);
-    const keyboard = buildNumberedKeyboard(
-        page.items,
-        page.startIndex,
-        (model) => `model:pick:${getModelCallbackKey(model)}`,
-    );
+    const keyboard = new InlineKeyboard();
+    page.items.forEach((model, index) => {
+        if (index > 0 && index % 3 === 0) {
+            keyboard.row();
+        }
+        const selected = model.id === currentModel?.id && model.providerID === currentModel?.providerID;
+        keyboard.text(`${selected ? "✓ " : ""}${page.startIndex + index + 1}`, `model:pick:${getModelCallbackKey(model)}`);
+    });
 
+    if (page.totalPages > 1) {
+        keyboard.row();
+    }
     appendPaginationButtons(keyboard, page.page, page.totalPages, "model:page", copy);
 
     return { keyboard, page };

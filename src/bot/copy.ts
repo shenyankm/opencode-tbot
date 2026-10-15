@@ -167,11 +167,10 @@ export interface BotCopy {
     models: {
         none: string;
         title: string;
-        configuredOnly: string;
+        choose: string;
         current(model: string): string;
         switched: string;
         currentReasoningLevel(variant: string): string;
-        reasoningLevel(variant: string): string;
         noReasoningLevels: string;
         reasoningLevelsTitle: string;
         model(model: string): string;
@@ -421,17 +420,14 @@ const EN_BOT_COPY: BotCopy = {
     },
     models: {
         none: "No models available.",
-        title: "Model List",
-        configuredOnly: "Only models exposed by OpenCode for connected providers are shown.",
+        title: "Choose a model",
+        choose: "Choose a number below to switch models.",
         current(model: string) {
             return `Current model: ${model}`;
         },
         switched: "Model switched.",
         currentReasoningLevel(variant: string) {
             return `Current reasoning level: ${variant}`;
-        },
-        reasoningLevel(variant: string) {
-            return `Reasoning level: ${variant}`;
         },
         noReasoningLevels: "This model has no selectable reasoning levels.",
         reasoningLevelsTitle: "Reasoning Levels",
@@ -689,17 +685,14 @@ const ZH_CN_BOT_COPY: BotCopy = {
     },
     models: {
         none: "没有可用模型。",
-        title: "模型列表",
-        configuredOnly: "仅显示 OpenCode 为已连接 provider 暴露的模型。",
+        title: "选择模型",
+        choose: "点击下方编号切换模型。",
         current(model: string) {
             return `当前模型: ${model}`;
         },
         switched: "模型已切换。",
         currentReasoningLevel(variant: string) {
             return `当前推理级别: ${variant}`;
-        },
-        reasoningLevel(variant: string) {
-            return `推理级别: ${variant}`;
         },
         noReasoningLevels: "该模型没有可选的推理级别。",
         reasoningLevelsTitle: "推理级别",
@@ -957,17 +950,14 @@ const JA_BOT_COPY: BotCopy = {
     },
     models: {
         none: "利用可能なモデルはありません。",
-        title: "モデル一覧",
-        configuredOnly: "OpenCode が接続済み provider 向けに公開しているモデルのみ表示します。",
+        title: "モデルを選択",
+        choose: "下の番号でモデルを切り替えます。",
         current(model: string) {
             return `現在のモデル: ${model}`;
         },
         switched: "モデルを切り替えました。",
         currentReasoningLevel(variant: string) {
             return `現在の推論レベル: ${variant}`;
-        },
-        reasoningLevel(variant: string) {
-            return `推論レベル: ${variant}`;
         },
         noReasoningLevels: "このモデルには選択可能な推論レベルがありません。",
         reasoningLevelsTitle: "推論レベル",

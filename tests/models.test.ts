@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { GrammyError } from "grammy";
+import { getBotCopy } from "../src/bot/copy.js";
+import { presentModelsMessage } from "../src/bot/presenters/message.presenter.js";
 import { getModelCallbackKey, getVariantCallbackKey, buildModelsKeyboard } from "../src/bot/presenters/keyboard.presenter.js";
 import { handleModelsCommand } from "../src/bot/commands/models.js";
 import { handleModelsCallback } from "../src/bot/handlers/callback.handler.js";
@@ -152,11 +155,12 @@ test("/model only shows configured models with numeric inline buttons", async ()
     );
 
     assert.equal(replies.length, 1);
-    assert.match(replies[0].text, /Model List/);
-    assert.match(replies[0].text, /Only models exposed by OpenCode for connected providers are shown\./);
-    assert.match(replies[0].text, /Current model: Not selected \(using OpenCode default\)/);
+    assert.match(replies[0].text, /^<h2>Choose a model<\/h2>/u);
+    assert.doesNotMatch(replies[0].text, /Only models exposed/u);
+    assert.match(replies[0].text, /Current model: <b>Not selected \(using OpenCode default\)<\/b>/u);
     assert.match(replies[0].text, /Page 1\/2/);
-    assert.match(replies[0].text, /1\. OpenAI \/ Model 1/);
+    assert.match(replies[0].text, /<h3>OpenAI<\/h3><ol start="1"><li>Model 1<\/li>/u);
+    assert.equal(replies[0].text.match(/OpenAI/gu)?.length, 1);
     assert.doesNotMatch(replies[0].text, /13\. /);
 
     const keyboard = replies[0].other?.reply_markup as {
@@ -164,7 +168,7 @@ test("/model only shows configured models with numeric inline buttons", async ()
     };
     assert.deepEqual(
         keyboard.inline_keyboard[0].map((button) => button.text),
-        ["1", "2", "3", "4", "5"],
+        ["1", "2", "3"],
     );
     assert.equal(keyboard.inline_keyboard[0][0].callback_data, `model:pick:${getModelCallbackKey(models[0])}`);
     assert.equal(keyboard.inline_keyboard.at(-1)?.at(-1)?.callback_data, "model:page:1");
@@ -216,17 +220,17 @@ test("model page callbacks re-render the requested page", async () => {
     assert.equal(answered, 1);
     assert.equal(edits.length, 1);
     assert.match(edits[0].text, /Page 2\/2/);
-    assert.match(edits[0].text, /11\. OpenAI \/ Model 11/);
-    assert.doesNotMatch(edits[0].text, /^1\. OpenAI \/ Model 1$/m);
+    assert.match(edits[0].text, /<ol start="11"><li>Model 11<\/li>/);
+    assert.doesNotMatch(edits[0].text, /^1\. Model 1$/m);
 
     const keyboard = edits[0].other?.reply_markup as {
         inline_keyboard: Array<Array<{ callback_data: string; text: string }>>;
     };
     assert.deepEqual(
         keyboard.inline_keyboard[0].map((button) => button.text),
-        ["11", "12", "Previous"],
+        ["11", "12"],
     );
-    assert.equal(keyboard.inline_keyboard[0].at(-1)?.callback_data, "model:page:0");
+    assert.equal(keyboard.inline_keyboard.at(-1)?.at(-1)?.callback_data, "model:page:0");
 });
 
 test("picking a model with variants opens a second numeric choice list", async () => {
@@ -525,4 +529,77 @@ test("model buttons preserve identity after the catalog order changes and reject
     const { dependencies: missing, repo: missingRepo } = createDependencies({ async listModels() { return [other]; } });
     await handleModelsCallback(context, missing);
     assert.equal(await missingRepo.getByChatId(1), null);
+});
+
+test("model catalogs group providers without mutating cached order or reordering models within a provider", async () => {
+    const models = [
+        createConfiguredModel("b", "1", "First B", "Provider B"),
+        createConfiguredModel("a", "2", "First A", "Provider A"),
+        createConfiguredModel("b", "3", "Second B", "Provider B"),
+        createConfiguredModel("a", "4", "Second A", "Provider A"),
+    ];
+    const { dependencies } = createDependencies({ async listModels() { return models; } });
+    const result = await dependencies.listModelsUseCase.execute({ chatId: 1 });
+    assert.deepEqual(result.models.map((model) => model.id), ["2", "4", "1", "3"]);
+    assert.deepEqual(models.map((model) => model.id), ["1", "2", "3", "4"]);
+});
+
+test("model menus localize hierarchy, escape names, and mark only the selected provider and model", () => {
+    const models = [
+        createConfiguredModel("a", "same-id", "Model <One>", "Provider & A"),
+        createConfiguredModel("a", "two", "Model Two", "Provider & A"),
+        createConfiguredModel("b", "same-id", "Model <One>", "Provider B"),
+    ];
+    for (const language of ["en", "zh-CN", "ja"] as const) {
+        const copy = getBotCopy(language);
+        const reply = presentModelsMessage({ models, page: 0, currentModelId: "same-id", currentModelProviderId: "a", currentModelVariant: "max" }, copy);
+        assert.equal(reply.preferred.options?.parse_mode, "HTML");
+        assert.ok(reply.preferred.text.startsWith(`<h2>${copy.models.title}</h2><p>`));
+        assert.ok(reply.preferred.text.includes(copy.models.current("<b>Model &lt;One&gt;(max)</b>")));
+        assert.ok(reply.preferred.text.includes(`<h3>Provider &amp; A</h3><ol start="1"><li><b>Model &lt;One&gt; ✓</b></li><li>Model Two</li>`));
+        assert.ok(reply.preferred.text.includes(`<h3>Provider B</h3><ol start="3"><li>Model &lt;One&gt;</li>`));
+        assert.equal(reply.preferred.text.match(/Provider &amp; A/gu)?.length, 1);
+        assert.equal(reply.preferred.text.match(/✓/gu)?.length, 1);
+        assert.ok(reply.fallback.text.includes("1. Model <One> ✓"));
+        assert.ok(!reply.fallback.text.includes("<b>"));
+        assert.ok(!reply.fallback.text.includes(copy.common.page(1, 1)));
+        assert.ok(reply.fallback.text.endsWith(copy.models.choose));
+        const defaultReply = presentModelsMessage({ models, page: 0, currentModelId: "same-id", currentModelProviderId: "a", currentModelVariant: null }, copy);
+        assert.ok(defaultReply.fallback.text.includes(`Model <One>(${copy.models.defaultReasoningLevel})`));
+    }
+});
+
+test("model keyboards use three columns and mark the current button without changing its callback", () => {
+    const models = Array.from({ length: 9 }, (_, index) => createConfiguredModel("p", `${index}`, `Model ${index}`, "Provider"));
+    const keyboard = buildModelsKeyboard(models, 0, getBotCopy("en"), models[3]).keyboard.inline_keyboard;
+    assert.deepEqual(keyboard.map((row) => row.map((button) => button.text)), [
+        ["1", "2", "3"], ["✓ 4", "5", "6"], ["7", "8", "9"],
+    ]);
+    assert.deepEqual(keyboard[1][0], { text: "✓ 4", callback_data: `model:pick:${getModelCallbackKey(models[3])}` });
+});
+
+test("initial and paginated model menus fall back to plain text while retaining their keyboard", async () => {
+    const models = Array.from({ length: 12 }, (_, index) => createConfiguredModel("p", `${index}`, `Model <${index}>`, "Provider & P"));
+    for (const action of ["command", "page"] as const) {
+        const { dependencies } = createDependencies({ async listModels() { return models; } });
+        const attempts: Array<{ text: string; other?: { parse_mode?: string; reply_markup?: unknown } }> = [];
+        const write = async (text: string, other?: { parse_mode?: string; reply_markup?: unknown }) => {
+            attempts.push({ text, other });
+            if (attempts.length === 1) {
+                throw new GrammyError("format rejected", { ok: false, error_code: 400, description: "can't parse entities" }, action === "command" ? "sendMessage" : "editMessageText", {});
+            }
+        };
+        if (action === "command") {
+            await handleModelsCommand({ chat: { id: 1 }, reply: write }, dependencies);
+        } else {
+            await handleModelsCallback({ chat: { id: 1 }, callbackQuery: { data: "model:page:1" }, async answerCallbackQuery() {}, editMessageText: write }, dependencies);
+        }
+        assert.equal(attempts.length, 2);
+        assert.equal(attempts[0].other?.parse_mode, "HTML");
+        assert.equal(attempts[1].other?.parse_mode, undefined);
+        assert.deepEqual(attempts[0].other?.reply_markup, attempts[1].other?.reply_markup);
+        assert.ok(attempts[1].text.includes("Provider & P"));
+        assert.ok(attempts[1].text.includes(action === "command" ? "1. Model <0>" : "11. Model <10>"));
+        assert.ok(!attempts[1].text.includes("<b>"));
+    }
 });

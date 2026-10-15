@@ -8,6 +8,7 @@ import type {
     OpenCodeSession,
 } from "../../services/opencode/opencode.client.js";
 import { OPENCODE_TBOT_VERSION } from "../../app/package-info.js";
+import { escapeTelegramHtml, type TelegramStaticReply } from "../../services/telegram/telegram-format.js";
 import type { GetStatusResult } from "../../use-cases/get-status.usecase.js";
 import {
     BOT_COPY,
@@ -701,9 +702,9 @@ export function presentAgentSwitchMessage(agent: OpenCodeAgent, copy: BotCopy = 
     ].join("\n");
 }
 
-export function presentModelsMessage(input: ModelsMessageInput, copy: BotCopy = BOT_COPY): string {
+export function presentModelsMessage(input: ModelsMessageInput, copy: BotCopy = BOT_COPY): TelegramStaticReply<"HTML"> {
     if (input.models.length === 0) {
-        return copy.models.none;
+        return { preferred: { text: copy.models.none }, fallback: { text: copy.models.none } };
     }
 
     const page = getModelsPage(input.models, input.page);
@@ -713,18 +714,32 @@ export function presentModelsMessage(input: ModelsMessageInput, copy: BotCopy = 
         ) ?? null
         : null;
     const currentModelLine = currentModel
-        ? formatModelSelection(currentModel, input.currentModelVariant, copy)
+        ? `${currentModel.name}(${input.currentModelVariant ?? copy.models.defaultReasoningLevel})`
         : copy.common.openCodeDefault;
-    const lines = [
-        copy.models.title,
-        copy.models.configuredOnly,
-        copy.models.current(currentModelLine),
-        copy.common.page(page.page + 1, page.totalPages),
-        "",
-        ...page.items.map((model, index) => formatModelListLine(model, page.startIndex + index + 1)),
-    ];
+    const plain = [copy.models.title, "", copy.models.current(currentModelLine)];
+    const html = [`<h2>${escapeTelegramHtml(copy.models.title)}</h2>`, `<p>${copy.models.current(`<b>${escapeTelegramHtml(currentModelLine)}</b>`)}</p>`];
+    let providerID: string | undefined;
+    for (const [index, model] of page.items.entries()) {
+        if (model.providerID !== providerID) {
+            if (providerID !== undefined) html.push("</ol>");
+            plain.push("", model.providerName);
+            html.push(`<h3>${escapeTelegramHtml(model.providerName)}</h3><ol start="${page.startIndex + index + 1}">`);
+            providerID = model.providerID;
+        }
+        const selected = model.id === currentModel?.id && model.providerID === currentModel?.providerID;
+        const label = `${model.name}${selected ? " ✓" : ""}`;
+        plain.push(`${page.startIndex + index + 1}. ${label}`);
+        const name = escapeTelegramHtml(label);
+        html.push(`<li>${selected ? `<b>${name}</b>` : name}</li>`);
+    }
+    html.push("</ol>");
+    plain.push("", ...(page.totalPages > 1 ? [copy.common.page(page.page + 1, page.totalPages)] : []), copy.models.choose);
+    html.push(`<footer>${[...(page.totalPages > 1 ? [copy.common.page(page.page + 1, page.totalPages)] : []), copy.models.choose].map(escapeTelegramHtml).join("<br/>")}</footer>`);
 
-    return lines.join("\n");
+    return {
+        preferred: { text: html.join(""), options: { parse_mode: "HTML" } },
+        fallback: { text: plain.join("\n") },
+    };
 }
 
 export function presentModelVariantsMessage(
@@ -806,18 +821,6 @@ function compareVariantNames(left: string, right: string): number {
 
 function formatAgentLabel(agent: OpenCodeAgent): string {
     return agent.name;
-}
-
-function formatModelListLine(model: OpenCodeConfiguredModel, displayIndex: number): string {
-    return `${displayIndex}. ${formatModelLabel(model)}`;
-}
-
-function formatModelSelection(
-    model: OpenCodeConfiguredModel,
-    variant: string | null,
-    copy: BotCopy,
-): string {
-    return `${formatModelLabel(model)} | ${copy.models.reasoningLevel(variant ?? copy.models.defaultReasoningLevel)}`;
 }
 
 function formatModelLabel(model: OpenCodeConfiguredModel): string {
