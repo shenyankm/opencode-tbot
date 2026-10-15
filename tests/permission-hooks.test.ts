@@ -70,6 +70,25 @@ function createRuntime() {
     };
 }
 
+test("a pending footer refresh does not block subsequent plugin events and logs refresh failures", async () => {
+    const { runtime } = createRuntime();
+    let rejectRefresh!: (error: Error) => void;
+    let published = 0;
+    const warnings: unknown[] = [];
+    runtime.container.foregroundSessionTracker.publish = () => { published += 1; };
+    runtime.container.contextFooter = {
+        refreshSession: () => new Promise<void>((_resolve, reject) => { rejectRefresh = reject; }),
+    } as never;
+    runtime.container.logger = { ...logger, warn(error) { warnings.push(error); } };
+    await handleTelegramBotPluginEvent(runtime, { type: "session.usage.updated", data: { sessionID: "s" } });
+    await handleTelegramBotPluginEvent(runtime, { type: "session.text.delta", data: { sessionID: "s", delta: "answer" } });
+    assert.equal(published, 2);
+    const error = new Error("offline");
+    rejectRefresh(error);
+    await Promise.resolve();
+    assert.deepEqual(warnings, [{ error }]);
+});
+
 test("permission.asked sends Telegram approval messages and persists them", async () => {
     const { runtime, sessionRepo, permissionApprovalRepo, messages } = createRuntime();
 

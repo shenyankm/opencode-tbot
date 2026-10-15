@@ -53,6 +53,7 @@ for (const operation of ["sessions", "lsp", "mcp", "prompt"] as const) {
             const client = {
                 async listProjects() { return [{ ...project, sandboxes: registeredSandbox ? project.sandboxes : [] }]; },
                 async listSessions() { return [session]; },
+                async getSession() { return session; },
                 async listAgents() { return []; },
                 async getCurrentProject() { throw new Error("The saved sandbox should stay selected."); },
                 async createSessionForDirectory() { throw new Error("The saved session should be reused."); },
@@ -107,6 +108,57 @@ test("ListSessionsUseCase rejects a sandbox belonging to a different saved proje
     assert.equal((await repo.getByChatId(1))?.projectId, null);
 });
 
+test("prompt validation preserves an existing session moved within its registered project", async () => {
+    const repo = new InMemorySessionRepository();
+    const binding = createBinding();
+    await repo.setCurrent(binding);
+    const client = {
+        async getSession() { return { ...session, directory: project.worktree }; },
+        async listProjects() { return [project]; },
+        async listAgents() { return []; },
+        async listSessions() { throw new Error("A session move must not require a catalog scan."); },
+        async createSessionForDirectory() { throw new Error("A session move must not discard the existing conversation."); },
+        async getCurrentProject() { return project; },
+        async promptSession() { return {} as PromptSessionResult; },
+    } as unknown as OpenCodeClientLike;
+
+    const result = await new SendPromptUseCase(repo, client, logger).execute({ chatId: 1, text: "continue" });
+
+    assert.equal(result.sessionId, session.id);
+    assert.equal((await repo.getByChatId(1))?.sessionId, binding.sessionId);
+});
+
+test("prompt validation reads only its saved session and rejects missing, external directory mismatches and cross-project sessions", async () => {
+    for (const state of ["valid", "missing", "moved", "other-project"] as const) {
+        const repo = new InMemorySessionRepository();
+        await repo.setCurrent(createBinding());
+        let reads = 0;
+        let creates = 0;
+        let prompted = "";
+        const client = {
+            async getSession(id: string) {
+                reads += 1;
+                assert.equal(id, session.id);
+                return state === "missing" ? null : {
+                    ...session,
+                    projectID: state === "other-project" ? "other" : project.id,
+                    directory: state === "moved" ? "/moved" : session.directory,
+                };
+            },
+            async listSessions() { throw new Error("Prompt validation must not scan the catalog."); },
+            async listProjects() { return [{ ...project, sandboxes: state === "moved" ? [] : project.sandboxes }]; },
+            async listAgents() { return []; },
+            async getCurrentProject() { return project; },
+            async createSessionForDirectory() { creates += 1; return { ...session, id: "new", directory: project.worktree }; },
+            async promptSession(input: { sessionId: string }) { prompted = input.sessionId; return {} as PromptSessionResult; },
+        } as unknown as OpenCodeClientLike;
+        await new SendPromptUseCase(repo, client, logger).execute({ chatId: 1, text: "hello" });
+        assert.equal(reads, 1);
+        assert.equal(creates, state === "valid" ? 0 : 1);
+        assert.equal(prompted, state === "valid" ? session.id : "new");
+    }
+});
+
 test("ListSessionsUseCase rejects a saved directory that disagrees with its session", async () => {
     const repo = new InMemorySessionRepository();
     await repo.setCurrent({ ...createBinding(), directory: "/wrong-worktree" });
@@ -132,6 +184,7 @@ for (const operation of ["sessions", "lsp", "mcp", "prompt"] as const) {
         const client = {
             async listProjects() { return [{ ...project, sandboxes: [] }]; },
             async listSessions() { throw offline; },
+            async getSession() { throw offline; },
         } as unknown as OpenCodeClientLike;
         const useCase = operation === "sessions" ? new ListSessionsUseCase(repo, client)
             : operation === "lsp" ? new ListLspUseCase(repo, client)

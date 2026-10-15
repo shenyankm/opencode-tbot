@@ -21,7 +21,7 @@ export interface RenameSessionInput {
 export class RenameSessionUseCase {
     constructor(
         private readonly sessionRepo: SessionRepository,
-        private readonly opencodeClient: OpenCodeCurrentProjectReader & OpenCodeSessionCatalog & Pick<OpenCodeSessionManager, "renameSession">,
+        private readonly opencodeClient: OpenCodeCurrentProjectReader & Pick<OpenCodeSessionCatalog, "getSession"> & Pick<OpenCodeSessionManager, "renameSession">,
         private readonly logger: AppLogger,
     ) { }
 
@@ -32,14 +32,12 @@ export class RenameSessionUseCase {
             throw new Error("Session title cannot be empty.");
         }
 
-        const [binding, sessions] = await Promise.all([
+        const [binding, session] = await Promise.all([
             this.sessionRepo.getByChatId(input.chatId),
-            this.opencodeClient.listSessions(),
+            this.opencodeClient.getSession(input.sessionId),
         ]);
         const currentProjectId = binding?.projectId ?? (await this.opencodeClient.getCurrentProject()).id;
-        const session = sessions.find((item) => item.id === input.sessionId && item.projectID === currentProjectId);
-
-        if (!session) {
+        if (!session || session.id !== input.sessionId || session.projectID !== currentProjectId) {
             return { found: false };
         }
 

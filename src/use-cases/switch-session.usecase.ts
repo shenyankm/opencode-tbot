@@ -20,19 +20,17 @@ export interface SwitchSessionInput {
 export class SwitchSessionUseCase {
     constructor(
         private readonly sessionRepo: SessionRepository,
-        private readonly opencodeClient: OpenCodeCurrentProjectReader & OpenCodeSessionCatalog,
+        private readonly opencodeClient: OpenCodeCurrentProjectReader & Pick<OpenCodeSessionCatalog, "getSession">,
         private readonly logger: AppLogger,
     ) { }
 
     async execute(input: SwitchSessionInput): Promise<SwitchSessionResult> {
-        const [binding, sessions] = await Promise.all([
+        const [binding, session] = await Promise.all([
             this.sessionRepo.getByChatId(input.chatId),
-            this.opencodeClient.listSessions(),
+            this.opencodeClient.getSession(input.sessionId),
         ]);
         const currentProjectId = binding?.projectId ?? (await this.opencodeClient.getCurrentProject()).id;
-        const session = sessions.find((item) => item.id === input.sessionId && item.projectID === currentProjectId);
-
-        if (!session) {
+        if (!session || session.id !== input.sessionId || session.projectID !== currentProjectId) {
             return { found: false };
         }
 

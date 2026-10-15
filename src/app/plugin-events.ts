@@ -74,7 +74,9 @@ export async function handleTelegramBotPluginEvent(
     runtime.container.foregroundSessionTracker.publish(event);
     if (["session.compaction.ended", "session.model.selected", "session.agent.selected", "session.moved", "session.usage.updated", "session.revert.committed", "session.revert.cleared"].includes(event.type)
         && event.data && typeof event.data === "object" && "sessionID" in event.data && typeof event.data.sessionID === "string") {
-        await runtime.container.contextFooter?.refreshSession(event.data.sessionID);
+        void runtime.container.contextFooter?.refreshSession(event.data.sessionID).catch((error) => {
+            runtime.container.logger.warn({ error }, "failed to refresh context footer after plugin event");
+        });
     }
     const handler = PLUGIN_EVENT_HANDLERS[event.type];
 

@@ -150,6 +150,23 @@ test("session and permission helpers preserve V2 void responses and location-bas
     ]);
 });
 
+test("getSession reads one session and only treats a session-not-found response as missing", async () => {
+    const calls: unknown[] = [];
+    const offline = new Error("offline");
+    const client = createClient({ session: { async get(input: { sessionID: string }) {
+        calls.push(input);
+        if (input.sessionID === "missing") {
+            throw { _tag: "SessionNotFoundError", sessionID: "missing", message: "Missing session" };
+        }
+        if (input.sessionID === "offline") { throw offline; }
+        return createSession(input.sessionID);
+    } } });
+    assert.equal((await client.getSession("target"))?.id, "target");
+    assert.equal(await client.getSession("missing"), null);
+    await assert.rejects(client.getSession("offline"), (error) => error === offline);
+    assert.deepEqual(calls, [{ sessionID: "target" }, { sessionID: "missing" }, { sessionID: "offline" }]);
+});
+
 test("listSessions follows V2 cursors instead of truncating the catalog to its default page", async () => {
     const calls: unknown[] = [];
     const client = createClient({
@@ -305,6 +322,16 @@ test("promptSession selects the V2 agent and model, sends URI attachments, and w
         files: [{ uri: "data:image/png;base64,aGVsbG8=", name: "diagram.png" }],
     } });
     assert.deepEqual(calls[3], { method: "wait", input: { sessionID: "ses_1" } });
+});
+
+test("promptSession uses an already resolved agent ID without listing agents and still switches the shared session", async () => {
+    const switched: unknown[] = [];
+    const client = createClient({
+        agent: { async list() { throw new Error("The resolved agent must not be queried again."); } },
+        session: { async switchAgent(input: unknown) { switched.push(input); } },
+    });
+    await client.promptSession({ sessionId: "ses_1", prompt: "hello", agent: "Planner", agentId: "agent_planner" });
+    assert.deepEqual(switched, [{ sessionID: "ses_1", agent: "agent_planner" }]);
 });
 
 test("promptSession uses the installed V2 transport paths and serialized payload", async () => {

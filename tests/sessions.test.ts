@@ -223,6 +223,7 @@ test("session switch callbacks switch the binding within the current project", a
         async listSessions() {
             return sessions;
         },
+        async getSession(id: string) { return sessions.find((session) => session.id === id) ?? null; },
     } as never);
     const edits: string[] = [];
 
@@ -318,6 +319,7 @@ test("session rename callbacks enter pending rename mode", async () => {
 test("invalid session actions ask the user to rerun /sessions", async () => {
     const currentProject = createProject("project-2", "E:/repo-2");
     const { dependencies } = createDependencies({
+        async getSession() { return null; },
         async getCurrentProject() {
             return currentProject;
         },
@@ -343,6 +345,37 @@ test("invalid session actions ask the user to rerun /sessions", async () => {
     );
 
     assert.equal(edits[0], "The session is no longer available. Run /sessions again.");
+});
+
+test("switching and renaming validate one session without listing the catalog", async () => {
+    for (const operation of ["switch", "rename"] as const) {
+        for (const state of ["valid", "missing", "other-project"] as const) {
+            const repo = new InMemorySessionRepository();
+            const project = createProject("project-1", "/repo");
+            let reads = 0;
+            let renames = 0;
+            const client = {
+                async getCurrentProject() { return project; },
+                async getSession(id: string) {
+                    reads += 1;
+                    assert.equal(id, "target");
+                    return state === "missing" ? null : createSession(id, state === "other-project" ? "other" : project.id, project.worktree);
+                },
+                async listSessions() { throw new Error("A single-session action must not scan the catalog."); },
+                async renameSession(id: string, title: string) {
+                    renames += 1;
+                    return createSession(id, project.id, project.worktree, title);
+                },
+            };
+            const result = operation === "switch"
+                ? await new SwitchSessionUseCase(repo, client, logger).execute({ chatId: 1, sessionId: "target" })
+                : await new RenameSessionUseCase(repo, client, logger).execute({ chatId: 1, sessionId: "target", title: "Renamed" });
+            assert.equal(result.found, state === "valid");
+            assert.equal(reads, 1);
+            assert.equal(renames, operation === "rename" && state === "valid" ? 1 : 0);
+            assert.equal(Boolean(await repo.getByChatId(1)), operation === "switch" && state === "valid");
+        }
+    }
 });
 
 test("ListSessionsUseCase clears stale saved session context and falls back to the current project", async () => {

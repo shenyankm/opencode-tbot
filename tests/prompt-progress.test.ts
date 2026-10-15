@@ -125,6 +125,87 @@ test("streaming thinking reuses unchanged messages, replaces final text and remo
     }
 });
 
+test("appending to one of one hundred thinking chunks reads only the changed chunk and finalizes every chunk", async (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const tracker = new ForegroundSessionTracker();
+    const thinking = createThinkingMessages();
+    const get = t.mock.method(thinking.repository, "get");
+    let nextId = 0;
+    const emit = (type: string, extra = {}) => tracker.publish({ type, data: {
+        sessionID: "s", assistantMessageID: "a", ordinal: 0, ...extra,
+    } });
+    await executePromptRequest({
+        chat: { id: 1 },
+        async reply() { return { message_id: ++nextId }; },
+        api: { async deleteMessage() {}, async editMessageText() {} },
+    }, {
+        thinkingMessages: thinking.service, foregroundSessionTracker: tracker,
+        sessionRepo: new InMemorySessionRepository(), logger,
+        sendPromptUseCase: { async execute(input) {
+            input.onExecutionSession?.("s");
+            input.onInputReady?.("input");
+            emit("session.inbox.delivered", { inboxID: "input" });
+            emit("session.step.started");
+            emit("session.reasoning.delta", { delta: "A".repeat(96_000) });
+            t.mock.timers.tick(1_000);
+            await setImmediate();
+            assert.equal(thinking.messages.size, 100);
+            const initialReads = get.mock.callCount();
+            emit("session.reasoning.delta", { delta: "B" });
+            t.mock.timers.tick(1_000);
+            await setImmediate();
+            assert.equal(get.mock.callCount() - initialReads, 1);
+            assert.equal([...thinking.messages.values()].map((message) => message.text).join(""), "A".repeat(96_000) + "B");
+            await thinking.service.setExpanded(1, 1, true, tracker.getRequestId(1), getBotCopy("en"), async () => {});
+            return { sessionId: "s", projectId: "p", assistantReply: {
+                bodyMd: "answer", fallbackText: "answer", assistantError: null, info: null, parts: [], structured: null,
+                metrics: { durationMs: 100, tokens: { total: 0, input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 } },
+            } };
+        } },
+    }, async () => ({ text: "test" }));
+    assert.ok([...thinking.messages.values()].every((message) => message.phase === "completed" && message.stopCallbackData === null));
+    assert.equal(thinking.messages.get("1:1")?.expanded, true);
+});
+
+test("a failed thinking edit is retried even when the next flush has identical thinking content", async (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const tracker = new ForegroundSessionTracker();
+    const thinking = createThinkingMessages();
+    let edits = 0;
+    const emit = (type: string, extra = {}) => tracker.publish({ type, data: {
+        sessionID: "s", assistantMessageID: "a", ordinal: 0, ...extra,
+    } });
+    await executePromptRequest({
+        chat: { id: 1 }, async reply() { return { message_id: 1 }; },
+        api: { async deleteMessage() {}, async editMessageText() {
+            if (++edits === 1) { throw new Error("offline"); }
+        } },
+    }, {
+        thinkingMessages: thinking.service, foregroundSessionTracker: tracker,
+        sessionRepo: new InMemorySessionRepository(), logger,
+        sendPromptUseCase: { async execute(input) {
+            input.onExecutionSession?.("s");
+            input.onInputReady?.("input");
+            emit("session.inbox.delivered", { inboxID: "input" });
+            emit("session.step.started");
+            emit("session.reasoning.delta", { delta: "thinking" });
+            t.mock.timers.tick(1_000);
+            await setImmediate();
+            assert.equal(edits, 1);
+            emit("session.text.delta", { delta: "answer" });
+            t.mock.timers.tick(1_000);
+            await setImmediate();
+            assert.equal(edits, 2);
+            assert.ok(thinking.messages.get("1:1")?.lastSentView);
+            return { sessionId: "s", projectId: "p", assistantReply: {
+                bodyMd: "answer", fallbackText: "answer", assistantError: null, info: null, parts: [], structured: null,
+                metrics: { durationMs: 100, tokens: { total: 0, input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 } },
+            } };
+        } },
+    }, async () => ({ text: "test" }));
+    assert.equal(thinking.messages.get("1:1")?.phase, "completed");
+});
+
 test("session compression reaches waiting requests before input delivery without leaking other sessions", () => {
     const tracker = new ForegroundSessionTracker();
     const received: string[] = [];

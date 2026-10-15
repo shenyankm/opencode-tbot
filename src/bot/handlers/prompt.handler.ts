@@ -1,6 +1,7 @@
 import { randomInt } from "node:crypto";
 import { GrammyError, InlineKeyboard } from "grammy";
 import type { InputRichMessage } from "grammy/types";
+import type { ThinkingContent } from "../../domain/thinking/thinking-message.entity.js";
 import { retryTelegramRequest } from "../../services/telegram/telegram-message-queue.js";
 import { TelegramPromptProgress } from "../../services/telegram/prompt-progress.js";
 import { getSafeChatCopy } from "../i18n.js";
@@ -102,7 +103,7 @@ export async function executePromptRequest(
     try {
         const keyboard = new InlineKeyboard().text(copy.status.stop, `prompt:stop:${foregroundRequest.id}`);
         processingMessage = await ctx.reply(copy.status.processing, { reply_markup: keyboard });
-        const thinkingMessages: Array<SentMessage & TelegramReplyPayload<"HTML"> & { terminal: boolean }> = [
+        const thinkingMessages: Array<SentMessage & TelegramReplyPayload<"HTML"> & { terminal: boolean; thinking?: ThinkingContent }> = [
             { ...processingMessage, text: copy.status.processing, terminal: false },
         ];
         progress = new TelegramPromptProgress(copy, async (replies, terminal) => {
@@ -110,6 +111,11 @@ export async function executePromptRequest(
             for (const [index, reply] of replies.entries()) {
                 let existing = thinkingMessages[index];
                 if (reply.thinking) {
+                    if (existing?.thinking?.text === reply.thinking.text
+                        && existing.thinking.phase === reply.thinking.phase
+                        && existing.thinking.part === reply.thinking.part) {
+                        continue;
+                    }
                     if (!existing) {
                         const message = await retryTelegramRequest(() => ctx.reply(copy.status.thinkingInProgress, { reply_markup: replyMarkup }));
                         existing = { ...message, text: copy.status.thinkingInProgress, terminal: false };
@@ -122,7 +128,7 @@ export async function executePromptRequest(
                             reply_markup: keyboard,
                         }) ?? Promise.resolve(),
                     );
-                    thinkingMessages[index] = { message_id: messageId, ...reply.preferred, terminal };
+                    thinkingMessages[index] = { message_id: messageId, ...reply.preferred, terminal, thinking: reply.thinking };
                     continue;
                 }
                 const write = async (payload: TelegramReplyPayload<"HTML">) => {

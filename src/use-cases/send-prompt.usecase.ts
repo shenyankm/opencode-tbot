@@ -75,6 +75,7 @@ export class SendPromptUseCase {
                     ...(input.onInputReady ? { onInputReady: input.onInputReady } : {}),
                     ...(files.length > 0 ? { files } : {}),
                     ...(context.selectedAgent ? { agent: context.selectedAgent.name } : {}),
+                    ...(context.selectedAgent?.id ? { agentId: context.selectedAgent.id } : {}),
                     format: {
                         type: "text",
                     },

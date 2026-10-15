@@ -57,13 +57,13 @@ export class PromptContextResolver {
         }
 
         let binding = await this.sessionRepo.getByChatId(input.chatId);
-        const sessions = binding?.sessionId && binding.projectId
-            ? await this.opencodeClient.listSessions()
-            : undefined;
+        const session = binding?.sessionId && binding.projectId
+            ? await this.opencodeClient.getSession(binding.sessionId)
+            : null;
 
         if (binding?.projectId && binding.directory) {
             const projects = await this.opencodeClient.listProjects();
-            if (!(await hasMatchingProject(projects, binding, this.opencodeClient, sessions))) {
+            if (!(await hasMatchingProject(projects, binding, this.opencodeClient, session ? [session] : []))) {
                 binding = await this.clearInvalidSessionContext(
                     input.chatId,
                     binding,
@@ -73,11 +73,7 @@ export class PromptContextResolver {
         }
 
         if (binding?.sessionId && binding.projectId) {
-            const selectedSession = sessions?.find((session) =>
-                session.id === binding?.sessionId && session.projectID === binding.projectId,
-            );
-
-            if (!selectedSession) {
+            if (!session || session.id !== binding.sessionId || session.projectID !== binding.projectId) {
                 binding = await this.clearInvalidSessionContext(
                     input.chatId,
                     binding,

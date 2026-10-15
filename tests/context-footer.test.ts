@@ -48,6 +48,76 @@ test("context uses the latest assistant step including cache rather than accumul
     assert.deepEqual(await client.getSessionContext("ses_test"), { capacity: 1000, used: 435, session: { directory: "/repo", modelName: "Small", providerID: "p", variant: "high", agentName: "build" } });
 });
 
+test("context reads share metadata for five seconds while session selections and token usage remain live", async (t) => {
+    let now = 1_000;
+    t.mock.method(Date, "now", () => now);
+    let modelReads = 0;
+    let agentReads = 0;
+    let sessionReads = 0;
+    let messageReads = 0;
+    let selected = "small";
+    let used = 10;
+    let capacity = 1000;
+    const sdk = {
+        async models() {
+            modelReads += 1;
+            return { data: ["small", "large"].map((id) => ({
+                id, providerID: "p", name: id, limit: { context: id === "small" ? capacity : 2000 },
+                enabled: true, capabilities: { input: ["text"], output: ["text"] }, variants: [],
+            })) };
+        },
+    };
+    const client = new OpenCodeClient(undefined, {
+        model: { list: sdk.models },
+        provider: { async list() { return { data: [{ id: "p", name: "Provider" }] }; } },
+        agent: { async list() { agentReads += 1; return { data: [{ id: "build", name: "Build" }] }; } },
+        session: { async get() { sessionReads += 1; return { model: { providerID: "p", id: selected }, agent: "build" }; } },
+        message: { async list() {
+            messageReads += 1;
+            return { data: [{ type: "assistant", tokens: { input: used, output: 0, reasoning: 0, cache: { read: 0, write: 0 } } }], cursor: {} };
+        } },
+    } as never);
+    await Promise.all([client.listModels(), client.listAgents(), ...Array.from({ length: 10 }, () => client.getSessionContext("s"))]);
+    assert.equal(modelReads, 1);
+    assert.equal(agentReads, 1);
+    assert.equal(sessionReads, 10);
+    assert.equal(messageReads, 10);
+    selected = "large";
+    used = 20;
+    const switched = await client.getSessionContext("s");
+    assert.equal(switched.capacity, 2000);
+    assert.equal(switched.used, 20);
+    selected = "small";
+    capacity = 1500;
+    now += 4_999;
+    assert.equal((await client.getSessionContext("s")).capacity, 1000);
+    now += 1;
+    assert.equal((await client.getSessionContext("s")).capacity, 1500);
+    assert.equal(modelReads, 2);
+    assert.equal(agentReads, 2);
+});
+
+test("failed metadata requests are retried and an agent fallback is never cached as an empty catalog", async () => {
+    let modelReads = 0;
+    let agentReads = 0;
+    const client = new OpenCodeClient(undefined, {
+        model: { async list() {
+            if (++modelReads === 1) { throw new Error("models offline"); }
+            return { data: [] };
+        } },
+        agent: { async list() {
+            if (++agentReads === 1) { throw new Error("agents offline"); }
+            return { data: [{ id: "build", name: "Build" }] };
+        } },
+        session: { async get() { return { model: { providerID: "p", id: "m" }, agent: "build" }; } },
+        message: { async list() { return { data: [], cursor: {} }; } },
+    } as never);
+    await assert.rejects(client.getSessionContext("s"), /models offline/);
+    assert.equal((await client.getSessionContext("s")).session?.agentName, "Build");
+    assert.equal(modelReads, 2);
+    assert.equal(agentReads, 2);
+});
+
 test("session footer uses the latest assistant agent when session metadata has no explicit agent", async () => {
     const client = createContextClient([[{ type: "assistant", tokens, agent: "agent_plan" }]], undefined, null);
     assert.equal((await client.getSessionContext("ses_test")).session?.agentName, "plan");
@@ -195,6 +265,60 @@ test("a slow refresh cannot overwrite a newer reply and failures do not break su
     await retry.refreshChat(1);
     await retry.refreshChat(1);
     assert.equal(writes, 1);
+});
+
+test("a burst of ten footer refreshes shares one read and refreshes again for changes during that read", async () => {
+    const repo = new InMemorySessionRepository();
+    await bind(repo);
+    let reads = 0;
+    let finish!: (context: OpenCodeContextUsage) => void;
+    let started!: () => void;
+    const entered = new Promise<void>((resolve) => { started = resolve; });
+    const footer = new TelegramContextFooter({ async execute() {
+        reads += 1;
+        if (reads === 2) {
+            started();
+            return new Promise<OpenCodeContextUsage>((resolve) => { finish = resolve; });
+        }
+        return { capacity: 1000, used: reads };
+    } }, repo, logger);
+    const writes: Array<number | null> = [];
+    footer.watch(1, "ses_test", async (context) => { writes.push(context.used); });
+    await Promise.all(Array.from({ length: 10 }, () => footer.refreshSession("ses_test")));
+    assert.equal(reads, 1);
+    assert.deepEqual(writes, [1]);
+
+    const pending = footer.refreshChat(1);
+    await entered;
+    const burst = Array.from({ length: 10 }, () => footer.refreshChat(1));
+    finish({ capacity: 1000, used: 2 });
+    await Promise.all([pending, ...burst]);
+    assert.equal(reads, 3);
+    assert.deepEqual(writes, [1, 3]);
+});
+
+test("clearing footer watches discards in-flight and queued refreshes", async () => {
+    const repo = new InMemorySessionRepository();
+    await bind(repo);
+    let finish!: (context: OpenCodeContextUsage) => void;
+    let started!: () => void;
+    const entered = new Promise<void>((resolve) => { started = resolve; });
+    let reads = 0;
+    const footer = new TelegramContextFooter({ async execute() {
+        reads += 1;
+        started();
+        return new Promise<OpenCodeContextUsage>((resolve) => { finish = resolve; });
+    } }, repo, logger);
+    let writes = 0;
+    footer.watch(1, "ses_test", async () => { writes += 1; });
+    const pending = footer.refreshChat(1);
+    await entered;
+    const queued = footer.refreshChat(1);
+    footer.clear();
+    finish({ capacity: 1000, used: 1 });
+    await Promise.all([pending, queued]);
+    assert.equal(reads, 1);
+    assert.equal(writes, 0);
 });
 
 test("changing sessions while metadata is loading cannot write that metadata into the old status message", async () => {

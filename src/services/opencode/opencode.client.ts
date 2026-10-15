@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import {
     ClientError,
+    isSessionNotFoundError,
     OpenCode,
     type AgentInfo,
     type ConfigEntry,
@@ -41,6 +42,7 @@ export interface PromptSessionInput {
     sessionId: string;
     prompt?: string | null;
     agent?: string | null;
+    agentId?: string | null;
     format?: OpenCodeTextOutputFormat;
     signal?: AbortSignal;
     model?: {
@@ -278,6 +280,7 @@ export interface OpenCodeClientLike {
     getSessionContext(sessionId: string, model?: { providerID: string; id: string }): Promise<OpenCodeContextUsage>;
     listProjects(): Promise<OpenCodeProject[]>;
     listSessions(): Promise<OpenCodeSession[]>;
+    getSession(sessionId: string): Promise<OpenCodeSession | null>;
     getCurrentProject(): Promise<OpenCodeProject>;
     createSessionForDirectory(directory: string, title?: string): Promise<OpenCodeSession>;
     renameSession(sessionId: string, title: string): Promise<OpenCodeSession>;
@@ -295,6 +298,12 @@ export interface OpenCodeClientLike {
 export class OpenCodeClient implements OpenCodeClientLike {
     readonly client: OpenCodeSdkClientLike;
     private promptTimeoutPolicy: OpenCodePromptTimeoutPolicy;
+    private readonly cachedModels = cacheMetadata(async () => (await this.client.model.list(undefined, {
+        signal: AbortSignal.timeout(5_000),
+    })).data);
+    private readonly cachedAgents = cacheMetadata(async () => (await this.client.agent.list(undefined, {
+        signal: AbortSignal.timeout(5_000),
+    })).data);
     private modelCache: {
         expiresAt: number;
         promise: Promise<OpenCodeConfiguredModel[]> | null;
@@ -336,10 +345,10 @@ export class OpenCodeClient implements OpenCodeClientLike {
         const session = await this.client.session.get({ sessionID: sessionId }, options);
         const model = selectedModel ?? session.model ?? (await this.client.model.default(undefined, options)).data;
         const [catalog, agents] = await Promise.all([
-            this.client.model.list(undefined, options),
-            this.client.agent.list(undefined, options).catch(() => ({ data: [] })),
+            this.cachedModels(),
+            this.cachedAgents().catch(() => []),
         ]);
-        const selected = catalog.data.find((item) => item.providerID === model?.providerID && item.id === model?.id);
+        const selected = catalog.find((item) => item.providerID === model?.providerID && item.id === model?.id);
         const capacity = selected?.limit.context;
         const result: OpenCodeContextUsage = {
             capacity: capacity && Number.isFinite(capacity) ? capacity : null,
@@ -349,7 +358,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
                 modelName: selected?.name ?? model?.id ?? null,
                 providerID: model?.providerID ?? null,
                 variant: model && "variant" in model && typeof model.variant === "string" ? model.variant : null,
-                agentName: agents.data.find((agent) => agent.id === session.agent)?.name ?? session.agent ?? null,
+                agentName: agents.find((agent) => agent.id === session.agent)?.name ?? session.agent ?? null,
             },
         };
         let cursor: string | undefined;
@@ -372,7 +381,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
                         used: Number.isFinite(used) && used >= 0 ? used : null,
                         session: {
                             ...result.session!,
-                            agentName: agents.data.find((agent) => agent.id === (session.agent ?? message.agent))?.name
+                            agentName: agents.find((agent) => agent.id === (session.agent ?? message.agent))?.name
                                 ?? session.agent ?? message.agent ?? null,
                         },
                     };
@@ -429,6 +438,17 @@ export class OpenCodeClient implements OpenCodeClientLike {
         return (await this.client.project.list()).map(toOpenCodeProject);
     }
 
+    async getSession(sessionId: string): Promise<OpenCodeSession | null> {
+        try {
+            return toOpenCodeSession(await this.client.session.get({ sessionID: sessionId }));
+        } catch (error) {
+            if (isSessionNotFoundError(error)) {
+                return null;
+            }
+            throw error;
+        }
+    }
+
     async listSessions(): Promise<OpenCodeSession[]> {
         const sessions: OpenCodeSession[] = [];
         let cursor: string | undefined;
@@ -462,7 +482,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
     }
 
     async listAgents(): Promise<OpenCodeAgent[]> {
-        return (await this.client.agent.list()).data;
+        return this.cachedAgents();
     }
 
     async replyToPermission(
@@ -529,12 +549,15 @@ export class OpenCodeClient implements OpenCodeClientLike {
         await this.runPromptRequestWithTimeout(
             { sessionId: input.sessionId, stage: "send-prompt", timeoutMs: deadlineAt - Date.now() },
             async (signal) => {
-                if (input.agent) {
-                    const agents = await this.client.agent.list(undefined, { signal });
-                    const agent = agents.data.find((candidate) => candidate.name === input.agent || candidate.id === input.agent);
+                let agentId = input.agentId ?? input.agent;
+                if (agentId) {
+                    if (!input.agentId) {
+                        const agents = await this.client.agent.list(undefined, { signal });
+                        agentId = agents.data.find((candidate) => candidate.name === input.agent || candidate.id === input.agent)?.id ?? agentId;
+                    }
                     await this.client.session.switchAgent({
                         sessionID: input.sessionId,
-                        agent: agent?.id ?? input.agent,
+                        agent: agentId,
                     }, { signal });
                 }
 
@@ -607,11 +630,11 @@ export class OpenCodeClient implements OpenCodeClientLike {
 
     private async loadModels(): Promise<OpenCodeConfiguredModel[]> {
         const [models, providers] = await Promise.all([
-            this.client.model.list(),
+            this.cachedModels(),
             this.client.provider.list(),
         ]);
         const providerNames = new Map(providers.data.map((provider) => [provider.id, provider.name]));
-        const value = models.data
+        const value = models
             .filter((model) => model.enabled && model.capabilities.input.includes("text") && model.capabilities.output.includes("text"))
             .map((model) => ({
                 id: model.id,
@@ -996,6 +1019,25 @@ function sumTokenMetrics(...values: Array<number | null>): number | null {
     const total = values.reduce<number>((sum, value) => sum + (value ?? 0), 0);
 
     return Number.isFinite(total) ? total : null;
+}
+
+function cacheMetadata<T>(load: () => Promise<T>): () => Promise<T> {
+    let promise: Promise<T> | null = null;
+    let expiresAt = 0;
+    return () => {
+        if (!promise || Date.now() >= expiresAt) {
+            // shortcut: metadata can lag host changes by five seconds; use event invalidation if immediate catalog updates are needed.
+            expiresAt = Infinity;
+            promise = Promise.resolve().then(load).then((value) => {
+                expiresAt = Date.now() + 5_000;
+                return value;
+            }, (error: unknown) => {
+                promise = null;
+                throw error;
+            });
+        }
+        return promise;
+    };
 }
 
 function resolvePromptTimeoutPolicy(

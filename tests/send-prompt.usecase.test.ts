@@ -108,6 +108,22 @@ function createImageFile(): PromptSessionFilePartInput {
     };
 }
 
+test("SendPromptUseCase forwards the agent ID it already resolved", async () => {
+    const repo = new InMemorySessionRepository();
+    let agentReads = 0;
+    let submitted: { agent?: string | null; agentId?: string | null } | undefined;
+    const client = createClient({
+        async getCurrentProject() { return createProject("p", "/repo"); },
+        async createSessionForDirectory() { return createSession("s", "p", "/repo"); },
+        async listAgents() { agentReads += 1; return [{ ...createAgent("build"), id: "agent_build" }]; },
+        async promptSession(input) { submitted = input; return createPromptReply("answer"); },
+    });
+    await new SendPromptUseCase(repo, client, logger).execute({ chatId: 1, text: "hello" });
+    assert.equal(agentReads, 1);
+    assert.equal(submitted?.agent, "build");
+    assert.equal(submitted?.agentId, "agent_build");
+});
+
 test("SendPromptUseCase creates a session in the current project when the chat is unbound", async () => {
     const repo = new InMemorySessionRepository();
     const calls: Array<{
@@ -156,8 +172,8 @@ test("SendPromptUseCase creates a session in the current project when the chat i
         async listProjects() {
             return [currentProject];
         },
-        async listSessions() {
-            return [];
+        async getSession() {
+            return null;
         },
         async getPath() {
             throw new Error("unused");
@@ -264,8 +280,8 @@ test("SendPromptUseCase preserves a selected model when it needs to create a ses
         async listProjects() {
             return [currentProject];
         },
-        async listSessions() {
-            return [];
+        async getSession() {
+            return null;
         },
         async getPath() {
             throw new Error("unused");
@@ -367,8 +383,8 @@ test("SendPromptUseCase clears a stale model selection before prompting", async 
         async listProjects() {
             return [createProject("project-1", "E:/repo-1")];
         },
-        async listSessions() {
-            return [];
+        async getSession() {
+            return null;
         },
         async getPath() {
             throw new Error("unused");
@@ -449,8 +465,8 @@ test("SendPromptUseCase recreates the session when the saved session context is 
         async listProjects() {
             return [createProject("project-1", "E:/repo-1")];
         },
-        async listSessions() {
-            return [createSession("session-live", "project-1", "E:/repo-1")];
+        async getSession() {
+            return createSession("session-live", "project-1", "E:/repo-1");
         },
         async getPath() {
             throw new Error("unused");
@@ -531,8 +547,8 @@ test("SendPromptUseCase clears stale selected agents before prompting", async ()
         async listProjects() {
             return [createProject("project-1", "E:/repo-1")];
         },
-        async listSessions() {
-            return [createSession("session-1", "project-1", "E:/repo-1")];
+        async getSession() {
+            return createSession("session-1", "project-1", "E:/repo-1");
         },
         async getPath() {
             throw new Error("unused");
@@ -607,8 +623,8 @@ test("SendPromptUseCase clears selected subagents before prompting", async () =>
         async listProjects() {
             return [createProject("project-1", "E:/repo-1")];
         },
-        async listSessions() {
-            return [createSession("session-1", "project-1", "E:/repo-1")];
+        async getSession() {
+            return createSession("session-1", "project-1", "E:/repo-1");
         },
         async getPath() {
             throw new Error("unused");
@@ -685,8 +701,8 @@ test("SendPromptUseCase forks a temporary child session for image prompts and ke
         async listProjects() {
             return [createProject("project-1", "E:/repo-1")];
         },
-        async listSessions() {
-            return [createSession("session-1", "project-1", "E:/repo-1")];
+        async getSession() {
+            return createSession("session-1", "project-1", "E:/repo-1");
         },
         async getPath() {
             throw new Error("unused");
@@ -761,8 +777,8 @@ test("SendPromptUseCase creates and keeps a main session when the first prompt i
         async listProjects() {
             return [currentProject];
         },
-        async listSessions() {
-            return [createSession("session-1", "project-1", "E:/repo-1")];
+        async getSession() {
+            return createSession("session-1", "project-1", "E:/repo-1");
         },
         async getPath() {
             throw new Error("unused");
@@ -861,8 +877,8 @@ test("SendPromptUseCase returns to the main session after an image turn", async 
         async listProjects() {
             return [createProject("project-1", "E:/repo-1")];
         },
-        async listSessions() {
-            return [createSession("session-1", "project-1", "E:/repo-1")];
+        async getSession() {
+            return createSession("session-1", "project-1", "E:/repo-1");
         },
         async getPath() {
             throw new Error("unused");
@@ -953,8 +969,8 @@ test("SendPromptUseCase deletes the temporary image session even when the prompt
         async listProjects() {
             return [createProject("project-1", "E:/repo-1")];
         },
-        async listSessions() {
-            return [createSession("session-1", "project-1", "E:/repo-1")];
+        async getSession() {
+            return createSession("session-1", "project-1", "E:/repo-1");
         },
         async getPath() {
             throw new Error("unused");
@@ -1028,8 +1044,8 @@ test("SendPromptUseCase logs a warning when temporary image session cleanup fail
         async listProjects() {
             return [createProject("project-1", "E:/repo-1")];
         },
-        async listSessions() {
-            return [createSession("session-1", "project-1", "E:/repo-1")];
+        async getSession() {
+            return createSession("session-1", "project-1", "E:/repo-1");
         },
         async getPath() {
             throw new Error("unused");
@@ -1082,8 +1098,8 @@ test("SendPromptUseCase forwards the execution session id when promptSession tim
         async listProjects() {
             return [createProject("project-1", "E:/repo-1")];
         },
-        async listSessions() {
-            return [createSession("session-1", "project-1", "E:/repo-1")];
+        async getSession() {
+            return createSession("session-1", "project-1", "E:/repo-1");
         },
         async getPath() {
             throw new Error("unused");
