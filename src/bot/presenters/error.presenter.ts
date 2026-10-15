@@ -14,10 +14,32 @@ export function presentError(error: unknown, copy: BotCopy = BOT_COPY): string {
 }
 
 function normalizeError(error: unknown, copy: BotCopy): PresentedError {
-    if (isNamedError(error, "ProviderAuthError")) {
+    if (isStructuredError(error)) {
+        const labels: Record<string, string> = {
+            ProviderAuthError: copy.errors.providerAuth,
+            MessageAbortedError: copy.errors.requestAborted,
+            StructuredOutputError: copy.errors.structuredOutput,
+            MessageOutputLengthError: copy.errors.outputLength,
+            ContextOverflowError: copy.errors.contextOverflow,
+            APIError: copy.errors.providerRequest,
+        };
+        const providerError = error.type === "APIError" || error.type.startsWith("provider.");
         return {
-            message: copy.errors.providerAuth,
-            cause: extractMessage(error.data) ?? null,
+            message: labels[error.type] ?? (providerError ? copy.errors.providerRequest : copy.errors.unexpected),
+            cause: joinNonEmptyParts([
+                providerError ? getProviderCompatibilityHint(error.message) : null,
+                error.message,
+                typeof error.status === "number" && Number.isFinite(error.status)
+                    ? `${copy.errors.statusCodeLabel}: ${error.status}` : null,
+            ]),
+        };
+    }
+
+    if (isTaggedError(error)) {
+        return {
+            message: error._tag === "InvalidRequestError" ? copy.errors.badRequest
+                : error._tag.endsWith("NotFoundError") ? copy.errors.notFound : copy.errors.unexpected,
+            cause: error.message,
         };
     }
 
@@ -35,16 +57,6 @@ function normalizeError(error: unknown, copy: BotCopy): PresentedError {
         };
     }
 
-    if (isNamedError(error, "StructuredOutputError")) {
-        return {
-            message: copy.errors.structuredOutput,
-            cause: joinNonEmptyParts([
-                extractMessage(error.data),
-                extractRetries(error.data),
-            ]),
-        };
-    }
-
     if (isNamedError(error, "ImageFileDownloadError")) {
         return {
             message: copy.errors.imageDownload,
@@ -56,48 +68,6 @@ function normalizeError(error: unknown, copy: BotCopy): PresentedError {
         return {
             message: copy.errors.imageUnsupported,
             cause: extractMessage(error.data) ?? null,
-        };
-    }
-
-    if (isNamedError(error, "MessageOutputLengthError")) {
-        return {
-            message: copy.errors.outputLength,
-            cause: extractMessage(error.data) ?? null,
-        };
-    }
-
-    if (isNamedError(error, "ContextOverflowError")) {
-        return {
-            message: copy.errors.contextOverflow,
-            cause: extractMessage(error.data) ?? null,
-        };
-    }
-
-    if (isNamedError(error, "APIError")) {
-        const providerMessage = extractMessage(error.data);
-
-        return {
-            message: copy.errors.providerRequest,
-            cause: joinNonEmptyParts([
-                getProviderCompatibilityHint(providerMessage),
-                providerMessage,
-                extractStatusCode(error.data, copy),
-                extractRetryable(error.data, copy),
-            ]),
-        };
-    }
-
-    if (isNamedError(error, "NotFoundError")) {
-        return {
-            message: copy.errors.notFound,
-            cause: extractMessage(error.data) ?? null,
-        };
-    }
-
-    if (isBadRequestError(error)) {
-        return {
-            message: copy.errors.badRequest,
-            cause: extractBadRequestCause(error),
         };
     }
 
@@ -124,11 +94,16 @@ function getProviderCompatibilityHint(message: string | null): string | null {
         : null;
 }
 
-function isBadRequestError(error: unknown): error is { data?: unknown; errors?: unknown[]; success: false } {
-    return !!error
-        && typeof error === "object"
-        && "success" in error
-        && (error as { success?: unknown }).success === false;
+function isStructuredError(error: unknown): error is { type: string; message: string; status?: number } {
+    return !!error && typeof error === "object"
+        && "type" in error && typeof error.type === "string"
+        && "message" in error && typeof error.message === "string";
+}
+
+function isTaggedError(error: unknown): error is { _tag: string; message: string } {
+    return !!error && typeof error === "object"
+        && "_tag" in error && typeof error._tag === "string"
+        && "message" in error && typeof error.message === "string";
 }
 
 function isNamedError<TName extends string>(
@@ -139,20 +114,6 @@ function isNamedError<TName extends string>(
         && typeof error === "object"
         && "name" in error
         && (error as { name?: unknown }).name === name;
-}
-
-function extractBadRequestCause(error: { data?: unknown; errors?: unknown[] }): string | null {
-    const directMessage = extractMessage(error.data);
-
-    if (directMessage) {
-        return directMessage;
-    }
-
-    const firstValidationError = Array.isArray(error.errors) && error.errors.length > 0
-        ? stringifyUnknown(error.errors[0])
-        : null;
-
-    return firstValidationError;
 }
 
 function extractMessage(value: unknown): string | null {
@@ -173,42 +134,6 @@ function extractMessage(value: unknown): string | null {
     }
 
     return null;
-}
-
-function extractRetries(value: unknown): string | null {
-    if (!value || typeof value !== "object" || !("retries" in value)) {
-        return null;
-    }
-
-    const retries = (value as { retries?: unknown }).retries;
-
-    return typeof retries === "number" && Number.isFinite(retries)
-        ? `retries: ${Math.round(retries)}`
-        : null;
-}
-
-function extractRetryable(value: unknown, copy: BotCopy): string | null {
-    if (!value || typeof value !== "object" || !("isRetryable" in value)) {
-        return null;
-    }
-
-    const isRetryable = (value as { isRetryable?: unknown }).isRetryable;
-
-    return typeof isRetryable === "boolean"
-        ? `${copy.errors.retryableLabel}: ${isRetryable ? "yes" : "no"}`
-        : null;
-}
-
-function extractStatusCode(value: unknown, copy: BotCopy): string | null {
-    if (!value || typeof value !== "object" || !("statusCode" in value)) {
-        return null;
-    }
-
-    const statusCode = (value as { statusCode?: unknown }).statusCode;
-
-    return typeof statusCode === "number" && Number.isFinite(statusCode)
-        ? `${copy.errors.statusCodeLabel}: ${Math.round(statusCode)}`
-        : null;
 }
 
 function joinNonEmptyParts(parts: Array<string | null | undefined>): string | null {

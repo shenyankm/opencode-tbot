@@ -76,9 +76,6 @@ export class SendPromptUseCase {
                     ...(files.length > 0 ? { files } : {}),
                     ...(context.selectedAgent ? { agent: context.selectedAgent.name } : {}),
                     ...(context.selectedAgent?.id ? { agentId: context.selectedAgent.id } : {}),
-                    format: {
-                        type: "text",
-                    },
                     ...(context.model ? { model: context.model } : {}),
                     ...(input.signal ? { signal: input.signal } : {}),
                     ...(context.activeBinding.modelVariant ? { variant: context.activeBinding.modelVariant } : {}),

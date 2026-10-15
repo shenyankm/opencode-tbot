@@ -11,11 +11,13 @@ import {
     type OpenCodeClient as SdkClient,
     type Project,
     type ProviderInfo,
+    type SessionStatus,
     type SessionInfo,
     type SessionMessageAssistant,
     type SessionMessageIdle,
 } from "@opencode/client";
 
+import { calculateDisplayedTokenTotal } from "../../domain/token/token-settings.entity.js";
 import { stripMarkdownToPlainText } from "../../infra/utils/markdown-text.js";
 
 export interface OpenCodeClientOptions {
@@ -43,7 +45,6 @@ export interface PromptSessionInput {
     prompt?: string | null;
     agent?: string | null;
     agentId?: string | null;
-    format?: OpenCodeTextOutputFormat;
     signal?: AbortSignal;
     model?: {
         providerID: string;
@@ -92,8 +93,6 @@ export interface PromptSessionResult {
     fallbackText: string;
     info: OpenCodeAssistantMessage | null;
     metrics: PromptSessionMetrics;
-    parts: Part[];
-    structured: unknown;
 }
 
 export type OpenCodeProject = Omit<Project, "canonical" | "time" | "sandboxes"> & {
@@ -108,8 +107,6 @@ export interface OpenCodeSession {
     title: string;
     time: SessionInfo["time"];
     parentID?: string;
-    slug?: string;
-    version?: string;
 }
 export type OpenCodeModel = ModelInfo;
 export type OpenCodeProvider = ProviderInfo;
@@ -124,24 +121,9 @@ export interface OpenCodeLspStatus {
 export interface OpenCodePath {
     directory: string;
     worktree: string;
-    home?: string;
-    state?: string;
-    config?: string;
 }
-export type OpenCodeMcpStatus = McpServer["status"] | {
-    status: "needs_client_registration";
-    error: string;
-} | {
-    status: "needs_auth";
-};
-export type OpenCodeSessionStatus = {
-    type: "idle" | "busy";
-} | {
-    type: "retry";
-    attempt: number;
-    message: string;
-    next: number;
-};
+export type OpenCodeMcpStatus = McpServer["status"];
+export type OpenCodeSessionStatus = SessionStatus;
 type Part = SessionMessageAssistant["content"][number];
 type OpenCodePromptTurn = {
     assistants: SessionMessageAssistant[];
@@ -168,9 +150,6 @@ export interface OpenCodeConfiguredModel {
     qualifiedId: string;
     reasoning: boolean;
     variants: Record<string, Record<string, unknown>>;
-}
-export interface OpenCodeTextOutputFormat {
-    type: "text";
 }
 export type OpenCodeSdkClientLike = SdkClient;
 
@@ -220,45 +199,8 @@ export function createMessageAbortedError(message = "Request was aborted."): Ope
     return new OpenCodeMessageAbortedError(message);
 }
 
-export interface OpenCodeAssistantError {
-    data?: Record<string, unknown>;
-    name: string;
-    [key: string]: unknown;
-}
-
-export interface OpenCodeAssistantMessage {
-    agent?: string;
-    cost?: number;
-    error?: OpenCodeAssistantError;
-    finish?: string;
-    id?: string;
-    mode?: string;
-    modelID?: string;
-    parentID?: string;
-    path?: {
-        cwd?: string;
-        root?: string;
-    };
-    providerID?: string;
-    role?: "assistant";
-    sessionID?: string;
-    summary?: boolean;
-    time?: {
-        completed?: number;
-        created?: number;
-    };
-    tokens?: {
-        cache?: {
-            read?: number;
-            write?: number;
-        };
-        input?: number;
-        output?: number;
-        reasoning?: number;
-        total?: number;
-    };
-    variant?: string;
-}
+export type OpenCodeAssistantError = NonNullable<SessionMessageAssistant["error"]>;
+export type OpenCodeAssistantMessage = SessionMessageAssistant;
 
 const EMPTY_RESPONSE_TEXT = "OpenCode returned empty response.";
 const DEFAULT_OPENCODE_PROMPT_TIMEOUT_POLICY: OpenCodePromptTimeoutPolicy = {
@@ -611,7 +553,6 @@ export class OpenCodeClient implements OpenCodeClientLike {
                 throw Object.assign(new Error(turn.idle.error.message), {
                     ...turn.idle.error,
                     name: turn.idle.error.type,
-                    data: { message: turn.idle.error.message },
                 });
             }
         }
@@ -622,7 +563,6 @@ export class OpenCodeClient implements OpenCodeClientLike {
 
         return buildPromptSessionResult(
             turn.idle?.error ? { ...response, error: turn.idle.error } : response,
-            input.sessionId,
             startedAt,
             Date.now(),
         );
@@ -883,39 +823,17 @@ function extractTextFromParts(parts: Part[]): string {
 
 function buildPromptSessionResult(
     message: SessionMessageAssistant,
-    sessionId: string,
     startedAt: number,
     finishedAt: number,
 ): PromptSessionResult {
-    const error = message.error ? {
-        name: message.error.type,
-        data: { message: message.error.message },
-        ...message.error,
-    } : undefined;
-    const info: OpenCodeAssistantMessage = {
-        id: message.id,
-        role: "assistant",
-        sessionID: sessionId,
-        agent: message.agent,
-        modelID: message.model.id,
-        providerID: message.model.providerID,
-        ...(message.model.variant ? { variant: message.model.variant } : {}),
-        time: message.time,
-        tokens: message.tokens,
-        cost: message.cost,
-        finish: message.finish,
-        ...(error ? { error } : {}),
-    };
     const bodyMd = extractTextFromParts(message.content) || null;
 
     return {
-        assistantError: error ?? null,
+        assistantError: message.error ?? null,
         bodyMd,
         fallbackText: bodyMd ? stripMarkdownToPlainText(bodyMd) || bodyMd : EMPTY_RESPONSE_TEXT,
-        info,
-        metrics: extractPromptMetrics(info, startedAt, finishedAt),
-        parts: message.content,
-        structured: null,
+        info: message,
+        metrics: extractPromptMetrics(message, startedAt, finishedAt),
     };
 }
 
@@ -994,11 +912,10 @@ function extractTokenMetrics(info: OpenCodeAssistantMessage | null | undefined):
     const reasoning = coerceFiniteNumber(info.tokens.reasoning);
     const cacheRead = coerceFiniteNumber(info.tokens.cache?.read);
     const cacheWrite = coerceFiniteNumber(info.tokens.cache?.write);
-    const total = coerceFiniteNumber(info.tokens.total);
-    const fallbackTotal = sumTokenMetrics(input, output, cacheRead, cacheWrite);
+    const total = calculateDisplayedTokenTotal({ input, output, reasoning, cacheRead, cacheWrite });
 
     return {
-        total: total ?? fallbackTotal,
+        total,
         input,
         output,
         reasoning,
@@ -1009,16 +926,6 @@ function extractTokenMetrics(info: OpenCodeAssistantMessage | null | undefined):
 
 function coerceFiniteNumber(value: unknown): number | null {
     return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function sumTokenMetrics(...values: Array<number | null>): number | null {
-    if (values.every((value) => value === null)) {
-        return null;
-    }
-
-    const total = values.reduce<number>((sum, value) => sum + (value ?? 0), 0);
-
-    return Number.isFinite(total) ? total : null;
 }
 
 function cacheMetadata<T>(load: () => Promise<T>): () => Promise<T> {

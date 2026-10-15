@@ -83,10 +83,6 @@ function createPromptReply(overrides: Partial<PromptSessionResult> = {}): Prompt
                 cacheWrite: 0,
             },
         },
-        parts: [],
-        structured: {
-            body_md: "Hello",
-        },
         ...overrides,
     };
 }
@@ -116,9 +112,6 @@ test("buildTelegramPromptReply falls back to plain text when markdown is unsuppo
                 cacheRead: null,
                 cacheWrite: null,
             },
-        },
-        structured: {
-            body_md: "<b>bad</b>",
         },
     }));
 

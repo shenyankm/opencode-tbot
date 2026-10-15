@@ -38,10 +38,6 @@ function createPromptReply(overrides: Partial<PromptSessionResult> = {}): Prompt
                 cacheWrite: 0,
             },
         },
-        parts: [],
-        structured: {
-            body_md: "## Hello",
-        },
         ...overrides,
     };
 }
@@ -55,10 +51,8 @@ function createDependencies(options: {
             directory: string;
             id: string;
             projectID: string;
-            slug: string;
             time: { created: number; updated: number };
             title: string;
-            version: string;
         }>;
     }>;
     renameSession?: (input: {
@@ -71,10 +65,8 @@ function createDependencies(options: {
             directory: string;
             id: string;
             projectID: string;
-            slug: string;
             time: { created: number; updated: number };
             title: string;
-            version: string;
         };
     }>;
     sendPrompt: (input: { chatId: number; text: string }) => Promise<{ assistantReply: PromptSessionResult }>;
@@ -295,8 +287,6 @@ test("handleTextMessage shows recovered assistant text instead of the empty-resp
             assistantReply: createPromptReply({
                 bodyMd: null,
                 fallbackText: "Recovered reply",
-                parts: [{ type: "text", text: "Recovered reply" }] as never,
-                structured: null,
             }),
         }),
     });
@@ -527,16 +517,9 @@ test("handleTextMessage renders assistant-side prompt errors without inline stat
     const { dependencies } = createDependencies({
         sendPrompt: async () => ({
             assistantReply: createPromptReply({
-                assistantError: {
-                    name: "StructuredOutputError",
-                    data: {
-                        message: "Schema validation failed",
-                        retries: 2,
-                    },
-                } as never,
+                assistantError: { type: "StructuredOutputError", message: "Schema validation failed" },
                 bodyMd: null,
                 fallbackText: "OpenCode returned empty response.",
-                parts: [],
             }),
         }),
     });
@@ -567,7 +550,7 @@ test("handleTextMessage renders assistant-side prompt errors without inline stat
         {
             text: [
                 "Structured output validation failed.",
-                "Cause: Schema validation failed | retries: 2",
+                "Cause: Schema validation failed",
             ].join("\n"),
             other: undefined,
         },
@@ -582,16 +565,9 @@ test("handleTextMessage shows assistant-side prompt errors even when text parts 
     const { dependencies, warnings } = createDependencies({
         sendPrompt: async () => ({
             assistantReply: createPromptReply({
-                assistantError: {
-                    name: "StructuredOutputError",
-                    data: {
-                        message: "Model did not produce structured output",
-                        retries: 0,
-                    },
-                } as never,
+                assistantError: { type: "StructuredOutputError", message: "Model did not produce structured output" },
                 bodyMd: null,
                 fallbackText: "This text should not be shown.",
-                parts: [{ type: "text", text: "This text should not be shown." }] as never,
             }),
         }),
     });
@@ -622,7 +598,7 @@ test("handleTextMessage shows assistant-side prompt errors even when text parts 
         {
             text: [
                 "Structured output validation failed.",
-                "Cause: Model did not produce structured output | retries: 0",
+                "Cause: Model did not produce structured output",
             ].join("\n"),
             other: undefined,
         },
@@ -692,11 +668,9 @@ test("handleTextMessage consumes pending session rename input, renames the sessi
     let sessions = [
         {
             id: "session-1",
-            slug: "session-1",
             projectID: "project-1",
             directory: "E:/repo-1",
             title: "Session 1",
-            version: "1",
             time: {
                 created: 1,
                 updated: 1,
@@ -704,11 +678,9 @@ test("handleTextMessage consumes pending session rename input, renames the sessi
         },
         {
             id: "session-2",
-            slug: "session-2",
             projectID: "project-1",
             directory: "E:/repo-1",
             title: "Session 2",
-            version: "1",
             time: {
                 created: 1,
                 updated: 1,
@@ -726,7 +698,6 @@ test("handleTextMessage consumes pending session rename input, renames the sessi
             const renamedSession = {
                 ...sessions[1],
                 id: sessionId,
-                slug: sessionId,
                 title,
             };
             sessions = [sessions[0], renamedSession];

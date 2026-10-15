@@ -36,11 +36,9 @@ function createProject(id: string, worktree: string): OpenCodeProject {
 function createSession(id: string, projectID: string, directory: string): OpenCodeSession {
     return {
         id,
-        slug: id,
         projectID,
         directory,
         title: "Session",
-        version: "1",
         time: {
             created: 1,
             updated: 1,
@@ -74,10 +72,6 @@ function createPromptReply(text: string): PromptSessionResult {
                 cacheRead: 15,
                 cacheWrite: 0,
             },
-        },
-        parts: [],
-        structured: {
-            body_md: text,
         },
     };
 }
@@ -184,7 +178,6 @@ test("SendPromptUseCase creates a session in the current project when the chat i
                 sessionId: input.sessionId,
                 prompt: input.prompt ?? undefined,
                 agent: input.agent ?? undefined,
-                format: input.format,
             });
             return createPromptReply("assistant reply");
         },
@@ -222,9 +215,6 @@ test("SendPromptUseCase creates a session in the current project when the chat i
             sessionId: "session-1",
             prompt: "hello",
             agent: "build",
-            format: {
-                type: "text",
-            },
         },
     ]);
 });
@@ -308,9 +298,6 @@ test("SendPromptUseCase preserves a selected model when it needs to create a ses
         {
             sessionId: "session-1",
             prompt: "continue",
-            format: {
-                type: "text",
-            },
             agent: "build",
             model: {
                 providerID: "openai",
@@ -406,9 +393,6 @@ test("SendPromptUseCase clears a stale model selection before prompting", async 
         {
             sessionId: "session-1",
             prompt: "hello",
-            format: {
-                type: "text",
-            },
             agent: "build",
         },
     ]);
@@ -488,9 +472,6 @@ test("SendPromptUseCase recreates the session when the saved session context is 
         {
             sessionId: "session-new",
             prompt: "continue",
-            format: {
-                type: "text",
-            },
             agent: "build",
         },
     ]);
@@ -570,9 +551,6 @@ test("SendPromptUseCase clears stale selected agents before prompting", async ()
         {
             sessionId: "session-1",
             prompt: "continue",
-            format: {
-                type: "text",
-            },
             agent: "build",
         },
     ]);
@@ -646,9 +624,6 @@ test("SendPromptUseCase clears selected subagents before prompting", async () =>
         {
             sessionId: "session-1",
             prompt: "continue",
-            format: {
-                type: "text",
-            },
             agent: "build",
         },
     ]);
@@ -732,9 +707,6 @@ test("SendPromptUseCase forks a temporary child session for image prompts and ke
                 sessionId: "session-1-image",
                 prompt: withImageTurnGuidance("analyze this image"),
                 files,
-                format: {
-                    type: "text",
-                },
                 agent: "build",
             },
         },
@@ -819,9 +791,6 @@ test("SendPromptUseCase creates and keeps a main session when the first prompt i
                 sessionId: "session-1-image",
                 prompt: withImageTurnGuidance(),
                 files,
-                format: {
-                    type: "text",
-                },
                 agent: "build",
             },
         },
@@ -907,17 +876,11 @@ test("SendPromptUseCase returns to the main session after an image turn", async 
             sessionId: "session-1-image",
             prompt: withImageTurnGuidance("analyze this image"),
             files: [createImageFile()],
-            format: {
-                type: "text",
-            },
             agent: "build",
         },
         {
             sessionId: "session-1",
             prompt: "who are you",
-            format: {
-                type: "text",
-            },
             agent: "build",
         },
     ]);

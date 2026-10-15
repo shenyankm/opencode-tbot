@@ -306,10 +306,10 @@ test("promptSession selects the V2 agent and model, sends URI attachments, and w
 
     assert.equal(result.bodyMd, "## Hello");
     assert.equal(result.fallbackText, "Hello");
-    assert.equal(result.info?.modelID, "gpt-test");
+    assert.equal(result.info?.model.id, "gpt-test");
     assert.deepEqual(result.metrics, {
         durationMs: 25,
-        tokens: { total: 31, input: 10, output: 12, reasoning: 3, cacheRead: 4, cacheWrite: 5 },
+        tokens: { total: 34, input: 10, output: 12, reasoning: 3, cacheRead: 4, cacheWrite: 5 },
     });
     assert.deepEqual(calls.slice(0, 2), [
         { method: "agent", input: { sessionID: "ses_1", agent: "agent_planner" } },
@@ -394,20 +394,24 @@ test("promptSession pages to its own user message and excludes later unrelated t
     ]);
 });
 
-test("promptSession converts V2 structured assistant errors without losing the error message", async () => {
+test("promptSession preserves native V2 assistant messages and structured errors without projecting V1 fields", async () => {
     let messageId = "";
+    const assistant = createAssistant({ content: [], error: { type: "APIError", message: "Provider unavailable", status: 503 } });
     const client = createClient({
         session: { async prompt(input: { id: string }) { messageId = input.id; } },
         message: { async list() { return {
-            data: [createAssistant({ content: [], error: { type: "APIError", message: "Provider unavailable", status: 503 } }), { id: messageId, type: "user" }],
+            data: [assistant, { id: messageId, type: "user" }],
             cursor: {},
         }; } },
     });
 
     const result = await client.promptSession({ sessionId: "ses_1", prompt: "hello" });
-    assert.equal(result.assistantError?.name, "APIError");
-    assert.deepEqual(result.assistantError?.data, { message: "Provider unavailable" });
+    assert.equal(result.assistantError?.type, "APIError");
+    assert.equal(result.assistantError?.message, "Provider unavailable");
     assert.equal(result.assistantError?.status, 503);
+    assert.equal(result.info, assistant);
+    assert.equal(result.assistantError, assistant.error);
+    assert.ok(!("name" in result.assistantError!) && !("data" in result.assistantError!));
     assert.equal(result.bodyMd, null);
 });
 

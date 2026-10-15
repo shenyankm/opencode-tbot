@@ -171,9 +171,6 @@ test("/status aggregates health, path, plugins, LSP, and MCP into one reply", as
             },
             async getPath() {
                 return {
-                    home: "E:/Users/demo",
-                    state: "E:/Users/demo/.opencode",
-                    config: "E:/Users/demo/.config/opencode",
                     worktree: "E:/repo",
                     directory: "E:/repo-1",
                 };
@@ -188,7 +185,6 @@ test("/status aggregates health, path, plugins, LSP, and MCP into one reply", as
                 return [
                     {
                         id: "session-1",
-                        slug: "build-status",
                         title: "Build status",
                         projectID: "project-1",
                     },
@@ -210,11 +206,11 @@ test("/status aggregates health, path, plugins, LSP, and MCP into one reply", as
                 assert.equal(directory, "E:/repo-1");
 
                 return {
-                    zed: { status: "needs_auth" },
+                    zed: { status: "needs_auth", error: "Authentication required" },
                     alpha: { status: "connected" },
                     beta: { status: "disabled" },
                     delta: { status: "failed", error: "timeout" },
-                    gamma: { status: "needs_client_registration", error: "missing metadata" },
+                    gamma: { status: "pending" },
                 };
             },
         } as never,
@@ -260,7 +256,7 @@ test("/status aggregates health, path, plugins, LSP, and MCP into one reply", as
     expectLine(markdown, "- **OpenCode Version:** 1.0.0");
     expectLine(markdown, `- **opencode-tbot Version:** ${OPENCODE_TBOT_VERSION}`);
     expectLine(markdown, "- **Current Project:** `E:/repo-1`");
-    expectLine(markdown, "- **Current Session:** Build status (build-status)");
+    expectLine(markdown, "- **Current Session:** Build status (session-1)");
     expectLine(markdown, "- `opencode-tbot`");
     expectLine(markdown, "- `oh-my-opencode`");
     assert.match(markdown, /- `alpha`\n  - \*\*Status:\*\* \uD83D\uDFE2\n- `beta`/u);
@@ -293,9 +289,6 @@ test("/status keeps successful sections when one section fails", async () => {
         },
         async getPath() {
             return {
-                home: "E:/Users/demo",
-                state: "E:/Users/demo/.opencode",
-                config: "E:/Users/demo/.config/opencode",
                 worktree: "E:/repo",
                 directory: "E:/repo/src",
             };
@@ -353,9 +346,6 @@ test("/status uses the selected chat language", async () => {
         },
         async getPath() {
             return {
-                home: "E:/Users/demo",
-                state: "E:/Users/demo/.opencode",
-                config: "E:/Users/demo/.config/opencode",
                 worktree: "E:/repo",
                 directory: "E:/repo/src",
             };

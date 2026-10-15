@@ -237,12 +237,11 @@ function formatSessionStatusLabel(session: OpenCodeSession | null, fallbackId: s
         return fallbackId;
     }
 
-    const slug = session.slug?.trim() || session.id;
-    const title = session.title.trim() || slug || session.id;
+    const title = session.title.trim() || session.id;
 
-    return title === slug
+    return title === session.id
         ? title
-        : `${title} (${slug})`;
+        : `${title} (${session.id})`;
 }
 
 function resolveWorkspaceProjectPath(path: OpenCodePath, preferredPath?: string | null): string {

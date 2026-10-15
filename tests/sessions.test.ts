@@ -37,11 +37,9 @@ function createProject(id: string, worktree: string): OpenCodeProject {
 function createSession(id: string, projectID: string, directory: string, title = id): OpenCodeSession {
     return {
         id,
-        slug: id,
         projectID,
         directory,
         title,
-        version: "1",
         time: {
             created: 1,
             updated: 1,

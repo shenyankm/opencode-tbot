@@ -30,11 +30,11 @@ test("ListMcpUseCase returns the current project and sorts statuses", async () =
                 calls.push(directory ?? "");
 
                 return {
-                    zed: { status: "needs_auth" },
+                    zed: { status: "needs_auth", error: "Authentication required" },
                     alpha: { status: "connected" },
                     beta: { status: "disabled" },
                     delta: { status: "failed", error: "timeout" },
-                    gamma: { status: "needs_client_registration", error: "missing metadata" },
+                    gamma: { status: "pending" },
                 } satisfies Record<string, OpenCodeMcpStatus>;
             },
         } as never,

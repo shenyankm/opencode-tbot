@@ -370,7 +370,7 @@ test("context changes edit only the separate context message and preserve the du
         contextFooter: footer,
         sendPromptUseCase: { async execute() { now = 40_000; return {
             sessionId: "ses_test", projectId: "p",
-            assistantReply: { bodyMd: null, fallbackText: "ANSWER", assistantError: null, info: null, parts: [], structured: null,
+            assistantReply: { bodyMd: null, fallbackText: "ANSWER", assistantError: null, info: null,
                 metrics: { durationMs: 100, tokens: { total: 999999, input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 } } },
         }; } },
     }, async () => ({ text: "test" }));
@@ -414,7 +414,7 @@ test("a failed context message does not turn a successful answer into an error r
         } as never,
         sendPromptUseCase: { async execute() { return {
             sessionId: "ses_test", projectId: "p", assistantReply: {
-                bodyMd: null, fallbackText: "ANSWER", assistantError: null, info: null, parts: [], structured: null,
+                bodyMd: null, fallbackText: "ANSWER", assistantError: null, info: null,
                 metrics: { durationMs: 100, tokens: { total: 0, input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 } },
             },
         }; } },
@@ -456,7 +456,7 @@ test("formatted footer rejection falls back to plain text and refreshes only the
         } as never,
         sendPromptUseCase: { async execute() { now = 19_100; return {
             sessionId: "ses_test", projectId: "p", assistantReply: {
-                bodyMd: null, fallbackText: "ANSWER", assistantError: null, info: null, parts: [], structured: null,
+                bodyMd: null, fallbackText: "ANSWER", assistantError: null, info: null,
                 metrics: { durationMs: 100, tokens: { total: 0, input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 } },
             },
         }; } },

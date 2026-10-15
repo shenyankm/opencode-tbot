@@ -67,7 +67,6 @@ interface StatusLayoutCopy {
     lspTitle: string;
     mcpFailedStatus: string;
     mcpNotesLabel: string;
-    mcpRegistrationRequiredStatus: string;
     mcpTitle: string;
     noPluginsMessage: string;
     noneStatus: string;
@@ -473,8 +472,6 @@ function formatMcpStatusBadge(status: OpenCodeMcpStatus, layout: StatusLayoutCop
             return "\uD83D\uDFE1";
         case "failed":
             return layout.mcpFailedStatus;
-        case "needs_client_registration":
-            return layout.mcpRegistrationRequiredStatus;
     }
 
     const exhaustiveStatus: never = status;
@@ -520,8 +517,6 @@ function formatMcpStatusNotes(status: OpenCodeMcpStatus, copy: BotCopy, layout: 
             return copy.mcp.pending;
         case "failed":
             return status.error;
-        case "needs_client_registration":
-            return status.error;
     }
 
     const exhaustiveStatus: never = status;
@@ -556,7 +551,6 @@ function getStatusLayoutCopy(copy: BotCopy): StatusLayoutCopy {
             lspTitle: "\uD83E\uDDE0 LSP",
             mcpFailedStatus: "\uD83D\uDD34",
             mcpNotesLabel: "Notes",
-            mcpRegistrationRequiredStatus: "\uD83D\uDFE1",
             mcpTitle: "\uD83D\uDD0C MCP",
             noPluginsMessage: "No npm plugins configured in OpenCode.",
             noneStatus: "\u26AA",
@@ -580,7 +574,6 @@ function getStatusLayoutCopy(copy: BotCopy): StatusLayoutCopy {
             lspTitle: "\uD83E\uDDE0 LSP",
             mcpFailedStatus: "\uD83D\uDD34",
             mcpNotesLabel: "補足",
-            mcpRegistrationRequiredStatus: "\uD83D\uDFE1",
             mcpTitle: "\uD83D\uDD0C MCP",
             noPluginsMessage: "OpenCode に npm プラグインが設定されていません。",
             noneStatus: "\u26AA",
@@ -603,7 +596,6 @@ function getStatusLayoutCopy(copy: BotCopy): StatusLayoutCopy {
         lspTitle: "\uD83E\uDDE0 LSP",
         mcpFailedStatus: "\uD83D\uDD34",
         mcpNotesLabel: "\u8BF4\u660E",
-        mcpRegistrationRequiredStatus: "\uD83D\uDFE1",
         mcpTitle: "\uD83D\uDD0C MCP",
         noPluginsMessage: "当前 OpenCode 中未配置 npm 插件。",
         noneStatus: "\u26AA",
@@ -828,12 +820,11 @@ function formatModelLabel(model: OpenCodeConfiguredModel): string {
 }
 
 function formatSessionLabel(session: OpenCodeSession): string {
-    const slug = session.slug?.trim() || session.id;
-    const title = session.title.trim() || slug || session.id;
+    const title = session.title.trim() || session.id;
 
-    return title === slug
+    return title === session.id
         ? title
-        : `${title} [${slug}]`;
+        : `${title} [${session.id}]`;
 }
 
 function formatMcpStatus(status: OpenCodeMcpStatus, copy: BotCopy): string {
@@ -848,8 +839,6 @@ function formatMcpStatus(status: OpenCodeMcpStatus, copy: BotCopy): string {
             return copy.mcp.pending;
         case "failed":
             return copy.mcp.failed(status.error);
-        case "needs_client_registration":
-            return copy.mcp.needsClientRegistration(status.error);
     }
 
     const exhaustiveStatus: never = status;

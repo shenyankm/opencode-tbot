@@ -102,7 +102,7 @@ test("streaming thinking reuses unchanged messages, replaces final text and remo
                 }
                 emit("session.reasoning.ended", { text: "FINAL THINKING" });
                 return { sessionId: "ses_test", projectId: "p", assistantReply: {
-                    bodyMd: null, fallbackText: "ANSWER", assistantError: null, info: null, parts: [], structured: null,
+                    bodyMd: null, fallbackText: "ANSWER", assistantError: null, info: null,
                     metrics: { durationMs: 100, tokens: { total: 0, input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 } },
                 } };
             } },
@@ -158,7 +158,7 @@ test("appending to one of one hundred thinking chunks reads only the changed chu
             assert.equal([...thinking.messages.values()].map((message) => message.text).join(""), "A".repeat(96_000) + "B");
             await thinking.service.setExpanded(1, 1, true, tracker.getRequestId(1), getBotCopy("en"), async () => {});
             return { sessionId: "s", projectId: "p", assistantReply: {
-                bodyMd: "answer", fallbackText: "answer", assistantError: null, info: null, parts: [], structured: null,
+                bodyMd: "answer", fallbackText: "answer", assistantError: null, info: null,
                 metrics: { durationMs: 100, tokens: { total: 0, input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 } },
             } };
         } },
@@ -198,7 +198,7 @@ test("a failed thinking edit is retried even when the next flush has identical t
             assert.equal(edits, 2);
             assert.ok(thinking.messages.get("1:1")?.lastSentView);
             return { sessionId: "s", projectId: "p", assistantReply: {
-                bodyMd: "answer", fallbackText: "answer", assistantError: null, info: null, parts: [], structured: null,
+                bodyMd: "answer", fallbackText: "answer", assistantError: null, info: null,
                 metrics: { durationMs: 100, tokens: { total: 0, input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 } },
             } };
         } },
@@ -360,7 +360,7 @@ test("stopped progress keeps partial output and hides tool failures", async () =
 test("long Telegram replies preserve every character and keep Unicode intact", () => {
     const body = ("你好😀".repeat(1_200) + "\n").repeat(3);
     const result: PromptSessionResult = {
-        bodyMd: body, fallbackText: body, assistantError: null, info: null, parts: [], structured: null,
+        bodyMd: body, fallbackText: body, assistantError: null, info: null,
         metrics: { durationMs: 100, tokens: { total: 0, input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 } },
     };
     const replies = buildTelegramPromptReplies(result);
@@ -458,7 +458,7 @@ test("expandable thinking stays separate from the streamed answer and context wi
                     await setImmediate();
                     return {
                         projectId: "p", sessionId: "ses_test",
-                        assistantReply: { bodyMd: "ANSWERONLY", fallbackText: "ANSWERONLY", assistantError: null, info: null, parts: [], structured: null, metrics },
+                        assistantReply: { bodyMd: "ANSWERONLY", fallbackText: "ANSWERONLY", assistantError: null, info: null, metrics },
                     };
                 },
             },
@@ -517,7 +517,7 @@ test("compression has a separate message and survives cleanup when the model ret
             tracker.publish({ type: "session.compaction.ended", data: { sessionID: "ses_test", text: "PRIVATE SUMMARY" } });
             await setImmediate();
             return { sessionId: "ses_test", projectId: "p", assistantReply: {
-                bodyMd: null, fallbackText: "ANSWER", assistantError: null, info: null, parts: [], structured: null,
+                bodyMd: null, fallbackText: "ANSWER", assistantError: null, info: null,
                 metrics: { durationMs: 100, tokens: { total: 0, input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 } },
             } };
         } },

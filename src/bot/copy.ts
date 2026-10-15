@@ -101,7 +101,6 @@ export interface BotCopy {
         notFound: string;
         badRequest: string;
         causeLabel: string;
-        retryableLabel: string;
         statusCodeLabel: string;
     };
     health: {
@@ -155,7 +154,6 @@ export interface BotCopy {
         pending: string;
         needsAuth: string;
         failed(error: string): string;
-        needsClientRegistration(error: string): string;
     };
     agents: {
         none: string;
@@ -319,7 +317,6 @@ const EN_BOT_COPY: BotCopy = {
         notFound: "Requested resource was not found.",
         badRequest: "Request was rejected by OpenCode.",
         causeLabel: "Cause",
-        retryableLabel: "retryable",
         statusCodeLabel: "status",
     },
     health: {
@@ -404,9 +401,6 @@ const EN_BOT_COPY: BotCopy = {
         needsAuth: "needs auth",
         failed(error: string) {
             return `failed: ${error}`;
-        },
-        needsClientRegistration(error: string) {
-            return `needs client registration: ${error}`;
         },
     },
     agents: {
@@ -584,7 +578,6 @@ const ZH_CN_BOT_COPY: BotCopy = {
         notFound: "请求的资源不存在。",
         badRequest: "OpenCode 拒绝了该请求。",
         causeLabel: "原因",
-        retryableLabel: "可重试",
         statusCodeLabel: "状态码",
     },
     health: {
@@ -669,9 +662,6 @@ const ZH_CN_BOT_COPY: BotCopy = {
         needsAuth: "需要认证",
         failed(error: string) {
             return `失败: ${error}`;
-        },
-        needsClientRegistration(error: string) {
-            return `需要客户端注册: ${error}`;
         },
     },
     agents: {
@@ -849,7 +839,6 @@ const JA_BOT_COPY: BotCopy = {
         notFound: "要求されたリソースが見つかりませんでした。",
         badRequest: "リクエストは OpenCode に拒否されました。",
         causeLabel: "原因",
-        retryableLabel: "再試行可能",
         statusCodeLabel: "ステータス",
     },
     health: {
@@ -934,9 +923,6 @@ const JA_BOT_COPY: BotCopy = {
         needsAuth: "認証が必要",
         failed(error: string) {
             return `失敗: ${error}`;
-        },
-        needsClientRegistration(error: string) {
-            return `クライアント登録が必要: ${error}`;
         },
     },
     agents: {

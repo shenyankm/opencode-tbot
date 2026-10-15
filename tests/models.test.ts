@@ -42,11 +42,9 @@ function createProject(id: string, worktree: string): OpenCodeProject {
 function createSession(id: string, projectID: string, directory: string): OpenCodeSession {
     return {
         id,
-        slug: id,
         projectID,
         directory,
         title: "Session",
-        version: "1",
         time: {
             created: 1,
             updated: 1,
@@ -88,10 +86,6 @@ function createPromptReply(text: string): PromptSessionResult {
                 cacheRead: 15,
                 cacheWrite: 0,
             },
-        },
-        parts: [],
-        structured: {
-            body_md: text,
         },
     };
 }
@@ -427,9 +421,6 @@ test("variant selection updates the binding and later prompts use the selected m
         {
             sessionId: "session-1",
             prompt: "continue",
-            format: {
-                type: "text",
-            },
             agent: "build",
             model: {
                 providerID: "openai",

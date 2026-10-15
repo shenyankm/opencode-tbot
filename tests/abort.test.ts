@@ -251,11 +251,9 @@ test("handleCancelCommand cancels pending session rename before aborting", async
                     sessions: [
                         {
                             id: "session-1",
-                            slug: "session-1",
                             projectID: "project-1",
                             directory: "E:/repo-1",
                             title: "Session 1",
-                            version: "1",
                             time: {
                                 created: 1,
                                 updated: 1,

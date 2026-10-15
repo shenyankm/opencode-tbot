@@ -33,10 +33,6 @@ function createPromptReply(overrides: Partial<PromptSessionResult> = {}): Prompt
                 cacheWrite: 0,
             },
         },
-        parts: [],
-        structured: {
-            body_md: "## Hello",
-        },
         ...overrides,
     };
 }
