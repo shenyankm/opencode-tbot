@@ -24,6 +24,12 @@ export class JsonStateStore<TState> {
         return cloneState(state);
     }
 
+    async select<TResult>(selector: (state: Readonly<TState>) => TResult): Promise<TResult> {
+        const state = await this.loadState();
+
+        return cloneState(selector(state));
+    }
+
     async update(mutator: (state: TState) => void): Promise<TState> {
         const nextStatePromise = this.writeQueue.then(async () => {
             const state = await this.loadState();

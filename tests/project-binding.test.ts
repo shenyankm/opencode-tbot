@@ -43,6 +43,68 @@ const session: OpenCodeSession = {
 };
 const logger = { info() {}, warn() {} } as AppLogger;
 
+test("current session summaries preserve binding validation and transport errors without listing other sessions", async () => {
+    for (const state of ["valid", "missing", "other-project", "offline", "unbound"] as const) {
+        const repo = new InMemorySessionRepository();
+        const binding = createBinding();
+        if (state !== "unbound") await repo.setCurrent(binding);
+        const offline = new Error("offline");
+        let reads = 0;
+        const client = {
+            async listProjects() { return [project]; },
+            async listSessions() { throw new Error("A current session summary must not scan the catalog."); },
+            async getSession() {
+                reads += 1;
+                if (state === "offline") throw offline;
+                return state === "missing" ? null : { ...session, projectID: state === "other-project" ? "other" : project.id };
+            },
+            async getCurrentProject() { return project; },
+        } as unknown as OpenCodeClientLike;
+        const pending = new ListSessionsUseCase(repo, client).execute({ chatId: 1, currentOnly: true });
+        if (state === "offline") {
+            await assert.rejects(pending, (error) => error === offline);
+            assert.deepEqual(await repo.getByChatId(1), binding);
+        } else {
+            const result = await pending;
+            assert.equal(result.currentSessionId, state === "valid" ? session.id : null);
+            assert.equal(result.sessions.length, state === "valid" ? 1 : 0);
+        }
+        assert.equal(reads, state === "unbound" ? 0 : 1);
+    }
+});
+
+for (const operation of ["lsp", "mcp"] as const) {
+    test(`${operation} validates an external worktree by reading only its saved session`, async () => {
+        for (const state of ["valid", "missing", "moved", "other-project", "other-id"] as const) {
+            const repo = new InMemorySessionRepository();
+            await repo.setCurrent(createBinding());
+            let reads = 0;
+            const client = {
+                async listProjects() { return [{ ...project, sandboxes: [] }]; },
+                async listSessions() { throw new Error("A single binding must not scan the session catalog."); },
+                async getSession(id: string) {
+                    reads += 1;
+                    assert.equal(id, session.id);
+                    return state === "missing" ? null : {
+                        ...session,
+                        id: state === "other-id" ? "other" : session.id,
+                        projectID: state === "other-project" ? "other" : project.id,
+                        directory: state === "moved" ? "/moved" : session.directory,
+                    };
+                },
+                async getCurrentProject() { return project; },
+                async listLspStatuses() { return null; },
+                async listMcpStatuses() { return {}; },
+            } as unknown as OpenCodeClientLike;
+            const useCase = operation === "lsp" ? new ListLspUseCase(repo, client) : new ListMcpUseCase(repo, client);
+            const result = await useCase.execute({ chatId: 1 });
+            assert.equal(reads, 1);
+            assert.equal(result.currentDirectory, state === "valid" ? session.directory : project.worktree);
+            assert.equal((await repo.getByChatId(1))!.sessionId, state === "valid" ? session.id : null);
+        }
+    });
+}
+
 for (const operation of ["sessions", "lsp", "mcp", "prompt"] as const) {
     for (const registeredSandbox of [true, false]) {
         test(`${operation} preserves a saved session in ${registeredSandbox ? "a registered" : "an external"} V2 worktree`, async () => {

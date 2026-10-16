@@ -32,6 +32,59 @@ const logger = {
     warn() { },
 } as unknown as AppLogger;
 
+test("/status reads only the bound session and observes later title changes without a catalog scan", async () => {
+    let title = "First title";
+    let reads = 0;
+    const { getStatusUseCase, sessionRepo } = createDependencies({
+        async getCurrentProject() { return createProject("p", "/repo"); },
+        async getHealth() { return { healthy: true, version: "2" }; },
+        async getPath() { return { directory: "/repo", worktree: "/repo" }; },
+        async listConfiguredPlugins() { return []; },
+        async listProjects() { return [createProject("p", "/repo")]; },
+        async listSessions() { throw new Error("Status must not scan the catalog."); },
+        async getSession(id: string) {
+            assert.equal(id, "s");
+            reads += 1;
+            return { id: "s", projectID: "p", title, directory: "/repo" };
+        },
+        async listLspStatuses() { return null; },
+        async listMcpStatuses() { return {}; },
+    } as never);
+    await sessionRepo.setCurrent({
+        chatId: 1, sessionId: "s", projectId: "p", directory: "/repo", agentName: null,
+        modelProviderId: null, modelId: null, modelVariant: null, language: "en", updatedAt: new Date(0).toISOString(),
+    });
+    const first = await getStatusUseCase.execute({ chatId: 1 });
+    assert.equal(first.workspace.status === "ok" && first.workspace.data.currentSession, "First title (s)");
+    title = "Renamed";
+    const second = await getStatusUseCase.execute({ chatId: 1 });
+    assert.equal(second.workspace.status === "ok" && second.workspace.data.currentSession, "Renamed (s)");
+    assert.equal(reads, 2);
+});
+
+test("/status retains workspace fallbacks and the saved binding when its session lookup is unavailable", async () => {
+    const { getStatusUseCase, sessionRepo } = createDependencies({
+        async getHealth() { return { healthy: true, version: "2" }; },
+        async getPath() { return { directory: "/repo", worktree: "/repo" }; },
+        async listProjects() { return [createProject("p", "/repo")]; },
+        async listConfiguredPlugins() { return []; },
+        async getSession() { throw new Error("offline"); },
+        async listSessions() { throw new Error("Status must not scan the catalog."); },
+        async listLspStatuses() { return null; },
+        async listMcpStatuses() { return {}; },
+    } as never);
+    const binding = {
+        chatId: 1, sessionId: "s", projectId: "p", directory: "/repo", agentName: null,
+        modelProviderId: null, modelId: null, modelVariant: null, language: "en", updatedAt: new Date(0).toISOString(),
+    };
+    await sessionRepo.setCurrent(binding);
+    const result = await getStatusUseCase.execute({ chatId: 1 });
+    assert.deepEqual(result.workspace, { status: "ok", data: { currentProject: "/repo", currentSession: "s" } });
+    assert.equal(result.mcp.status, "ok");
+    assert.equal(result.lsp.status, "ok");
+    assert.deepEqual(await sessionRepo.getByChatId(1), binding);
+});
+
 interface StatusReply {
     options?: {
         parse_mode: "Markdown";
@@ -190,6 +243,9 @@ test("/status aggregates health, path, plugins, LSP, and MCP into one reply", as
                     },
                 ] as never;
             },
+            async getSession() {
+                return { id: "session-1", title: "Build status", projectID: "project-1" } as never;
+            },
             async listProjects() {
                 return [project];
             },
@@ -321,7 +377,7 @@ test("/status keeps successful sections when one section fails", async () => {
 
     assert.deepEqual(replies[0]?.options, { parse_mode: "Markdown" });
     expectLine(markdown, "- **Connectivity:** \uD83D\uDD34");
-    expectLine(markdown, "- **Current Project:** `E:/repo`");
+    expectLine(markdown, "- **Current Project:** `E:/repo-1`");
     expectLine(markdown, "- **Current Session:** OpenCode Default");
     assert.match(markdown, /- \*\*Details:\*\* Unexpected error\./u);
     assert.match(markdown, /- \*\*Details:\*\* Cause: health boom/u);

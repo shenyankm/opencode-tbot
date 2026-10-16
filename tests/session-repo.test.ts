@@ -25,6 +25,59 @@ function createTempStateStore() {
     };
 }
 
+test("selected reads clone their result without serializing unrelated state and recover from selector failures", async (t) => {
+    const directory = mkdtempSync(join(tmpdir(), "opencode-selected-"));
+    t.after(() => rmSync(directory, { recursive: true, force: true }));
+    let unrelatedSerializations = 0;
+    const store = new JsonStateStore({
+        filePath: join(directory, "state.json"),
+        createDefaultState: () => ({
+            selected: { rows: [{ value: 1 }] },
+            unrelated: { toJSON() { unrelatedSerializations += 1; return { value: 2 }; } },
+        }),
+    });
+    const result = await store.select((state) => state.selected);
+    result.rows[0].value = 9;
+    result.rows.push({ value: 10 });
+    assert.deepEqual(await store.select((state) => state.selected), { rows: [{ value: 1 }] });
+    assert.equal(await store.select(() => null), null);
+    await assert.rejects(store.select(() => { throw new Error("selector failed"); }), /selector failed/);
+    assert.equal(unrelatedSerializations, 0);
+    assert.deepEqual(await store.read(), { selected: { rows: [{ value: 1 }] }, unrelated: { value: 2 } });
+    assert.equal(unrelatedSerializations, 1);
+});
+
+test("selected repository results cannot mutate stored bindings, actions or permissions", async (t) => {
+    const tempState = createTempStateStore();
+    t.after(tempState.cleanup);
+    const sessions = new FileSessionRepository(tempState.store);
+    const actions = new FilePendingActionRepository(tempState.store);
+    const permissions = new FilePermissionApprovalRepository(tempState.store);
+    await sessions.setCurrent({
+        chatId: 1, sessionId: "s", projectId: "p", directory: "/repo", agentName: null,
+        modelProviderId: null, modelId: null, modelVariant: null, language: "en", updatedAt: new Date(0).toISOString(),
+    });
+    await actions.set({ chatId: 1, kind: "session_rename", sessionId: "s", menuMessageId: 2, returnPage: 0, updatedAt: new Date(0).toISOString() });
+    await permissions.set({ chatId: 1, sessionId: "s", requestId: "r", messageId: 3, status: "pending", updatedAt: new Date(0).toISOString() });
+    (await sessions.getByChatId(1))!.directory = "/changed";
+    (await sessions.listBySessionId("s"))[0].language = "ja";
+    (await actions.getByChatId(1))!.menuMessageId = 99;
+    (await permissions.listBySessionId("s"))[0].status = "reject";
+    (await permissions.listByRequestId("r"))[0].messageId = 99;
+    assert.equal((await sessions.getByChatId(1))!.directory, "/repo");
+    assert.equal((await sessions.getByChatId(1))!.language, "en");
+    assert.equal((await actions.getByChatId(1))!.menuMessageId, 2);
+    assert.equal((await permissions.listByRequestId("r"))[0].status, "pending");
+    assert.equal((await permissions.listBySessionId("s"))[0].messageId, 3);
+    assert.equal(await sessions.getByChatId(2), null);
+    assert.equal(await actions.getByChatId(2), null);
+    assert.deepEqual(await permissions.listByRequestId("missing"), []);
+    const restarted = new FileSessionRepository(new JsonStateStore({
+        filePath: tempState.filePath, createDefaultState: createDefaultOpencodeTbotState,
+    }));
+    assert.deepEqual(await restarted.getByChatId(1), await sessions.getByChatId(1));
+});
+
 test("FileSessionRepository persists bindings across repository instances", async () => {
     const tempState = createTempStateStore();
     const initialBinding = {

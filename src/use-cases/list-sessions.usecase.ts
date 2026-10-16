@@ -21,6 +21,7 @@ export interface ListSessionsResult {
 
 export interface ListSessionsInput {
     chatId: number;
+    currentOnly?: boolean;
 }
 
 export class ListSessionsUseCase {
@@ -32,7 +33,10 @@ export class ListSessionsUseCase {
     async execute(input: ListSessionsInput): Promise<ListSessionsResult> {
         let binding = await this.sessionRepo.getByChatId(input.chatId);
         const [sessions, projects] = await Promise.all([
-            this.opencodeClient.listSessions(),
+            input.currentOnly
+                ? (binding?.sessionId ? this.opencodeClient.getSession(binding.sessionId) : Promise.resolve(null))
+                    .then((session) => session ? [session] : [])
+                : this.opencodeClient.listSessions(),
             binding?.projectId && binding.directory
                 ? this.opencodeClient.listProjects()
                 : Promise.resolve<OpenCodeProject[] | null>(null),

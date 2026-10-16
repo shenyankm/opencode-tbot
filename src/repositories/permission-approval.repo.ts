@@ -27,14 +27,11 @@ export class FilePermissionApprovalRepository implements PermissionApprovalRepos
     constructor(private readonly store: JsonStateStore<OpencodeTbotState>) { }
 
     async listBySessionId(sessionId: string): Promise<PendingPermissionApproval[]> {
-        const state = await this.store.read();
-        return Object.values(state.pendingPermissions).filter((approval) => approval.sessionId === sessionId);
+        return this.store.select((state) => Object.values(state.pendingPermissions).filter((approval) => approval.sessionId === sessionId));
     }
 
     async listByRequestId(requestId: string): Promise<PendingPermissionApproval[]> {
-        const state = await this.store.read();
-
-        return Object.values(state.pendingPermissions).filter((approval) => approval.requestId === requestId);
+        return this.store.select((state) => Object.values(state.pendingPermissions).filter((approval) => approval.requestId === requestId));
     }
 
     async set(approval: PendingPermissionApproval): Promise<void> {

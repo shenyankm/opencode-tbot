@@ -36,15 +36,11 @@ export class FileSessionRepository implements SessionRepository {
     constructor(private readonly store: JsonStateStore<OpencodeTbotState>) { }
 
     async getByChatId(chatId: number): Promise<ChatSessionBinding | null> {
-        const state = await this.store.read();
-
-        return state.sessions[String(chatId)] ?? null;
+        return this.store.select((state) => state.sessions[String(chatId)] ?? null);
     }
 
     async listBySessionId(sessionId: string): Promise<ChatSessionBinding[]> {
-        const state = await this.store.read();
-
-        return Object.values(state.sessions).filter((binding) => binding.sessionId === sessionId);
+        return this.store.select((state) => Object.values(state.sessions).filter((binding) => binding.sessionId === sessionId));
     }
 
     async setCurrent(binding: ChatSessionBinding): Promise<void> {

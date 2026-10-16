@@ -175,7 +175,7 @@ export function createStatusSectionProviders(
                 let currentSession = binding?.sessionId ?? null;
 
                 try {
-                    const sessions = await input.listSessionsUseCase.execute({ chatId: context.chatId });
+                    const sessions = await input.listSessionsUseCase.execute({ chatId: context.chatId, currentOnly: true });
 
                     currentProject = resolveWorkspaceProjectPath(path.data, sessions.currentDirectory);
                     currentSession = sessions.currentSessionId

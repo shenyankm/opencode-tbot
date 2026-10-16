@@ -29,7 +29,7 @@ export class ListMcpUseCase {
         private readonly opencodeClient: OpenCodeCurrentProjectReader
             & OpenCodeMcpCatalog
             & OpenCodeProjectCatalog
-            & Pick<OpenCodeSessionCatalog, "listSessions">,
+            & Pick<OpenCodeSessionCatalog, "getSession">,
     ) { }
 
     async execute(input: ListMcpInput): Promise<ListMcpResult> {

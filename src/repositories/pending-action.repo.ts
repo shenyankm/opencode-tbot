@@ -23,9 +23,7 @@ export class FilePendingActionRepository implements PendingActionRepository {
     constructor(private readonly store: JsonStateStore<OpencodeTbotState>) { }
 
     async getByChatId(chatId: number): Promise<PendingChatAction | null> {
-        const state = await this.store.read();
-
-        return state.pendingActions[String(chatId)] ?? null;
+        return this.store.select((state) => state.pendingActions[String(chatId)] ?? null);
     }
 
     async set(action: PendingChatAction): Promise<void> {

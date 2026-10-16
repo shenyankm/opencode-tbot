@@ -5,7 +5,7 @@ import type { OpenCodeSessionCatalog } from "../services/opencode/opencode.ports
 export async function hasMatchingProject(
     projects: OpenCodeProject[] | null,
     binding: ChatSessionBinding,
-    sessionCatalog: Pick<OpenCodeSessionCatalog, "listSessions">,
+    sessionCatalog: Pick<OpenCodeSessionCatalog, "getSession">,
     sessions?: OpenCodeSession[],
 ): Promise<boolean> {
     if (projects === null) {
@@ -26,8 +26,9 @@ export async function hasMatchingProject(
         return false;
     }
 
-    return (sessions ?? await sessionCatalog.listSessions()).some((session) =>
-        session.id === binding.sessionId
+    return (sessions ?? [await sessionCatalog.getSession(binding.sessionId)]).some((session) =>
+        session !== null
+        && session.id === binding.sessionId
         && session.projectID === binding.projectId
         && session.directory === binding.directory,
     );

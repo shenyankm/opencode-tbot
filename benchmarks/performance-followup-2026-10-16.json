@@ -1,0 +1,335 @@
+{
+  "date": "2026-10-16",
+  "timezone": "Asia/Singapore",
+  "baselineCommit": "f74450592b8a0ef6d4c0523055f12459d92cac7f",
+  "benchmarkCommand": "pnpm exec tsx tests/storage-status.bench.ts [source-checkout]",
+  "method": {
+    "timing": "Separate sequential baseline and modified processes; five samples, report medians. SDK catalog scenarios have one warmup.",
+    "storage": "One cached chat binding and 10, 1000 or 10000 permission records belonging to one chat; fifty binding lookups per sample. Initial state load is excluded from timing.",
+    "catalogs": "1000 synthetic sessions in an external worktree, one hundred per page. Each session lookup or page has 2 ms simulated latency.",
+    "equivalence": "Every baseline and modified final-result SHA-256 fingerprint matches.",
+    "limits": "Synthetic cached-state reads and SDK latency on one machine; not production profiling or a real Telegram/model-service measurement."
+  },
+  "changes": [
+    "Select and clone only matching repository read results, preserving caller isolation and atomic writes.",
+    "Validate external worktrees with a lookup of the saved session instead of enumerating all sessions.",
+    "Let status summaries read only the current session while the sessions command retains full listing."
+  ],
+  "before": {
+    "environment": {
+      "node": "v22.23.2",
+      "platform": "darwin",
+      "arch": "arm64",
+      "cpu": "Apple M4"
+    },
+    "sourceHashes": {
+      "src/services/storage/json-state-store.ts": "76c249c130d39f3a8290be5bcc44b52cc5b245710c6675a3b5cff56f4a89186b",
+      "src/repositories/session.repo.ts": "9807602f98c404e6ed3a98bb50de5985762fa6f1634865e93708978fad37067e",
+      "src/repositories/pending-action.repo.ts": "e42c689c199c866bb04fe4359263668ff62c6b1069d3021205c270d2d8fc1b6b",
+      "src/repositories/permission-approval.repo.ts": "7e1bbc0ed386893626a9649acc56387029a9bf59b0fce1e803ca4e8dcb3459a0",
+      "src/use-cases/project-binding.ts": "a76e60881a0e40b12421765d33781276f90bd90c31f22038acfef9b0ecd084f1",
+      "src/use-cases/list-lsp.usecase.ts": "55904982675fadca8a326a641da33150915bffcb3b28e01b51925b87a12552eb",
+      "src/use-cases/list-mcp.usecase.ts": "0d482caed1b63b74ef1f1d5eec503e86300c09157ca268ce0f90b31f4089dc43",
+      "src/use-cases/list-sessions.usecase.ts": "58f450f58b826b074703b0271cac4a486ad1e25198f83f57a0003d0d5cbd6d7b",
+      "src/use-cases/get-status.usecase.ts": "820484b710ae8add1a12b96d079942361ebeb7dab46adb1911c389d0d7d86d2d"
+    },
+    "storage": [
+      {
+        "permissionCount": 10,
+        "stateBytes": 1515,
+        "readsPerSample": 50,
+        "samplesMs": [
+          0.3701250000000016,
+          0.33833400000000324,
+          0.31245799999999235,
+          0.2903750000000116,
+          0.2947080000000142
+        ],
+        "medianMs": 0.31245799999999235,
+        "fingerprint": "4f60cc2d0374ec89ebc43a5e43b487a3c50268523745d3cf37042d053e5a1406"
+      },
+      {
+        "permissionCount": 1000,
+        "stateBytes": 130847,
+        "readsPerSample": 50,
+        "samplesMs": [
+          27.784625000000005,
+          27.196375000000018,
+          27.19470899999999,
+          28.478250000000003,
+          27.647500000000036
+        ],
+        "medianMs": 27.647500000000036,
+        "fingerprint": "4f60cc2d0374ec89ebc43a5e43b487a3c50268523745d3cf37042d053e5a1406"
+      },
+      {
+        "permissionCount": 10000,
+        "stateBytes": 1345848,
+        "readsPerSample": 50,
+        "samplesMs": [
+          355.771083,
+          418.5244170000001,
+          351.5821249999999,
+          322.99062500000014,
+          349.489875
+        ],
+        "medianMs": 351.5821249999999,
+        "fingerprint": "4f60cc2d0374ec89ebc43a5e43b487a3c50268523745d3cf37042d053e5a1406"
+      }
+    ],
+    "externalWorktreeValidation": {
+      "sessionCount": 1000,
+      "simulatedRequestLatencyMs": 2,
+      "samples": [
+        {
+          "elapsedMs": 22.615166000000045,
+          "pages": 20,
+          "lookups": 0,
+          "fingerprint": "83733dc4530c4a2f46d2670747940cc75acd3004eb26a21975f7c37cc64b9d17"
+        },
+        {
+          "elapsedMs": 23.064792000000125,
+          "pages": 20,
+          "lookups": 0,
+          "fingerprint": "83733dc4530c4a2f46d2670747940cc75acd3004eb26a21975f7c37cc64b9d17"
+        },
+        {
+          "elapsedMs": 21.600625000000036,
+          "pages": 20,
+          "lookups": 0,
+          "fingerprint": "83733dc4530c4a2f46d2670747940cc75acd3004eb26a21975f7c37cc64b9d17"
+        },
+        {
+          "elapsedMs": 23.033124999999927,
+          "pages": 20,
+          "lookups": 0,
+          "fingerprint": "83733dc4530c4a2f46d2670747940cc75acd3004eb26a21975f7c37cc64b9d17"
+        },
+        {
+          "elapsedMs": 22.762083000000075,
+          "pages": 20,
+          "lookups": 0,
+          "fingerprint": "83733dc4530c4a2f46d2670747940cc75acd3004eb26a21975f7c37cc64b9d17"
+        }
+      ],
+      "medianMs": 22.762083000000075
+    },
+    "status": {
+      "sessionCount": 1000,
+      "simulatedRequestLatencyMs": 2,
+      "samples": [
+        {
+          "elapsedMs": 23.249541000000136,
+          "pages": 30,
+          "lookups": 0,
+          "fingerprint": "eaad7eb6b6240e43ddd82e887139c0832cd0898d5392967a594c2abfdffcd870"
+        },
+        {
+          "elapsedMs": 23.09183299999995,
+          "pages": 30,
+          "lookups": 0,
+          "fingerprint": "eaad7eb6b6240e43ddd82e887139c0832cd0898d5392967a594c2abfdffcd870"
+        },
+        {
+          "elapsedMs": 22.287083999999595,
+          "pages": 30,
+          "lookups": 0,
+          "fingerprint": "eaad7eb6b6240e43ddd82e887139c0832cd0898d5392967a594c2abfdffcd870"
+        },
+        {
+          "elapsedMs": 22.76879199999985,
+          "pages": 30,
+          "lookups": 0,
+          "fingerprint": "eaad7eb6b6240e43ddd82e887139c0832cd0898d5392967a594c2abfdffcd870"
+        },
+        {
+          "elapsedMs": 23.358416000000034,
+          "pages": 30,
+          "lookups": 0,
+          "fingerprint": "eaad7eb6b6240e43ddd82e887139c0832cd0898d5392967a594c2abfdffcd870"
+        }
+      ],
+      "medianMs": 23.09183299999995
+    }
+  },
+  "after": {
+    "environment": {
+      "node": "v22.23.2",
+      "platform": "darwin",
+      "arch": "arm64",
+      "cpu": "Apple M4"
+    },
+    "sourceHashes": {
+      "src/services/storage/json-state-store.ts": "51eda256cfc487a976ffaab2a2a4f7d2e24a6ef682c07eb3b7f94ce53af5b67f",
+      "src/repositories/session.repo.ts": "738c7c6804a77a806829187aaa17936ae0dd5ea3aff4264ad0346e8f30aa47e1",
+      "src/repositories/pending-action.repo.ts": "10affbb2c7a20b5743c73715577d05a00531490f48a2e9161990e117feb473a2",
+      "src/repositories/permission-approval.repo.ts": "82fbbbc247c872d87077ae2c2fa9abfc6ab8832bab812c82c5f0a67c2f52a797",
+      "src/use-cases/project-binding.ts": "7e4d18b0af0d6772bbb3ce0eb7ca18ebb18a693043f6ed7063c6ce9570e98471",
+      "src/use-cases/list-lsp.usecase.ts": "632adc91b802bf3af9e8a5faf1111d7d0b4338818214c61e917da8af8029755e",
+      "src/use-cases/list-mcp.usecase.ts": "4e92f5b1021a18143764962121c0e4e14ab2b89bb7c275861d1b04af12004add",
+      "src/use-cases/list-sessions.usecase.ts": "b7ab9bddc87ebcbb0ee1e8983df9f089a31944a5d997b3ea533174d46d5bad11",
+      "src/use-cases/get-status.usecase.ts": "9bdb7b8eda5ea59500d54649691fde7f57fb148ea104d87fb43423b4c7759acc"
+    },
+    "storage": [
+      {
+        "permissionCount": 10,
+        "stateBytes": 1515,
+        "readsPerSample": 50,
+        "samplesMs": [
+          0.12237500000000523,
+          0.102958000000001,
+          0.046916999999993436,
+          0.045667000000008784,
+          0.04574999999999818
+        ],
+        "medianMs": 0.046916999999993436,
+        "fingerprint": "4f60cc2d0374ec89ebc43a5e43b487a3c50268523745d3cf37042d053e5a1406"
+      },
+      {
+        "permissionCount": 1000,
+        "stateBytes": 130847,
+        "readsPerSample": 50,
+        "samplesMs": [
+          0.12354200000000048,
+          0.04724999999999113,
+          0.07208299999999213,
+          0.09291600000000244,
+          0.053375000000002615
+        ],
+        "medianMs": 0.07208299999999213,
+        "fingerprint": "4f60cc2d0374ec89ebc43a5e43b487a3c50268523745d3cf37042d053e5a1406"
+      },
+      {
+        "permissionCount": 10000,
+        "stateBytes": 1345848,
+        "readsPerSample": 50,
+        "samplesMs": [
+          0.0519999999999925,
+          0.049916000000010285,
+          0.04858399999999108,
+          0.04908299999999599,
+          0.04966699999999946
+        ],
+        "medianMs": 0.04966699999999946,
+        "fingerprint": "4f60cc2d0374ec89ebc43a5e43b487a3c50268523745d3cf37042d053e5a1406"
+      }
+    ],
+    "externalWorktreeValidation": {
+      "sessionCount": 1000,
+      "simulatedRequestLatencyMs": 2,
+      "samples": [
+        {
+          "elapsedMs": 2.3663749999999766,
+          "pages": 0,
+          "lookups": 2,
+          "fingerprint": "83733dc4530c4a2f46d2670747940cc75acd3004eb26a21975f7c37cc64b9d17"
+        },
+        {
+          "elapsedMs": 2.39741699999999,
+          "pages": 0,
+          "lookups": 2,
+          "fingerprint": "83733dc4530c4a2f46d2670747940cc75acd3004eb26a21975f7c37cc64b9d17"
+        },
+        {
+          "elapsedMs": 2.275041000000016,
+          "pages": 0,
+          "lookups": 2,
+          "fingerprint": "83733dc4530c4a2f46d2670747940cc75acd3004eb26a21975f7c37cc64b9d17"
+        },
+        {
+          "elapsedMs": 1.2679170000000113,
+          "pages": 0,
+          "lookups": 2,
+          "fingerprint": "83733dc4530c4a2f46d2670747940cc75acd3004eb26a21975f7c37cc64b9d17"
+        },
+        {
+          "elapsedMs": 2.373000000000019,
+          "pages": 0,
+          "lookups": 2,
+          "fingerprint": "83733dc4530c4a2f46d2670747940cc75acd3004eb26a21975f7c37cc64b9d17"
+        }
+      ],
+      "medianMs": 2.3663749999999766
+    },
+    "status": {
+      "sessionCount": 1000,
+      "simulatedRequestLatencyMs": 2,
+      "samples": [
+        {
+          "elapsedMs": 2.4517079999999964,
+          "pages": 0,
+          "lookups": 3,
+          "fingerprint": "eaad7eb6b6240e43ddd82e887139c0832cd0898d5392967a594c2abfdffcd870"
+        },
+        {
+          "elapsedMs": 2.2419999999999902,
+          "pages": 0,
+          "lookups": 3,
+          "fingerprint": "eaad7eb6b6240e43ddd82e887139c0832cd0898d5392967a594c2abfdffcd870"
+        },
+        {
+          "elapsedMs": 2.5325420000000065,
+          "pages": 0,
+          "lookups": 3,
+          "fingerprint": "eaad7eb6b6240e43ddd82e887139c0832cd0898d5392967a594c2abfdffcd870"
+        },
+        {
+          "elapsedMs": 1.8256250000000023,
+          "pages": 0,
+          "lookups": 3,
+          "fingerprint": "eaad7eb6b6240e43ddd82e887139c0832cd0898d5392967a594c2abfdffcd870"
+        },
+        {
+          "elapsedMs": 2.46629200000001,
+          "pages": 0,
+          "lookups": 3,
+          "fingerprint": "eaad7eb6b6240e43ddd82e887139c0832cd0898d5392967a594c2abfdffcd870"
+        }
+      ],
+      "medianMs": 2.4517079999999964
+    }
+  },
+  "verification": {
+    "typecheck": "passed",
+    "focusedTests": {
+      "passed": 45,
+      "failed": 0
+    },
+    "defaultSuite": {
+      "passed": 343,
+      "failed": 0,
+      "skipped": 1
+    },
+    "hostIntegration": {
+      "passed": 1,
+      "failed": 0,
+      "opencodeVersion": "2.0.29",
+      "telegram": "isolated local stub",
+      "includesBuild": true
+    },
+    "newPerformanceRegressionsAgainstBaseline": {
+      "failedAsExpected": 5
+    },
+    "regressionCoverage": [
+      "Selected reads do not serialize unrelated records.",
+      "Returned bindings, action records and permission arrays remain isolated from stored state.",
+      "Null and empty results, restart persistence and selector errors remain supported.",
+      "Missing, moved, cross-project and wrong-ID external sessions fail validation.",
+      "Transport failures retain bindings; status keeps fallback sections.",
+      "Status sees later session-title changes without persistent caching.",
+      "Sessions command retains full enumeration coverage."
+    ]
+  },
+  "remainingCandidates": [
+    {
+      "path": "src/use-cases/get-status.usecase.ts",
+      "case": "Status sections still independently read project metadata.",
+      "decision": "Not measured as a dominant cost in this round; do not add persistent catalog caching."
+    },
+    {
+      "path": "src/services/storage/json-state-store.ts",
+      "case": "Writes still serialize the complete state and permission history can grow.",
+      "decision": "Keep atomic writes and all persisted permission history; no retention policy or disk-format migration requested."
+    }
+  ]
+}

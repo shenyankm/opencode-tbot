@@ -24,7 +24,7 @@ export class ListLspUseCase {
         private readonly opencodeClient: OpenCodeCurrentProjectReader
             & OpenCodeLspCatalog
             & OpenCodeProjectCatalog
-            & Pick<OpenCodeSessionCatalog, "listSessions">,
+            & Pick<OpenCodeSessionCatalog, "getSession">,
     ) { }
 
     async execute(input: ListLspInput): Promise<ListLspResult> {
