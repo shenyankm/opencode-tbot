@@ -34,6 +34,17 @@ test("readable chunks prefer a paragraph boundary and preserve blank lines and C
     assert.equal(chunks.join(""), text);
 });
 
+test("paragraph chunks skip sentence scanning and mixed text scans only once when needed", (t) => {
+    const paragraph = `${"中文😀. ".repeat(160)}\n\n`;
+    const sentences = `${"甲".repeat(950)}。${"乙".repeat(950)}。${"丙".repeat(950)}。`;
+    const expectedTail = splitTelegramText(sentences);
+    const segment = t.mock.method(Intl.Segmenter.prototype, "segment");
+    assert.deepEqual(splitTelegramText(paragraph.repeat(20)), Array(20).fill(paragraph));
+    assert.equal(segment.mock.callCount(), 0);
+    assert.deepEqual(splitTelegramText(paragraph.repeat(3) + sentences), [paragraph, paragraph, paragraph, ...expectedTail]);
+    assert.equal(segment.mock.callCount(), 1);
+});
+
 test("numbered list markers stay with their sentence instead of forming a closer split point", () => {
     const first = `1. ${"a".repeat(1016)}.\n`;
     const text = first + `2. ${"b".repeat(400)}.\n3. ${"c".repeat(500)}.\n`;

@@ -148,9 +148,7 @@ export function splitTelegramText(text: string, target = TELEGRAM_MESSAGE_TARGET
     if (text.length <= upper) {
         return text ? [text] : [];
     }
-    const sentenceEnds = Array.from(SENTENCE_SEGMENTER.segment(text))
-        .filter(({ segment }) => !/^\s*\d+[.)]\s*$/u.test(segment))
-        .map(({ index, segment }) => index + segment.length);
+    let sentenceEnds: number[] | null = null;
     const chunks: string[] = [];
     let offset = 0;
     let sentenceIndex = 0;
@@ -160,21 +158,26 @@ export function splitTelegramText(text: string, target = TELEGRAM_MESSAGE_TARGET
         const lower = Math.max(1, aim - tolerance);
         const window = text.slice(offset, offset + upper);
         const paragraphs = [...window.matchAll(/\n[\t ]*\n+/gu)].map((match) => match.index + match[0].length);
-        const lines = [...window.matchAll(/\n/gu)].map((match) => match.index + 1);
-        const sentences: number[] = [];
-        while (sentenceEnds[sentenceIndex] <= offset) {
-            sentenceIndex += 1;
+        let end = closestBoundary(paragraphs, aim, lower);
+        if (end === undefined) {
+            sentenceEnds ??= Array.from(SENTENCE_SEGMENTER.segment(text))
+                .filter(({ segment }) => !/^\s*\d+[.)]\s*$/u.test(segment))
+                .map(({ index, segment }) => index + segment.length);
+            const lines = [...window.matchAll(/\n/gu)].map((match) => match.index + 1);
+            const sentences: number[] = [];
+            while (sentenceEnds[sentenceIndex] <= offset) {
+                sentenceIndex += 1;
+            }
+            for (let index = sentenceIndex; sentenceEnds[index] <= offset + upper; index += 1) {
+                sentences.push(sentenceEnds[index] - offset);
+            }
+            end = closestBoundary(sentences, aim, lower)
+                ?? closestBoundary(lines, aim, lower)
+                ?? sentences.at(-1)
+                ?? lines.at(-1)
+                ?? closestBoundary([...window.matchAll(/[\t ]+/gu)].map((match) => match.index + match[0].length), aim, lower)
+                ?? aim;
         }
-        for (let index = sentenceIndex; sentenceEnds[index] <= offset + upper; index += 1) {
-            sentences.push(sentenceEnds[index] - offset);
-        }
-        let end = closestBoundary(paragraphs, aim, lower)
-            ?? closestBoundary(sentences, aim, lower)
-            ?? closestBoundary(lines, aim, lower)
-            ?? sentences.at(-1)
-            ?? lines.at(-1)
-            ?? closestBoundary([...window.matchAll(/[\t ]+/gu)].map((match) => match.index + match[0].length), aim, lower)
-            ?? aim;
         if (/[\uD800-\uDBFF]/u.test(text[offset + end - 1])) {
             end -= 1;
         }

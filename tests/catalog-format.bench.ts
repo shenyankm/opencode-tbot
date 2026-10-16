@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { arch, cpus, platform } from "node:os";
 import { join, resolve } from "node:path";
+import { mock } from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
 
@@ -17,7 +18,7 @@ const { GetPathUseCase } = await load("src/use-cases/get-path.usecase.ts") as ty
 const { ListSessionsUseCase } = await load("src/use-cases/list-sessions.usecase.ts") as typeof import("../src/use-cases/list-sessions.usecase.js");
 const { ListMcpUseCase } = await load("src/use-cases/list-mcp.usecase.ts") as typeof import("../src/use-cases/list-mcp.usecase.js");
 const { ListLspUseCase } = await load("src/use-cases/list-lsp.usecase.ts") as typeof import("../src/use-cases/list-lsp.usecase.js");
-const { buildTelegramPromptReplies } = await load("src/services/telegram/telegram-format.ts") as typeof import("../src/services/telegram/telegram-format.js");
+const { buildTelegramPromptReplies, splitTelegramText } = await load("src/services/telegram/telegram-format.ts") as typeof import("../src/services/telegram/telegram-format.js");
 const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const median = (values: number[]) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
@@ -55,6 +56,7 @@ async function statuses(concurrency: number) {
 function formatting(body: string) {
     const input = { bodyMd: body, fallbackText: body };
     buildTelegramPromptReplies(input);
+    const segment = mock.method(Intl.Segmenter.prototype, "segment");
     const samplesMs: number[] = [];
     for (let sample = 0; sample < 7; sample += 1) {
         const start = performance.now();
@@ -64,7 +66,27 @@ function formatting(body: string) {
     const result = buildTelegramPromptReplies(input);
     assert.ok(result.length > 1);
     assert.ok(result.every((reply) => reply.preferred.text.length > 0 && reply.fallback.text.length > 0));
-    return { characters: body.length, rendersPerSample: 20, samplesMs, medianMs: median(samplesMs), chunks: result.length, fingerprint: hash(result) };
+    const sentenceScans = segment.mock.callCount();
+    segment.mock.restore();
+    return { characters: body.length, rendersPerSample: 20, samplesMs, medianMs: median(samplesMs), sentenceScans, measuredRenders: 141, chunks: result.length, fingerprint: hash(result) };
+}
+
+const boundaries = [];
+const targets = [2, 64, 960, 1024, 4096];
+const pieces = ["中文😀。", "A complete sentence. ", "\n\n", "\r\n\r\n", "1. List item.\n", "```ts\nconst n = 1;\n```\n", "无".repeat(1400), "\t ", "。”\n", "| key | value |\n"];
+let seed = 42;
+for (let index = 0; index < 120; index += 1) {
+    let text = "";
+    for (let part = 0; part < 30; part += 1) {
+        seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+        text += pieces[seed % pieces.length];
+    }
+    const target = targets[index % targets.length];
+    const chunks = splitTelegramText(text, target);
+    assert.equal(chunks.join(""), text);
+    assert.ok(chunks.every((chunk) => chunk.length > 0 && chunk.length <= Math.min(4096, target + Math.min(128, Math.floor(target / 8)))));
+    assert.ok(chunks.every((chunk) => !/[\uD800-\uDBFF]$/u.test(chunk) && !/^[\uDC00-\uDFFF]/u.test(chunk)));
+    boundaries.push({ target, characters: text.length, fingerprint: hash(chunks) });
 }
 
 await statuses(1);
@@ -84,4 +106,5 @@ console.log(JSON.stringify({
     environment: { node: process.version, platform: platform(), arch: arch(), cpu: cpus()[0]?.model },
     sourceHashes: Object.fromEntries(await Promise.all(sourceFiles.map(async (file) => [file, hash(await readFile(join(root, file), "utf8"))]))),
     projectQueries, formats,
+    boundaryCorpus: { initialSeed: 42, cases: boundaries.length, targets, fingerprint: hash(boundaries) },
 }, null, 2));

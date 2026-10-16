@@ -1,0 +1,401 @@
+{
+  "date": "2026-10-16",
+  "timezone": "Asia/Singapore",
+  "baselineCommit": "248521cc6d123dd81dc77be5e62f3a89dcd3a4ef",
+  "commands": [
+    "pnpm exec tsx tests/performance.bench.ts [source-checkout]",
+    "pnpm exec tsx tests/catalog-format.bench.ts [source-checkout]"
+  ],
+  "method": {
+    "execution": "Two separate-process pairs: baseline then modified, followed by modified then baseline. No tests or builds during measurement. Warmups are outside timing.",
+    "context": "Five samples per process, ten combined. Fresh client and cold metadata in each sample, four SDK reads each with 10 ms synthetic latency.",
+    "format": "Seven samples per process, fourteen combined. Each sample renders the same reply twenty times. Sentence scans count 140 timed renders plus one final untimed output check per process.",
+    "equivalence": "Compare complete reply and context result SHA-256 fingerprints. Verify seeded mixed-text chunks across 120 cases and targets 2, 64, 960, 1024, 4096. Validate original text, length bounds, and Unicode surrogate boundaries. Existing thinking and status benchmark fingerprints also agree.",
+    "hashEncoding": "SHA-256 of JSON.stringify(value), including source file strings.",
+    "limits": "One local Apple M4. SDK latency is simulated, not live host response latency. Code and table timings are controls; small differences are not claimed as an improvement. No real Telegram or model latency measured."
+  },
+  "changes": [
+    "Start session metadata, cached catalogs, and first history page together; preserve model selection/default fallback, live usage, pagination and compaction/revert boundaries.",
+    "Only scan sentence boundaries when a chunk has no suitable paragraph boundary; keep the same boundary priority, balancing and Unicode handling."
+  ],
+  "benchmarkHashes": {
+    "tests/performance.bench.ts": "c48ca6292513ea00fbb9b40f3ec70ea207e0a7182935ce43727ec465bee2bfe9",
+    "tests/catalog-format.bench.ts": "7cc6e370a5a07e09a20f08091dccf51a0d198638f88f0faedb0a7fa5fba22e8a"
+  },
+  "before": {
+    "environment": {
+      "node": "v22.23.2",
+      "platform": "darwin",
+      "arch": "arm64",
+      "cpu": "Apple M4"
+    },
+    "sourceHashes": {
+      "src/services/telegram/prompt-progress.ts": "bdf3127263ff0c6022a900f76eb9530691818912b760305fb8d02e2f98d40721",
+      "src/services/telegram/thinking-messages.ts": "b366a2b9765d2389a236d1a7a8459edabf8f87d4e4dd94a8f9d3edb865cb443e",
+      "src/services/opencode/opencode.client.ts": "cb957d951286f75ea8de642db5f237428ff859a7fa48ade6fcb5f62d0247524d",
+      "src/services/telegram/telegram-format.ts": "c60887fd92dc533eeb8b29b8ca86bbea4c576d5b951ab97ea7241186142ace6f",
+      "src/infra/utils/markdown-text.ts": "f35802ab1f127cbd900bf42cf4969cc58e3fb431184ae610dcaad843b65a1bc5"
+    },
+    "coldContext": {
+      "simulatedRequestLatencyMs": 10,
+      "samples": [
+        {
+          "elapsedMs": 22.46875,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        },
+        {
+          "elapsedMs": 22.212957999999986,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        },
+        {
+          "elapsedMs": 22.340458000000012,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        },
+        {
+          "elapsedMs": 22.16587499999997,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        },
+        {
+          "elapsedMs": 22.19912499999998,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        },
+        {
+          "elapsedMs": 22.058291999999994,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        },
+        {
+          "elapsedMs": 22.03283300000001,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        },
+        {
+          "elapsedMs": 22.46112500000001,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        },
+        {
+          "elapsedMs": 21.93237499999998,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        },
+        {
+          "elapsedMs": 22.386708999999996,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        }
+      ],
+      "medianMs": 22.206041499999984
+    },
+    "formats": {
+      "prose": {
+        "characters": 35100,
+        "rendersPerSample": 20,
+        "samplesMs": [
+          28.187542000000008,
+          24.227458000000013,
+          24.565958000000023,
+          27.909958000000017,
+          24.638874999999985,
+          24.32462499999997,
+          63.23662499999995,
+          30.920875000000024,
+          27.114832999999976,
+          26.96983399999999,
+          28.09687500000001,
+          30.904792000000043,
+          25.459957999999972,
+          25.486167000000023
+        ],
+        "medianMs": 27.042333499999984,
+        "sentenceScans": [
+          141,
+          141
+        ],
+        "measuredRendersPerProcess": 141,
+        "chunks": 34,
+        "fingerprint": "d20abe7d22b3b36d8e6bc153898ad16881fa03052de43728bdfd07dbca18c490"
+      },
+      "code": {
+        "characters": 37209,
+        "rendersPerSample": 20,
+        "samplesMs": [
+          101.04729100000003,
+          37.302374999999984,
+          34.66416599999991,
+          37.857916000000046,
+          35.16204199999993,
+          42.19645799999989,
+          37.53262500000005,
+          41.12233299999997,
+          36.62520899999993,
+          37.793000000000006,
+          36.60370799999998,
+          37.35204199999998,
+          40.621666000000005,
+          39.08137499999998
+        ],
+        "medianMs": 37.66281250000003,
+        "sentenceScans": [
+          141,
+          141
+        ],
+        "measuredRendersPerProcess": 141,
+        "chunks": 36,
+        "fingerprint": "724f0e83a705f29b41dd9dae4bfedbbcf5485435c0289a074de72984d552096d"
+      },
+      "table": {
+        "characters": 24031,
+        "rendersPerSample": 20,
+        "samplesMs": [
+          37.519000000000005,
+          32.62254199999995,
+          30.727666999999997,
+          30.6360830000001,
+          30.3214999999999,
+          30.92750000000001,
+          30.408917000000088,
+          38.708708,
+          42.57145800000001,
+          32.55929200000003,
+          33.309916000000044,
+          33.38929100000007,
+          31.81104199999993,
+          30.780750000000012
+        ],
+        "medianMs": 32.18516699999998,
+        "sentenceScans": [
+          0,
+          0
+        ],
+        "measuredRendersPerProcess": 141,
+        "chunks": 22,
+        "fingerprint": "97f65053505864f012a6875411883d1e5e1e073a0baf0952de9597fb42593dd9"
+      }
+    },
+    "boundaryCorpus": {
+      "initialSeed": 42,
+      "cases": 120,
+      "targets": [
+        2,
+        64,
+        960,
+        1024,
+        4096
+      ],
+      "fingerprint": "950578f6697ba8fdf69f249b4a5e617db49994127f0b19a086e3d2ad861015cd"
+    }
+  },
+  "after": {
+    "environment": {
+      "node": "v22.23.2",
+      "platform": "darwin",
+      "arch": "arm64",
+      "cpu": "Apple M4"
+    },
+    "sourceHashes": {
+      "src/services/telegram/prompt-progress.ts": "bdf3127263ff0c6022a900f76eb9530691818912b760305fb8d02e2f98d40721",
+      "src/services/telegram/thinking-messages.ts": "b366a2b9765d2389a236d1a7a8459edabf8f87d4e4dd94a8f9d3edb865cb443e",
+      "src/services/opencode/opencode.client.ts": "9a1e476d3c1dd041da940c0c738ecfc106af481b771f9d238e2501fd13aa7622",
+      "src/services/telegram/telegram-format.ts": "dde2390804faaaa8b5ef65f26c5805468f14ace28bae265ffe9a0e1a3c8199c0",
+      "src/infra/utils/markdown-text.ts": "f35802ab1f127cbd900bf42cf4969cc58e3fb431184ae610dcaad843b65a1bc5"
+    },
+    "coldContext": {
+      "simulatedRequestLatencyMs": 10,
+      "samples": [
+        {
+          "elapsedMs": 11.301209,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        },
+        {
+          "elapsedMs": 11.222042000000016,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        },
+        {
+          "elapsedMs": 10.343333999999999,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        },
+        {
+          "elapsedMs": 10.493832999999995,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        },
+        {
+          "elapsedMs": 11.51325,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        },
+        {
+          "elapsedMs": 10.35537500000001,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        },
+        {
+          "elapsedMs": 11.356083999999981,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        },
+        {
+          "elapsedMs": 11.14654200000001,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        },
+        {
+          "elapsedMs": 11.195332999999977,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        },
+        {
+          "elapsedMs": 10.210125000000005,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        }
+      ],
+      "medianMs": 11.170937499999994
+    },
+    "formats": {
+      "prose": {
+        "characters": 35100,
+        "rendersPerSample": 20,
+        "samplesMs": [
+          14.851499999999987,
+          13.75566600000002,
+          12.813749999999999,
+          15.903957999999989,
+          14.499833000000024,
+          17.23004199999997,
+          13.222500000000025,
+          15.093207999999976,
+          14.025042000000013,
+          13.431874999999991,
+          12.616834000000011,
+          12.821416,
+          13.074457999999993,
+          12.728415999999982
+        ],
+        "medianMs": 13.593770500000005,
+        "sentenceScans": [
+          0,
+          0
+        ],
+        "measuredRendersPerProcess": 141,
+        "chunks": 34,
+        "fingerprint": "d20abe7d22b3b36d8e6bc153898ad16881fa03052de43728bdfd07dbca18c490"
+      },
+      "code": {
+        "characters": 37209,
+        "rendersPerSample": 20,
+        "samplesMs": [
+          38.26929100000001,
+          35.35820799999999,
+          37.465125,
+          35.46945800000003,
+          35.462333,
+          36.246167000000014,
+          39.75591700000007,
+          38.714541,
+          35.957832999999994,
+          37.05324999999999,
+          35.03762499999999,
+          34.27249999999998,
+          33.74745800000005,
+          36.41979100000003
+        ],
+        "medianMs": 36.102000000000004,
+        "sentenceScans": [
+          141,
+          141
+        ],
+        "measuredRendersPerProcess": 141,
+        "chunks": 36,
+        "fingerprint": "724f0e83a705f29b41dd9dae4bfedbbcf5485435c0289a074de72984d552096d"
+      },
+      "table": {
+        "characters": 24031,
+        "rendersPerSample": 20,
+        "samplesMs": [
+          37.055875000000015,
+          32.583291999999915,
+          33.263874999999985,
+          29.98599999999999,
+          30.58800000000008,
+          29.673416999999972,
+          29.55662499999994,
+          35.213750000000005,
+          31.600084000000038,
+          30.801000000000045,
+          30.513374999999996,
+          29.67166599999996,
+          29.828957999999943,
+          29.393625000000043
+        ],
+        "medianMs": 30.550687500000038,
+        "sentenceScans": [
+          0,
+          0
+        ],
+        "measuredRendersPerProcess": 141,
+        "chunks": 22,
+        "fingerprint": "97f65053505864f012a6875411883d1e5e1e073a0baf0952de9597fb42593dd9"
+      }
+    },
+    "boundaryCorpus": {
+      "initialSeed": 42,
+      "cases": 120,
+      "targets": [
+        2,
+        64,
+        960,
+        1024,
+        4096
+      ],
+      "fingerprint": "950578f6697ba8fdf69f249b4a5e617db49994127f0b19a086e3d2ad861015cd"
+    }
+  },
+  "verification": {
+    "typecheck": "passed",
+    "focusedTests": {
+      "passed": 44,
+      "failed": 0
+    },
+    "defaultSuite": {
+      "passed": 354,
+      "failed": 0,
+      "skipped": 1
+    },
+    "hostIntegration": {
+      "passed": 1,
+      "failed": 0,
+      "opencodeVersion": "2.0.29",
+      "telegram": "isolated local stub",
+      "includesBuildAndPack": true
+    },
+    "performanceRegressionsAgainstBaseline": {
+      "failedAsExpected": 2
+    },
+    "diffCheck": "passed",
+    "coveredInvariants": [
+      "Session/catalog/history requests overlap",
+      "Default and selected model precedence",
+      "Session/history error propagation and later recovery",
+      "Agent catalog fallback",
+      "Existing cache lifetime and live model/token updates",
+      "Paragraph priority with deferred single sentence scan",
+      "Numbered lists, quotes, CRLF, Unicode and balanced chunks",
+      "Compaction, revert boundaries and paginated history"
+    ]
+  },
+  "scopeLimits": [
+    "No changes to state formats, commands, configuration or dependencies",
+    "Concurrent context reads may start catalog/history requests even when session lookup later fails",
+    "Results do not establish real Telegram/model end-to-end latency"
+  ]
+}

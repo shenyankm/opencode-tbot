@@ -49,12 +49,12 @@ test("context uses the latest assistant step including cache rather than accumul
     assert.deepEqual(await client.getSessionContext("ses_test"), { capacity: 1000, used: 435, session: { directory: "/repo", modelName: "Small", providerID: "p", variant: "high", agentName: "build" } });
 });
 
-test("context fetches the first history page while independent metadata requests are still pending", async () => {
+test("context starts history and catalog requests before session metadata finishes", async () => {
     let release!: () => void;
     const pending = new Promise<void>((resolve) => { release = resolve; });
     const started: string[] = [];
     const client = new OpenCodeClient(undefined, {
-        session: { async get() { return { model: { providerID: "p", id: "m" }, agent: "build" }; } },
+        session: { async get() { started.push("session"); await pending; return { model: { providerID: "p", id: "m" }, agent: "build" }; } },
         model: { async list() { started.push("models"); await pending; return { data: [{ id: "m", providerID: "p", limit: { context: 1000 } }] }; } },
         agent: { async list() { started.push("agents"); await pending; return { data: [{ id: "build", name: "Build" }] }; } },
         message: { async list() { started.push("messages"); return { data: [{ type: "assistant", tokens }], cursor: {} }; } },
@@ -62,11 +62,43 @@ test("context fetches the first history page while independent metadata requests
     const result = client.getSessionContext("s");
     await setImmediate();
     try {
-        assert.deepEqual([...started].sort(), ["agents", "messages", "models"]);
+        assert.deepEqual([...started].sort(), ["agents", "messages", "models", "session"]);
     } finally {
         release();
     }
     assert.equal((await result).used, 435);
+});
+
+test("parallel context reads preserve default and selected models and propagate request failures", async () => {
+    let defaults = 0;
+    let failure: "session" | "messages" | null = null;
+    const client = new OpenCodeClient(undefined, {
+        session: { async get() {
+            if (failure === "session") throw new Error("session offline");
+            return {};
+        } },
+        model: {
+            async default() { defaults += 1; return { data: { providerID: "p", id: "default" } }; },
+            async list() { return { data: ["default", "selected"].map((id) => ({ id, providerID: "p", limit: { context: id === "default" ? 1000 : 2000 } })) }; },
+        },
+        agent: { async list() { throw new Error("agents offline"); } },
+        message: { async list() {
+            if (failure === "messages") throw new Error("messages offline");
+            return { data: [{ type: "assistant", tokens }], cursor: {} };
+        } },
+    } as never);
+    const fallback = await client.getSessionContext("s");
+    assert.equal(fallback.capacity, 1000);
+    assert.equal(fallback.used, 435);
+    assert.equal(fallback.session?.modelName, "default");
+    assert.equal((await client.getSessionContext("s", { providerID: "p", id: "selected" })).capacity, 2000);
+    assert.equal(defaults, 1);
+    for (const stage of ["session", "messages"] as const) {
+        failure = stage;
+        await assert.rejects(client.getSessionContext("s"), new RegExp(`${stage} offline`));
+    }
+    failure = null;
+    assert.equal((await client.getSessionContext("s")).used, 435);
 });
 
 test("context reads share metadata for five seconds while session selections and token usage remain live", async (t) => {

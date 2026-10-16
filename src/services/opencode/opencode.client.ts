@@ -280,13 +280,13 @@ export class OpenCodeClient implements OpenCodeClientLike {
 
     async getSessionContext(sessionId: string, selectedModel?: { providerID: string; id: string }): Promise<OpenCodeContextUsage> {
         const options = { signal: AbortSignal.timeout(5_000) };
-        const session = await this.client.session.get({ sessionID: sessionId }, options);
-        const model = selectedModel ?? session.model ?? (await this.client.model.default(undefined, options)).data;
-        const [catalog, agents, firstPage] = await Promise.all([
+        const [session, catalog, agents, firstPage] = await Promise.all([
+            this.client.session.get({ sessionID: sessionId }, options),
             this.cachedModels(),
             this.cachedAgents().catch(() => []),
             this.client.message.list({ sessionID: sessionId, limit: 100, order: "desc" }, options),
         ]);
+        const model = selectedModel ?? session.model ?? (await this.client.model.default(undefined, options)).data;
         const selected = catalog.find((item) => item.providerID === model?.providerID && item.id === model?.id);
         const capacity = selected?.limit.context;
         const result: OpenCodeContextUsage = {
