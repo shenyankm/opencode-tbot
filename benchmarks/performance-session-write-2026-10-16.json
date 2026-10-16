@@ -1,0 +1,509 @@
+{
+  "date": "2026-10-16",
+  "timezone": "Asia/Singapore",
+  "baselineCommit": "beb3364136141bdc4ea354ad92ca8e04819dbdf8",
+  "benchmarkCommand": "pnpm exec tsx tests/session-write.bench.ts [source-checkout]",
+  "method": {
+    "execution": "Two separate-process pairs, baseline then modified and modified then baseline; no tests or builds run during measurement.",
+    "sessionListings": "Ten projects with one thousand total sessions, one hundred in the selected project. One hundred entries per page and 2 ms synthetic page latency. Five samples per process, ten combined.",
+    "writes": "Real serialized atomic file updates in an isolated local temporary directory. Twenty permission-record updates per sample, seven samples per process, fourteen combined. Initial file creation and load are outside the timing.",
+    "equivalence": "Baseline and modified session listing and parsed persisted-state SHA-256 fingerprints match for every scenario.",
+    "limits": "Synthetic session distribution and local filesystem writes on one Apple M4. No real model or Telegram latency measured; no power-loss durability measurement."
+  },
+  "changes": [
+    "Use the native SDK project filter on every session page when a project is already bound.",
+    "Reload the current project when scoped results invalidate the saved binding; retain complete same-project worktree sessions.",
+    "Remove the unused cloned return value from the internal state update method; all callers await completion without consuming a result."
+  ],
+  "before": {
+    "environment": {
+      "node": "v22.23.2",
+      "platform": "darwin",
+      "arch": "arm64",
+      "cpu": "Apple M4"
+    },
+    "sourceHashes": {
+      "src/services/opencode/opencode.client.ts": "84e2ea2f56e4b7d46ef38d0421a04b1799fb37a157fee2c190d6ed21b03e7ff3",
+      "src/services/opencode/opencode.ports.ts": "908aecd22be534e06fdde7ff9926f62988bb7c6c48af6c590b20969a37d5a3b5",
+      "src/use-cases/list-sessions.usecase.ts": "b7ab9bddc87ebcbb0ee1e8983df9f089a31944a5d997b3ea533174d46d5bad11",
+      "src/services/storage/json-state-store.ts": "51eda256cfc487a976ffaab2a2a4f7d2e24a6ef682c07eb3b7f94ce53af5b67f"
+    },
+    "listings": [
+      {
+        "stale": false,
+        "totalSessions": 1000,
+        "selectedProjectSessions": 100,
+        "simulatedPageLatencyMs": 2,
+        "samples": [
+          {
+            "elapsedMs": 23.935708999999974,
+            "pages": 10,
+            "bytes": 120119,
+            "fingerprint": "f3fcd5a61411452c8e393f86014a0942f627b065b9cd56a1742fddb489d0c93a"
+          },
+          {
+            "elapsedMs": 22.39100000000002,
+            "pages": 10,
+            "bytes": 120119,
+            "fingerprint": "f3fcd5a61411452c8e393f86014a0942f627b065b9cd56a1742fddb489d0c93a"
+          },
+          {
+            "elapsedMs": 23.690499999999986,
+            "pages": 10,
+            "bytes": 120119,
+            "fingerprint": "f3fcd5a61411452c8e393f86014a0942f627b065b9cd56a1742fddb489d0c93a"
+          },
+          {
+            "elapsedMs": 22.55612500000001,
+            "pages": 10,
+            "bytes": 120119,
+            "fingerprint": "f3fcd5a61411452c8e393f86014a0942f627b065b9cd56a1742fddb489d0c93a"
+          },
+          {
+            "elapsedMs": 22.78629099999995,
+            "pages": 10,
+            "bytes": 120119,
+            "fingerprint": "f3fcd5a61411452c8e393f86014a0942f627b065b9cd56a1742fddb489d0c93a"
+          },
+          {
+            "elapsedMs": 22.935749999999985,
+            "pages": 10,
+            "bytes": 120119,
+            "fingerprint": "f3fcd5a61411452c8e393f86014a0942f627b065b9cd56a1742fddb489d0c93a"
+          },
+          {
+            "elapsedMs": 22.401667000000003,
+            "pages": 10,
+            "bytes": 120119,
+            "fingerprint": "f3fcd5a61411452c8e393f86014a0942f627b065b9cd56a1742fddb489d0c93a"
+          },
+          {
+            "elapsedMs": 23.289041999999995,
+            "pages": 10,
+            "bytes": 120119,
+            "fingerprint": "f3fcd5a61411452c8e393f86014a0942f627b065b9cd56a1742fddb489d0c93a"
+          },
+          {
+            "elapsedMs": 22.977249999999998,
+            "pages": 10,
+            "bytes": 120119,
+            "fingerprint": "f3fcd5a61411452c8e393f86014a0942f627b065b9cd56a1742fddb489d0c93a"
+          },
+          {
+            "elapsedMs": 22.896834000000013,
+            "pages": 10,
+            "bytes": 120119,
+            "fingerprint": "f3fcd5a61411452c8e393f86014a0942f627b065b9cd56a1742fddb489d0c93a"
+          }
+        ],
+        "medianMs": 22.916292
+      },
+      {
+        "stale": true,
+        "totalSessions": 1000,
+        "selectedProjectSessions": 100,
+        "simulatedPageLatencyMs": 2,
+        "samples": [
+          {
+            "elapsedMs": 21.5625,
+            "pages": 10,
+            "bytes": 120119,
+            "fingerprint": "bf33fdb38f72eb3fb116e8782f3f8181beb9464a5e4e155c732e4a29cf630475"
+          },
+          {
+            "elapsedMs": 23.26362499999999,
+            "pages": 10,
+            "bytes": 120119,
+            "fingerprint": "bf33fdb38f72eb3fb116e8782f3f8181beb9464a5e4e155c732e4a29cf630475"
+          },
+          {
+            "elapsedMs": 23.445667000000014,
+            "pages": 10,
+            "bytes": 120119,
+            "fingerprint": "bf33fdb38f72eb3fb116e8782f3f8181beb9464a5e4e155c732e4a29cf630475"
+          },
+          {
+            "elapsedMs": 23.547750000000008,
+            "pages": 10,
+            "bytes": 120119,
+            "fingerprint": "bf33fdb38f72eb3fb116e8782f3f8181beb9464a5e4e155c732e4a29cf630475"
+          },
+          {
+            "elapsedMs": 22.36979100000002,
+            "pages": 10,
+            "bytes": 120119,
+            "fingerprint": "bf33fdb38f72eb3fb116e8782f3f8181beb9464a5e4e155c732e4a29cf630475"
+          },
+          {
+            "elapsedMs": 22.020708000000013,
+            "pages": 10,
+            "bytes": 120119,
+            "fingerprint": "bf33fdb38f72eb3fb116e8782f3f8181beb9464a5e4e155c732e4a29cf630475"
+          },
+          {
+            "elapsedMs": 23.025874999999985,
+            "pages": 10,
+            "bytes": 120119,
+            "fingerprint": "bf33fdb38f72eb3fb116e8782f3f8181beb9464a5e4e155c732e4a29cf630475"
+          },
+          {
+            "elapsedMs": 23.183416999999963,
+            "pages": 10,
+            "bytes": 120119,
+            "fingerprint": "bf33fdb38f72eb3fb116e8782f3f8181beb9464a5e4e155c732e4a29cf630475"
+          },
+          {
+            "elapsedMs": 23.159541999999988,
+            "pages": 10,
+            "bytes": 120119,
+            "fingerprint": "bf33fdb38f72eb3fb116e8782f3f8181beb9464a5e4e155c732e4a29cf630475"
+          },
+          {
+            "elapsedMs": 23.45470800000004,
+            "pages": 10,
+            "bytes": 120119,
+            "fingerprint": "bf33fdb38f72eb3fb116e8782f3f8181beb9464a5e4e155c732e4a29cf630475"
+          }
+        ],
+        "medianMs": 23.171479499999975
+      }
+    ],
+    "writes": [
+      {
+        "permissionCount": 10,
+        "stateBytes": 1302,
+        "writesPerSample": 20,
+        "samplesMs": [
+          6.654458000000034,
+          5.562915999999973,
+          4.4970839999999725,
+          5.021500000000003,
+          5.352666999999997,
+          5.012125000000026,
+          4.429208000000017,
+          5.000249999999994,
+          4.242583999999965,
+          3.829334000000017,
+          4.507957999999974,
+          4.070334000000003,
+          3.8249999999999886,
+          4.643624999999986
+        ],
+        "medianMs": 4.57579149999998,
+        "fingerprint": "ea87de4830476eb2354f640e0be77851e1f53dcc777c368de0d1a2b1dc0b2a6b"
+      },
+      {
+        "permissionCount": 1000,
+        "stateBytes": 130634,
+        "writesPerSample": 20,
+        "samplesMs": [
+          48.278458,
+          39.972582999999986,
+          39.72162500000002,
+          46.28479200000004,
+          44.02724999999998,
+          43.38079200000004,
+          41.659374999999955,
+          37.236334,
+          34.15616600000004,
+          38.06670799999995,
+          39.96950000000004,
+          42.576041999999916,
+          42.100415999999996,
+          39.16366699999992
+        ],
+        "medianMs": 40.81597899999997,
+        "fingerprint": "cb4ee4793cb9be78a39df809a9620a59ce403d61b64f2644002b038f74bb71ec"
+      },
+      {
+        "permissionCount": 5000,
+        "stateBytes": 670634,
+        "writesPerSample": 20,
+        "samplesMs": [
+          191.6647499999999,
+          189.07537500000012,
+          191.07712500000002,
+          193.78162499999985,
+          196.5754579999998,
+          195.07112499999994,
+          187.19854099999998,
+          189.83566700000006,
+          188.27808300000004,
+          179.3125,
+          182.86758299999997,
+          197.51375000000007,
+          180.65466700000002,
+          173.45974999999999
+        ],
+        "medianMs": 189.4555210000001,
+        "fingerprint": "647fb2a1f0a4f59d966964eccb5c115ae0ebb1cea8c34447982125491f365dde"
+      }
+    ]
+  },
+  "after": {
+    "environment": {
+      "node": "v22.23.2",
+      "platform": "darwin",
+      "arch": "arm64",
+      "cpu": "Apple M4"
+    },
+    "sourceHashes": {
+      "src/services/opencode/opencode.client.ts": "cb957d951286f75ea8de642db5f237428ff859a7fa48ade6fcb5f62d0247524d",
+      "src/services/opencode/opencode.ports.ts": "3a7d9470adbd65825064dc6cd232631806b9f12880059122a15dca5b92a0b0df",
+      "src/use-cases/list-sessions.usecase.ts": "cdb1b63ce802a4d6474c3f90d1077e7cc6fe41ad77747c5222c0cb284a8bf24d",
+      "src/services/storage/json-state-store.ts": "5f41e53cacc056710a49e073ac2e290ca743dc64b91dd40488a1c633554dc2f1"
+    },
+    "listings": [
+      {
+        "stale": false,
+        "totalSessions": 1000,
+        "selectedProjectSessions": 100,
+        "simulatedPageLatencyMs": 2,
+        "samples": [
+          {
+            "elapsedMs": 2.302625000000006,
+            "pages": 1,
+            "bytes": 12011,
+            "fingerprint": "f3fcd5a61411452c8e393f86014a0942f627b065b9cd56a1742fddb489d0c93a"
+          },
+          {
+            "elapsedMs": 2.3366670000000056,
+            "pages": 1,
+            "bytes": 12011,
+            "fingerprint": "f3fcd5a61411452c8e393f86014a0942f627b065b9cd56a1742fddb489d0c93a"
+          },
+          {
+            "elapsedMs": 2.6680829999999958,
+            "pages": 1,
+            "bytes": 12011,
+            "fingerprint": "f3fcd5a61411452c8e393f86014a0942f627b065b9cd56a1742fddb489d0c93a"
+          },
+          {
+            "elapsedMs": 2.4932919999999967,
+            "pages": 1,
+            "bytes": 12011,
+            "fingerprint": "f3fcd5a61411452c8e393f86014a0942f627b065b9cd56a1742fddb489d0c93a"
+          },
+          {
+            "elapsedMs": 2.388417000000004,
+            "pages": 1,
+            "bytes": 12011,
+            "fingerprint": "f3fcd5a61411452c8e393f86014a0942f627b065b9cd56a1742fddb489d0c93a"
+          },
+          {
+            "elapsedMs": 2.5014170000000036,
+            "pages": 1,
+            "bytes": 12011,
+            "fingerprint": "f3fcd5a61411452c8e393f86014a0942f627b065b9cd56a1742fddb489d0c93a"
+          },
+          {
+            "elapsedMs": 2.143416000000002,
+            "pages": 1,
+            "bytes": 12011,
+            "fingerprint": "f3fcd5a61411452c8e393f86014a0942f627b065b9cd56a1742fddb489d0c93a"
+          },
+          {
+            "elapsedMs": 2.7188329999999894,
+            "pages": 1,
+            "bytes": 12011,
+            "fingerprint": "f3fcd5a61411452c8e393f86014a0942f627b065b9cd56a1742fddb489d0c93a"
+          },
+          {
+            "elapsedMs": 2.566958999999997,
+            "pages": 1,
+            "bytes": 12011,
+            "fingerprint": "f3fcd5a61411452c8e393f86014a0942f627b065b9cd56a1742fddb489d0c93a"
+          },
+          {
+            "elapsedMs": 2.3525829999999956,
+            "pages": 1,
+            "bytes": 12011,
+            "fingerprint": "f3fcd5a61411452c8e393f86014a0942f627b065b9cd56a1742fddb489d0c93a"
+          }
+        ],
+        "medianMs": 2.4408545000000004
+      },
+      {
+        "stale": true,
+        "totalSessions": 1000,
+        "selectedProjectSessions": 100,
+        "simulatedPageLatencyMs": 2,
+        "samples": [
+          {
+            "elapsedMs": 4.680416000000008,
+            "pages": 2,
+            "bytes": 12045,
+            "fingerprint": "bf33fdb38f72eb3fb116e8782f3f8181beb9464a5e4e155c732e4a29cf630475"
+          },
+          {
+            "elapsedMs": 4.772874999999999,
+            "pages": 2,
+            "bytes": 12045,
+            "fingerprint": "bf33fdb38f72eb3fb116e8782f3f8181beb9464a5e4e155c732e4a29cf630475"
+          },
+          {
+            "elapsedMs": 4.99920800000001,
+            "pages": 2,
+            "bytes": 12045,
+            "fingerprint": "bf33fdb38f72eb3fb116e8782f3f8181beb9464a5e4e155c732e4a29cf630475"
+          },
+          {
+            "elapsedMs": 4.692625000000021,
+            "pages": 2,
+            "bytes": 12045,
+            "fingerprint": "bf33fdb38f72eb3fb116e8782f3f8181beb9464a5e4e155c732e4a29cf630475"
+          },
+          {
+            "elapsedMs": 4.617750000000001,
+            "pages": 2,
+            "bytes": 12045,
+            "fingerprint": "bf33fdb38f72eb3fb116e8782f3f8181beb9464a5e4e155c732e4a29cf630475"
+          },
+          {
+            "elapsedMs": 4.791792000000001,
+            "pages": 2,
+            "bytes": 12045,
+            "fingerprint": "bf33fdb38f72eb3fb116e8782f3f8181beb9464a5e4e155c732e4a29cf630475"
+          },
+          {
+            "elapsedMs": 4.908499999999989,
+            "pages": 2,
+            "bytes": 12045,
+            "fingerprint": "bf33fdb38f72eb3fb116e8782f3f8181beb9464a5e4e155c732e4a29cf630475"
+          },
+          {
+            "elapsedMs": 5.257959,
+            "pages": 2,
+            "bytes": 12045,
+            "fingerprint": "bf33fdb38f72eb3fb116e8782f3f8181beb9464a5e4e155c732e4a29cf630475"
+          },
+          {
+            "elapsedMs": 4.735167000000004,
+            "pages": 2,
+            "bytes": 12045,
+            "fingerprint": "bf33fdb38f72eb3fb116e8782f3f8181beb9464a5e4e155c732e4a29cf630475"
+          },
+          {
+            "elapsedMs": 4.7468339999999785,
+            "pages": 2,
+            "bytes": 12045,
+            "fingerprint": "bf33fdb38f72eb3fb116e8782f3f8181beb9464a5e4e155c732e4a29cf630475"
+          }
+        ],
+        "medianMs": 4.759854499999989
+      }
+    ],
+    "writes": [
+      {
+        "permissionCount": 10,
+        "stateBytes": 1302,
+        "writesPerSample": 20,
+        "samplesMs": [
+          4.229249999999979,
+          3.623500000000007,
+          3.7610420000000033,
+          3.598000000000013,
+          3.7914580000000058,
+          4.085332999999991,
+          4.008542000000006,
+          5.224415999999991,
+          4.129333000000003,
+          4.122125000000011,
+          5.201999999999998,
+          3.9141250000000127,
+          4.248792000000009,
+          5.0645000000000095
+        ],
+        "medianMs": 4.103729000000001,
+        "fingerprint": "ea87de4830476eb2354f640e0be77851e1f53dcc777c368de0d1a2b1dc0b2a6b"
+      },
+      {
+        "permissionCount": 1000,
+        "stateBytes": 130634,
+        "writesPerSample": 20,
+        "samplesMs": [
+          23.45679199999998,
+          21.611917000000034,
+          22.615124999999978,
+          21.80066599999998,
+          22.488875000000007,
+          24.320750000000032,
+          22.63983300000001,
+          23.81495799999999,
+          23.021083000000004,
+          24.125124999999997,
+          24.48670900000002,
+          22.57541699999996,
+          25.125,
+          23.881624999999985
+        ],
+        "medianMs": 23.23893749999999,
+        "fingerprint": "cb4ee4793cb9be78a39df809a9620a59ce403d61b64f2644002b038f74bb71ec"
+      },
+      {
+        "permissionCount": 5000,
+        "stateBytes": 670634,
+        "writesPerSample": 20,
+        "samplesMs": [
+          123.78420800000004,
+          112.27375000000006,
+          113.688625,
+          108.887833,
+          110.98820799999999,
+          116.80141700000001,
+          104.95170800000005,
+          106.91783299999997,
+          107.42037499999998,
+          115.84512500000005,
+          101.42395899999997,
+          102.71445899999992,
+          104.01604199999997,
+          115.47520799999995
+        ],
+        "medianMs": 109.9380205,
+        "fingerprint": "647fb2a1f0a4f59d966964eccb5c115ae0ebb1cea8c34447982125491f365dde"
+      }
+    ]
+  },
+  "verification": {
+    "typecheck": "passed",
+    "focusedTests": {
+      "passed": 84,
+      "failed": 0
+    },
+    "defaultSuite": {
+      "passed": 352,
+      "failed": 0,
+      "skipped": 1
+    },
+    "hostIntegration": {
+      "passed": 1,
+      "failed": 0,
+      "opencodeVersion": "2.0.29",
+      "telegram": "isolated local stub",
+      "includesBuild": true,
+      "nativeFilter": "Validated inclusion and exclusion through the production adapter against the real isolated host"
+    },
+    "newPerformanceRegressionsAgainstBaseline": {
+      "failedAsExpected": 4
+    },
+    "stateSerializationsPerWrite": {
+      "before": 3,
+      "after": 2
+    },
+    "coveredInvariants": [
+      "Native project filter retained across cursors",
+      "All worktrees of the selected project remain listed",
+      "Missing project/session reloads current-project sessions",
+      "Unscoped listing retains its existing behavior",
+      "Mutator and disk failures do not commit a draft",
+      "Queued writes recover after failures and preserve every increment",
+      "Persisted state survives restart and read results remain isolated"
+    ]
+  },
+  "scopeLimits": [
+    "Unbound session listing keeps its current full-catalog path",
+    "No persisted history deletion or state-format migration",
+    "No dependencies or configuration schema changes"
+  ]
+}

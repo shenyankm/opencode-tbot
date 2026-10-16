@@ -32,11 +32,12 @@ export class ListSessionsUseCase {
 
     async execute(input: ListSessionsInput): Promise<ListSessionsResult> {
         let binding = await this.sessionRepo.getByChatId(input.chatId);
-        const [sessions, projects] = await Promise.all([
+        const listedProjectId = binding?.projectId && binding.directory ? binding.projectId : undefined;
+        let [sessions, projects] = await Promise.all([
             input.currentOnly
                 ? (binding?.sessionId ? this.opencodeClient.getSession(binding.sessionId) : Promise.resolve(null))
                     .then((session) => session ? [session] : [])
-                : this.opencodeClient.listSessions(),
+                : this.opencodeClient.listSessions(listedProjectId),
             binding?.projectId && binding.directory
                 ? this.opencodeClient.listProjects()
                 : Promise.resolve<OpenCodeProject[] | null>(null),
@@ -60,6 +61,10 @@ export class ListSessionsUseCase {
                 directory: binding.directory,
             }
             : await this.getCurrentProjectContext();
+
+        if (!input.currentOnly && listedProjectId && listedProjectId !== projectContext.projectId) {
+            sessions = await this.opencodeClient.listSessions(projectContext.projectId);
+        }
 
         return {
             sessions: sessions.filter((session) => session.projectID === projectContext.projectId),

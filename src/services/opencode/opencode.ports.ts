@@ -63,7 +63,7 @@ export interface OpenCodePromptExecutor {
 export interface OpenCodeSessionCatalog {
     getSession(sessionId: string): Promise<OpenCodeSession | null>;
     getSessionStatuses(): Promise<Record<string, OpenCodeSessionStatus>>;
-    listSessions(): Promise<OpenCodeSession[]>;
+    listSessions(projectId?: string): Promise<OpenCodeSession[]>;
 }
 
 export interface OpenCodeSessionManager {

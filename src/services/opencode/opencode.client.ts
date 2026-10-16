@@ -216,7 +216,7 @@ export interface OpenCodeClientLike {
     getSessionStatuses(): Promise<Record<string, OpenCodeSessionStatus>>;
     getSessionContext(sessionId: string, model?: { providerID: string; id: string }): Promise<OpenCodeContextUsage>;
     listProjects(): Promise<OpenCodeProject[]>;
-    listSessions(): Promise<OpenCodeSession[]>;
+    listSessions(projectId?: string): Promise<OpenCodeSession[]>;
     getSession(sessionId: string): Promise<OpenCodeSession | null>;
     getCurrentProject(): Promise<OpenCodeProject>;
     createSessionForDirectory(directory: string, title?: string): Promise<OpenCodeSession>;
@@ -404,12 +404,12 @@ export class OpenCodeClient implements OpenCodeClientLike {
         }
     }
 
-    async listSessions(): Promise<OpenCodeSession[]> {
+    async listSessions(projectId?: string): Promise<OpenCodeSession[]> {
         const sessions: OpenCodeSession[] = [];
         let cursor: string | undefined;
 
         do {
-            const page = await this.client.session.list({ limit: 100, ...(cursor ? { cursor } : {}) });
+            const page = await this.client.session.list({ limit: 100, ...(projectId ? { project: projectId } : {}), ...(cursor ? { cursor } : {}) });
             sessions.push(...page.data.map(toOpenCodeSession));
             cursor = page.cursor.next ?? undefined;
         } while (cursor);

@@ -30,21 +30,19 @@ export class JsonStateStore<TState> {
         return cloneState(selector(state));
     }
 
-    async update(mutator: (state: TState) => void): Promise<TState> {
-        const nextStatePromise = this.writeQueue.then(async () => {
+    async update(mutator: (state: TState) => void): Promise<void> {
+        const writePromise = this.writeQueue.then(async () => {
             const state = await this.loadState();
             const draft = cloneState(state);
 
             mutator(draft);
             await writeStateFile(this.filePath, draft);
             this.statePromise = Promise.resolve(draft);
-
-            return cloneState(draft);
         });
 
-        this.writeQueue = nextStatePromise.then(() => undefined, () => undefined);
+        this.writeQueue = writePromise.then(() => undefined, () => undefined);
 
-        return nextStatePromise;
+        return writePromise;
     }
 
     private async loadState(): Promise<TState> {

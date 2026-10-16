@@ -25,6 +25,52 @@ const logger = {
     warn() { },
 } as unknown as AppLogger;
 
+test("bound session menus request only their project while keeping sessions from its other worktrees", async () => {
+    const project = createProject("p", "/repo");
+    const repo = new InMemorySessionRepository();
+    await repo.setCurrent({
+        chatId: 1, sessionId: "s", projectId: "p", directory: "/repo", agentName: null,
+        modelProviderId: null, modelId: null, modelVariant: null, language: "en", updatedAt: new Date(0).toISOString(),
+    });
+    const calls: Array<string | undefined> = [];
+    const client = {
+        async listProjects() { return [project]; },
+        async listSessions(projectId?: string) {
+            calls.push(projectId);
+            return [createSession("s", "p", "/repo"), createSession("sandbox", "p", "/worktree")];
+        },
+    } as unknown as OpenCodeClientLike;
+    const result = await new ListSessionsUseCase(repo, client).execute({ chatId: 1 });
+    assert.deepEqual(calls, ["p"]);
+    assert.deepEqual(result.sessions.map((session) => session.id), ["s", "sandbox"]);
+    assert.equal(result.currentSessionId, "s");
+});
+
+test("filtered session menus reload the current project when a saved project or session is gone", async () => {
+    for (const missing of ["project", "session"]) {
+        const repo = new InMemorySessionRepository();
+        await repo.setCurrent({
+            chatId: 1, sessionId: "old", projectId: "old-project", directory: "/old", agentName: null,
+            modelProviderId: null, modelId: null, modelVariant: null, language: "en", updatedAt: new Date(0).toISOString(),
+        });
+        const currentProject = createProject("current", "/current");
+        const calls: Array<string | undefined> = [];
+        const client = {
+            async listProjects() { return missing === "project" ? [currentProject] : [currentProject, createProject("old-project", "/old")]; },
+            async listSessions(projectId?: string) {
+                calls.push(projectId);
+                return projectId === "current" ? [createSession("new", "current", "/current")] : [];
+            },
+            async getCurrentProject() { return currentProject; },
+        } as unknown as OpenCodeClientLike;
+        const result = await new ListSessionsUseCase(repo, client).execute({ chatId: 1 });
+        assert.deepEqual(calls, ["old-project", "current"]);
+        assert.deepEqual(result.sessions.map((session) => session.id), ["new"]);
+        assert.equal(result.currentSessionId, null);
+        assert.equal((await repo.getByChatId(1))!.projectId, null);
+    }
+});
+
 function createProject(id: string, worktree: string): OpenCodeProject {
     return {
         id,

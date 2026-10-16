@@ -191,6 +191,10 @@ test("OpenCode v2 loads the locally built plugin, handles Telegram commands, and
     const sessions = await client.session.list({ directory: worktree });
     const session = sessions.data.find((entry) => entry.title === "V2 integration session");
     assert.ok(session);
+    const catalog = createOpenCodeClientFromSdkClient(client);
+    const projectSessions = await catalog.listSessions(session.projectID);
+    assert.ok(projectSessions.some((entry) => entry.id === session.id));
+    assert.deepEqual(await catalog.listSessions(`missing-${randomUUID()}`), []);
     await sendCommand("/sessions", BOT_COPY.sessions.title);
     const agents = await client.agent.list({ location });
     assert.ok(agents.data.length > 0);

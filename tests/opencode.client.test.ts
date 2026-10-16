@@ -275,6 +275,21 @@ test("listSessions follows V2 cursors instead of truncating the catalog to its d
     assert.deepEqual(calls, [{ limit: 100 }, { limit: 100, cursor: "page-2" }]);
 });
 
+test("project-scoped session listings preserve the native project filter on every cursor page", async () => {
+    const calls: unknown[] = [];
+    const client = createClient({ session: { async list(input: { project?: string; cursor?: string }) {
+        calls.push(input);
+        return input.cursor
+            ? { data: [createSession("second", "/sandbox")], cursor: {} }
+            : { data: [createSession("first")], cursor: { next: "next" } };
+    } } });
+    assert.deepEqual((await client.listSessions("project-1")).map((session) => session.id), ["first", "second"]);
+    assert.deepEqual(calls, [
+        { limit: 100, project: "project-1" },
+        { limit: 100, project: "project-1", cursor: "next" },
+    ]);
+});
+
 test("listLspStatuses reports the missing V2 capability and listMcpStatuses preserves pending status", async () => {
     let request: unknown;
     const client = createClient({
