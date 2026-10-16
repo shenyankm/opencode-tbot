@@ -176,6 +176,83 @@ test("permission buttons remain hidden until persistence completes and stay hidd
     }
 });
 
+test("permission delivery recovers from explicit rate limits in both text formats and keyboard activation", async () => {
+    for (const fallback of [false, true]) {
+        const { runtime, messages, keyboards, permissionApprovalRepo } = createRuntime();
+        const lease = runtime.container.foregroundSessionTracker.acquire(101)!;
+        lease.attachSession("session-1");
+        const send = runtime.bot.api.sendMessage;
+        const activate = runtime.bot.api.editMessageReplyMarkup;
+        let sends = 0;
+        let activations = 0;
+        runtime.bot.api.sendMessage = async (...args) => {
+            sends += 1;
+            if (fallback && args[2]?.parse_mode === "HTML") {
+                throw new GrammyError("bad format", { ok: false, error_code: 400, description: "bad format" }, "sendRichMessage", {});
+            }
+            if (sends === (fallback ? 2 : 1)) {
+                throw new GrammyError("rate limited", { ok: false, error_code: 429, description: "Too Many Requests", parameters: { retry_after: 0 } }, "sendRichMessage", {});
+            }
+            return send(...args);
+        };
+        runtime.bot.api.editMessageReplyMarkup = async (...args) => {
+            activations += 1;
+            assert.equal((await permissionApprovalRepo.listByRequestId("request-1")).length, 1);
+            if (activations === 1) {
+                throw new GrammyError("rate limited", { ok: false, error_code: 429, description: "Too Many Requests", parameters: { retry_after: 0 } }, "editMessageReplyMarkup", {});
+            }
+            return activate(...args);
+        };
+        try {
+            await handleTelegramBotPluginEvent(runtime, {
+                type: "permission.asked",
+                data: { id: "request-1", sessionID: "session-1", action: "read", resources: [], save: [] },
+            });
+            assert.equal(sends, fallback ? 3 : 2);
+            assert.equal(activations, 2);
+            assert.equal(messages.length, 1);
+            assert.equal(keyboards.length, 1);
+        } finally {
+            lease.dispose();
+        }
+    }
+});
+
+test("permission delivery bounds rate-limit retries and never repeats an ambiguous send", async () => {
+    for (const failure of ["send-rate-limit", "keyboard-rate-limit", "ambiguous-send"]) {
+        const { runtime, messages, keyboards, permissionApprovalRepo } = createRuntime();
+        const lease = runtime.container.foregroundSessionTracker.acquire(101)!;
+        lease.attachSession("session-1");
+        const send = runtime.bot.api.sendMessage;
+        let sends = 0;
+        let activations = 0;
+        const limited = new GrammyError("rate limited", { ok: false, error_code: 429, description: "Too Many Requests", parameters: { retry_after: 0 } }, "sendRichMessage", {});
+        runtime.bot.api.sendMessage = async (...args) => {
+            sends += 1;
+            if (failure === "ambiguous-send") throw new Error("response lost after delivery");
+            if (failure === "send-rate-limit") throw limited;
+            return send(...args);
+        };
+        runtime.bot.api.editMessageReplyMarkup = async () => {
+            activations += 1;
+            throw limited;
+        };
+        try {
+            await handleTelegramBotPluginEvent(runtime, {
+                type: "permission.asked",
+                data: { id: "request-1", sessionID: "session-1", action: "read", resources: [], save: [] },
+            });
+            assert.equal(sends, failure === "send-rate-limit" ? 4 : 1);
+            assert.equal(activations, failure === "keyboard-rate-limit" ? 4 : 0);
+            assert.equal(messages.length, failure === "keyboard-rate-limit" ? 1 : 0);
+            assert.equal(keyboards.length, 0);
+            assert.equal((await permissionApprovalRepo.listByRequestId("request-1")).length, failure === "keyboard-rate-limit" ? 1 : 0);
+        } finally {
+            lease.dispose();
+        }
+    }
+});
+
 test("permission.asked deduplicates requests received more than once", async () => {
     const { runtime, sessionRepo, permissionApprovalRepo, messages } = createRuntime();
 

@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 
@@ -47,7 +47,10 @@ export class JsonStateStore<TState> {
 
     private async loadState(): Promise<TState> {
         if (!this.statePromise) {
-            this.statePromise = readStateFile(this.filePath, this.createDefaultState);
+            this.statePromise = readStateFile(this.filePath, this.createDefaultState).catch((error) => {
+                this.statePromise = null;
+                throw error;
+            });
         }
 
         return this.statePromise;
@@ -77,8 +80,14 @@ async function writeStateFile<TState>(filePath: string, state: TState): Promise<
     const temporaryFilePath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
     const serialized = `${JSON.stringify(state, null, 2)}\n`;
 
-    await writeFile(temporaryFilePath, serialized, { encoding: "utf8", mode: 0o600 });
-    await rename(temporaryFilePath, filePath);
+    try {
+        await writeFile(temporaryFilePath, serialized, { encoding: "utf8", mode: 0o600 });
+        await rename(temporaryFilePath, filePath);
+    } catch (error) {
+        // Cleanup must not replace the original write failure.
+        await unlink(temporaryFilePath).catch(() => {});
+        throw error;
+    }
 }
 
 function cloneState<TState>(state: TState): TState {

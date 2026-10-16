@@ -1,5 +1,6 @@
 import type { OpenCodeEvent } from "@opencode/client";
 import { isTelegramFormattingError } from "../services/telegram/rich-messages.js";
+import { retryTelegramRequest } from "../services/telegram/telegram-message-queue.js";
 import { getSafeChatCopy } from "../bot/i18n.js";
 import type { PendingPermissionApproval, PermissionApprovalReply } from "../domain/permission/approval.entity.js";
 import type { AppLogger } from "../infra/logger/index.js";
@@ -135,9 +136,9 @@ async function handlePermissionAsked(
                 updatedAt: new Date().toISOString(),
             });
             // Persist the approval before exposing buttons that can immediately trigger a callback.
-            await runtime.bot.api.editMessageReplyMarkup(chatId, message.message_id, {
+            await retryTelegramRequest(() => runtime.bot.api.editMessageReplyMarkup(chatId, message.message_id, {
                 reply_markup: buildPermissionApprovalKeyboard(request.id, copy),
-            });
+            }));
         } catch (error) {
             logger.error(
                 {
@@ -312,11 +313,11 @@ async function sendPermissionApprovalMessage(
     const message = buildPermissionApprovalMessage(request, copy);
 
     try {
-        return await runtime.bot.api.sendMessage(
+        return await retryTelegramRequest(() => runtime.bot.api.sendMessage(
             chatId,
             message.preferred.text,
             message.preferred.options,
-        );
+        ));
     } catch (error) {
         if (!isTelegramFormattingError(error)) {
             throw error;
@@ -331,10 +332,10 @@ async function sendPermissionApprovalMessage(
             "failed to format rich permission request; retrying with plain rich text",
         );
 
-        return runtime.bot.api.sendMessage(
+        return retryTelegramRequest(() => runtime.bot.api.sendMessage(
             chatId,
             message.fallback.text,
-        );
+        ));
     }
 }
 

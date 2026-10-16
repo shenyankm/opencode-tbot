@@ -82,6 +82,8 @@ test("OpenCode v2 loads the locally built plugin, handles Telegram commands, and
     const editedReplies: string[] = [];
     const updates: Array<Record<string, unknown>> = [];
     let nextUpdateId = 1;
+    let permissionSends = 0;
+    let permissionKeyboards = 0;
     server = createServer(async (request, response) => {
         const chunks: Buffer[] = [];
         for await (const chunk of request) {
@@ -90,6 +92,12 @@ test("OpenCode v2 loads the locally built plugin, handles Telegram commands, and
         const body = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}") as typeof replyMessages[number];
         const method = request.url?.split("/").at(-1) ?? "";
         requests.push(method);
+        if ((method === "sendRichMessage" && body.rich_message?.html?.includes("tbot.integration") && ++permissionSends === 1)
+            || (method === "editMessageReplyMarkup" && ++permissionKeyboards === 1)) {
+            response.writeHead(200, { "content-type": "application/json" });
+            response.end(JSON.stringify({ ok: false, error_code: 429, description: "Too Many Requests", parameters: { retry_after: 0 } }));
+            return;
+        }
         let result: unknown = true;
 
         if (method === "getMe") {
@@ -231,6 +239,8 @@ test("OpenCode v2 loads the locally built plugin, handles Telegram commands, and
     assert.ok(approvalMessage.text?.includes("integration-resource"));
     const callbackData = approvalMessage.reply_markup?.inline_keyboard[0]?.[1]?.callback_data;
     assert.ok(callbackData?.startsWith("permission:always:"));
+    assert.equal(permissionSends, 2);
+    assert.equal(permissionKeyboards, 2);
     updates.push({
         update_id: nextUpdateId++,
         callback_query: {

@@ -1,0 +1,90 @@
+{
+  "date": "2026-10-16",
+  "baselineCommit": "e3b570c273f297f6232953c63cc53536df7590e2",
+  "sourceHashes": {
+    "src/app/plugin-events.ts": "0c14ebbef61a513fe5cb1cb9fb8d3cbbd769417d2f77b3326ccaf81a7a1b458b",
+    "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+    "tests/json-state-store.test.ts": "47c826bf76c4f803d8095b7c2847e4596ef3f962a0ce7d13f17e676ed9c269f3",
+    "tests/permission-hooks.test.ts": "242b3f2313c7ec18031c88c2e46d0b053353d6ef929670cda6fc501acd7ec614",
+    "tests/opencode-host.integration.test.ts": "3a6f199fb3d266055a4f9e07c63f5d87800e8e38345c8249f64d961fcb62d006"
+  },
+  "changes": [
+    {
+      "issue": "A rejected initial state-load promise remains cached after its file is repaired.",
+      "fix": "Clear only failed load promises, retaining successful cached state and propagating read errors.",
+      "acceptance": "Invalid JSON and a directory at the file path each reject read/select/update, then recover in the same store after repair. Ten queued increments preserve count 40 to 50 and the unrelated keep field in each case. Corrupt input is not silently reset."
+    },
+    {
+      "issue": "Failed atomic file renames leave temporary state files behind.",
+      "fix": "Attempt temporary-file cleanup after write/rename errors without replacing the original error.",
+      "acceptance": "Three real filesystem rename failures leave no temporary files and preserve cached count zero. A later valid write persists count one."
+    },
+    {
+      "issue": "An explicit Telegram rate limit can prevent permission messages or their buttons from being delivered.",
+      "fix": "Reuse the existing bounded 429 retry helper for preferred/fallback text and keyboard activation.",
+      "acceptance": "Preferred and fallback text recover from one 429, and buttons recover after persistence. Exhaustion makes four total attempts. Ambiguous sends make one attempt. The isolated real host also recovers from injected 429 responses for text and buttons without duplicate permission messages."
+    }
+  ],
+  "reproduction": {
+    "before": {
+      "command": "pnpm exec tsx --test --test-name-pattern '^failed initial state loads|^failed atomic renames|^permission delivery recovers' tests/json-state-store.test.ts tests/permission-hooks.test.ts",
+      "source": "Baseline production code with the new regression tests",
+      "failedAsExpected": 3,
+      "passed": 0
+    },
+    "after": {
+      "sameThreeRegressions": "passed",
+      "additionalBoundaryTests": "bounded retries, ambiguous sends, persistence ordering and failure recovery passed"
+    }
+  },
+  "verification": {
+    "typecheck": {
+      "command": "pnpm typecheck",
+      "status": "passed"
+    },
+    "targeted": {
+      "command": "pnpm exec tsx --test tests/json-state-store.test.ts tests/session-repo.test.ts tests/permission-hooks.test.ts tests/telegram-network-recovery.test.ts",
+      "passed": 34,
+      "failed": 0
+    },
+    "defaultSuite": {
+      "command": "pnpm test",
+      "passed": 359,
+      "failed": 0,
+      "skipped": 1,
+      "skip": "Host integration is env gated and was run separately"
+    },
+    "hostIntegration": {
+      "command": "OPENCODE_HOST_E2E=1 pnpm exec tsx --test tests/opencode-host.integration.test.ts",
+      "platform": "macOS arm64, Node 22.23.2",
+      "opencode": "2.0.29",
+      "telegram": "isolated local stub",
+      "passed": 1,
+      "failed": 0,
+      "includesBuildAndPack": true,
+      "faults": [
+        "First permission send returns Telegram 429 with retry_after zero",
+        "First keyboard activation returns Telegram 429 with retry_after zero",
+        "Successful permission send response is delayed 500ms"
+      ]
+    },
+    "linuxFilesystem": {
+      "runtime": "Linux arm64, Node 24 Docker",
+      "passed": 4,
+      "failed": 0,
+      "method": "Compile json-state-store.ts and json-state-store.test.ts with the existing TypeScript compiler, then execute the emitted tests directly with Linux Node 24. These tests use only Node builtins."
+    },
+    "linuxHostIntegration": {
+      "status": "not_run",
+      "reason": "Optional Docker setup stalled downloading the pinned OpenCode host package. Setup was stopped; no Linux host result is claimed."
+    },
+    "diffCheck": "passed"
+  },
+  "scopeLimits": [
+    "No dependency, configuration, persisted-state schema or command changes",
+    "Temporary cleanup is best effort if the filesystem also rejects unlink; original write errors remain visible",
+    "Rate limits are retried at most three times; exhaustion is logged and is not an unbounded background retry",
+    "No process-kill or power-loss durability testing",
+    "No real Telegram or model calls, and no remote CI run for these uncommitted changes"
+  ]
+}
