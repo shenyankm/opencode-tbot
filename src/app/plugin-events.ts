@@ -134,6 +134,10 @@ async function handlePermissionAsked(
                 status: "pending",
                 updatedAt: new Date().toISOString(),
             });
+            // Persist the approval before exposing buttons that can immediately trigger a callback.
+            await runtime.bot.api.editMessageReplyMarkup(chatId, message.message_id, {
+                reply_markup: buildPermissionApprovalKeyboard(request.id, copy),
+            });
         } catch (error) {
             logger.error(
                 {
@@ -306,16 +310,12 @@ async function sendPermissionApprovalMessage(
     logger: AppLogger,
 ) {
     const message = buildPermissionApprovalMessage(request, copy);
-    const replyMarkup = buildPermissionApprovalKeyboard(request.id, copy);
 
     try {
         return await runtime.bot.api.sendMessage(
             chatId,
             message.preferred.text,
-            {
-                ...message.preferred.options,
-                reply_markup: replyMarkup,
-            },
+            message.preferred.options,
         );
     } catch (error) {
         if (!isTelegramFormattingError(error)) {
@@ -334,9 +334,6 @@ async function sendPermissionApprovalMessage(
         return runtime.bot.api.sendMessage(
             chatId,
             message.fallback.text,
-            {
-                reply_markup: replyMarkup,
-            },
         );
     }
 }

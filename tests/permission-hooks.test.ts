@@ -27,9 +27,14 @@ function createRuntime() {
     const messages: Array<{ chatId: number; text: string; options?: unknown }> = [];
     const edits: Array<{ chatId: number; messageId: number; text: string }> = [];
     const replies: Array<{ sessionId: string; requestId: string; reply: string }> = [];
+    const keyboards: Array<{ chatId: number; messageId: number; options: unknown }> = [];
     const runtime = {
         bot: {
             api: {
+                async editMessageReplyMarkup(chatId: number, messageId: number, options: unknown) {
+                    keyboards.push({ chatId, messageId, options });
+                    return true;
+                },
                 async editMessageText(chatId: number, messageId: number, text: string) {
                     edits.push({ chatId, messageId, text });
                     return true;
@@ -63,6 +68,7 @@ function createRuntime() {
     return {
         edits,
         messages,
+        keyboards,
         permissionApprovalRepo,
         replies,
         runtime,
@@ -90,7 +96,7 @@ test("a pending footer refresh does not block subsequent plugin events and logs 
 });
 
 test("permission.asked sends Telegram approval messages and persists them", async () => {
-    const { runtime, sessionRepo, permissionApprovalRepo, messages } = createRuntime();
+    const { runtime, sessionRepo, permissionApprovalRepo, messages, keyboards } = createRuntime();
 
     await sessionRepo.setCurrent({
         chatId: 101,
@@ -122,6 +128,9 @@ test("permission.asked sends Telegram approval messages and persists them", asyn
     assert.equal(messages.length, 1);
     assert.equal(messages[0]?.chatId, 101);
     assert.match(messages[0]?.text ?? "", /Permission Request/);
+    assert.equal((messages[0]?.options as { reply_markup?: unknown }).reply_markup, undefined);
+    assert.equal(keyboards.length, 1);
+    assert.equal(keyboards[0]?.messageId, 1);
     assert.deepEqual(approvals, [{
         requestId: "request-1",
         sessionId: "session-1",
@@ -130,6 +139,41 @@ test("permission.asked sends Telegram approval messages and persists them", asyn
         status: "pending",
         updatedAt: approvals[0]?.updatedAt,
     }]);
+});
+
+test("permission buttons remain hidden until persistence completes and stay hidden when it fails", async () => {
+    for (const failWrite of [false, true]) {
+        const { runtime, permissionApprovalRepo, messages, keyboards } = createRuntime();
+        const lease = runtime.container.foregroundSessionTracker.acquire(101)!;
+        lease.attachSession("session-1");
+        let release!: () => void;
+        const pending = new Promise<void>((resolve) => { release = resolve; });
+        let started!: () => void;
+        const writing = new Promise<void>((resolve) => { started = resolve; });
+        const set = permissionApprovalRepo.set.bind(permissionApprovalRepo);
+        permissionApprovalRepo.set = async (approval) => {
+            started();
+            await pending;
+            if (failWrite) throw new Error("disk unavailable");
+            await set(approval);
+        };
+        const delivery = handleTelegramBotPluginEvent(runtime, {
+            type: "permission.asked",
+            data: { id: "request-1", sessionID: "session-1", action: "read", resources: [], save: [] },
+        });
+        await writing;
+        try {
+            assert.equal(messages.length, 1);
+            assert.equal((messages[0]?.options as { reply_markup?: unknown }).reply_markup, undefined);
+            assert.equal(keyboards.length, 0);
+        } finally {
+            release();
+            await delivery;
+            lease.dispose();
+        }
+        assert.equal(keyboards.length, failWrite ? 0 : 1);
+        assert.equal((await permissionApprovalRepo.listByRequestId("request-1")).length, failWrite ? 0 : 1);
+    }
 });
 
 test("permission.asked deduplicates requests received more than once", async () => {

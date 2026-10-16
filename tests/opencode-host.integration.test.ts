@@ -74,6 +74,7 @@ test("OpenCode v2 loads the locally built plugin, handles Telegram commands, and
     const requests: string[] = [];
     const replies: string[] = [];
     const replyMessages: Array<{
+        message_id?: number;
         rich_message?: { html?: string; markdown?: string; blocks?: Array<{ text?: string }> };
         text?: string;
         reply_markup?: { inline_keyboard: Array<Array<{ callback_data: string }>> };
@@ -101,6 +102,10 @@ test("OpenCode v2 loads the locally built plugin, handles Telegram commands, and
         } else if (method === "getUpdates") {
             await new Promise((resolve) => setTimeout(resolve, 100));
             result = updates.splice(0, 1);
+        } else if (method === "editMessageReplyMarkup") {
+            const message = replyMessages[(body.message_id ?? 0) - 1];
+            assert.ok(message);
+            message.reply_markup = body.reply_markup;
         } else if (method === "sendRichMessage" || method === "editMessageText") {
             body.text = body.rich_message?.markdown ?? body.rich_message?.html ?? body.rich_message?.blocks?.map((block) => block.text ?? "").join("\n") ?? "";
             if (method === "sendRichMessage") {
@@ -117,6 +122,10 @@ test("OpenCode v2 loads the locally built plugin, handles Telegram commands, and
             };
         }
 
+        if (method === "sendRichMessage" && body.text?.includes("tbot.integration")) {
+            // A visible message can precede the send response and the approval's durable write.
+            await new Promise((resolve) => setTimeout(resolve, 500));
+        }
         response.writeHead(200, { "content-type": "application/json" });
         response.end(JSON.stringify({ ok: true, result }));
     });
@@ -143,7 +152,7 @@ test("OpenCode v2 loads the locally built plugin, handles Telegram commands, and
     child.stderr.on("data", (chunk: string) => appendOutputChunk(stderrChunks, chunk));
     let spawnError: Error | undefined;
     child.once("error", (error) => { spawnError = error; });
-    const failureContext = () => buildFailureContext(requests, replies, stdoutChunks, stderrChunks);
+    const failureContext = () => buildFailureContext(requests, replies, editedReplies, stdoutChunks, stderrChunks);
     let endpoint: Endpoint | undefined;
     await waitFor(async () => {
         if (spawnError) {
@@ -213,7 +222,8 @@ test("OpenCode v2 loads the locally built plugin, handles Telegram commands, and
         save: ["integration-resource"],
     }, { signal: AbortSignal.timeout(15_000) });
     assert.equal(permission.effect, "ask");
-    await waitFor(() => replyMessages.some((message) => message.text?.includes(BOT_COPY.permission.requestTitle)),
+    await waitFor(() => replyMessages.some((message) => message.text?.includes(BOT_COPY.permission.requestTitle)
+        && message.reply_markup?.inline_keyboard[0]?.[1]?.callback_data.startsWith("permission:always:")),
         15_000, failureContext);
     const approvalMessageIndex = replyMessages.findIndex((message) => message.text?.includes(BOT_COPY.permission.requestTitle));
     const approvalMessage = replyMessages[approvalMessageIndex]!;
@@ -330,12 +340,14 @@ function appendOutputChunk(chunks: string[], chunk: string): void {
 function buildFailureContext(
     requests: string[],
     replies: string[],
+    editedReplies: string[],
     stdoutChunks: string[],
     stderrChunks: string[],
 ): string {
     return [
         `requests=${JSON.stringify(requests.slice(-30))}`,
         `replies=${JSON.stringify(replies)}`,
+        `editedReplies=${JSON.stringify(editedReplies)}`,
         `stdout=${JSON.stringify(stdoutChunks.join("").trim())}`,
         `stderr=${JSON.stringify(stderrChunks.join("").trim())}`,
     ].join("\n");
