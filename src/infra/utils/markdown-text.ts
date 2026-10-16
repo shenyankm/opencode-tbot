@@ -83,9 +83,12 @@ function consumeMarkdownTable(lines: string[], startIndex: number): ConsumedTabl
     }
 
     const headerCells = parseMarkdownTableRow(lines[startIndex] ?? "");
+    if (!headerCells) {
+        return null;
+    }
     const separatorCells = parseMarkdownTableSeparator(lines[startIndex + 1] ?? "");
 
-    if (!headerCells || !separatorCells || headerCells.length !== separatorCells.length) {
+    if (!separatorCells || headerCells.length !== separatorCells.length) {
         return null;
     }
 

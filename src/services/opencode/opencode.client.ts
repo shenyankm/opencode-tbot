@@ -235,6 +235,7 @@ export interface OpenCodeClientLike {
 export class OpenCodeClient implements OpenCodeClientLike {
     readonly client: OpenCodeSdkClientLike;
     private promptTimeoutPolicy: OpenCodePromptTimeoutPolicy;
+    private projectRequest: Promise<Project[]> | null = null;
     private readonly cachedModels = cacheMetadata(async () => (await this.client.model.list(undefined, {
         signal: AbortSignal.timeout(5_000),
     })).data);
@@ -385,7 +386,11 @@ export class OpenCodeClient implements OpenCodeClientLike {
     }
 
     async listProjects(): Promise<OpenCodeProject[]> {
-        return (await this.client.project.list()).map(toOpenCodeProject);
+        this.projectRequest ??= this.client.project.list(undefined, {
+            signal: AbortSignal.timeout(this.promptTimeoutPolicy.pollRequestTimeoutMs),
+        }).finally(() => { this.projectRequest = null; });
+
+        return (await this.projectRequest).map(toOpenCodeProject);
     }
 
     async getSession(sessionId: string): Promise<OpenCodeSession | null> {

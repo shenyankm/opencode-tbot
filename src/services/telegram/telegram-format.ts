@@ -104,8 +104,8 @@ function splitTelegramMarkdown(text: string, streaming: boolean): MarkdownChunk[
             else if (marker[1][0] === fence[0] && marker[1].length >= fence.length && !marker[2].trim()) fence = null;
         }
         const separator = lines[index + 1];
-        const columns = separator ? cells(separator) : [];
-        if (fence || !separator?.includes("|") || !columns.length
+        const columns = !fence && separator?.includes("|") ? cells(separator) : [];
+        if (!columns.length
             || !columns.every((cell) => /^\s*:?-{3,}:?\s*$/u.test(cell))
             || cells(line).length !== columns.length) {
             prose += line;

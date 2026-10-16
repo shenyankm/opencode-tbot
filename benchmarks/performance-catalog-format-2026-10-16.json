@@ -1,0 +1,397 @@
+{
+  "date": "2026-10-16",
+  "timezone": "Asia/Singapore",
+  "baselineCommit": "d8d6163d978e6fa30b235e0443ad4bead0437c92",
+  "benchmarkCommand": "pnpm exec tsx tests/catalog-format.bench.ts [source-checkout]",
+  "method": {
+    "execution": "Two pairs of separate processes, baseline then modified and modified then baseline. No test suite or build runs during measurement.",
+    "formatting": "One warmup per fixture per process, seven timed samples of twenty complete renders per process. Combined medians use fourteen samples per fixture.",
+    "catalogs": "One or twenty concurrent status calls on one client; project requests have 2 ms synthetic latency. Five samples per group per process, ten samples combined.",
+    "freshness": "Every sample performs another status call after the first batch completes and requires a new backend project request.",
+    "equivalence": "All final status results and full preferred/fallback formatting outputs have identical baseline and modified SHA-256 fingerprints.",
+    "limits": "Local synthetic workloads, not measured real model or Telegram service latency. Request reductions require overlapping requests."
+  },
+  "changes": [
+    "Share only pending project list requests within one OpenCode client. Clear on success and failure; use the existing poll request timeout to release stalled requests.",
+    "Skip table-column parsing inside fenced code and when the next line cannot be a table separator.",
+    "Skip plain-text table-separator parsing when the current line cannot be a table header."
+  ],
+  "before": {
+    "environment": {
+      "node": "v22.23.2",
+      "platform": "darwin",
+      "arch": "arm64",
+      "cpu": "Apple M4"
+    },
+    "sourceHashes": {
+      "src/services/opencode/opencode.client.ts": "32f52b1b1df8d1574cbb82c26ba8b90c1b1f3b244229381e7903f0b19e33bafa",
+      "src/services/telegram/telegram-format.ts": "62ad15bf8f96fb9f5b638a176b8214e89aecc82f40ba6f118b26e8603bf4dc5e",
+      "src/infra/utils/markdown-text.ts": "26d3e5769b4912f03291d142dee9d1d8cabd8f452c3bbd25d79bcdf99416a23f"
+    },
+    "projectQueries": [
+      {
+        "concurrency": 1,
+        "elapsedSamplesMs": [
+          2.5328329999999823,
+          2.3320420000000013,
+          2.3939169999999876,
+          2.5941660000000013,
+          2.163792000000001,
+          2.5060000000000002,
+          2.4940830000000034,
+          2.3546249999999986,
+          2.5149590000000046,
+          2.34375
+        ],
+        "medianMs": 2.4439999999999955,
+        "projectRequestsPerBatch": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3
+        ],
+        "freshNextBatchRequests": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3
+        ],
+        "fingerprint": "f30462264fada9aad65fc5a3c7fcd4a63686c8c11a04a4d5e9e3fcd5af106d98"
+      },
+      {
+        "concurrency": 20,
+        "elapsedSamplesMs": [
+          2.858542,
+          2.496292000000011,
+          2.9264169999999865,
+          2.5537080000000003,
+          2.4957080000000076,
+          2.978499999999997,
+          2.711250000000007,
+          1.7501250000000255,
+          2.681791000000004,
+          2.576833999999991
+        ],
+        "medianMs": 2.6293124999999975,
+        "projectRequestsPerBatch": [
+          60,
+          60,
+          60,
+          60,
+          60,
+          60,
+          60,
+          60,
+          60,
+          60
+        ],
+        "freshNextBatchRequests": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3
+        ],
+        "fingerprint": "6167667af1bb73394fceb7b6a217e1efd9ddd9191c20358296e154a8c2b9b5a9"
+      }
+    ],
+    "formats": {
+      "prose": {
+        "characters": 35100,
+        "rendersPerSample": 20,
+        "samplesMs": [
+          37.839042000000006,
+          34.31200000000001,
+          32.78845899999999,
+          32.71358300000003,
+          32.44375000000002,
+          35.39425,
+          33.188792000000035,
+          40.62908300000001,
+          36.626750000000015,
+          33.764958999999976,
+          32.91274999999996,
+          33.16737499999999,
+          35.52354199999996,
+          33.04991699999999
+        ],
+        "medianMs": 33.476875500000006,
+        "chunks": 34,
+        "fingerprint": "d20abe7d22b3b36d8e6bc153898ad16881fa03052de43728bdfd07dbca18c490"
+      },
+      "code": {
+        "characters": 37209,
+        "rendersPerSample": 20,
+        "samplesMs": [
+          44.05695800000001,
+          41.82466699999998,
+          39.967874999999935,
+          38.64412500000003,
+          39.21154200000001,
+          39.102209000000016,
+          39.515499999999975,
+          39.79366600000003,
+          37.97887499999996,
+          37.32458299999996,
+          37.79829200000006,
+          38.29312500000003,
+          37.943250000000035,
+          36.79879099999994
+        ],
+        "medianMs": 38.873167000000024,
+        "chunks": 36,
+        "fingerprint": "724f0e83a705f29b41dd9dae4bfedbbcf5485435c0289a074de72984d552096d"
+      },
+      "table": {
+        "characters": 24031,
+        "rendersPerSample": 20,
+        "samplesMs": [
+          33.873249999999985,
+          30.844165999999973,
+          30.584459000000038,
+          31.822332999999958,
+          30.052542000000017,
+          29.831416999999988,
+          29.78033400000004,
+          30.560333000000014,
+          29.278291999999965,
+          28.623874999999998,
+          28.733542000000057,
+          28.7550829999999,
+          28.579707999999982,
+          28.547666999999933
+        ],
+        "medianMs": 29.805875500000013,
+        "chunks": 22,
+        "fingerprint": "97f65053505864f012a6875411883d1e5e1e073a0baf0952de9597fb42593dd9"
+      }
+    }
+  },
+  "after": {
+    "environment": {
+      "node": "v22.23.2",
+      "platform": "darwin",
+      "arch": "arm64",
+      "cpu": "Apple M4"
+    },
+    "sourceHashes": {
+      "src/services/opencode/opencode.client.ts": "84e2ea2f56e4b7d46ef38d0421a04b1799fb37a157fee2c190d6ed21b03e7ff3",
+      "src/services/telegram/telegram-format.ts": "c60887fd92dc533eeb8b29b8ca86bbea4c576d5b951ab97ea7241186142ace6f",
+      "src/infra/utils/markdown-text.ts": "f35802ab1f127cbd900bf42cf4969cc58e3fb431184ae610dcaad843b65a1bc5"
+    },
+    "projectQueries": [
+      {
+        "concurrency": 1,
+        "elapsedSamplesMs": [
+          2.393125000000012,
+          2.4973750000000052,
+          2.377291999999997,
+          2.526291999999998,
+          2.3050839999999937,
+          2.4735000000000014,
+          2.476332999999997,
+          2.2992090000000047,
+          2.5147910000000024,
+          2.373917000000006
+        ],
+        "medianMs": 2.4333125000000067,
+        "projectRequestsPerBatch": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "freshNextBatchRequests": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "fingerprint": "f30462264fada9aad65fc5a3c7fcd4a63686c8c11a04a4d5e9e3fcd5af106d98"
+      },
+      {
+        "concurrency": 20,
+        "elapsedSamplesMs": [
+          1.609125000000006,
+          2.485749999999996,
+          2.4227920000000154,
+          2.4170420000000092,
+          2.4957919999999945,
+          1.6279169999999965,
+          2.4027499999999975,
+          2.466916999999995,
+          2.432167000000021,
+          2.49754200000001
+        ],
+        "medianMs": 2.427479500000018,
+        "projectRequestsPerBatch": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "freshNextBatchRequests": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "fingerprint": "6167667af1bb73394fceb7b6a217e1efd9ddd9191c20358296e154a8c2b9b5a9"
+      }
+    ],
+    "formats": {
+      "prose": {
+        "characters": 35100,
+        "rendersPerSample": 20,
+        "samplesMs": [
+          26.622041999999993,
+          24.42700000000002,
+          24.012875000000008,
+          22.46829199999999,
+          22.40354099999999,
+          22.343583999999964,
+          22.985208,
+          26.60216600000001,
+          24.52208299999998,
+          24.132749999999987,
+          22.369958000000025,
+          22.52041700000001,
+          22.72645799999998,
+          22.38216699999998
+        ],
+        "medianMs": 22.85583299999999,
+        "chunks": 34,
+        "fingerprint": "d20abe7d22b3b36d8e6bc153898ad16881fa03052de43728bdfd07dbca18c490"
+      },
+      "code": {
+        "characters": 37209,
+        "rendersPerSample": 20,
+        "samplesMs": [
+          35.900082999999995,
+          33.35050000000001,
+          33.226125000000025,
+          34.152333999999996,
+          33.41745900000001,
+          32.597334000000046,
+          32.43316600000003,
+          36.12412499999999,
+          32.993583,
+          32.62562499999996,
+          33.71154200000001,
+          32.272208000000035,
+          33.021792000000005,
+          32.644209000000046
+        ],
+        "medianMs": 33.123958500000015,
+        "chunks": 36,
+        "fingerprint": "724f0e83a705f29b41dd9dae4bfedbbcf5485435c0289a074de72984d552096d"
+      },
+      "table": {
+        "characters": 24031,
+        "rendersPerSample": 20,
+        "samplesMs": [
+          31.47008299999993,
+          30.22170799999992,
+          29.452750000000037,
+          28.518041999999923,
+          28.259832999999958,
+          28.077042000000006,
+          28.617999999999938,
+          32.110000000000014,
+          30.876999999999953,
+          29.97270900000001,
+          29.163874999999962,
+          29.038915999999972,
+          29.360582999999906,
+          28.86091600000009
+        ],
+        "medianMs": 29.262228999999934,
+        "chunks": 22,
+        "fingerprint": "97f65053505864f012a6875411883d1e5e1e073a0baf0952de9597fb42593dd9"
+      }
+    }
+  },
+  "claims": {
+    "proseReductionPercent": 31.726504762966947,
+    "codeReductionPercent": 14.789658120728898,
+    "tableSpeedupClaim": false,
+    "catalogLatencySpeedupClaim": false,
+    "catalogBenefit": "Fewer backend project requests while reads overlap; no persistent metadata caching."
+  },
+  "verification": {
+    "typecheck": "passed",
+    "focusedTests": {
+      "passed": 76,
+      "failed": 0
+    },
+    "defaultSuite": {
+      "passed": 347,
+      "failed": 0,
+      "skipped": 1
+    },
+    "hostIntegration": {
+      "passed": 1,
+      "failed": 0,
+      "opencodeVersion": "2.0.29",
+      "telegram": "isolated local stub",
+      "includesBuild": true
+    },
+    "newSharingAndTimeoutRegressionsAgainstBaseline": {
+      "failedAsExpected": 3
+    },
+    "coveredInvariants": [
+      "Fresh catalog reads after completion",
+      "Failure and timeout release",
+      "Per-client isolation",
+      "Separate returned project objects",
+      "Prose and fenced pipe expressions beside real tables",
+      "Existing formatted/literal fallback and streaming tests"
+    ]
+  },
+  "notChanged": [
+    "No persisted state or retention changes",
+    "No configuration schema or command changes",
+    "No global or cross-client catalog cache"
+  ]
+}

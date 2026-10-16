@@ -161,6 +161,17 @@ test("table padding cannot expand a short reply into an oversized message", () =
     assert.match(replies.map((reply) => reply.preferred.text).join(""), /value17/);
 });
 
+test("ordinary prose and fenced pipe expressions stay intact beside a real Markdown table", () => {
+    const body = "Plain text.\nAnother ordinary line.\n\n```ts\nconst value: string | null = null;\n```\n\n| Name | Value |\n| --- | --- |\n| row | ok |";
+    const replies = buildTelegramPromptReplies({ bodyMd: body, fallbackText: body });
+    assert.equal(replies.map((reply) => reply.preferred.text).join(""), body);
+    const plain = replies.map((reply) => reply.fallback.text).join("\n");
+    assert.match(plain, /Plain text\.\nAnother ordinary line\./u);
+    assert.match(plain, /const value: string \| null = null;/u);
+    assert.match(plain, /Name\s+\| Value/u);
+    assert.match(plain, /row\s+\| ok/u);
+});
+
 test("long tables repeat their header and preserve every complete row alongside surrounding prose", () => {
     const header = "| 编号 | 说明 |\n| :--- | ---: |\n";
     const rows = Array.from({ length: 100 }, (_, i) => `| ${i} | 完整内容 ${"文字".repeat(18)} |\n`);

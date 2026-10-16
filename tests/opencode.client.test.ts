@@ -199,6 +199,62 @@ test("getSession reads one session and only treats a session-not-found response 
     assert.deepEqual(calls, [{ sessionID: "target" }, { sessionID: "missing" }, { sessionID: "offline" }]);
 });
 
+test("concurrent project reads share only the pending request and later calls observe fresh projects", async () => {
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    let requests = 0;
+    let canonical = "/repo";
+    const client = createClient({ project: { async list() {
+        requests += 1;
+        await pending;
+        return [{ id: "p", canonical }];
+    } } });
+    const reads = Array.from({ length: 20 }, () => client.listProjects());
+    assert.equal(requests, 1);
+    release();
+    const results = await Promise.all(reads);
+    assert.ok(results.every((result) => result[0].worktree === "/repo"));
+    results[0][0].worktree = "/caller-change";
+    assert.equal(results[1][0].worktree, "/repo");
+    canonical = "/moved";
+    assert.equal((await client.listProjects())[0].worktree, "/moved");
+    assert.equal(requests, 2);
+});
+
+test("project request sharing releases failed requests and remains scoped to one client", async () => {
+    const offline = new Error("projects offline");
+    let attempts = 0;
+    const sdk = { project: { async list() {
+        if (++attempts === 1) throw offline;
+        return [{ id: "p", canonical: "/repo" }];
+    } } };
+    const client = createClient(sdk);
+    const failures = await Promise.allSettled([client.listProjects(), client.listProjects()]);
+    assert.ok(failures.every((failure) => failure.status === "rejected" && failure.reason === offline));
+    assert.equal(attempts, 1);
+    assert.equal((await client.listProjects())[0].worktree, "/repo");
+    assert.equal(attempts, 2);
+    await Promise.all([client.listProjects(), createClient(sdk).listProjects()]);
+    assert.equal(attempts, 4);
+});
+
+test("a stalled shared project request times out and a later query can recover", async () => {
+    let attempts = 0;
+    const client = createClient({ project: { async list(_input: unknown, options: { signal: AbortSignal }) {
+        if (++attempts > 1) return [];
+        return new Promise<never>((_resolve, reject) => {
+            options.signal.addEventListener("abort", () => reject(options.signal.reason), { once: true });
+        });
+    } } }, { pollRequestTimeoutMs: 20 });
+    const pending = Promise.allSettled([client.listProjects(), client.listProjects()]);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    const results = await pending;
+    assert.ok(results.every((result) => result.status === "rejected" && result.reason.name === "TimeoutError"));
+    assert.equal(attempts, 1);
+    assert.deepEqual(await client.listProjects(), []);
+    assert.equal(attempts, 2);
+});
+
 test("listSessions follows V2 cursors instead of truncating the catalog to its default page", async () => {
     const calls: unknown[] = [];
     const client = createClient({
