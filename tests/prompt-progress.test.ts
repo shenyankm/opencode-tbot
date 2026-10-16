@@ -18,6 +18,75 @@ import type { AppLogger } from "../src/infra/logger/index.js";
 
 const logger = { child() { return this; }, warn() {}, error() {} } as unknown as AppLogger;
 
+test("answer updates reuse thinking segmentation while replacements and new reasoning parts invalidate it", async (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const segment = t.mock.method(Intl.Segmenter.prototype, "segment");
+    const writes: TelegramProgressReply[][] = [];
+    const answers: string[] = [];
+    const progress = new TelegramPromptProgress(getBotCopy("en"), async (replies) => { writes.push(replies); },
+        (error) => { throw error; }, async (answer) => { answers.push(answer); });
+    const reasoning = "中文😀 paragraph.\n".repeat(200) + "token=syntheticsecret";
+    const emit = (type: string, data: Record<string, unknown>) => progress.accept({ type, data: { assistantMessageID: "a", ordinal: 0, ...data } });
+    emit("session.reasoning.ended", { text: reasoning });
+    for (let index = 0; index < 10; index += 1) {
+        emit("session.text.delta", { delta: "answer" });
+        t.mock.timers.tick(1_000);
+        await setImmediate();
+    }
+    assert.equal(segment.mock.callCount(), 1);
+    assert.equal(answers.at(-1), "answer".repeat(10));
+    emit("session.reasoning.ended", { text: reasoning });
+    t.mock.timers.tick(1_000);
+    await setImmediate();
+    assert.equal(segment.mock.callCount(), 1);
+    emit("session.reasoning.ended", { text: "replacement. ".repeat(200) });
+    t.mock.timers.tick(1_000);
+    await setImmediate();
+    assert.equal(segment.mock.callCount(), 2);
+    emit("session.reasoning.delta", { assistantMessageID: "b", delta: "next step" });
+    await progress.finish("stopped");
+    assert.equal(segment.mock.callCount(), 3);
+    assert.equal(writes.at(-1)!.map((reply) => reply.thinking!.text).join(""), "replacement. ".repeat(200) + "\nnext step");
+    assert.ok(writes.at(-1)!.every((reply) => reply.thinking!.phase === "stopped"));
+    assert.doesNotMatch(JSON.stringify(writes), /syntheticsecret/);
+});
+
+test("slow progress delivery coalesces refreshes and finish waits for the newest terminal output", async (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    let release!: () => void;
+    const blocked = new Promise<void>((resolve) => { release = resolve; });
+    const writes: Array<{ text: string; terminal: boolean }> = [];
+    const answers: string[] = [];
+    const errors: unknown[] = [];
+    const progress = new TelegramPromptProgress(getBotCopy("en"), async (replies, terminal) => {
+        writes.push({ text: replies.map((reply) => reply.thinking?.text ?? reply.fallback.text).join(""), terminal });
+        if (writes.length === 1) await blocked;
+    }, (error) => { errors.push(error); }, async (text) => { answers.push(text); });
+    const renders = t.mock.method(progress as unknown as { render(): TelegramProgressReply[] }, "render");
+    for (let index = 0; index < 20; index += 1) {
+        progress.accept({ type: "session.reasoning.delta", data: { assistantMessageID: "a", ordinal: 0, delta: "思考😀" } });
+        progress.accept({ type: "session.text.delta", data: { assistantMessageID: "a", ordinal: 0, delta: "answer" } });
+        t.mock.timers.tick(1_000);
+        await setImmediate();
+    }
+    let finished = false;
+    const finishing = progress.finish("failed").then(() => { finished = true; });
+    await setImmediate();
+    assert.equal(finished, false);
+    release();
+    await finishing;
+    assert.equal(writes.at(-1)!.text, "思考😀".repeat(20));
+    assert.equal(writes.at(-1)!.terminal, true);
+    assert.equal(answers.at(-1), "answer".repeat(20));
+    assert.ok(renders.mock.callCount() <= 3);
+    assert.deepEqual(errors, []);
+    const count = writes.length;
+    progress.accept({ type: "session.reasoning.delta", data: { delta: "too late" } });
+    t.mock.timers.tick(1_000);
+    await progress.finish("failed");
+    assert.equal(writes.length, count);
+});
+
 test("thinking uses localized expandable quotes and escapes provider text without changing the plain fallback", async () => {
     for (const language of ["en", "zh-CN", "ja"] as const) {
         const copy = getBotCopy(language);

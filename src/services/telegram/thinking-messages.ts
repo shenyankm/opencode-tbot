@@ -15,7 +15,7 @@ export function buildThinkingMessageReply(content: ThinkingContent, expanded: bo
     const action = expanded ? "collapse" : "expand";
     const label = expanded ? copy.status.collapseThinking : copy.status.expandThinking;
     const header = `${title}${status} · `;
-    const text = redactSensitiveText(content.text);
+    const text = expanded ? redactSensitiveText(content.text) : "";
     return {
         preferred: {
             text: `<p>${escapeTelegramHtml(header)}<tg-button type="callback_data" style="link" data="thinking:${action}">${escapeTelegramHtml(label)}</tg-button>${expanded ? `<br/>${escapeTelegramHtml(text).replace(/\n/gu, "<br/>")}` : ""}</p>`,

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { setImmediate } from "node:timers/promises";
 import { homedir } from "node:os";
 import { GrammyError } from "grammy";
 import { createThinkingMessages } from "./helpers/thinking.js";
@@ -46,6 +47,26 @@ function createContextClient(pages: unknown[][], revert?: { messageID: string },
 test("context uses the latest assistant step including cache rather than accumulated session usage", async () => {
     const client = createContextClient([[{ type: "assistant", id: "latest", tokens }, { type: "assistant", tokens: { ...tokens, input: 9999 } }]]);
     assert.deepEqual(await client.getSessionContext("ses_test"), { capacity: 1000, used: 435, session: { directory: "/repo", modelName: "Small", providerID: "p", variant: "high", agentName: "build" } });
+});
+
+test("context fetches the first history page while independent metadata requests are still pending", async () => {
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    const started: string[] = [];
+    const client = new OpenCodeClient(undefined, {
+        session: { async get() { return { model: { providerID: "p", id: "m" }, agent: "build" }; } },
+        model: { async list() { started.push("models"); await pending; return { data: [{ id: "m", providerID: "p", limit: { context: 1000 } }] }; } },
+        agent: { async list() { started.push("agents"); await pending; return { data: [{ id: "build", name: "Build" }] }; } },
+        message: { async list() { started.push("messages"); return { data: [{ type: "assistant", tokens }], cursor: {} }; } },
+    } as never);
+    const result = client.getSessionContext("s");
+    await setImmediate();
+    try {
+        assert.deepEqual([...started].sort(), ["agents", "messages", "models"]);
+    } finally {
+        release();
+    }
+    assert.equal((await result).used, 435);
 });
 
 test("context reads share metadata for five seconds while session selections and token usage remain live", async (t) => {

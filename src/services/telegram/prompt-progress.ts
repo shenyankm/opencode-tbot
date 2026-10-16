@@ -15,6 +15,8 @@ export class TelegramPromptProgress {
     private readonly answers = new Map<string, string>();
     private timer: ReturnType<typeof setTimeout> | null = null;
     private writes = Promise.resolve();
+    private flushQueued = false;
+    private reasoningChunks: string[] | null = null;
     private lastTexts: string[] = [];
     private lastAnswer = "";
     private lastCompaction = "";
@@ -54,8 +56,10 @@ export class TelegramPromptProgress {
             const parts = isReasoning ? this.reasoning : this.answers;
             const key = `${String(data.assistantMessageID)}:${String(data.ordinal)}`;
             if (typeof data.text === "string") {
+                if (isReasoning && parts.get(key) !== data.text) this.reasoningChunks = null;
                 parts.set(key, data.text);
             } else if (typeof data.delta === "string") {
+                if (isReasoning) this.reasoningChunks = null;
                 parts.set(key, (parts.get(key) ?? "") + data.delta);
             }
         } else {
@@ -84,7 +88,10 @@ export class TelegramPromptProgress {
     }
 
     private flush(terminal: boolean): Promise<void> {
+        if (!terminal && this.flushQueued) return this.writes;
+        this.flushQueued = true;
         this.writes = this.writes.then(async () => {
+            this.flushQueued = false;
             const compaction = this.finished && this.compacting ? this.phase : this.compactionStatus;
             if (compaction && compaction !== this.lastCompaction && this.writeCompaction) {
                 await this.writeCompaction(compaction, !this.compacting || this.finished);
@@ -106,13 +113,17 @@ export class TelegramPromptProgress {
     }
 
     private render(): TelegramProgressReply[] {
-        const reasoning = [...this.reasoning.values()].join("\n");
+        if (!this.reasoningChunks) {
+            const reasoning = [...this.reasoning.values()].join("\n");
+            this.reasoningChunks = reasoning.trim()
+                ? splitTelegramText(redactSensitiveText(reasoning), TELEGRAM_MESSAGE_TARGET_LENGTH - 64) : [];
+        }
         const status = this.finished && this.phase !== this.copy.status.completed ? this.phase : null;
-        if (!reasoning.trim()) {
+        if (!this.reasoningChunks.length) {
             const fallback = { text: status ?? this.copy.status.processing };
             return [{ preferred: fallback, fallback }];
         }
-        const chunks = splitTelegramText(redactSensitiveText(reasoning), TELEGRAM_MESSAGE_TARGET_LENGTH - 64);
+        const chunks = this.reasoningChunks;
         return chunks.map((text, index) => {
             const thinking: ThinkingContent = {
                 text,

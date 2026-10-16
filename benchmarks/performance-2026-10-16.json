@@ -1,0 +1,261 @@
+{
+  "date": "2026-10-16",
+  "timezone": "Asia/Singapore",
+  "baselineCommit": "0faf83eaf24cf3b483f57a2268e9c21112c2f691",
+  "baseline": "Clean committed OpenCode V2 plugin after discarding the standalone migration at the user request.",
+  "commands": {
+    "benchmark": "pnpm exec tsx tests/performance.bench.ts [source-checkout]",
+    "typecheck": "pnpm typecheck",
+    "tests": "pnpm test",
+    "hostIntegration": "OPENCODE_HOST_E2E=1 pnpm exec tsx --test tests/opencode-host.integration.test.ts"
+  },
+  "method": {
+    "timing": "One warmup then five samples in separate, sequential baseline and modified processes; report medians.",
+    "staticThinking": "100000 UTF-16 code units of fixed thinking, ten answer updates, then completion.",
+    "slowDelivery": "Fifty simulated timer windows while the first write is blocked; finish with stopped status.",
+    "context": "Four synthetic SDK requests with 10 ms latency each and cold metadata caches.",
+    "equivalence": "All baseline and modified final-output SHA-256 fingerprints match.",
+    "limits": "Local synthetic workloads on one Apple M4 and Node 22; no real model or Telegram latency measured."
+  },
+  "before": {
+    "environment": {
+      "node": "v22.23.2",
+      "platform": "darwin",
+      "arch": "arm64",
+      "cpu": "Apple M4"
+    },
+    "sourceHashes": {
+      "src/services/telegram/prompt-progress.ts": "83debb953e253ecaa819b802bcfd9c9c309a838ca3b5e66ffb414144fe34fe06",
+      "src/services/telegram/thinking-messages.ts": "42ba68e5aa64914ccaf9acdddc7427cb504a2083b730576d45861724c51f2633",
+      "src/services/opencode/opencode.client.ts": "58a8bff6a4f49f7c8c373be3db8247ccf0581aaf08a43296c068309731599ad8"
+    },
+    "staticThinking": {
+      "characters": 100000,
+      "answerUpdates": 10,
+      "samples": [
+        {
+          "elapsedMs": 34.907332999999994,
+          "segmentations": 11,
+          "chunks": 104,
+          "fingerprint": "6421efd9a029b5c8de06ee55f9c3f19810b88527d4aaa69f06ce80374a16c382"
+        },
+        {
+          "elapsedMs": 32.51445799999999,
+          "segmentations": 11,
+          "chunks": 104,
+          "fingerprint": "6421efd9a029b5c8de06ee55f9c3f19810b88527d4aaa69f06ce80374a16c382"
+        },
+        {
+          "elapsedMs": 32.08774999999997,
+          "segmentations": 11,
+          "chunks": 104,
+          "fingerprint": "6421efd9a029b5c8de06ee55f9c3f19810b88527d4aaa69f06ce80374a16c382"
+        },
+        {
+          "elapsedMs": 30.666458999999975,
+          "segmentations": 11,
+          "chunks": 104,
+          "fingerprint": "6421efd9a029b5c8de06ee55f9c3f19810b88527d4aaa69f06ce80374a16c382"
+        },
+        {
+          "elapsedMs": 30.588833000000022,
+          "segmentations": 11,
+          "chunks": 104,
+          "fingerprint": "6421efd9a029b5c8de06ee55f9c3f19810b88527d4aaa69f06ce80374a16c382"
+        }
+      ],
+      "medianMs": 32.08774999999997
+    },
+    "slowDelivery": {
+      "timerWindows": 50,
+      "renders": 51,
+      "writes": 3,
+      "fingerprint": "040f5be4b478fd50b4fdd97e3ad08b66fe1a3d0adba8d7087cdfd5858fb08506"
+    },
+    "coldContext": {
+      "simulatedRequestLatencyMs": 10,
+      "samples": [
+        {
+          "elapsedMs": 32.53791699999999,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        },
+        {
+          "elapsedMs": 33.71912499999996,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        },
+        {
+          "elapsedMs": 33.28429199999999,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        },
+        {
+          "elapsedMs": 33.39941699999997,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        },
+        {
+          "elapsedMs": 32.34325000000001,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        }
+      ],
+      "medianMs": 33.28429199999999
+    }
+  },
+  "after": {
+    "environment": {
+      "node": "v22.23.2",
+      "platform": "darwin",
+      "arch": "arm64",
+      "cpu": "Apple M4"
+    },
+    "sourceHashes": {
+      "src/services/telegram/prompt-progress.ts": "bdf3127263ff0c6022a900f76eb9530691818912b760305fb8d02e2f98d40721",
+      "src/services/telegram/thinking-messages.ts": "b366a2b9765d2389a236d1a7a8459edabf8f87d4e4dd94a8f9d3edb865cb443e",
+      "src/services/opencode/opencode.client.ts": "32f52b1b1df8d1574cbb82c26ba8b90c1b1f3b244229381e7903f0b19e33bafa"
+    },
+    "staticThinking": {
+      "characters": 100000,
+      "answerUpdates": 10,
+      "samples": [
+        {
+          "elapsedMs": 6.917167000000006,
+          "segmentations": 1,
+          "chunks": 104,
+          "fingerprint": "6421efd9a029b5c8de06ee55f9c3f19810b88527d4aaa69f06ce80374a16c382"
+        },
+        {
+          "elapsedMs": 6.695707999999996,
+          "segmentations": 1,
+          "chunks": 104,
+          "fingerprint": "6421efd9a029b5c8de06ee55f9c3f19810b88527d4aaa69f06ce80374a16c382"
+        },
+        {
+          "elapsedMs": 6.47312500000001,
+          "segmentations": 1,
+          "chunks": 104,
+          "fingerprint": "6421efd9a029b5c8de06ee55f9c3f19810b88527d4aaa69f06ce80374a16c382"
+        },
+        {
+          "elapsedMs": 7.926000000000016,
+          "segmentations": 1,
+          "chunks": 104,
+          "fingerprint": "6421efd9a029b5c8de06ee55f9c3f19810b88527d4aaa69f06ce80374a16c382"
+        },
+        {
+          "elapsedMs": 6.360957999999982,
+          "segmentations": 1,
+          "chunks": 104,
+          "fingerprint": "6421efd9a029b5c8de06ee55f9c3f19810b88527d4aaa69f06ce80374a16c382"
+        }
+      ],
+      "medianMs": 6.695707999999996
+    },
+    "slowDelivery": {
+      "timerWindows": 50,
+      "renders": 3,
+      "writes": 3,
+      "fingerprint": "040f5be4b478fd50b4fdd97e3ad08b66fe1a3d0adba8d7087cdfd5858fb08506"
+    },
+    "coldContext": {
+      "simulatedRequestLatencyMs": 10,
+      "samples": [
+        {
+          "elapsedMs": 21.935332999999986,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        },
+        {
+          "elapsedMs": 22.040542000000016,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        },
+        {
+          "elapsedMs": 22.27849999999998,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        },
+        {
+          "elapsedMs": 22.28370799999999,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        },
+        {
+          "elapsedMs": 22.10420800000003,
+          "requests": 4,
+          "fingerprint": "b27ad7f0e52dcd180e69379bd1b05a4a5579bed377df8ecead9eec40391582ee"
+        }
+      ],
+      "medianMs": 22.10420800000003
+    }
+  },
+  "verification": {
+    "baselineTests": {
+      "passed": 333,
+      "failed": 0,
+      "skipped": 1
+    },
+    "modifiedTests": {
+      "passed": 336,
+      "failed": 0,
+      "skipped": 1
+    },
+    "focusedTests": {
+      "passed": 47,
+      "failed": 0,
+      "skipped": 0
+    },
+    "newRegressionTestsAgainstBaseline": {
+      "failedAsExpected": 3
+    },
+    "typecheck": "passed",
+    "build": "passed through host integration",
+    "hostIntegration": {
+      "passed": 1,
+      "failed": 0,
+      "hostVersion": "2.0.29",
+      "telegram": "isolated local stub"
+    }
+  },
+  "reviewedPaths": [
+    "src/plugin.ts",
+    "src/app/bootstrap.ts",
+    "src/app/runtime.ts",
+    "src/app/container.ts",
+    "src/app/plugin-events.ts",
+    "src/bot/handlers",
+    "src/bot/middlewares/auth.ts",
+    "src/bot/presenters",
+    "src/use-cases",
+    "src/services/opencode/opencode.client.ts",
+    "src/services/session-activity/foreground-session-tracker.ts",
+    "src/services/telegram",
+    "src/services/storage",
+    "src/repositories",
+    "src/infra/logger/index.ts",
+    "package.json",
+    "vite.config.ts",
+    ".github/workflows/ci.yml",
+    "tests"
+  ],
+  "otherCandidates": [
+    {
+      "path": "src/use-cases/get-status.usecase.ts",
+      "case": "Status workspace loads the full session catalog; LSP/MCP/workspace sections can repeat project validation requests.",
+      "decision": "Keep current live freshness and fallback behavior; measure realistic catalog size before adding sharing or changing interfaces."
+    },
+    {
+      "path": "src/services/storage/json-state-store.ts",
+      "case": "Reads clone the entire binding/permission state and writes serialize the entire file.",
+      "decision": "Keep atomic persistence and isolation. No production state-size evidence justifies a storage redesign for a small trusted allowlist."
+    }
+  ],
+  "reviewAssumption": "One local OpenCode V2 shared service with a small trusted Telegram allowlist; inspect long reasoning and delayed Telegram delivery explicitly.",
+  "notReviewedInFull": [
+    "CLI installer implementation",
+    "Every unchanged locale string and unit test",
+    "Production CPU, heap and real-service latency profiles"
+  ]
+}

@@ -281,9 +281,10 @@ export class OpenCodeClient implements OpenCodeClientLike {
         const options = { signal: AbortSignal.timeout(5_000) };
         const session = await this.client.session.get({ sessionID: sessionId }, options);
         const model = selectedModel ?? session.model ?? (await this.client.model.default(undefined, options)).data;
-        const [catalog, agents] = await Promise.all([
+        const [catalog, agents, firstPage] = await Promise.all([
             this.cachedModels(),
             this.cachedAgents().catch(() => []),
+            this.client.message.list({ sessionID: sessionId, limit: 100, order: "desc" }, options),
         ]);
         const selected = catalog.find((item) => item.providerID === model?.providerID && item.id === model?.id);
         const capacity = selected?.limit.context;
@@ -301,7 +302,9 @@ export class OpenCodeClient implements OpenCodeClientLike {
         let cursor: string | undefined;
         let beforeBoundary = !session.revert;
         do {
-            const page = await this.client.message.list({ sessionID: sessionId, limit: 100, ...(cursor ? { cursor } : { order: "desc" as const }) }, options);
+            const page = cursor
+                ? await this.client.message.list({ sessionID: sessionId, limit: 100, cursor }, options)
+                : firstPage;
             for (const message of page.data) {
                 if (!beforeBoundary) {
                     beforeBoundary = message.id === session.revert?.messageID;
