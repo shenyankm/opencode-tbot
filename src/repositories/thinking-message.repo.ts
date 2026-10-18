@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import type { ThinkingMessage } from "../domain/thinking/thinking-message.entity.js";
 import type { ThinkingMessageRepository } from "../domain/thinking/thinking-message.repository.js";
-import { JsonStateStore } from "../services/storage/json-state-store.js";
+import { readStateFile, writeStateFile } from "../services/storage/json-state-store.js";
 
 const messageSchema = z.object({
     chatId: z.number().int().safe(),
@@ -20,7 +20,7 @@ export class FileThinkingMessageRepository implements ThinkingMessageRepository 
     constructor(private readonly directory: string) { }
 
     async get(chatId: number, messageId: number): Promise<ThinkingMessage | null> {
-        const { message } = await this.store(chatId, messageId).read();
+        const { message } = await this.read(chatId, messageId);
         if (message === null) return null;
         const parsed = messageSchema.parse(message);
         if (parsed.chatId !== chatId || parsed.messageId !== messageId) {
@@ -31,7 +31,9 @@ export class FileThinkingMessageRepository implements ThinkingMessageRepository 
 
     async set(message: ThinkingMessage): Promise<void> {
         const parsed = messageSchema.parse(message);
-        await this.store(parsed.chatId, parsed.messageId).update((state) => { state.message = parsed; });
+        const state = await this.read(parsed.chatId, parsed.messageId);
+        state.message = parsed;
+        await writeStateFile(this.path(parsed.chatId, parsed.messageId), state);
     }
 
     async delete(chatId: number, messageId: number): Promise<void> {
@@ -49,10 +51,7 @@ export class FileThinkingMessageRepository implements ThinkingMessageRepository 
         return join(this.directory, `${chatId}.${messageId}.json`);
     }
 
-    private store(chatId: number, messageId: number): JsonStateStore<{ message: ThinkingMessage | null }> {
-        return new JsonStateStore<{ message: ThinkingMessage | null }>({
-            filePath: this.path(chatId, messageId),
-            createDefaultState: () => ({ message: null }),
-        });
+    private read(chatId: number, messageId: number): Promise<{ message: ThinkingMessage | null }> {
+        return readStateFile(this.path(chatId, messageId), () => ({ message: null }));
     }
 }

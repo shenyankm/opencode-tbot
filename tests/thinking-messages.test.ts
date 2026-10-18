@@ -126,6 +126,31 @@ test("private per-message files survive restart and orphaned streaming messages 
     await assert.rejects(restartedRepo.get(-100, 42), /does not belong/);
 });
 
+test("thinking file replacements preserve envelope data and reject corrupt files until repaired", async (t) => {
+    const directory = await mkdtemp(join(tmpdir(), "tbot-thinking-replace-"));
+    t.after(() => rm(directory, { recursive: true, force: true }));
+    const repository = new FileThinkingMessageRepository(directory);
+    const path = join(directory, "1.42.json");
+    const message = { chatId: 1, messageId: 42, text: "original", phase: "completed" as const, expanded: true, stopCallbackData: null };
+    await writeFile(path, JSON.stringify({ message, retained: { version: 2 } }));
+    await repository.set({ ...message, text: "newest" });
+    assert.deepEqual(JSON.parse(await readFile(path, "utf8")).retained, { version: 2 });
+    const snapshot = (await repository.get(1, 42))!;
+    snapshot.text = "local mutation";
+    assert.equal((await repository.get(1, 42))!.text, "newest");
+    const saved = await readFile(path, "utf8");
+    await assert.rejects(repository.set({ ...message, messageId: NaN }));
+    assert.equal(await readFile(path, "utf8"), saved);
+    await writeFile(path, "{broken");
+    await assert.rejects(repository.set(message), SyntaxError);
+    await assert.rejects(repository.get(1, 42), SyntaxError);
+    assert.equal(await readFile(path, "utf8"), "{broken");
+    await writeFile(path, JSON.stringify({ message, retained: "after repair" }));
+    await repository.set({ ...message, text: "recovered" });
+    assert.equal((await repository.get(1, 42))!.text, "recovered");
+    assert.equal(JSON.parse(await readFile(path, "utf8")).retained, "after repair");
+});
+
 test("callbacks edit the original message, reject missing chat data, and leave content intact on edit failure", async () => {
     const { service } = createThinkingMessages();
     const { write } = capture();

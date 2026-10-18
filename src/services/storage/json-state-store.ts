@@ -93,7 +93,7 @@ export class JsonStateStore<TState> {
     }
 }
 
-async function readStateFile<TState>(
+export async function readStateFile<TState>(
     filePath: string,
     createDefaultState: () => TState,
 ): Promise<TState> {
@@ -110,7 +110,7 @@ async function readStateFile<TState>(
     }
 }
 
-async function writeStateFile<TState>(filePath: string, state: TState): Promise<void> {
+export async function writeStateFile<TState>(filePath: string, state: TState): Promise<void> {
     await mkdir(dirname(filePath), { recursive: true });
 
     const temporaryFilePath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;

@@ -1,0 +1,3834 @@
+{
+  "short-microtask": [
+    {
+      "environment": {
+        "node": "v22.23.2",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpu": "Apple M4"
+      },
+      "roots": [
+        "/var/folders/1b/b19xbzjx7xqc4kl0k9x_y4y80000gp/T/tbot-regression-7znoc3ej/original",
+        "/var/folders/1b/b19xbzjx7xqc4kl0k9x_y4y80000gp/T/tbot-regression-7znoc3ej/prior"
+      ],
+      "scenario": "stream-short",
+      "mode": "microtask",
+      "blocks": 6,
+      "repetitions": 100,
+      "sourceHashes": [
+        {
+          "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+          "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+          "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+          "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+          "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+        },
+        {
+          "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+          "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+          "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+          "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+          "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+        }
+      ],
+      "samples": [
+        {
+          "block": 0,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 12.188832999999988,
+          "cpuMs": 39.16,
+          "perReplayMs": 0.12188832999999988,
+          "perReplayCpuMs": 0.39159999999999995,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 0,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 6.448833000000008,
+          "cpuMs": 22.114,
+          "perReplayMs": 0.06448833000000008,
+          "perReplayCpuMs": 0.22114,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 0,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 3.736249999999984,
+          "cpuMs": 9.318,
+          "perReplayMs": 0.03736249999999984,
+          "perReplayCpuMs": 0.09318,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 0,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 8.562749999999994,
+          "cpuMs": 28.965,
+          "perReplayMs": 0.08562749999999994,
+          "perReplayCpuMs": 0.28965,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 1,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 5.9507919999999785,
+          "cpuMs": 13.908,
+          "perReplayMs": 0.059507919999999784,
+          "perReplayCpuMs": 0.13907999999999998,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 1,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 4.8136670000000095,
+          "cpuMs": 13.234,
+          "perReplayMs": 0.0481366700000001,
+          "perReplayCpuMs": 0.13234,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 1,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 3.603166999999985,
+          "cpuMs": 8.8,
+          "perReplayMs": 0.03603166999999985,
+          "perReplayCpuMs": 0.08800000000000001,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 1,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 11.32774999999998,
+          "cpuMs": 37.823,
+          "perReplayMs": 0.11327749999999981,
+          "perReplayCpuMs": 0.37823,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 2,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 7.871667000000002,
+          "cpuMs": 24.513,
+          "perReplayMs": 0.07871667000000002,
+          "perReplayCpuMs": 0.24513000000000001,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 2,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 4.756208000000015,
+          "cpuMs": 17.959,
+          "perReplayMs": 0.04756208000000015,
+          "perReplayCpuMs": 0.17959,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 2,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 5.3867499999999495,
+          "cpuMs": 17.476,
+          "perReplayMs": 0.05386749999999949,
+          "perReplayCpuMs": 0.17476,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 2,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 9.35529200000002,
+          "cpuMs": 29.198,
+          "perReplayMs": 0.0935529200000002,
+          "perReplayCpuMs": 0.29198,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 3,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 8.006333999999981,
+          "cpuMs": 26.653,
+          "perReplayMs": 0.08006333999999982,
+          "perReplayCpuMs": 0.26653,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 3,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 5.531457999999986,
+          "cpuMs": 22.657,
+          "perReplayMs": 0.05531457999999986,
+          "perReplayCpuMs": 0.22657,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 3,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 5.687624999999969,
+          "cpuMs": 15.496,
+          "perReplayMs": 0.056876249999999684,
+          "perReplayCpuMs": 0.15496000000000001,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 3,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 11.161959000000024,
+          "cpuMs": 43.077,
+          "perReplayMs": 0.11161959000000024,
+          "perReplayCpuMs": 0.43077,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 4,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 10.438083000000006,
+          "cpuMs": 28.876,
+          "perReplayMs": 0.10438083000000006,
+          "perReplayCpuMs": 0.28876,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 4,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 4.3870000000000005,
+          "cpuMs": 11.449,
+          "perReplayMs": 0.043870000000000006,
+          "perReplayCpuMs": 0.11449,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 4,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 7.536665999999968,
+          "cpuMs": 27.344,
+          "perReplayMs": 0.07536665999999968,
+          "perReplayCpuMs": 0.27344,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 4,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 10.429332999999986,
+          "cpuMs": 35.518,
+          "perReplayMs": 0.10429332999999985,
+          "perReplayCpuMs": 0.35518,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 5,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 6.886915999999985,
+          "cpuMs": 14.18,
+          "perReplayMs": 0.06886915999999985,
+          "perReplayCpuMs": 0.1418,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 5,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 5.672708,
+          "cpuMs": 21.667,
+          "perReplayMs": 0.05672708,
+          "perReplayCpuMs": 0.21667000000000003,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 5,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 3.6814170000000104,
+          "cpuMs": 8.391,
+          "perReplayMs": 0.036814170000000104,
+          "perReplayCpuMs": 0.08391,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 5,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 11.492999999999938,
+          "cpuMs": 38.154,
+          "perReplayMs": 0.11492999999999938,
+          "perReplayCpuMs": 0.38154000000000005,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        }
+      ],
+      "diagnostics": [
+        {
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 0.1915000000000191,
+          "cpuMs": 0.823,
+          "perReplayMs": 0.1915000000000191,
+          "perReplayCpuMs": 0.823,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "renders": 61,
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 0.20841700000005403,
+          "cpuMs": 0.222,
+          "perReplayMs": 0.20841700000005403,
+          "perReplayCpuMs": 0.222,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "renders": 2,
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        }
+      ]
+    },
+    {
+      "environment": {
+        "node": "v22.23.2",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpu": "Apple M4"
+      },
+      "roots": [
+        "/var/folders/1b/b19xbzjx7xqc4kl0k9x_y4y80000gp/T/tbot-regression-7znoc3ej/prior",
+        "/var/folders/1b/b19xbzjx7xqc4kl0k9x_y4y80000gp/T/tbot-regression-7znoc3ej/original"
+      ],
+      "scenario": "stream-short",
+      "mode": "microtask",
+      "blocks": 6,
+      "repetitions": 100,
+      "sourceHashes": [
+        {
+          "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+          "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+          "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+          "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+          "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+        },
+        {
+          "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+          "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+          "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+          "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+          "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+        }
+      ],
+      "samples": [
+        {
+          "block": 0,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 5.963250000000016,
+          "cpuMs": 15.322,
+          "perReplayMs": 0.059632500000000165,
+          "perReplayCpuMs": 0.15322,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 0,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 9.468125000000015,
+          "cpuMs": 28.94,
+          "perReplayMs": 0.09468125000000015,
+          "perReplayCpuMs": 0.2894,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 0,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 7.443375000000003,
+          "cpuMs": 20.444,
+          "perReplayMs": 0.07443375000000003,
+          "perReplayCpuMs": 0.20443999999999998,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 0,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 6.206250000000011,
+          "cpuMs": 20.261,
+          "perReplayMs": 0.06206250000000011,
+          "perReplayCpuMs": 0.20260999999999998,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 1,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 4.600291999999968,
+          "cpuMs": 10.026,
+          "perReplayMs": 0.04600291999999968,
+          "perReplayCpuMs": 0.10026,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 1,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 9.446334000000036,
+          "cpuMs": 32.377,
+          "perReplayMs": 0.09446334000000035,
+          "perReplayCpuMs": 0.32377,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 1,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 6.156667000000027,
+          "cpuMs": 12.867,
+          "perReplayMs": 0.061566670000000275,
+          "perReplayCpuMs": 0.12867,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 1,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 5.339166999999975,
+          "cpuMs": 18.648,
+          "perReplayMs": 0.05339166999999975,
+          "perReplayCpuMs": 0.18648,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 2,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 5.875749999999982,
+          "cpuMs": 21.11,
+          "perReplayMs": 0.058757499999999824,
+          "perReplayCpuMs": 0.21109999999999998,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 2,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 8.800208999999995,
+          "cpuMs": 26.129,
+          "perReplayMs": 0.08800208999999995,
+          "perReplayCpuMs": 0.26129,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 2,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 8.891124999999988,
+          "cpuMs": 28.08,
+          "perReplayMs": 0.08891124999999989,
+          "perReplayCpuMs": 0.2808,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 2,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 6.60004200000003,
+          "cpuMs": 22.235,
+          "perReplayMs": 0.06600042000000031,
+          "perReplayCpuMs": 0.22235,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 3,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 4.004374999999982,
+          "cpuMs": 9.528,
+          "perReplayMs": 0.040043749999999816,
+          "perReplayCpuMs": 0.09528,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 3,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 10.657708000000014,
+          "cpuMs": 34.886,
+          "perReplayMs": 0.10657708000000014,
+          "perReplayCpuMs": 0.34886,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 3,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 7.366416000000015,
+          "cpuMs": 15.01,
+          "perReplayMs": 0.07366416000000015,
+          "perReplayCpuMs": 0.1501,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 3,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 5.26720899999998,
+          "cpuMs": 20.131,
+          "perReplayMs": 0.0526720899999998,
+          "perReplayCpuMs": 0.20131,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 4,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 6.156917000000021,
+          "cpuMs": 19.654,
+          "perReplayMs": 0.061569170000000215,
+          "perReplayCpuMs": 0.19654,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 4,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 9.078624999999988,
+          "cpuMs": 28.681,
+          "perReplayMs": 0.09078624999999989,
+          "perReplayCpuMs": 0.28681,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 4,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 10.308957999999961,
+          "cpuMs": 46.061,
+          "perReplayMs": 0.10308957999999961,
+          "perReplayCpuMs": 0.46061,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 4,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 5.701542000000018,
+          "cpuMs": 19.999,
+          "perReplayMs": 0.05701542000000018,
+          "perReplayCpuMs": 0.19999,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 5,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 3.438208999999972,
+          "cpuMs": 8.726,
+          "perReplayMs": 0.03438208999999972,
+          "perReplayCpuMs": 0.08726,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 5,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 10.159625000000005,
+          "cpuMs": 36.113,
+          "perReplayMs": 0.10159625000000005,
+          "perReplayCpuMs": 0.36113,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 5,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 7.053249999999991,
+          "cpuMs": 15.953,
+          "perReplayMs": 0.07053249999999991,
+          "perReplayCpuMs": 0.15953,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 5,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 5.900457999999958,
+          "cpuMs": 21.292,
+          "perReplayMs": 0.05900457999999958,
+          "perReplayCpuMs": 0.21292000000000003,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        }
+      ],
+      "diagnostics": [
+        {
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 0.14479199999993853,
+          "cpuMs": 0.46,
+          "perReplayMs": 0.14479199999993853,
+          "perReplayCpuMs": 0.46,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "renders": 2,
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 0.1594590000000835,
+          "cpuMs": 0.397,
+          "perReplayMs": 0.1594590000000835,
+          "perReplayCpuMs": 0.397,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "renders": 61,
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        }
+      ]
+    }
+  ],
+  "short-scheduled": [
+    {
+      "environment": {
+        "node": "v22.23.2",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpu": "Apple M4"
+      },
+      "roots": [
+        "/var/folders/1b/b19xbzjx7xqc4kl0k9x_y4y80000gp/T/tbot-regression-7znoc3ej/original",
+        "/var/folders/1b/b19xbzjx7xqc4kl0k9x_y4y80000gp/T/tbot-regression-7znoc3ej/prior"
+      ],
+      "scenario": "stream-short",
+      "mode": "scheduled",
+      "blocks": 6,
+      "repetitions": 100,
+      "sourceHashes": [
+        {
+          "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+          "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+          "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+          "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+          "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+        },
+        {
+          "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+          "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+          "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+          "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+          "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+        }
+      ],
+      "samples": [
+        {
+          "block": 0,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 112.25516599999997,
+          "cpuMs": 73.206,
+          "perReplayMs": 1.1225516599999998,
+          "perReplayCpuMs": 0.73206,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 0,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 112.21941700000002,
+          "cpuMs": 71.261,
+          "perReplayMs": 1.1221941700000002,
+          "perReplayCpuMs": 0.71261,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 0,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 103.31983400000001,
+          "cpuMs": 56.889,
+          "perReplayMs": 1.0331983400000002,
+          "perReplayCpuMs": 0.56889,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 0,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 118.59358300000008,
+          "cpuMs": 84.953,
+          "perReplayMs": 1.185935830000001,
+          "perReplayCpuMs": 0.84953,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 1,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 116.95154100000002,
+          "cpuMs": 66.929,
+          "perReplayMs": 1.1695154100000003,
+          "perReplayCpuMs": 0.66929,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 1,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 120.26966700000003,
+          "cpuMs": 71.728,
+          "perReplayMs": 1.2026966700000004,
+          "perReplayCpuMs": 0.7172799999999999,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 1,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 97.12179200000014,
+          "cpuMs": 52.287,
+          "perReplayMs": 0.9712179200000014,
+          "perReplayCpuMs": 0.52287,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 1,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 89.04245900000001,
+          "cpuMs": 50.957,
+          "perReplayMs": 0.8904245900000001,
+          "perReplayCpuMs": 0.50957,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 2,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 105.62687500000015,
+          "cpuMs": 52.75,
+          "perReplayMs": 1.0562687500000016,
+          "perReplayCpuMs": 0.5275,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 2,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 99.5769170000001,
+          "cpuMs": 50.631,
+          "perReplayMs": 0.995769170000001,
+          "perReplayCpuMs": 0.50631,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 2,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 99.8732080000002,
+          "cpuMs": 52.275,
+          "perReplayMs": 0.998732080000002,
+          "perReplayCpuMs": 0.5227499999999999,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 2,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 90.81291699999997,
+          "cpuMs": 55.635,
+          "perReplayMs": 0.9081291699999997,
+          "perReplayCpuMs": 0.55635,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 3,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 93.81879200000003,
+          "cpuMs": 45.478,
+          "perReplayMs": 0.9381879200000003,
+          "perReplayCpuMs": 0.45478,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 3,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 93.29362500000002,
+          "cpuMs": 48.268,
+          "perReplayMs": 0.9329362500000002,
+          "perReplayCpuMs": 0.48268,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 3,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 80.41979199999992,
+          "cpuMs": 36.738,
+          "perReplayMs": 0.8041979199999991,
+          "perReplayCpuMs": 0.36738,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 3,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 92.05562499999996,
+          "cpuMs": 48.887,
+          "perReplayMs": 0.9205562499999996,
+          "perReplayCpuMs": 0.48887,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 4,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 86.35575000000017,
+          "cpuMs": 38.468,
+          "perReplayMs": 0.8635575000000018,
+          "perReplayCpuMs": 0.38468,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 4,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 80.38479099999995,
+          "cpuMs": 37.849,
+          "perReplayMs": 0.8038479099999996,
+          "perReplayCpuMs": 0.37849,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 4,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 83.27491599999985,
+          "cpuMs": 36.832,
+          "perReplayMs": 0.8327491599999984,
+          "perReplayCpuMs": 0.36832,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 4,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 90.06095800000003,
+          "cpuMs": 47.177,
+          "perReplayMs": 0.9006095800000002,
+          "perReplayCpuMs": 0.47177,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 5,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 85.91187499999978,
+          "cpuMs": 36.599,
+          "perReplayMs": 0.8591187499999978,
+          "perReplayCpuMs": 0.36599,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 5,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 82.6631669999997,
+          "cpuMs": 36.407,
+          "perReplayMs": 0.826631669999997,
+          "perReplayCpuMs": 0.36406999999999995,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 5,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 90.08374999999978,
+          "cpuMs": 39.51,
+          "perReplayMs": 0.9008374999999978,
+          "perReplayCpuMs": 0.3951,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 5,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 90.73725000000013,
+          "cpuMs": 53.521,
+          "perReplayMs": 0.9073725000000014,
+          "perReplayCpuMs": 0.53521,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        }
+      ],
+      "diagnostics": [
+        {
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 1.2000419999999394,
+          "cpuMs": 1.913,
+          "perReplayMs": 1.2000419999999394,
+          "perReplayCpuMs": 1.913,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "renders": 61,
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 1.096541999999772,
+          "cpuMs": 1.585,
+          "perReplayMs": 1.096541999999772,
+          "perReplayCpuMs": 1.585,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "renders": 2,
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        }
+      ]
+    },
+    {
+      "environment": {
+        "node": "v22.23.2",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpu": "Apple M4"
+      },
+      "roots": [
+        "/var/folders/1b/b19xbzjx7xqc4kl0k9x_y4y80000gp/T/tbot-regression-7znoc3ej/prior",
+        "/var/folders/1b/b19xbzjx7xqc4kl0k9x_y4y80000gp/T/tbot-regression-7znoc3ej/original"
+      ],
+      "scenario": "stream-short",
+      "mode": "scheduled",
+      "blocks": 6,
+      "repetitions": 100,
+      "sourceHashes": [
+        {
+          "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+          "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+          "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+          "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+          "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+        },
+        {
+          "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+          "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+          "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+          "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+          "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+        }
+      ],
+      "samples": [
+        {
+          "block": 0,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 85.17008299999998,
+          "cpuMs": 39.278,
+          "perReplayMs": 0.8517008299999997,
+          "perReplayCpuMs": 0.39277999999999996,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 0,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 88.70287499999995,
+          "cpuMs": 55.536,
+          "perReplayMs": 0.8870287499999995,
+          "perReplayCpuMs": 0.55536,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 0,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 91.14020900000003,
+          "cpuMs": 56.038,
+          "perReplayMs": 0.9114020900000003,
+          "perReplayCpuMs": 0.56038,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 0,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 79.68200000000002,
+          "cpuMs": 35.858,
+          "perReplayMs": 0.7968200000000002,
+          "perReplayCpuMs": 0.35857999999999995,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 1,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 83.23854099999994,
+          "cpuMs": 35.878,
+          "perReplayMs": 0.8323854099999994,
+          "perReplayCpuMs": 0.35878,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 1,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 91.67379200000005,
+          "cpuMs": 48.516,
+          "perReplayMs": 0.9167379200000005,
+          "perReplayCpuMs": 0.48516,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 1,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 86.28083300000003,
+          "cpuMs": 37.456,
+          "perReplayMs": 0.8628083300000003,
+          "perReplayCpuMs": 0.37456,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 1,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 87.42883399999994,
+          "cpuMs": 40.029,
+          "perReplayMs": 0.8742883399999993,
+          "perReplayCpuMs": 0.40029000000000003,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 2,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 86.04145799999992,
+          "cpuMs": 38.981,
+          "perReplayMs": 0.8604145799999992,
+          "perReplayCpuMs": 0.38981,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 2,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 91.47091599999999,
+          "cpuMs": 54.204,
+          "perReplayMs": 0.9147091599999999,
+          "perReplayCpuMs": 0.54204,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 2,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 86.55204200000003,
+          "cpuMs": 36.42,
+          "perReplayMs": 0.8655204200000003,
+          "perReplayCpuMs": 0.3642,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 2,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 91.34133399999996,
+          "cpuMs": 45.875,
+          "perReplayMs": 0.9134133399999996,
+          "perReplayCpuMs": 0.45875,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 3,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 81.50833300000022,
+          "cpuMs": 36.278,
+          "perReplayMs": 0.8150833300000022,
+          "perReplayCpuMs": 0.36278,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 3,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 89.97229100000004,
+          "cpuMs": 51.202,
+          "perReplayMs": 0.8997229100000004,
+          "perReplayCpuMs": 0.51202,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 3,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 92.9239590000002,
+          "cpuMs": 44.195,
+          "perReplayMs": 0.929239590000002,
+          "perReplayCpuMs": 0.44195,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 3,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 80.83791599999995,
+          "cpuMs": 35.94,
+          "perReplayMs": 0.8083791599999995,
+          "perReplayCpuMs": 0.3594,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 4,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 84.08849999999984,
+          "cpuMs": 34.991,
+          "perReplayMs": 0.8408849999999984,
+          "perReplayCpuMs": 0.34991,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 4,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 89.103208,
+          "cpuMs": 53.287,
+          "perReplayMs": 0.89103208,
+          "perReplayCpuMs": 0.53287,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 4,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 91.93066700000008,
+          "cpuMs": 43.439,
+          "perReplayMs": 0.9193066700000009,
+          "perReplayCpuMs": 0.43439,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 4,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 91.26808400000027,
+          "cpuMs": 44.768,
+          "perReplayMs": 0.9126808400000027,
+          "perReplayCpuMs": 0.44768,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 5,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 87.18212500000027,
+          "cpuMs": 40.276,
+          "perReplayMs": 0.8718212500000027,
+          "perReplayCpuMs": 0.40276,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 5,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 93.12129199999981,
+          "cpuMs": 54.481,
+          "perReplayMs": 0.9312129199999981,
+          "perReplayCpuMs": 0.54481,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 5,
+          "variant": 1,
+          "repetitions": 100,
+          "elapsedMs": 89.6789590000003,
+          "cpuMs": 41.062,
+          "perReplayMs": 0.896789590000003,
+          "perReplayCpuMs": 0.41062,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "block": 5,
+          "variant": 0,
+          "repetitions": 100,
+          "elapsedMs": 92.0727909999996,
+          "cpuMs": 45.593,
+          "perReplayMs": 0.920727909999996,
+          "perReplayCpuMs": 0.45593000000000006,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        }
+      ],
+      "diagnostics": [
+        {
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 1.1347499999997126,
+          "cpuMs": 2.143,
+          "perReplayMs": 1.1347499999997126,
+          "perReplayCpuMs": 2.143,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "renders": 2,
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        },
+        {
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 1.2858750000000327,
+          "cpuMs": 2.2,
+          "perReplayMs": 1.2858750000000327,
+          "perReplayCpuMs": 2.2,
+          "io": {
+            "mkdir": 0,
+            "reads": 0,
+            "writes": 0,
+            "renames": 0,
+            "bytesWritten": 0
+          },
+          "renders": 61,
+          "fingerprint": "ad0e85d20bcaee96adad04692862ac453c915c4df814a66177802f42ffef4490"
+        }
+      ]
+    }
+  ],
+  "expanded-memory": [
+    {
+      "environment": {
+        "node": "v22.23.2",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpu": "Apple M4"
+      },
+      "roots": [
+        "/var/folders/1b/b19xbzjx7xqc4kl0k9x_y4y80000gp/T/tbot-regression-7znoc3ej/original",
+        "/var/folders/1b/b19xbzjx7xqc4kl0k9x_y4y80000gp/T/tbot-regression-7znoc3ej/prior"
+      ],
+      "scenario": "thinking-expanded",
+      "mode": "memory",
+      "blocks": 6,
+      "repetitions": 8,
+      "sourceHashes": [
+        {
+          "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+          "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+          "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+          "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+          "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+        },
+        {
+          "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+          "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+          "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+          "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+          "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+        }
+      ],
+      "samples": [
+        {
+          "block": 0,
+          "variant": 0,
+          "repetitions": 8,
+          "elapsedMs": 15.651666000000006,
+          "cpuMs": 22.984,
+          "perReplayMs": 1.9564582500000007,
+          "perReplayCpuMs": 2.873,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 0,
+          "variant": 1,
+          "repetitions": 8,
+          "elapsedMs": 18.946417000000025,
+          "cpuMs": 38.713,
+          "perReplayMs": 2.368302125000003,
+          "perReplayCpuMs": 4.839125,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 0,
+          "variant": 1,
+          "repetitions": 8,
+          "elapsedMs": 18.51550000000003,
+          "cpuMs": 37.793,
+          "perReplayMs": 2.314437500000004,
+          "perReplayCpuMs": 4.724125,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 0,
+          "variant": 0,
+          "repetitions": 8,
+          "elapsedMs": 15.202417000000025,
+          "cpuMs": 27.215,
+          "perReplayMs": 1.9003021250000032,
+          "perReplayCpuMs": 3.401875,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 1,
+          "variant": 0,
+          "repetitions": 8,
+          "elapsedMs": 15.574583000000018,
+          "cpuMs": 40.175,
+          "perReplayMs": 1.9468228750000023,
+          "perReplayCpuMs": 5.021875,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 1,
+          "variant": 1,
+          "repetitions": 8,
+          "elapsedMs": 15.445790999999986,
+          "cpuMs": 20.436,
+          "perReplayMs": 1.9307238749999982,
+          "perReplayCpuMs": 2.5545,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 1,
+          "variant": 1,
+          "repetitions": 8,
+          "elapsedMs": 15.881416999999999,
+          "cpuMs": 36.671,
+          "perReplayMs": 1.9851771249999999,
+          "perReplayCpuMs": 4.583875,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 1,
+          "variant": 0,
+          "repetitions": 8,
+          "elapsedMs": 17.704165999999987,
+          "cpuMs": 37.898,
+          "perReplayMs": 2.2130207499999983,
+          "perReplayCpuMs": 4.73725,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 2,
+          "variant": 0,
+          "repetitions": 8,
+          "elapsedMs": 15.145167000000015,
+          "cpuMs": 34.13,
+          "perReplayMs": 1.8931458750000019,
+          "perReplayCpuMs": 4.26625,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 2,
+          "variant": 1,
+          "repetitions": 8,
+          "elapsedMs": 16.09687500000001,
+          "cpuMs": 35.976,
+          "perReplayMs": 2.0121093750000014,
+          "perReplayCpuMs": 4.497,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 2,
+          "variant": 1,
+          "repetitions": 8,
+          "elapsedMs": 17.409958999999958,
+          "cpuMs": 38.494,
+          "perReplayMs": 2.1762448749999947,
+          "perReplayCpuMs": 4.81175,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 2,
+          "variant": 0,
+          "repetitions": 8,
+          "elapsedMs": 17.703791000000024,
+          "cpuMs": 45.568,
+          "perReplayMs": 2.212973875000003,
+          "perReplayCpuMs": 5.696,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 3,
+          "variant": 0,
+          "repetitions": 8,
+          "elapsedMs": 17.413333000000023,
+          "cpuMs": 26.861,
+          "perReplayMs": 2.176666625000003,
+          "perReplayCpuMs": 3.357625,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 3,
+          "variant": 1,
+          "repetitions": 8,
+          "elapsedMs": 16.573458000000016,
+          "cpuMs": 33.641,
+          "perReplayMs": 2.071682250000002,
+          "perReplayCpuMs": 4.205125,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 3,
+          "variant": 1,
+          "repetitions": 8,
+          "elapsedMs": 14.768750000000068,
+          "cpuMs": 22.76,
+          "perReplayMs": 1.8460937500000085,
+          "perReplayCpuMs": 2.845,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 3,
+          "variant": 0,
+          "repetitions": 8,
+          "elapsedMs": 16.874416999999994,
+          "cpuMs": 35.919,
+          "perReplayMs": 2.1093021249999993,
+          "perReplayCpuMs": 4.489875,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 4,
+          "variant": 0,
+          "repetitions": 8,
+          "elapsedMs": 17.116959000000065,
+          "cpuMs": 22.472,
+          "perReplayMs": 2.139619875000008,
+          "perReplayCpuMs": 2.809,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 4,
+          "variant": 1,
+          "repetitions": 8,
+          "elapsedMs": 15.937124999999924,
+          "cpuMs": 33.373,
+          "perReplayMs": 1.9921406249999905,
+          "perReplayCpuMs": 4.171625,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 4,
+          "variant": 1,
+          "repetitions": 8,
+          "elapsedMs": 15.653584000000023,
+          "cpuMs": 28.722,
+          "perReplayMs": 1.956698000000003,
+          "perReplayCpuMs": 3.59025,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 4,
+          "variant": 0,
+          "repetitions": 8,
+          "elapsedMs": 16.554666999999995,
+          "cpuMs": 35.245,
+          "perReplayMs": 2.0693333749999994,
+          "perReplayCpuMs": 4.405625,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 5,
+          "variant": 0,
+          "repetitions": 8,
+          "elapsedMs": 15.61683400000004,
+          "cpuMs": 23.742,
+          "perReplayMs": 1.952104250000005,
+          "perReplayCpuMs": 2.96775,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 5,
+          "variant": 1,
+          "repetitions": 8,
+          "elapsedMs": 16.706874999999968,
+          "cpuMs": 36.042,
+          "perReplayMs": 2.088359374999996,
+          "perReplayCpuMs": 4.50525,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 5,
+          "variant": 1,
+          "repetitions": 8,
+          "elapsedMs": 14.936166999999955,
+          "cpuMs": 29.689,
+          "perReplayMs": 1.8670208749999944,
+          "perReplayCpuMs": 3.711125,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 5,
+          "variant": 0,
+          "repetitions": 8,
+          "elapsedMs": 15.985415999999987,
+          "cpuMs": 36.782,
+          "perReplayMs": 1.9981769999999983,
+          "perReplayCpuMs": 4.59775,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        }
+      ],
+      "diagnostics": [
+        {
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 2.010958999999957,
+          "cpuMs": 6.429,
+          "perReplayMs": 2.010958999999957,
+          "perReplayCpuMs": 6.429,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "renders": 0,
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 2.4306669999999713,
+          "cpuMs": 5.365,
+          "perReplayMs": 2.4306669999999713,
+          "perReplayCpuMs": 5.365,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "renders": 0,
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        }
+      ]
+    },
+    {
+      "environment": {
+        "node": "v22.23.2",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpu": "Apple M4"
+      },
+      "roots": [
+        "/var/folders/1b/b19xbzjx7xqc4kl0k9x_y4y80000gp/T/tbot-regression-7znoc3ej/prior",
+        "/var/folders/1b/b19xbzjx7xqc4kl0k9x_y4y80000gp/T/tbot-regression-7znoc3ej/original"
+      ],
+      "scenario": "thinking-expanded",
+      "mode": "memory",
+      "blocks": 6,
+      "repetitions": 8,
+      "sourceHashes": [
+        {
+          "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+          "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+          "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+          "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+          "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+        },
+        {
+          "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+          "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+          "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+          "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+          "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+        }
+      ],
+      "samples": [
+        {
+          "block": 0,
+          "variant": 0,
+          "repetitions": 8,
+          "elapsedMs": 16.221958,
+          "cpuMs": 23.112,
+          "perReplayMs": 2.02774475,
+          "perReplayCpuMs": 2.889,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 0,
+          "variant": 1,
+          "repetitions": 8,
+          "elapsedMs": 17.39500000000001,
+          "cpuMs": 38.071,
+          "perReplayMs": 2.1743750000000013,
+          "perReplayCpuMs": 4.758875,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 0,
+          "variant": 1,
+          "repetitions": 8,
+          "elapsedMs": 15.906207999999992,
+          "cpuMs": 31.934,
+          "perReplayMs": 1.988275999999999,
+          "perReplayCpuMs": 3.99175,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 0,
+          "variant": 0,
+          "repetitions": 8,
+          "elapsedMs": 14.917083999999988,
+          "cpuMs": 26.97,
+          "perReplayMs": 1.8646354999999986,
+          "perReplayCpuMs": 3.37125,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 1,
+          "variant": 0,
+          "repetitions": 8,
+          "elapsedMs": 15.372707999999989,
+          "cpuMs": 35.045,
+          "perReplayMs": 1.9215884999999986,
+          "perReplayCpuMs": 4.380625,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 1,
+          "variant": 1,
+          "repetitions": 8,
+          "elapsedMs": 15.080791999999974,
+          "cpuMs": 20.309,
+          "perReplayMs": 1.8850989999999967,
+          "perReplayCpuMs": 2.538625,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 1,
+          "variant": 1,
+          "repetitions": 8,
+          "elapsedMs": 20.235333999999966,
+          "cpuMs": 46.391,
+          "perReplayMs": 2.5294167499999958,
+          "perReplayCpuMs": 5.798875,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 1,
+          "variant": 0,
+          "repetitions": 8,
+          "elapsedMs": 16.75524999999999,
+          "cpuMs": 30.321,
+          "perReplayMs": 2.0944062499999987,
+          "perReplayCpuMs": 3.790125,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 2,
+          "variant": 0,
+          "repetitions": 8,
+          "elapsedMs": 18.360792000000004,
+          "cpuMs": 38.536,
+          "perReplayMs": 2.2950990000000004,
+          "perReplayCpuMs": 4.817,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 2,
+          "variant": 1,
+          "repetitions": 8,
+          "elapsedMs": 15.39420899999999,
+          "cpuMs": 20.937,
+          "perReplayMs": 1.9242761249999987,
+          "perReplayCpuMs": 2.617125,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 2,
+          "variant": 1,
+          "repetitions": 8,
+          "elapsedMs": 17.648082999999986,
+          "cpuMs": 44.136,
+          "perReplayMs": 2.206010374999998,
+          "perReplayCpuMs": 5.517,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 2,
+          "variant": 0,
+          "repetitions": 8,
+          "elapsedMs": 17.457625000000007,
+          "cpuMs": 30.273,
+          "perReplayMs": 2.182203125000001,
+          "perReplayCpuMs": 3.784125,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 3,
+          "variant": 0,
+          "repetitions": 8,
+          "elapsedMs": 18.137917000000016,
+          "cpuMs": 49.51,
+          "perReplayMs": 2.267239625000002,
+          "perReplayCpuMs": 6.18875,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 3,
+          "variant": 1,
+          "repetitions": 8,
+          "elapsedMs": 16.947625000000016,
+          "cpuMs": 35.818,
+          "perReplayMs": 2.118453125000002,
+          "perReplayCpuMs": 4.47725,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 3,
+          "variant": 1,
+          "repetitions": 8,
+          "elapsedMs": 15.55358299999989,
+          "cpuMs": 22.734,
+          "perReplayMs": 1.9441978749999862,
+          "perReplayCpuMs": 2.84175,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 3,
+          "variant": 0,
+          "repetitions": 8,
+          "elapsedMs": 15.568167000000017,
+          "cpuMs": 31.974,
+          "perReplayMs": 1.946020875000002,
+          "perReplayCpuMs": 3.99675,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 4,
+          "variant": 0,
+          "repetitions": 8,
+          "elapsedMs": 15.65091700000005,
+          "cpuMs": 25.097,
+          "perReplayMs": 1.9563646250000062,
+          "perReplayCpuMs": 3.137125,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 4,
+          "variant": 1,
+          "repetitions": 8,
+          "elapsedMs": 15.679750000000013,
+          "cpuMs": 33.728,
+          "perReplayMs": 1.9599687500000016,
+          "perReplayCpuMs": 4.216,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 4,
+          "variant": 1,
+          "repetitions": 8,
+          "elapsedMs": 13.785833000000025,
+          "cpuMs": 26.82,
+          "perReplayMs": 1.7232291250000031,
+          "perReplayCpuMs": 3.3525,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 4,
+          "variant": 0,
+          "repetitions": 8,
+          "elapsedMs": 17.53208399999994,
+          "cpuMs": 36.877,
+          "perReplayMs": 2.1915104999999926,
+          "perReplayCpuMs": 4.609625,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 5,
+          "variant": 0,
+          "repetitions": 8,
+          "elapsedMs": 15.255750000000035,
+          "cpuMs": 29.859,
+          "perReplayMs": 1.9069687500000043,
+          "perReplayCpuMs": 3.732375,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 5,
+          "variant": 1,
+          "repetitions": 8,
+          "elapsedMs": 15.161125000000084,
+          "cpuMs": 31.954,
+          "perReplayMs": 1.8951406250000105,
+          "perReplayCpuMs": 3.99425,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 5,
+          "variant": 1,
+          "repetitions": 8,
+          "elapsedMs": 15.656124999999975,
+          "cpuMs": 23.042,
+          "perReplayMs": 1.9570156249999968,
+          "perReplayCpuMs": 2.88025,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 5,
+          "variant": 0,
+          "repetitions": 8,
+          "elapsedMs": 15.971874999999955,
+          "cpuMs": 33.389,
+          "perReplayMs": 1.9964843749999943,
+          "perReplayCpuMs": 4.173625,
+          "io": {
+            "mkdir": 480,
+            "reads": 728,
+            "writes": 480,
+            "renames": 480,
+            "bytesWritten": 1782376
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        }
+      ],
+      "diagnostics": [
+        {
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 2.11587499999996,
+          "cpuMs": 6.649,
+          "perReplayMs": 2.11587499999996,
+          "perReplayCpuMs": 6.649,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "renders": 0,
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 1.9128749999999854,
+          "cpuMs": 3.624,
+          "perReplayMs": 1.9128749999999854,
+          "perReplayCpuMs": 3.624,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "renders": 0,
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        }
+      ]
+    }
+  ],
+  "expanded-disk": [
+    {
+      "environment": {
+        "node": "v22.23.2",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpu": "Apple M4"
+      },
+      "roots": [
+        "/var/folders/1b/b19xbzjx7xqc4kl0k9x_y4y80000gp/T/tbot-regression-7znoc3ej/original",
+        "/var/folders/1b/b19xbzjx7xqc4kl0k9x_y4y80000gp/T/tbot-regression-7znoc3ej/prior"
+      ],
+      "scenario": "thinking-expanded",
+      "mode": "disk",
+      "blocks": 6,
+      "repetitions": 1,
+      "sourceHashes": [
+        {
+          "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+          "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+          "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+          "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+          "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+        },
+        {
+          "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+          "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+          "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+          "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+          "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+        }
+      ],
+      "samples": [
+        {
+          "block": 0,
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 27.32250000000002,
+          "cpuMs": 26.602,
+          "perReplayMs": 27.32250000000002,
+          "perReplayCpuMs": 26.602,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 0,
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 35.27562499999999,
+          "cpuMs": 38.157,
+          "perReplayMs": 35.27562499999999,
+          "perReplayCpuMs": 38.157,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 0,
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 25.650292000000036,
+          "cpuMs": 33.306,
+          "perReplayMs": 25.650292000000036,
+          "perReplayCpuMs": 33.306,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 0,
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 28.375958000000026,
+          "cpuMs": 31.609,
+          "perReplayMs": 28.375958000000026,
+          "perReplayCpuMs": 31.609,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 1,
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 22.17833300000001,
+          "cpuMs": 29.634,
+          "perReplayMs": 22.17833300000001,
+          "perReplayCpuMs": 29.634,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 1,
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 25.464499999999987,
+          "cpuMs": 29.566,
+          "perReplayMs": 25.464499999999987,
+          "perReplayCpuMs": 29.566,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 1,
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 30.057165999999995,
+          "cpuMs": 37.75,
+          "perReplayMs": 30.057165999999995,
+          "perReplayCpuMs": 37.75,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 1,
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 24.609874999999988,
+          "cpuMs": 28.536,
+          "perReplayMs": 24.609874999999988,
+          "perReplayCpuMs": 28.536,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 2,
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 30.94962499999997,
+          "cpuMs": 37.842,
+          "perReplayMs": 30.94962499999997,
+          "perReplayCpuMs": 37.842,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 2,
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 39.14808300000004,
+          "cpuMs": 41.074,
+          "perReplayMs": 39.14808300000004,
+          "perReplayCpuMs": 41.074,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 2,
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 27.553916000000072,
+          "cpuMs": 30.205,
+          "perReplayMs": 27.553916000000072,
+          "perReplayCpuMs": 30.205,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 2,
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 30.827292000000057,
+          "cpuMs": 33.599,
+          "perReplayMs": 30.827292000000057,
+          "perReplayCpuMs": 33.599,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 3,
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 36.19512499999996,
+          "cpuMs": 40.295,
+          "perReplayMs": 36.19512499999996,
+          "perReplayCpuMs": 40.295,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 3,
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 25.498874999999998,
+          "cpuMs": 34.853,
+          "perReplayMs": 25.498874999999998,
+          "perReplayCpuMs": 34.853,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 3,
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 29.398667000000046,
+          "cpuMs": 35.193,
+          "perReplayMs": 29.398667000000046,
+          "perReplayCpuMs": 35.193,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 3,
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 27.748749999999973,
+          "cpuMs": 28.731,
+          "perReplayMs": 27.748749999999973,
+          "perReplayCpuMs": 28.731,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 4,
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 21.163790999999947,
+          "cpuMs": 30.254,
+          "perReplayMs": 21.163790999999947,
+          "perReplayCpuMs": 30.254,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 4,
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 22.287916999999993,
+          "cpuMs": 28.579,
+          "perReplayMs": 22.287916999999993,
+          "perReplayCpuMs": 28.579,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 4,
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 21.944333999999913,
+          "cpuMs": 23.161,
+          "perReplayMs": 21.944333999999913,
+          "perReplayCpuMs": 23.161,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 4,
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 21.528792000000067,
+          "cpuMs": 27.038,
+          "perReplayMs": 21.528792000000067,
+          "perReplayCpuMs": 27.038,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 5,
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 23.960708000000068,
+          "cpuMs": 31.087,
+          "perReplayMs": 23.960708000000068,
+          "perReplayCpuMs": 31.087,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 5,
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 21.791916000000015,
+          "cpuMs": 25.277,
+          "perReplayMs": 21.791916000000015,
+          "perReplayCpuMs": 25.277,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 5,
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 33.64220899999998,
+          "cpuMs": 46.805,
+          "perReplayMs": 33.64220899999998,
+          "perReplayCpuMs": 46.805,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 5,
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 20.71154200000001,
+          "cpuMs": 22.745,
+          "perReplayMs": 20.71154200000001,
+          "perReplayCpuMs": 22.745,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        }
+      ],
+      "diagnostics": [
+        {
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 24.398374999999987,
+          "cpuMs": 28.958,
+          "perReplayMs": 24.398374999999987,
+          "perReplayCpuMs": 28.958,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "renders": 0,
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 34.05508399999985,
+          "cpuMs": 44.238,
+          "perReplayMs": 34.05508399999985,
+          "perReplayCpuMs": 44.238,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "renders": 0,
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        }
+      ]
+    },
+    {
+      "environment": {
+        "node": "v22.23.2",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpu": "Apple M4"
+      },
+      "roots": [
+        "/var/folders/1b/b19xbzjx7xqc4kl0k9x_y4y80000gp/T/tbot-regression-7znoc3ej/prior",
+        "/var/folders/1b/b19xbzjx7xqc4kl0k9x_y4y80000gp/T/tbot-regression-7znoc3ej/original"
+      ],
+      "scenario": "thinking-expanded",
+      "mode": "disk",
+      "blocks": 6,
+      "repetitions": 1,
+      "sourceHashes": [
+        {
+          "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+          "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+          "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+          "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+          "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+        },
+        {
+          "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+          "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+          "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+          "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+          "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+        }
+      ],
+      "samples": [
+        {
+          "block": 0,
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 28.314666999999986,
+          "cpuMs": 29.994,
+          "perReplayMs": 28.314666999999986,
+          "perReplayCpuMs": 29.994,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 0,
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 32.34266699999995,
+          "cpuMs": 32.845,
+          "perReplayMs": 32.34266699999995,
+          "perReplayCpuMs": 32.845,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 0,
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 34.634416000000044,
+          "cpuMs": 39.386,
+          "perReplayMs": 34.634416000000044,
+          "perReplayCpuMs": 39.386,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 0,
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 41.43845900000002,
+          "cpuMs": 47.769,
+          "perReplayMs": 41.43845900000002,
+          "perReplayCpuMs": 47.769,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 1,
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 29.175958999999978,
+          "cpuMs": 37.268,
+          "perReplayMs": 29.175958999999978,
+          "perReplayCpuMs": 37.268,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 1,
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 29.11491699999999,
+          "cpuMs": 35.119,
+          "perReplayMs": 29.11491699999999,
+          "perReplayCpuMs": 35.119,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 1,
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 27.146083999999973,
+          "cpuMs": 32.673,
+          "perReplayMs": 27.146083999999973,
+          "perReplayCpuMs": 32.673,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 1,
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 30.088917000000038,
+          "cpuMs": 33.003,
+          "perReplayMs": 30.088917000000038,
+          "perReplayCpuMs": 33.003,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 2,
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 23.35775000000001,
+          "cpuMs": 29.203,
+          "perReplayMs": 23.35775000000001,
+          "perReplayCpuMs": 29.203,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 2,
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 21.840584000000035,
+          "cpuMs": 25.233,
+          "perReplayMs": 21.840584000000035,
+          "perReplayCpuMs": 25.233,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 2,
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 23.63316599999996,
+          "cpuMs": 29.789,
+          "perReplayMs": 23.63316599999996,
+          "perReplayCpuMs": 29.789,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 2,
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 21.754957999999988,
+          "cpuMs": 26.829,
+          "perReplayMs": 21.754957999999988,
+          "perReplayCpuMs": 26.829,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 3,
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 24.77308299999993,
+          "cpuMs": 30.076,
+          "perReplayMs": 24.77308299999993,
+          "perReplayCpuMs": 30.076,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 3,
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 27.358292000000006,
+          "cpuMs": 39.592,
+          "perReplayMs": 27.358292000000006,
+          "perReplayCpuMs": 39.592,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 3,
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 23.70474999999999,
+          "cpuMs": 29.981,
+          "perReplayMs": 23.70474999999999,
+          "perReplayCpuMs": 29.981,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 3,
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 19.90620899999999,
+          "cpuMs": 23.954,
+          "perReplayMs": 19.90620899999999,
+          "perReplayCpuMs": 23.954,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 4,
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 19.82283300000006,
+          "cpuMs": 30.217,
+          "perReplayMs": 19.82283300000006,
+          "perReplayCpuMs": 30.217,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 4,
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 18.827166000000034,
+          "cpuMs": 24.586,
+          "perReplayMs": 18.827166000000034,
+          "perReplayCpuMs": 24.586,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 4,
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 18.306124999999952,
+          "cpuMs": 23.42,
+          "perReplayMs": 18.306124999999952,
+          "perReplayCpuMs": 23.42,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 4,
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 18.3365,
+          "cpuMs": 25.12,
+          "perReplayMs": 18.3365,
+          "perReplayCpuMs": 25.12,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 5,
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 19.54387500000007,
+          "cpuMs": 25.291,
+          "perReplayMs": 19.54387500000007,
+          "perReplayCpuMs": 25.291,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 5,
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 18.861875000000055,
+          "cpuMs": 23.761,
+          "perReplayMs": 18.861875000000055,
+          "perReplayCpuMs": 23.761,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 5,
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 21.837790999999925,
+          "cpuMs": 34.809,
+          "perReplayMs": 21.837790999999925,
+          "perReplayCpuMs": 34.809,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "block": 5,
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 20.39737500000001,
+          "cpuMs": 24.76,
+          "perReplayMs": 20.39737500000001,
+          "perReplayCpuMs": 24.76,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        }
+      ],
+      "diagnostics": [
+        {
+          "variant": 0,
+          "repetitions": 1,
+          "elapsedMs": 19.126709000000005,
+          "cpuMs": 26.113,
+          "perReplayMs": 19.126709000000005,
+          "perReplayCpuMs": 26.113,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "renders": 0,
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        },
+        {
+          "variant": 1,
+          "repetitions": 1,
+          "elapsedMs": 17.971541000000002,
+          "cpuMs": 25.068,
+          "perReplayMs": 17.971541000000002,
+          "perReplayCpuMs": 25.068,
+          "io": {
+            "mkdir": 60,
+            "reads": 91,
+            "writes": 60,
+            "renames": 60,
+            "bytesWritten": 222797
+          },
+          "renders": 0,
+          "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+        }
+      ]
+    }
+  ]
+}
