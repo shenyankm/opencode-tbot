@@ -1,0 +1,280 @@
+TAP version 13
+# Subtest: context capacity formatting preserves compact rounding across languages and changing capacities
+ok 1 - context capacity formatting preserves compact rounding across languages and changing capacities
+  ---
+  duration_ms: 1.550042
+  type: 'test'
+  ...
+# Subtest: the final footer formats request duration in seconds, minutes and hours without changing command context output
+ok 2 - the final footer formats request duration in seconds, minutes and hours without changing command context output
+  ---
+  duration_ms: 0.277709
+  type: 'test'
+  ...
+# Subtest: context uses the latest assistant step including cache rather than accumulated session usage
+ok 3 - context uses the latest assistant step including cache rather than accumulated session usage
+  ---
+  duration_ms: 0.633375
+  type: 'test'
+  ...
+# Subtest: context starts history and catalog requests before session metadata finishes
+ok 4 - context starts history and catalog requests before session metadata finishes
+  ---
+  duration_ms: 2.965042
+  type: 'test'
+  ...
+# Subtest: parallel context reads preserve default and selected models and propagate request failures
+ok 5 - parallel context reads preserve default and selected models and propagate request failures
+  ---
+  duration_ms: 0.574416
+  type: 'test'
+  ...
+# Subtest: context reads share metadata for five seconds while session selections and token usage remain live
+ok 6 - context reads share metadata for five seconds while session selections and token usage remain live
+  ---
+  duration_ms: 0.750417
+  type: 'test'
+  ...
+# Subtest: failed metadata requests are retried and an agent fallback is never cached as an empty catalog
+ok 7 - failed metadata requests are retried and an agent fallback is never cached as an empty catalog
+  ---
+  duration_ms: 0.195709
+  type: 'test'
+  ...
+# Subtest: session footer uses the latest assistant agent when session metadata has no explicit agent
+ok 8 - session footer uses the latest assistant agent when session metadata has no explicit agent
+  ---
+  duration_ms: 0.077125
+  type: 'test'
+  ...
+# Subtest: session footer has a compact localized layout with escaped metadata and safe unavailable values
+ok 9 - session footer has a compact localized layout with escaped metadata and safe unavailable values
+  ---
+  duration_ms: 0.743625
+  type: 'test'
+  ...
+# Subtest: model, reasoning, agent and workspace refreshes preserve the reply duration and do not reuse pre-compression usage
+ok 10 - model, reasoning, agent and workspace refreshes preserve the reply duration and do not reuse pre-compression usage
+  ---
+  duration_ms: 0.639167
+  type: 'test'
+  ...
+# Subtest: switching models recomputes the remaining ratio against the selected model capacity
+ok 11 - switching models recomputes the remaining ratio against the selected model capacity
+  ---
+  duration_ms: 0.134167
+  type: 'test'
+  ...
+# Subtest: completed compression across a page boundary invalidates all earlier usage until a new step reports tokens
+ok 12 - completed compression across a page boundary invalidates all earlier usage until a new step reports tokens
+  ---
+  duration_ms: 0.173958
+  type: 'test'
+  ...
+# Subtest: reverted and failed compression records do not pick usage from outside the active context
+ok 13 - reverted and failed compression records do not pick usage from outside the active context
+  ---
+  duration_ms: 0.081167
+  type: 'test'
+  ...
+# Subtest: the context footer shows only percentage left and capacity with safe unknown values
+ok 14 - the context footer shows only percentage left and capacity with safe unknown values
+  ---
+  duration_ms: 0.049334
+  type: 'test'
+  ...
+# Subtest: the last reply refreshes after a model switch and compression without editing replies for another session
+ok 15 - the last reply refreshes after a model switch and compression without editing replies for another session
+  ---
+  duration_ms: 0.165959
+  type: 'test'
+  ...
+# Subtest: a slow refresh cannot overwrite a newer reply and failures do not break subsequent refreshes
+ok 16 - a slow refresh cannot overwrite a newer reply and failures do not break subsequent refreshes
+  ---
+  duration_ms: 0.16525
+  type: 'test'
+  ...
+# Subtest: a burst of ten footer refreshes shares one read and refreshes again for changes during that read
+ok 17 - a burst of ten footer refreshes shares one read and refreshes again for changes during that read
+  ---
+  duration_ms: 0.221833
+  type: 'test'
+  ...
+# Subtest: clearing footer watches discards in-flight and queued refreshes
+ok 18 - clearing footer watches discards in-flight and queued refreshes
+  ---
+  duration_ms: 0.084167
+  type: 'test'
+  ...
+# Subtest: changing sessions while metadata is loading cannot write that metadata into the old status message
+ok 19 - changing sessions while metadata is loading cannot write that metadata into the old status message
+  ---
+  duration_ms: 0.080125
+  type: 'test'
+  ...
+# Subtest: context changes edit only the separate context message and preserve the duration of the whole request
+ok 20 - context changes edit only the separate context message and preserve the duration of the whole request
+  ---
+  duration_ms: 16.81275
+  type: 'test'
+  ...
+# Subtest: a failed context message does not turn a successful answer into an error reply
+ok 21 - a failed context message does not turn a successful answer into an error reply
+  ---
+  duration_ms: 1.0695
+  type: 'test'
+  ...
+# Subtest: formatted footer rejection falls back to plain text and refreshes only the same status message
+ok 22 - formatted footer rejection falls back to plain text and refreshes only the same status message
+  ---
+  duration_ms: 0.867416
+  type: 'test'
+  ...
+# Subtest: readable chunks allow a sentence to finish on either side of the target and keep closing quotes
+ok 23 - readable chunks allow a sentence to finish on either side of the target and keep closing quotes
+  ---
+  duration_ms: 0.794333
+  type: 'test'
+  ...
+# Subtest: readable chunks prefer a paragraph boundary and preserve blank lines and CRLF
+ok 24 - readable chunks prefer a paragraph boundary and preserve blank lines and CRLF
+  ---
+  duration_ms: 0.082709
+  type: 'test'
+  ...
+# Subtest: paragraph chunks skip sentence scanning and mixed text scans only once when needed
+ok 25 - paragraph chunks skip sentence scanning and mixed text scans only once when needed
+  ---
+  duration_ms: 0.692333
+  type: 'test'
+  ...
+# Subtest: numbered list markers stay with their sentence instead of forming a closer split point
+ok 26 - numbered list markers stay with their sentence instead of forming a closer split point
+  ---
+  duration_ms: 0.0675
+  type: 'test'
+  ...
+# Subtest: overlong sentences split at words while unbroken text stays bounded without losing Unicode
+ok 27 - overlong sentences split at words while unbroken text stays bounded without losing Unicode
+  ---
+  duration_ms: 0.322667
+  type: 'test'
+  ...
+# Subtest: readable chunks balance an otherwise tiny remainder and leave short replies intact
+ok 28 - readable chunks balance an otherwise tiny remainder and leave short replies intact
+  ---
+  duration_ms: 0.239
+  type: 'test'
+  ...
+# Subtest: native Markdown keeps headings, lists, quotes, links and tables without legacy escapes
+ok 29 - native Markdown keeps headings, lists, quotes, links and tables without legacy escapes
+  ---
+  duration_ms: 0.1305
+  type: 'test'
+  ...
+# Subtest: Markdown wrapper fences are removed while actual code fences remain intact
+ok 30 - Markdown wrapper fences are removed while actual code fences remain intact
+  ---
+  duration_ms: 0.132583
+  type: 'test'
+  ...
+# Subtest: buildTelegramPromptReply falls back to plain text when markdown is unsupported
+ok 31 - buildTelegramPromptReply falls back to plain text when markdown is unsupported
+  ---
+  duration_ms: 0.398791
+  type: 'test'
+  ...
+# Subtest: buildTelegramPromptReply keeps context information out of markdown replies
+ok 32 - buildTelegramPromptReply keeps context information out of markdown replies
+  ---
+  duration_ms: 0.792333
+  type: 'test'
+  ...
+# Subtest: long replies use readable chunks without reserving space for context information
+ok 33 - long replies use readable chunks without reserving space for context information
+  ---
+  duration_ms: 0.105459
+  type: 'test'
+  ...
+# Subtest: table padding cannot expand a short reply into an oversized message
+ok 34 - table padding cannot expand a short reply into an oversized message
+  ---
+  duration_ms: 3.474292
+  type: 'test'
+  ...
+# Subtest: ordinary prose and fenced pipe expressions stay intact beside a real Markdown table
+ok 35 - ordinary prose and fenced pipe expressions stay intact beside a real Markdown table
+  ---
+  duration_ms: 0.340875
+  type: 'test'
+  ...
+# Subtest: long tables repeat their header and preserve every complete row alongside surrounding prose
+ok 36 - long tables repeat their header and preserve every complete row alongside surrounding prose
+  ---
+  duration_ms: 1.496292
+  type: 'test'
+  ...
+# Subtest: streaming tables buffer incomplete rows and final output includes the unterminated last row
+ok 37 - streaming tables buffer incomplete rows and final output includes the unterminated last row
+  ---
+  duration_ms: 0.3915
+  type: 'test'
+  ...
+# Subtest: an oversized table row stays intact above the soft target and uses literal chunks above the safe size
+ok 38 - an oversized table row stays intact above the soft target and uses literal chunks above the safe size
+  ---
+  duration_ms: 0.558958
+  type: 'test'
+  ...
+# Subtest: single-column tables repeat their header and escaped pipes do not create extra columns
+ok 39 - single-column tables repeat their header and escaped pipes do not create extra columns
+  ---
+  duration_ms: 0.922166
+  type: 'test'
+  ...
+# Subtest: punctuation stays readable without MarkdownV2 escape expansion
+ok 40 - punctuation stays readable without MarkdownV2 escape expansion
+  ---
+  duration_ms: 0.085916
+  type: 'test'
+  ...
+# Subtest: buildTelegramPromptReply keeps Markdown enabled for table content
+ok 41 - buildTelegramPromptReply keeps Markdown enabled for table content
+  ---
+  duration_ms: 0.129042
+  type: 'test'
+  ...
+# Subtest: buildTelegramPromptReply keeps context information out of localized replies
+ok 42 - buildTelegramPromptReply keeps context information out of localized replies
+  ---
+  duration_ms: 0.053417
+  type: 'test'
+  ...
+# Subtest: buildTelegramStaticReply prefers Markdown when the markdown is supported
+ok 43 - buildTelegramStaticReply prefers Markdown when the markdown is supported
+  ---
+  duration_ms: 0.06375
+  type: 'test'
+  ...
+# Subtest: buildTelegramStaticReply falls back to plain text when markdown is unsupported
+ok 44 - buildTelegramStaticReply falls back to plain text when markdown is unsupported
+  ---
+  duration_ms: 0.0355
+  type: 'test'
+  ...
+# Subtest: long fenced code stays formatted across rich chunks and preserves the source in fallbacks
+ok 45 - long fenced code stays formatted across rich chunks and preserves the source in fallbacks
+  ---
+  duration_ms: 0.761292
+  type: 'test'
+  ...
+1..45
+# tests 45
+# suites 0
+# pass 45
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 300.678

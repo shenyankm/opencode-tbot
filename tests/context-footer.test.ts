@@ -13,6 +13,22 @@ import { GetContextUsageUseCase } from "../src/use-cases/get-context-usage.useca
 import { InMemorySessionRepository } from "../src/repositories/session.repo.js";
 import { buildTelegramSessionFooter, formatContextFooter } from "../src/services/telegram/telegram-format.js";
 
+test("context capacity formatting preserves compact rounding across languages and changing capacities", () => {
+    const formatter = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
+    const capacities = [1, 999, 1_000, 1_250, 128_000, 999_950, 1_000_000, 475_000, Number.MAX_VALUE, 1_000];
+    for (const language of ["en", "zh-CN", "ja"] as const) {
+        const copy = getBotCopy(language);
+        for (const capacity of capacities) {
+            assert.equal(formatContextFooter({ capacity, used: 0 }, copy),
+                `${copy.replyMetrics.contextLabel}: ${copy.replyMetrics.remaining(100)} | ${formatter.format(capacity)}`);
+        }
+        for (const capacity of [null, 0, -1, NaN, Infinity, -Infinity]) {
+            assert.equal(formatContextFooter({ capacity, used: 0 }, copy),
+                `${copy.replyMetrics.contextLabel}: ${copy.replyMetrics.notAvailable} | ${copy.replyMetrics.notAvailable}`);
+        }
+    }
+});
+
 test("the final footer formats request duration in seconds, minutes and hours without changing command context output", () => {
     const context = { capacity: 1_000, used: 100 };
     for (const language of ["en", "zh-CN", "ja"] as const) {

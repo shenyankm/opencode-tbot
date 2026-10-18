@@ -1,0 +1,1794 @@
+{
+  "date": "2026-10-18",
+  "timezone": "Asia/Singapore",
+  "baselineCommit": "237d0679d7ba96c18237d9d66a48b583efd354d5",
+  "change": "Reuse the module-scoped en-US compact number formatter for context and session footers.",
+  "productionFilesChanged": [
+    "src/services/telegram/telegram-format.ts"
+  ],
+  "sourceSha256": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f",
+  "benchmarkSha256": "e29c2842abf655f38a0868b6e85866fb34de548b030190b51e4e9087a87e0949",
+  "benchmarkCommand": "pnpm exec tsx tests/footer-split.bench.ts [source-checkout] [scenario]",
+  "method": {
+    "baseline": "git archive of baselineCommit with local node_modules symlinked; generated files are not edited.",
+    "execution": "Each scenario runs in four separate processes in baseline, modified, modified, baseline order. No local test or build commands run during measurement. Other desktop activity remains uncontrolled.",
+    "warmup": "One iterations-sized batch before measurement for each process.",
+    "samples": "Nine timed samples per process; combined medians use eighteen samples for each version.",
+    "footerFixtures": "Four context capacities (1K, 128K, 475K, 1M), all three languages, real preferred and fallback session footer construction, and unknown-capacity control.",
+    "controls": "Unknown-capacity footer and unchanged sentence/paragraph/unbroken text splitter workloads.",
+    "equivalence": "All six scenarios assert matching baseline and modified full-output SHA-256 fingerprints. Splitter also asserts exact reconstruction, bounded chunks and intact surrogate pairs.",
+    "hashes": "sourceHash is SHA-256 of raw source bytes; output fingerprints are SHA-256 of JSON.stringify(output)."
+  },
+  "summary": {
+    "context": {
+      "beforeMedianMs": 170.28825000000006,
+      "afterMedianMs": 3.825083499999998,
+      "reductionPercent": 97.75375958118073,
+      "fingerprint": "2adb1a016964c9e507c351b7d91bb53e4c1ceea9d141eca525fc1b3b2f03718e"
+    },
+    "session": {
+      "beforeMedianMs": 64.88722899999996,
+      "afterMedianMs": 10.720478499999984,
+      "reductionPercent": 83.47829200719914,
+      "fingerprint": "794c364c7a01acab62c283331523cb016142ae9e934ff8b0dabc4ec300321c2f",
+      "footersPerSample": 3600,
+      "beforeMicrosecondsPerFooter": 18.024230277777768,
+      "afterMicrosecondsPerFooter": 2.9779106944444402
+    },
+    "unavailable": {
+      "beforeMedianMs": 25.893000000000015,
+      "afterMedianMs": 25.685562500000003,
+      "reductionPercent": 0.8011335109875728,
+      "fingerprint": "bcc2659fdab712fe59da2a3f391cdfeb6a546721237c88d99367fed6e8626b84"
+    },
+    "sentences": {
+      "beforeMedianMs": 82.603521,
+      "afterMedianMs": 80.10735449999999,
+      "reductionPercent": 3.0218645280266188,
+      "fingerprint": "9bafbc1afc7d00f82ffbc8165312facbd37cb74f3d8e720d765948355983ea44"
+    },
+    "paragraphs": {
+      "beforeMedianMs": 2.143374999999999,
+      "afterMedianMs": 2.2547704999999993,
+      "reductionPercent": -5.1972006765032,
+      "fingerprint": "c2e2bce31232554fb96353583a3c54cf5b4880e52d39ddc2479ec03dba0eeadb"
+    },
+    "unbroken": {
+      "beforeMedianMs": 9.870937499999982,
+      "afterMedianMs": 10.645979499999996,
+      "reductionPercent": -7.851756735365956,
+      "fingerprint": "9e5b8928d41da71a0e13a75e5cd48e1fdd5bb7c206fed73797014fceeef26b5b"
+    }
+  },
+  "claims": {
+    "contextFormattingTimeReductionPercent": 97.75375958118073,
+    "completeSessionFooterTimeReductionPercent": 83.47829200719914,
+    "unknownCapacitySpeedupClaim": false,
+    "splitterSpeedupClaim": false,
+    "controlInterpretation": "Unknown-capacity time differs by less than 1%; unchanged splitters vary between 3% faster and 8% slower. No speedup or regression attribution is made for those paths.",
+    "endToEndSpeedupClaim": false
+  },
+  "verification": {
+    "typecheck": {
+      "exitCode": 0,
+      "log": "performance-footer-2026-10-18/typecheck.txt",
+      "logSha256": "4c53d754020facacb23b77f44a7c9ebd5dfa5fd8bb2d30e1f33c24dcf8a37c78"
+    },
+    "focusedTests": {
+      "passed": 45,
+      "failed": 0,
+      "command": "pnpm exec tsx --test tests/context-footer.test.ts tests/telegram-format.test.ts",
+      "log": "performance-footer-2026-10-18/focused.tap",
+      "logSha256": "ff076ddc100f7865aa37d21d282f5e0c54b7ea85d9bf6d0110a3a965fc295b50"
+    },
+    "defaultSuite": {
+      "passed": 360,
+      "failed": 0,
+      "skipped": 1,
+      "command": "pnpm test",
+      "log": "performance-footer-2026-10-18/suite.tap",
+      "logSha256": "a3bf146c076a65a90142bd6983287c05e9ff8b0918720d24980456a8f36edd89"
+    },
+    "hostIntegration": {
+      "passed": 1,
+      "failed": 0,
+      "opencodeVersion": "2.0.29",
+      "telegram": "isolated local stub",
+      "includesBuildAndPack": true,
+      "command": "OPENCODE_HOST_E2E=1 pnpm exec tsx --test tests/opencode-host.integration.test.ts",
+      "log": "performance-footer-2026-10-18/host.tap",
+      "logSha256": "0a5429bb941828f2212c132b2a101e90600b711698fd4266c2d9357a0bee9d48"
+    },
+    "invariants": [
+      "Three-language output",
+      "Compact rounding at capacity boundaries",
+      "Changing capacities with one shared formatter",
+      "Null, negative and non-finite capacities",
+      "Existing footer/error/fallback and command behavior",
+      "Host plugin load and polling disposal"
+    ],
+    "docs": "No command, configuration, copy or user-visible behavior changes; README translations require no change.",
+    "remoteCI": "not run; changes remain local",
+    "diffCheck": "passed"
+  },
+  "scopeLimits": [
+    "Local CPU formatting microbenchmark; no measured real Telegram/model latency.",
+    "Absolute complete-footer CPU savings are about 15 microseconds per render in this fixture.",
+    "Import-time startup cost and production traffic were not benchmarked.",
+    "No persistent state, dependency, protocol or cache-lifetime changes."
+  ],
+  "runs": {
+    "context": {
+      "before": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "f9ae29674f65ba0b23603fbfc0574fde22b07c828ae8e9d1e698a30529862939",
+          "footers": {
+            "context": {
+              "iterations": 1000,
+              "samplesMs": [
+                168.52375,
+                172.00783399999995,
+                172.36312499999997,
+                169.89879099999996,
+                169.846583,
+                169.48779200000013,
+                170.28016700000012,
+                169.44212500000003,
+                171.01262500000007
+              ],
+              "medianMs": 169.89879099999996,
+              "fingerprint": "2adb1a016964c9e507c351b7d91bb53e4c1ceea9d141eca525fc1b3b2f03718e"
+            }
+          },
+          "splits": {}
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "f9ae29674f65ba0b23603fbfc0574fde22b07c828ae8e9d1e698a30529862939",
+          "footers": {
+            "context": {
+              "iterations": 1000,
+              "samplesMs": [
+                172.170167,
+                171.70383400000003,
+                173.08891700000004,
+                171.65491599999996,
+                169.02024999999992,
+                170.296333,
+                169.0411250000002,
+                170.00891699999988,
+                171.75262500000008
+              ],
+              "medianMs": 171.65491599999996,
+              "fingerprint": "2adb1a016964c9e507c351b7d91bb53e4c1ceea9d141eca525fc1b3b2f03718e"
+            }
+          },
+          "splits": {}
+        }
+      ],
+      "after": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f",
+          "footers": {
+            "context": {
+              "iterations": 1000,
+              "samplesMs": [
+                4.0658340000000095,
+                4.068667000000005,
+                3.98358300000001,
+                3.8260000000000076,
+                3.8241669999999885,
+                3.985500000000002,
+                3.721416999999988,
+                3.6872909999999877,
+                3.729666999999978
+              ],
+              "medianMs": 3.8260000000000076,
+              "fingerprint": "2adb1a016964c9e507c351b7d91bb53e4c1ceea9d141eca525fc1b3b2f03718e"
+            }
+          },
+          "splits": {}
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f",
+          "footers": {
+            "context": {
+              "iterations": 1000,
+              "samplesMs": [
+                4.287707999999995,
+                4.167999999999992,
+                3.7950000000000017,
+                3.7017919999999975,
+                3.8870000000000005,
+                3.7342920000000106,
+                3.6901670000000024,
+                3.9598330000000033,
+                3.7733750000000015
+              ],
+              "medianMs": 3.7950000000000017,
+              "fingerprint": "2adb1a016964c9e507c351b7d91bb53e4c1ceea9d141eca525fc1b3b2f03718e"
+            }
+          },
+          "splits": {}
+        }
+      ]
+    },
+    "session": {
+      "before": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "f9ae29674f65ba0b23603fbfc0574fde22b07c828ae8e9d1e698a30529862939",
+          "footers": {
+            "session": {
+              "iterations": 300,
+              "samplesMs": [
+                66.322958,
+                63.78533300000001,
+                63.93041600000004,
+                64.061084,
+                64.39337499999999,
+                63.801624999999945,
+                66.840959,
+                63.69895799999995,
+                64.15733399999999
+              ],
+              "medianMs": 64.061084,
+              "fingerprint": "794c364c7a01acab62c283331523cb016142ae9e934ff8b0dabc4ec300321c2f"
+            }
+          },
+          "splits": {}
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "f9ae29674f65ba0b23603fbfc0574fde22b07c828ae8e9d1e698a30529862939",
+          "footers": {
+            "session": {
+              "iterations": 300,
+              "samplesMs": [
+                66.797125,
+                65.94116699999998,
+                64.88066699999996,
+                66.37495799999999,
+                64.89379099999996,
+                64.89570900000007,
+                66.68554199999994,
+                67.38241700000003,
+                64.28495799999996
+              ],
+              "medianMs": 65.94116699999998,
+              "fingerprint": "794c364c7a01acab62c283331523cb016142ae9e934ff8b0dabc4ec300321c2f"
+            }
+          },
+          "splits": {}
+        }
+      ],
+      "after": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f",
+          "footers": {
+            "session": {
+              "iterations": 300,
+              "samplesMs": [
+                12.885958000000002,
+                12.047791999999987,
+                10.798416000000003,
+                10.728415999999982,
+                10.838583999999997,
+                10.533832999999987,
+                10.686292000000009,
+                10.849708000000021,
+                10.712540999999987
+              ],
+              "medianMs": 10.798416000000003,
+              "fingerprint": "794c364c7a01acab62c283331523cb016142ae9e934ff8b0dabc4ec300321c2f"
+            }
+          },
+          "splits": {}
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f",
+          "footers": {
+            "session": {
+              "iterations": 300,
+              "samplesMs": [
+                12.556958000000009,
+                12.12299999999999,
+                10.537500000000023,
+                10.355166999999994,
+                10.923584000000005,
+                10.298292000000004,
+                10.112583,
+                10.290084000000007,
+                10.42795799999999
+              ],
+              "medianMs": 10.42795799999999,
+              "fingerprint": "794c364c7a01acab62c283331523cb016142ae9e934ff8b0dabc4ec300321c2f"
+            }
+          },
+          "splits": {}
+        }
+      ]
+    },
+    "unavailable": {
+      "before": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "f9ae29674f65ba0b23603fbfc0574fde22b07c828ae8e9d1e698a30529862939",
+          "footers": {
+            "unavailable": {
+              "iterations": 5000,
+              "samplesMs": [
+                26.02683300000001,
+                25.87062499999999,
+                25.749000000000024,
+                25.667709000000002,
+                25.97566599999999,
+                26.311417000000034,
+                26.409374999999955,
+                26.274834,
+                26.126417000000004
+              ],
+              "medianMs": 26.02683300000001,
+              "fingerprint": "bcc2659fdab712fe59da2a3f391cdfeb6a546721237c88d99367fed6e8626b84"
+            }
+          },
+          "splits": {}
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "f9ae29674f65ba0b23603fbfc0574fde22b07c828ae8e9d1e698a30529862939",
+          "footers": {
+            "unavailable": {
+              "iterations": 5000,
+              "samplesMs": [
+                25.854416999999998,
+                25.818209000000024,
+                26.04529099999999,
+                25.697958999999997,
+                25.278625000000005,
+                26.27924999999999,
+                25.91537500000004,
+                25.33329200000003,
+                25.837333
+              ],
+              "medianMs": 25.837333,
+              "fingerprint": "bcc2659fdab712fe59da2a3f391cdfeb6a546721237c88d99367fed6e8626b84"
+            }
+          },
+          "splits": {}
+        }
+      ],
+      "after": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f",
+          "footers": {
+            "unavailable": {
+              "iterations": 5000,
+              "samplesMs": [
+                26.537333000000018,
+                26.39895899999999,
+                25.513082999999995,
+                25.657332999999994,
+                25.970083000000017,
+                26.627584000000013,
+                26.721000000000004,
+                25.905249999999967,
+                25.643542000000025
+              ],
+              "medianMs": 25.970083000000017,
+              "fingerprint": "bcc2659fdab712fe59da2a3f391cdfeb6a546721237c88d99367fed6e8626b84"
+            }
+          },
+          "splits": {}
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f",
+          "footers": {
+            "unavailable": {
+              "iterations": 5000,
+              "samplesMs": [
+                25.790125000000003,
+                26.016249999999985,
+                25.656292000000008,
+                25.396667000000008,
+                25.572707999999977,
+                25.585167000000013,
+                25.55333300000001,
+                25.713792000000012,
+                25.492124999999987
+              ],
+              "medianMs": 25.585167000000013,
+              "fingerprint": "bcc2659fdab712fe59da2a3f391cdfeb6a546721237c88d99367fed6e8626b84"
+            }
+          },
+          "splits": {}
+        }
+      ]
+    },
+    "sentences": {
+      "before": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "f9ae29674f65ba0b23603fbfc0574fde22b07c828ae8e9d1e698a30529862939",
+          "footers": {},
+          "splits": {
+            "sentences": {
+              "characters": 84000,
+              "chunks": 83,
+              "iterations": 50,
+              "samplesMs": [
+                80.44549999999998,
+                82.30737499999998,
+                80.286833,
+                80.722958,
+                82.25066700000002,
+                83.07000000000005,
+                83.97962500000006,
+                83.64829199999997,
+                83.749458
+              ],
+              "medianMs": 82.30737499999998,
+              "fingerprint": "9bafbc1afc7d00f82ffbc8165312facbd37cb74f3d8e720d765948355983ea44"
+            }
+          }
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "f9ae29674f65ba0b23603fbfc0574fde22b07c828ae8e9d1e698a30529862939",
+          "footers": {},
+          "splits": {
+            "sentences": {
+              "characters": 84000,
+              "chunks": 83,
+              "iterations": 50,
+              "samplesMs": [
+                82.458042,
+                83.82233400000001,
+                80.97387500000002,
+                81.53058299999998,
+                82.59304199999997,
+                82.61400000000003,
+                83.00379199999998,
+                82.68866700000001,
+                83.27754199999993
+              ],
+              "medianMs": 82.61400000000003,
+              "fingerprint": "9bafbc1afc7d00f82ffbc8165312facbd37cb74f3d8e720d765948355983ea44"
+            }
+          }
+        }
+      ],
+      "after": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f",
+          "footers": {},
+          "splits": {
+            "sentences": {
+              "characters": 84000,
+              "chunks": 83,
+              "iterations": 50,
+              "samplesMs": [
+                88.225583,
+                87.56720899999999,
+                79.40575000000001,
+                78.89641699999993,
+                78.9251250000001,
+                80.31687499999998,
+                79.53158400000007,
+                79.27366699999993,
+                79.89783399999999
+              ],
+              "medianMs": 79.53158400000007,
+              "fingerprint": "9bafbc1afc7d00f82ffbc8165312facbd37cb74f3d8e720d765948355983ea44"
+            }
+          }
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f",
+          "footers": {},
+          "splits": {
+            "sentences": {
+              "characters": 84000,
+              "chunks": 83,
+              "iterations": 50,
+              "samplesMs": [
+                80.52708300000003,
+                81.770333,
+                79.53745900000001,
+                79.83095799999995,
+                79.47116700000004,
+                80.834791,
+                82.67441700000006,
+                81.14983299999994,
+                82.15341699999999
+              ],
+              "medianMs": 80.834791,
+              "fingerprint": "9bafbc1afc7d00f82ffbc8165312facbd37cb74f3d8e720d765948355983ea44"
+            }
+          }
+        }
+      ]
+    },
+    "paragraphs": {
+      "before": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "f9ae29674f65ba0b23603fbfc0574fde22b07c828ae8e9d1e698a30529862939",
+          "footers": {},
+          "splits": {
+            "paragraphs": {
+              "characters": 35100,
+              "chunks": 34,
+              "iterations": 50,
+              "samplesMs": [
+                2.2799169999999975,
+                2.088249999999988,
+                2.130291999999997,
+                2.075333999999998,
+                2.1867500000000035,
+                2.160375000000002,
+                2.223792000000003,
+                1.8766669999999976,
+                1.7568339999999978
+              ],
+              "medianMs": 2.130291999999997,
+              "fingerprint": "c2e2bce31232554fb96353583a3c54cf5b4880e52d39ddc2479ec03dba0eeadb"
+            }
+          }
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "f9ae29674f65ba0b23603fbfc0574fde22b07c828ae8e9d1e698a30529862939",
+          "footers": {},
+          "splits": {
+            "paragraphs": {
+              "characters": 35100,
+              "chunks": 34,
+              "iterations": 50,
+              "samplesMs": [
+                2.1564580000000007,
+                2.0492500000000007,
+                2.6187910000000016,
+                2.102166000000011,
+                2.235541000000012,
+                2.3712090000000074,
+                2.1602919999999983,
+                1.8155840000000012,
+                1.8138750000000101
+              ],
+              "medianMs": 2.1564580000000007,
+              "fingerprint": "c2e2bce31232554fb96353583a3c54cf5b4880e52d39ddc2479ec03dba0eeadb"
+            }
+          }
+        }
+      ],
+      "after": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f",
+          "footers": {},
+          "splits": {
+            "paragraphs": {
+              "characters": 35100,
+              "chunks": 34,
+              "iterations": 50,
+              "samplesMs": [
+                2.2431669999999997,
+                2.261166000000003,
+                2.248374999999996,
+                1.9943329999999975,
+                2.065125000000009,
+                2.6700420000000094,
+                2.4862919999999917,
+                1.9841669999999993,
+                1.8227909999999952
+              ],
+              "medianMs": 2.2431669999999997,
+              "fingerprint": "c2e2bce31232554fb96353583a3c54cf5b4880e52d39ddc2479ec03dba0eeadb"
+            }
+          }
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f",
+          "footers": {},
+          "splits": {
+            "paragraphs": {
+              "characters": 35100,
+              "chunks": 34,
+              "iterations": 50,
+              "samplesMs": [
+                2.274000000000001,
+                2.2654999999999887,
+                2.28045800000001,
+                2.291667000000004,
+                2.478332999999992,
+                2.2106250000000074,
+                2.3364589999999907,
+                1.8906670000000076,
+                1.7929579999999987
+              ],
+              "medianMs": 2.274000000000001,
+              "fingerprint": "c2e2bce31232554fb96353583a3c54cf5b4880e52d39ddc2479ec03dba0eeadb"
+            }
+          }
+        }
+      ]
+    },
+    "unbroken": {
+      "before": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "f9ae29674f65ba0b23603fbfc0574fde22b07c828ae8e9d1e698a30529862939",
+          "footers": {},
+          "splits": {
+            "unbroken": {
+              "characters": 60000,
+              "chunks": 59,
+              "iterations": 50,
+              "samplesMs": [
+                10.871583999999999,
+                10.637249999999995,
+                11.170374999999979,
+                10.485540999999984,
+                10.17070799999999,
+                9.93558299999998,
+                9.27604100000002,
+                9.057916000000006,
+                9.066541999999998
+              ],
+              "medianMs": 10.17070799999999,
+              "fingerprint": "9e5b8928d41da71a0e13a75e5cd48e1fdd5bb7c206fed73797014fceeef26b5b"
+            }
+          }
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "f9ae29674f65ba0b23603fbfc0574fde22b07c828ae8e9d1e698a30529862939",
+          "footers": {},
+          "splits": {
+            "unbroken": {
+              "characters": 60000,
+              "chunks": 59,
+              "iterations": 50,
+              "samplesMs": [
+                10.23375,
+                9.799500000000009,
+                10.762709000000001,
+                10.474209000000002,
+                9.806291999999985,
+                9.29525000000001,
+                9.13429099999999,
+                9.061292000000009,
+                8.937791999999973
+              ],
+              "medianMs": 9.799500000000009,
+              "fingerprint": "9e5b8928d41da71a0e13a75e5cd48e1fdd5bb7c206fed73797014fceeef26b5b"
+            }
+          }
+        }
+      ],
+      "after": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f",
+          "footers": {},
+          "splits": {
+            "unbroken": {
+              "characters": 60000,
+              "chunks": 59,
+              "iterations": 50,
+              "samplesMs": [
+                10.575665999999998,
+                10.463415999999995,
+                10.768750000000011,
+                11.713374999999985,
+                13.857624999999985,
+                10.68466699999999,
+                11.65825000000001,
+                10.746375,
+                9.454250000000002
+              ],
+              "medianMs": 10.746375,
+              "fingerprint": "9e5b8928d41da71a0e13a75e5cd48e1fdd5bb7c206fed73797014fceeef26b5b"
+            }
+          }
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f",
+          "footers": {},
+          "splits": {
+            "unbroken": {
+              "characters": 60000,
+              "chunks": 59,
+              "iterations": 50,
+              "samplesMs": [
+                10.767707999999999,
+                11.553082999999987,
+                10.214708000000002,
+                10.607292000000001,
+                9.985874999999993,
+                11.579207999999994,
+                9.526999999999987,
+                10.300125000000008,
+                10.607083999999986
+              ],
+              "medianMs": 10.607083999999986,
+              "fingerprint": "9e5b8928d41da71a0e13a75e5cd48e1fdd5bb7c206fed73797014fceeef26b5b"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "discardedExperiment": {
+    "change": "Replace Array.from/filter/map over sentence segments with a single for-of loop.",
+    "outcome": "Reverted because initial paired runs showed no stable useful improvement. The final splitter implementation is unchanged.",
+    "runs": {
+      "before": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "dde2390804faaaa8b5ef65f26c5805468f14ace28bae265ffe9a0e1a3c8199c0",
+          "footers": {
+            "context": {
+              "iterations": 1000,
+              "samplesMs": [
+                178.54849999999993,
+                184.24133300000005,
+                176.680292,
+                172.94170799999995,
+                181.61579200000006,
+                172.31054199999994,
+                173.15033300000005,
+                184.95291599999996,
+                171.49791600000003
+              ],
+              "medianMs": 176.680292,
+              "fingerprint": "2adb1a016964c9e507c351b7d91bb53e4c1ceea9d141eca525fc1b3b2f03718e"
+            },
+            "session": {
+              "iterations": 300,
+              "samplesMs": [
+                69.2087919999999,
+                67.10904100000016,
+                70.23920799999996,
+                71.24829199999976,
+                66.39779199999975,
+                64.75374999999985,
+                63.28479100000004,
+                64.30879199999981,
+                84.09904199999983
+              ],
+              "medianMs": 67.10904100000016,
+              "fingerprint": "794c364c7a01acab62c283331523cb016142ae9e934ff8b0dabc4ec300321c2f"
+            },
+            "unavailable": {
+              "iterations": 1000,
+              "samplesMs": [
+                7.183083999999781,
+                6.040124999999989,
+                5.5888340000001335,
+                5.931332999999995,
+                5.5475830000000315,
+                5.666666999999961,
+                5.645082999999886,
+                6.5733329999998205,
+                5.36770899999965
+              ],
+              "medianMs": 5.666666999999961,
+              "fingerprint": "bcc2659fdab712fe59da2a3f391cdfeb6a546721237c88d99367fed6e8626b84"
+            }
+          },
+          "splits": {
+            "sentences": {
+              "characters": 84000,
+              "chunks": 83,
+              "iterations": 10,
+              "samplesMs": [
+                18.714665999999852,
+                18.41604200000029,
+                17.310999999999694,
+                16.4861249999999,
+                16.000125000000025,
+                16.23241599999983,
+                15.718209000000115,
+                16.42833299999984,
+                15.741207999999915
+              ],
+              "medianMs": 16.42833299999984,
+              "fingerprint": "9bafbc1afc7d00f82ffbc8165312facbd37cb74f3d8e720d765948355983ea44"
+            },
+            "paragraphs": {
+              "characters": 35100,
+              "chunks": 34,
+              "iterations": 10,
+              "samplesMs": [
+                0.37516599999980826,
+                0.3597500000000764,
+                0.36304199999995035,
+                0.45720799999980954,
+                0.37979200000017954,
+                0.5314590000002681,
+                0.3814159999997173,
+                0.5635419999998703,
+                0.3812089999996715
+              ],
+              "medianMs": 0.3812089999996715,
+              "fingerprint": "c2e2bce31232554fb96353583a3c54cf5b4880e52d39ddc2479ec03dba0eeadb"
+            },
+            "unbroken": {
+              "characters": 60000,
+              "chunks": 59,
+              "iterations": 10,
+              "samplesMs": [
+                2.0448749999995925,
+                2.344665999999961,
+                2.109875000000102,
+                2.1003749999999854,
+                1.912166999999954,
+                1.9288329999999405,
+                2.1257919999998194,
+                2.0540829999999914,
+                2.016041999999743
+              ],
+              "medianMs": 2.0540829999999914,
+              "fingerprint": "9e5b8928d41da71a0e13a75e5cd48e1fdd5bb7c206fed73797014fceeef26b5b"
+            }
+          }
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "dde2390804faaaa8b5ef65f26c5805468f14ace28bae265ffe9a0e1a3c8199c0",
+          "footers": {
+            "context": {
+              "iterations": 1000,
+              "samplesMs": [
+                211.50199999999995,
+                251.905667,
+                232.75016700000003,
+                200.01600000000008,
+                208.51854200000002,
+                186.97166700000002,
+                175.11374999999998,
+                173.02537500000017,
+                212.0937919999999
+              ],
+              "medianMs": 208.51854200000002,
+              "fingerprint": "2adb1a016964c9e507c351b7d91bb53e4c1ceea9d141eca525fc1b3b2f03718e"
+            },
+            "session": {
+              "iterations": 300,
+              "samplesMs": [
+                71.30445800000007,
+                66.52891700000009,
+                67.82954100000006,
+                70.92441700000018,
+                70.42570899999964,
+                70.236625,
+                69.62379200000032,
+                71.43387500000017,
+                70.77024999999958
+              ],
+              "medianMs": 70.42570899999964,
+              "fingerprint": "794c364c7a01acab62c283331523cb016142ae9e934ff8b0dabc4ec300321c2f"
+            },
+            "unavailable": {
+              "iterations": 1000,
+              "samplesMs": [
+                7.336334000000079,
+                6.138374999999996,
+                5.683375000000069,
+                5.401749999999993,
+                5.610875000000306,
+                5.403416000000107,
+                5.392832999999882,
+                5.394792000000052,
+                5.577166999999918
+              ],
+              "medianMs": 5.577166999999918,
+              "fingerprint": "bcc2659fdab712fe59da2a3f391cdfeb6a546721237c88d99367fed6e8626b84"
+            }
+          },
+          "splits": {
+            "sentences": {
+              "characters": 84000,
+              "chunks": 83,
+              "iterations": 10,
+              "samplesMs": [
+                19.00470899999982,
+                19.466499999999996,
+                18.366250000000036,
+                17.527500000000146,
+                17.25274999999965,
+                18.084249999999884,
+                16.984375,
+                17.822749999999814,
+                17.24100000000044
+              ],
+              "medianMs": 17.822749999999814,
+              "fingerprint": "9bafbc1afc7d00f82ffbc8165312facbd37cb74f3d8e720d765948355983ea44"
+            },
+            "paragraphs": {
+              "characters": 35100,
+              "chunks": 34,
+              "iterations": 10,
+              "samplesMs": [
+                0.4022090000003118,
+                0.3692500000001928,
+                0.36420799999996234,
+                0.36345899999969333,
+                0.37770899999986796,
+                0.6251250000000255,
+                0.7468750000002728,
+                0.8935409999999138,
+                0.5320000000001528
+              ],
+              "medianMs": 0.4022090000003118,
+              "fingerprint": "c2e2bce31232554fb96353583a3c54cf5b4880e52d39ddc2479ec03dba0eeadb"
+            },
+            "unbroken": {
+              "characters": 60000,
+              "chunks": 59,
+              "iterations": 10,
+              "samplesMs": [
+                1.9853750000002037,
+                2.1162500000000364,
+                2.1917499999999563,
+                1.912916999999652,
+                1.9960419999997612,
+                2.1194580000001224,
+                2.1788330000003953,
+                2.1778330000001915,
+                2.042000000000371
+              ],
+              "medianMs": 2.1162500000000364,
+              "fingerprint": "9e5b8928d41da71a0e13a75e5cd48e1fdd5bb7c206fed73797014fceeef26b5b"
+            }
+          }
+        }
+      ],
+      "after": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "28f03492338daba8aab359400439bfce7666d5c433fa7edf3a4270a2a320cfba",
+          "footers": {
+            "context": {
+              "iterations": 1000,
+              "samplesMs": [
+                4.236291999999992,
+                4.1592919999999935,
+                4.471874999999983,
+                3.8179580000000044,
+                3.944166000000024,
+                4.054249999999996,
+                4.30920900000001,
+                4.080250000000007,
+                4.015874999999994
+              ],
+              "medianMs": 4.080250000000007,
+              "fingerprint": "2adb1a016964c9e507c351b7d91bb53e4c1ceea9d141eca525fc1b3b2f03718e"
+            },
+            "session": {
+              "iterations": 300,
+              "samplesMs": [
+                15.41425000000001,
+                20.152541999999983,
+                14.588291000000027,
+                12.71516699999998,
+                13.780250000000024,
+                12.729292000000044,
+                12.396041000000025,
+                13.088458000000003,
+                12.513874999999985
+              ],
+              "medianMs": 13.088458000000003,
+              "fingerprint": "794c364c7a01acab62c283331523cb016142ae9e934ff8b0dabc4ec300321c2f"
+            },
+            "unavailable": {
+              "iterations": 1000,
+              "samplesMs": [
+                8.193874999999991,
+                7.524624999999958,
+                6.963292000000024,
+                7.141291000000024,
+                6.753999999999962,
+                6.754292000000021,
+                6.916249999999991,
+                6.396374999999978,
+                6.479417000000012
+              ],
+              "medianMs": 6.916249999999991,
+              "fingerprint": "bcc2659fdab712fe59da2a3f391cdfeb6a546721237c88d99367fed6e8626b84"
+            }
+          },
+          "splits": {
+            "sentences": {
+              "characters": 84000,
+              "chunks": 83,
+              "iterations": 10,
+              "samplesMs": [
+                20.17120799999998,
+                17.265291999999988,
+                17.237708999999995,
+                19.325375000000008,
+                16.690666999999962,
+                17.06662499999993,
+                16.860374999999976,
+                17.180500000000052,
+                16.440709000000084
+              ],
+              "medianMs": 17.180500000000052,
+              "fingerprint": "9bafbc1afc7d00f82ffbc8165312facbd37cb74f3d8e720d765948355983ea44"
+            },
+            "paragraphs": {
+              "characters": 35100,
+              "chunks": 34,
+              "iterations": 10,
+              "samplesMs": [
+                0.5063330000000406,
+                0.5133749999999964,
+                0.47554200000001856,
+                0.6512079999999969,
+                0.3961659999999938,
+                0.44887500000004366,
+                0.4191250000000082,
+                0.44237499999997,
+                0.4235840000000053
+              ],
+              "medianMs": 0.44887500000004366,
+              "fingerprint": "c2e2bce31232554fb96353583a3c54cf5b4880e52d39ddc2479ec03dba0eeadb"
+            },
+            "unbroken": {
+              "characters": 60000,
+              "chunks": 59,
+              "iterations": 10,
+              "samplesMs": [
+                2.1613330000000133,
+                1.9619579999999814,
+                2.195791999999983,
+                2.5024579999999332,
+                1.9900420000000167,
+                1.889332999999965,
+                2.08137499999998,
+                2.306750000000079,
+                1.9605420000000322
+              ],
+              "medianMs": 2.08137499999998,
+              "fingerprint": "9e5b8928d41da71a0e13a75e5cd48e1fdd5bb7c206fed73797014fceeef26b5b"
+            }
+          }
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "28f03492338daba8aab359400439bfce7666d5c433fa7edf3a4270a2a320cfba",
+          "footers": {
+            "context": {
+              "iterations": 1000,
+              "samplesMs": [
+                4.887666999999993,
+                3.8225419999999986,
+                4.224500000000006,
+                4.379500000000007,
+                3.908791000000008,
+                3.8580419999999833,
+                4.005415999999997,
+                4.375958999999995,
+                3.907499999999999
+              ],
+              "medianMs": 4.005415999999997,
+              "fingerprint": "2adb1a016964c9e507c351b7d91bb53e4c1ceea9d141eca525fc1b3b2f03718e"
+            },
+            "session": {
+              "iterations": 300,
+              "samplesMs": [
+                13.193207999999998,
+                13.09895800000001,
+                11.332750000000004,
+                12.146541999999982,
+                11.306542000000007,
+                11.127250000000004,
+                11.888334000000015,
+                11.402874999999995,
+                11.270624999999995
+              ],
+              "medianMs": 11.402874999999995,
+              "fingerprint": "794c364c7a01acab62c283331523cb016142ae9e934ff8b0dabc4ec300321c2f"
+            },
+            "unavailable": {
+              "iterations": 1000,
+              "samplesMs": [
+                7.714875000000006,
+                6.186166000000014,
+                6.286125000000027,
+                5.497792000000004,
+                6.193624999999997,
+                5.350500000000011,
+                5.418999999999983,
+                5.48766599999999,
+                5.587291999999991
+              ],
+              "medianMs": 5.587291999999991,
+              "fingerprint": "bcc2659fdab712fe59da2a3f391cdfeb6a546721237c88d99367fed6e8626b84"
+            }
+          },
+          "splits": {
+            "sentences": {
+              "characters": 84000,
+              "chunks": 83,
+              "iterations": 10,
+              "samplesMs": [
+                17.99312500000002,
+                15.950290999999993,
+                15.976665999999966,
+                17.309292000000028,
+                16.278750000000002,
+                16.195666999999958,
+                16.398167,
+                16.19883299999998,
+                18.13516599999997
+              ],
+              "medianMs": 16.278750000000002,
+              "fingerprint": "9bafbc1afc7d00f82ffbc8165312facbd37cb74f3d8e720d765948355983ea44"
+            },
+            "paragraphs": {
+              "characters": 35100,
+              "chunks": 34,
+              "iterations": 10,
+              "samplesMs": [
+                1.1188329999999382,
+                1.8408749999999827,
+                2.095916999999986,
+                3.252416999999923,
+                2.930749999999989,
+                12.455625000000055,
+                1.5184169999999995,
+                2.9521250000000236,
+                1.0902079999999614
+              ],
+              "medianMs": 2.095916999999986,
+              "fingerprint": "c2e2bce31232554fb96353583a3c54cf5b4880e52d39ddc2479ec03dba0eeadb"
+            },
+            "unbroken": {
+              "characters": 60000,
+              "chunks": 59,
+              "iterations": 10,
+              "samplesMs": [
+                3.1612910000000056,
+                2.138249999999971,
+                3.000291999999945,
+                2.5604170000000295,
+                6.611792000000037,
+                2.3415410000000065,
+                2.6467909999998938,
+                2.907750000000078,
+                2.2561249999999973
+              ],
+              "medianMs": 2.6467909999998938,
+              "fingerprint": "9e5b8928d41da71a0e13a75e5cd48e1fdd5bb7c206fed73797014fceeef26b5b"
+            }
+          }
+        }
+      ]
+    },
+    "sourceHashEncoding": "These earlier sourceHash fields hash JSON.stringify(source text), rather than raw source bytes."
+  },
+  "earlierMixedScenarioRuns": {
+    "reasonForIsolatedRerun": "Mixed runs showed substantial control timing variability during concurrent desktop activity, so final claims use per-scenario processes.",
+    "runs": {
+      "before": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "f9ae29674f65ba0b23603fbfc0574fde22b07c828ae8e9d1e698a30529862939",
+          "footers": {
+            "context": {
+              "iterations": 1000,
+              "samplesMs": [
+                176.81975,
+                177.301375,
+                224.791333,
+                325.57604200000003,
+                211.240542,
+                219.21912499999985,
+                207.65870899999982,
+                179.4939579999998,
+                249.87941600000022
+              ],
+              "medianMs": 211.240542,
+              "fingerprint": "2adb1a016964c9e507c351b7d91bb53e4c1ceea9d141eca525fc1b3b2f03718e"
+            },
+            "session": {
+              "iterations": 300,
+              "samplesMs": [
+                322.4465,
+                115.02925000000005,
+                96.58241700000008,
+                106.18604199999982,
+                72.07787499999995,
+                64.64174999999977,
+                66.9474580000001,
+                67.24995799999988,
+                73.53224999999975
+              ],
+              "medianMs": 73.53224999999975,
+              "fingerprint": "794c364c7a01acab62c283331523cb016142ae9e934ff8b0dabc4ec300321c2f"
+            },
+            "unavailable": {
+              "iterations": 5000,
+              "samplesMs": [
+                27.86437500000011,
+                27.536790999999994,
+                27.33337500000016,
+                27.218624999999975,
+                28.537667000000056,
+                27.860415999999987,
+                27.55987499999992,
+                27.589750000000095,
+                27.31487500000003
+              ],
+              "medianMs": 27.55987499999992,
+              "fingerprint": "bcc2659fdab712fe59da2a3f391cdfeb6a546721237c88d99367fed6e8626b84"
+            }
+          },
+          "splits": {
+            "sentences": {
+              "characters": 84000,
+              "chunks": 83,
+              "iterations": 50,
+              "samplesMs": [
+                84.12137499999972,
+                83.93537500000002,
+                82.48633399999972,
+                83.08933399999933,
+                82.22862500000065,
+                83.25737500000014,
+                82.96958300000006,
+                90.20924999999988,
+                83.81408300000021
+              ],
+              "medianMs": 83.25737500000014,
+              "fingerprint": "9bafbc1afc7d00f82ffbc8165312facbd37cb74f3d8e720d765948355983ea44"
+            },
+            "paragraphs": {
+              "characters": 35100,
+              "chunks": 34,
+              "iterations": 50,
+              "samplesMs": [
+                2.1645840000001044,
+                2.5275830000000497,
+                2.190958000000137,
+                2.017083000000639,
+                1.927958999999646,
+                2.1809589999993477,
+                2.0110420000000886,
+                2.052375000000211,
+                2.212499999999636
+              ],
+              "medianMs": 2.1645840000001044,
+              "fingerprint": "c2e2bce31232554fb96353583a3c54cf5b4880e52d39ddc2479ec03dba0eeadb"
+            },
+            "unbroken": {
+              "characters": 60000,
+              "chunks": 59,
+              "iterations": 50,
+              "samplesMs": [
+                10.763792000000649,
+                10.481124999999338,
+                9.559333000000152,
+                9.956083000000035,
+                9.491834000000381,
+                9.083416999999827,
+                8.667500000000473,
+                9.334667000000081,
+                9.090540999999575
+              ],
+              "medianMs": 9.491834000000381,
+              "fingerprint": "9e5b8928d41da71a0e13a75e5cd48e1fdd5bb7c206fed73797014fceeef26b5b"
+            }
+          }
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "f9ae29674f65ba0b23603fbfc0574fde22b07c828ae8e9d1e698a30529862939",
+          "footers": {
+            "context": {
+              "iterations": 1000,
+              "samplesMs": [
+                175.288834,
+                175.595916,
+                178.21308399999998,
+                183.56733300000008,
+                168.93554099999994,
+                191.1681669999998,
+                234.71266600000013,
+                192.28058299999998,
+                197.0919590000001
+              ],
+              "medianMs": 183.56733300000008,
+              "fingerprint": "2adb1a016964c9e507c351b7d91bb53e4c1ceea9d141eca525fc1b3b2f03718e"
+            },
+            "session": {
+              "iterations": 300,
+              "samplesMs": [
+                119.07116700000006,
+                104.5473750000001,
+                95.20629199999985,
+                99.02341699999988,
+                85.27591699999994,
+                71.09783300000026,
+                78.15991699999995,
+                77.846,
+                73.29424999999992
+              ],
+              "medianMs": 85.27591699999994,
+              "fingerprint": "794c364c7a01acab62c283331523cb016142ae9e934ff8b0dabc4ec300321c2f"
+            },
+            "unavailable": {
+              "iterations": 5000,
+              "samplesMs": [
+                28.430667000000085,
+                28.599375000000236,
+                28.69549999999981,
+                28.249915999999757,
+                28.741665999999896,
+                29.40987499999983,
+                30.61904199999981,
+                36.83324999999968,
+                35.06145800000013
+              ],
+              "medianMs": 28.741665999999896,
+              "fingerprint": "bcc2659fdab712fe59da2a3f391cdfeb6a546721237c88d99367fed6e8626b84"
+            }
+          },
+          "splits": {
+            "sentences": {
+              "characters": 84000,
+              "chunks": 83,
+              "iterations": 50,
+              "samplesMs": [
+                82.01762499999995,
+                82.59770799999978,
+                82.2805830000002,
+                84.08304099999987,
+                88.19008299999996,
+                89.73325000000023,
+                99.94370799999979,
+                89.73350000000028,
+                94.50616700000046
+              ],
+              "medianMs": 88.19008299999996,
+              "fingerprint": "9bafbc1afc7d00f82ffbc8165312facbd37cb74f3d8e720d765948355983ea44"
+            },
+            "paragraphs": {
+              "characters": 35100,
+              "chunks": 34,
+              "iterations": 50,
+              "samplesMs": [
+                2.69366699999955,
+                3.6260000000002037,
+                2.3075830000007045,
+                1.9339159999999538,
+                2.6338749999995343,
+                3.0338330000004134,
+                2.2629589999996824,
+                2.076999999999316,
+                2.3036250000004657
+              ],
+              "medianMs": 2.3075830000007045,
+              "fingerprint": "c2e2bce31232554fb96353583a3c54cf5b4880e52d39ddc2479ec03dba0eeadb"
+            },
+            "unbroken": {
+              "characters": 60000,
+              "chunks": 59,
+              "iterations": 50,
+              "samplesMs": [
+                10.25195900000017,
+                12.542250000000422,
+                14.326125000000502,
+                9.071125000000393,
+                11.815666999999848,
+                9.651291999999557,
+                9.35858300000018,
+                8.87541599999986,
+                10.216457999999875
+              ],
+              "medianMs": 10.216457999999875,
+              "fingerprint": "9e5b8928d41da71a0e13a75e5cd48e1fdd5bb7c206fed73797014fceeef26b5b"
+            }
+          }
+        }
+      ],
+      "after": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f",
+          "footers": {
+            "context": {
+              "iterations": 1000,
+              "samplesMs": [
+                4.586791000000005,
+                5.105041999999997,
+                4.312125000000009,
+                4.087124999999986,
+                4.722666000000004,
+                7.001791999999995,
+                4.464249999999993,
+                4.045040999999998,
+                4.5400000000000205
+              ],
+              "medianMs": 4.5400000000000205,
+              "fingerprint": "2adb1a016964c9e507c351b7d91bb53e4c1ceea9d141eca525fc1b3b2f03718e"
+            },
+            "session": {
+              "iterations": 300,
+              "samplesMs": [
+                22.70558299999999,
+                16.825582999999995,
+                16.081624999999974,
+                13.934875000000034,
+                14.862832999999966,
+                16.005708000000027,
+                15.913084000000026,
+                19.10066599999999,
+                16.738083000000017
+              ],
+              "medianMs": 16.081624999999974,
+              "fingerprint": "794c364c7a01acab62c283331523cb016142ae9e934ff8b0dabc4ec300321c2f"
+            },
+            "unavailable": {
+              "iterations": 5000,
+              "samplesMs": [
+                54.800707999999986,
+                59.89900000000006,
+                105.66762499999993,
+                59.23070800000005,
+                136.36416700000007,
+                69.00204199999996,
+                60.118291,
+                48.63029199999994,
+                45.45395800000006
+              ],
+              "medianMs": 59.89900000000006,
+              "fingerprint": "bcc2659fdab712fe59da2a3f391cdfeb6a546721237c88d99367fed6e8626b84"
+            }
+          },
+          "splits": {
+            "sentences": {
+              "characters": 84000,
+              "chunks": 83,
+              "iterations": 50,
+              "samplesMs": [
+                97.43125000000009,
+                88.57345800000007,
+                86.13870899999984,
+                85.79729199999997,
+                83.33791699999983,
+                83.02133299999991,
+                81.35458299999982,
+                82.60383300000012,
+                86.02654200000006
+              ],
+              "medianMs": 85.79729199999997,
+              "fingerprint": "9bafbc1afc7d00f82ffbc8165312facbd37cb74f3d8e720d765948355983ea44"
+            },
+            "paragraphs": {
+              "characters": 35100,
+              "chunks": 34,
+              "iterations": 50,
+              "samplesMs": [
+                1.8158750000000055,
+                2.07287499999984,
+                1.928625000000011,
+                2.2024579999999787,
+                1.880916999999954,
+                1.945416000000023,
+                1.7811670000000959,
+                1.8977090000000771,
+                2.0140420000000177
+              ],
+              "medianMs": 1.928625000000011,
+              "fingerprint": "c2e2bce31232554fb96353583a3c54cf5b4880e52d39ddc2479ec03dba0eeadb"
+            },
+            "unbroken": {
+              "characters": 60000,
+              "chunks": 59,
+              "iterations": 50,
+              "samplesMs": [
+                11.082832999999937,
+                9.516916999999921,
+                10.060209000000214,
+                8.848416999999927,
+                9.181583000000046,
+                9.317082999999911,
+                9.123916999999892,
+                9.1203330000003,
+                9.730457999999999
+              ],
+              "medianMs": 9.317082999999911,
+              "fingerprint": "9e5b8928d41da71a0e13a75e5cd48e1fdd5bb7c206fed73797014fceeef26b5b"
+            }
+          }
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHash": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f",
+          "footers": {
+            "context": {
+              "iterations": 1000,
+              "samplesMs": [
+                4.544875000000005,
+                4.148875000000004,
+                4.046915999999996,
+                3.8632920000000013,
+                4.055374999999998,
+                4.034500000000008,
+                4.083208000000013,
+                4.250291000000004,
+                4.3629999999999995
+              ],
+              "medianMs": 4.083208000000013,
+              "fingerprint": "2adb1a016964c9e507c351b7d91bb53e4c1ceea9d141eca525fc1b3b2f03718e"
+            },
+            "session": {
+              "iterations": 300,
+              "samplesMs": [
+                14.180374999999998,
+                12.489542,
+                11.194333,
+                10.718666000000013,
+                10.924417000000005,
+                10.542749999999984,
+                10.810833000000002,
+                10.479917,
+                10.542375000000021
+              ],
+              "medianMs": 10.810833000000002,
+              "fingerprint": "794c364c7a01acab62c283331523cb016142ae9e934ff8b0dabc4ec300321c2f"
+            },
+            "unavailable": {
+              "iterations": 5000,
+              "samplesMs": [
+                28.760917000000006,
+                28.05600000000004,
+                30.016458,
+                30.54649999999998,
+                31.733916999999963,
+                34.86566699999997,
+                33.02129099999996,
+                30.126041999999984,
+                32.79620799999998
+              ],
+              "medianMs": 30.54649999999998,
+              "fingerprint": "bcc2659fdab712fe59da2a3f391cdfeb6a546721237c88d99367fed6e8626b84"
+            }
+          },
+          "splits": {
+            "sentences": {
+              "characters": 84000,
+              "chunks": 83,
+              "iterations": 50,
+              "samplesMs": [
+                113.46904200000006,
+                105.02091700000005,
+                103.4543329999999,
+                103.03941599999985,
+                135.455958,
+                152.734917,
+                157.0480829999999,
+                143.38487499999997,
+                96.15316700000017
+              ],
+              "medianMs": 113.46904200000006,
+              "fingerprint": "9bafbc1afc7d00f82ffbc8165312facbd37cb74f3d8e720d765948355983ea44"
+            },
+            "paragraphs": {
+              "characters": 35100,
+              "chunks": 34,
+              "iterations": 50,
+              "samplesMs": [
+                1.8451669999999467,
+                2.466333000000077,
+                1.8943329999999605,
+                2.085207999999966,
+                2.245541000000003,
+                1.9164579999999205,
+                2.2572500000001128,
+                1.922125000000051,
+                2.7870000000000346
+              ],
+              "medianMs": 2.085207999999966,
+              "fingerprint": "c2e2bce31232554fb96353583a3c54cf5b4880e52d39ddc2479ec03dba0eeadb"
+            },
+            "unbroken": {
+              "characters": 60000,
+              "chunks": 59,
+              "iterations": 50,
+              "samplesMs": [
+                9.902415999999903,
+                12.332290999999941,
+                10.410624999999982,
+                11.919875000000047,
+                9.828457999999955,
+                11.348874999999907,
+                9.118791000000101,
+                9.36808300000007,
+                9.360583000000133
+              ],
+              "medianMs": 9.902415999999903,
+              "fingerprint": "9e5b8928d41da71a0e13a75e5cd48e1fdd5bb7c206fed73797014fceeef26b5b"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

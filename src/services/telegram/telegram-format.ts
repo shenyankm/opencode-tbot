@@ -11,6 +11,7 @@ const MAX_TELEGRAM_MESSAGE_LENGTH = 4096;
 export const TELEGRAM_MESSAGE_TARGET_LENGTH = 1024;
 const MESSAGE_LENGTH_TOLERANCE = 128;
 const SENTENCE_SEGMENTER = new Intl.Segmenter(undefined, { granularity: "sentence" });
+const CONTEXT_NUMBER_FORMAT = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
 const TRUNCATED_SUFFIX = "...";
 export { stripMarkdownToPlainText } from "../../infra/utils/markdown-text.js";
 
@@ -281,7 +282,7 @@ export function formatContextFooter(context: OpenCodeContextUsage | null | undef
         ? copy.replyMetrics.remaining(Math.round(Math.max(0, Math.min(1, 1 - used / capacity)) * 100))
         : copy.replyMetrics.notAvailable;
     const length = validCapacity
-        ? new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(capacity)
+        ? CONTEXT_NUMBER_FORMAT.format(capacity)
         : copy.replyMetrics.notAvailable;
     const contextText = `${copy.replyMetrics.contextLabel}: ${remaining} | ${length}`;
     if (durationMs === undefined) {
