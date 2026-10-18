@@ -1,0 +1,234 @@
+TAP version 13
+# Subtest: concurrent updates use bounded atomic batches while failed mutators leave no partial changes
+ok 1 - concurrent updates use bounded atomic batches while failed mutators leave no partial changes
+  ---
+  duration_ms: 22.002958
+  type: 'test'
+  ...
+# Subtest: updates arriving during a write form a later batch and resolve only after their durable commit
+ok 2 - updates arriving during a write form a later batch and resolve only after their durable commit
+  ---
+  duration_ms: 9.569041
+  type: 'test'
+  ...
+# Subtest: a failed batch rejects every pending update without committing drafts and later writes recover
+ok 3 - a failed batch rejects every pending update without committing drafts and later writes recover
+  ---
+  duration_ms: 9.939958
+  type: 'test'
+  ...
+# Subtest: batched updates let event-loop work run between state mutations
+ok 4 - batched updates let event-loop work run between state mutations
+  ---
+  duration_ms: 4.484458
+  type: 'test'
+  ...
+# Subtest: non-serializable updates reject individually without poisoning other updates in the batch
+ok 5 - non-serializable updates reject individually without poisoning other updates in the batch
+  ---
+  duration_ms: 4.817584
+  type: 'test'
+  ...
+# Subtest: state updates serialize the draft and file without cloning an unused return value
+ok 6 - state updates serialize the draft and file without cloning an unused return value
+  ---
+  duration_ms: 3.17275
+  type: 'test'
+  ...
+# Subtest: queued updates preserve atomic commits and recover after mutator and disk failures
+ok 7 - queued updates preserve atomic commits and recover after mutator and disk failures
+  ---
+  duration_ms: 5.273083
+  type: 'test'
+  ...
+# Subtest: failed initial state loads recover after the file is repaired without resetting stored data
+ok 8 - failed initial state loads recover after the file is repaired without resetting stored data
+  ---
+  duration_ms: 12.320833
+  type: 'test'
+  ...
+# Subtest: failed atomic renames remove temporary files without committing drafts and later writes recover
+ok 9 - failed atomic renames remove temporary files without committing drafts and later writes recover
+  ---
+  duration_ms: 6.162958
+  type: 'test'
+  ...
+# (node:69580) ExperimentalWarning: The MockTimers API is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: answer updates reuse thinking segmentation while replacements and new reasoning parts invalidate it
+ok 10 - answer updates reuse thinking segmentation while replacements and new reasoning parts invalidate it
+  ---
+  duration_ms: 18.241625
+  type: 'test'
+  ...
+# Subtest: thinking refreshes retry failed writes and retain changes arriving during an awaited write
+ok 11 - thinking refreshes retry failed writes and retain changes arriving during an awaited write
+  ---
+  duration_ms: 7.313167
+  type: 'test'
+  ...
+# Subtest: slow progress delivery coalesces refreshes and finish waits for the newest terminal output
+ok 12 - slow progress delivery coalesces refreshes and finish waits for the newest terminal output
+  ---
+  duration_ms: 4.349
+  type: 'test'
+  ...
+# Subtest: thinking uses localized expandable quotes and escapes provider text without changing the plain fallback
+ok 13 - thinking uses localized expandable quotes and escapes provider text without changing the plain fallback
+  ---
+  duration_ms: 1.152583
+  type: 'test'
+  ...
+# Subtest: long thinking preserves every part in expandable messages without leaking secrets or breaking Unicode
+ok 14 - long thinking preserves every part in expandable messages without leaking secrets or breaking Unicode
+  ---
+  duration_ms: 1.199584
+  type: 'test'
+  ...
+# Subtest: streaming thinking reuses unchanged messages, replaces final text and removes surplus cards
+ok 15 - streaming thinking reuses unchanged messages, replaces final text and removes surplus cards
+  ---
+  duration_ms: 8.549917
+  type: 'test'
+  ...
+# Subtest: appending to one of one hundred thinking chunks reads only the changed chunk and finalizes every chunk
+ok 16 - appending to one of one hundred thinking chunks reads only the changed chunk and finalizes every chunk
+  ---
+  duration_ms: 25.032125
+  type: 'test'
+  ...
+# Subtest: a failed thinking edit is retried even when the next flush has identical thinking content
+ok 17 - a failed thinking edit is retried even when the next flush has identical thinking content
+  ---
+  duration_ms: 2.692458
+  type: 'test'
+  ...
+# Subtest: session compression reaches waiting requests before input delivery without leaking other sessions
+ok 18 - session compression reaches waiting requests before input delivery without leaking other sessions
+  ---
+  duration_ms: 0.772333
+  type: 'test'
+  ...
+# Subtest: context compression is localized, keeps existing output and never sends its summary as an answer
+ok 19 - context compression is localized, keeps existing output and never sends its summary as an answer
+  ---
+  duration_ms: 2.023166
+  type: 'test'
+  ...
+# Subtest: compression failure and cancellation do not leave a misleading running status
+ok 20 - compression failure and cancellation do not leave a misleading running status
+  ---
+  duration_ms: 1.049458
+  type: 'test'
+  ...
+# Subtest: progress accepts only the admitted input and its assistant messages
+ok 21 - progress accepts only the admitted input and its assistant messages
+  ---
+  duration_ms: 0.375042
+  type: 'test'
+  ...
+# Subtest: progress streams reasoning and answers without displaying tool details or a request per token
+ok 22 - progress streams reasoning and answers without displaying tool details or a request per token
+  ---
+  duration_ms: 0.842375
+  type: 'test'
+  ...
+# Subtest: stopped progress keeps partial output and hides tool failures
+ok 23 - stopped progress keeps partial output and hides tool failures
+  ---
+  duration_ms: 0.140041
+  type: 'test'
+  ...
+# Subtest: long Telegram replies preserve every character and keep Unicode intact
+ok 24 - long Telegram replies preserve every character and keep Unicode intact
+  ---
+  duration_ms: 0.913292
+  type: 'test'
+  ...
+# Subtest: Telegram requests retry only explicit rate limit rejections
+ok 25 - Telegram requests retry only explicit rate limit rejections
+  ---
+  duration_ms: 0.767625
+  type: 'test'
+  ...
+# Subtest: an old stop button cannot cancel a newer request
+ok 26 - an old stop button cannot cancel a newer request
+  ---
+  duration_ms: 0.493291
+  type: 'test'
+  ...
+# Subtest: a stop callback rechecks request identity after acknowledging the button
+ok 27 - a stop callback rechecks request identity after acknowledging the button
+  ---
+  duration_ms: 0.141625
+  type: 'test'
+  ...
+# Subtest: expandable thinking stays separate from the streamed answer and context with a safe format fallback
+ok 28 - expandable thinking stays separate from the streamed answer and context with a safe format fallback
+  ---
+  duration_ms: 3.42725
+  type: 'test'
+  ...
+# Subtest: disposing or aborting an old lease leaves its successor running
+ok 29 - disposing or aborting an old lease leaves its successor running
+  ---
+  duration_ms: 0.219042
+  type: 'test'
+  ...
+# Subtest: compression has a separate message and survives cleanup when the model returns no thinking
+ok 30 - compression has a separate message and survives cleanup when the model returns no thinking
+  ---
+  duration_ms: 1.41525
+  type: 'test'
+  ...
+# Subtest: compact thinking is one paragraph with a localized inline toggle and no hidden-body placeholder
+ok 31 - compact thinking is one paragraph with a localized inline toggle and no hidden-body placeholder
+  ---
+  duration_ms: 1.048583
+  type: 'test'
+  ...
+# Subtest: collapsed streams retain complete new content without redundant edits and expanded streams stay expanded
+ok 32 - collapsed streams retain complete new content without redundant edits and expanded streams stay expanded
+  ---
+  duration_ms: 1.430333
+  type: 'test'
+  ...
+# Subtest: queued clicks and streaming updates preserve the newest content and explicit actions are idempotent
+ok 33 - queued clicks and streaming updates preserve the newest content and explicit actions are idempotent
+  ---
+  duration_ms: 4.576125
+  type: 'test'
+  ...
+# Subtest: a failed edit is retried on a later update while the newest complete text remains saved
+ok 34 - a failed edit is retried on a later update while the newest complete text remains saved
+  ---
+  duration_ms: 7.675625
+  type: 'test'
+  ...
+# Subtest: format fallback preserves toggle and stop controls
+ok 35 - format fallback preserves toggle and stop controls
+  ---
+  duration_ms: 0.617584
+  type: 'test'
+  ...
+# Subtest: private per-message files survive restart and orphaned streaming messages remain readable without stale Stop controls
+ok 36 - private per-message files survive restart and orphaned streaming messages remain readable without stale Stop controls
+  ---
+  duration_ms: 33.4535
+  type: 'test'
+  ...
+# Subtest: callbacks edit the original message, reject missing chat data, and leave content intact on edit failure
+ok 37 - callbacks edit the original message, reject missing chat data, and leave content intact on edit failure
+  ---
+  duration_ms: 1.588916
+  type: 'test'
+  ...
+1..37
+# tests 37
+# suites 0
+# pass 37
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 498.47075

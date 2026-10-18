@@ -17,6 +17,7 @@ export class TelegramPromptProgress {
     private writes = Promise.resolve();
     private flushQueued = false;
     private reasoningChunks: string[] | null = null;
+    private lastReasoningChunks: string[] | null | undefined;
     private lastTexts: string[] = [];
     private lastAnswer = "";
     private lastCompaction = "";
@@ -97,11 +98,15 @@ export class TelegramPromptProgress {
                 await this.writeCompaction(compaction, !this.compacting || this.finished);
                 this.lastCompaction = compaction;
             }
-            const replies = this.render();
-            const texts = replies.map((reply) => JSON.stringify(reply.thinking ?? reply.preferred.text));
-            if (texts.length !== this.lastTexts.length || texts.some((text, index) => text !== this.lastTexts[index]) || terminal) {
-                await this.write(replies, terminal || this.finished);
-                this.lastTexts = texts;
+            if (terminal || this.reasoningChunks !== this.lastReasoningChunks) {
+                const replies = this.render();
+                const chunks = this.reasoningChunks;
+                const texts = replies.map((reply) => JSON.stringify(reply.thinking ?? reply.preferred.text));
+                if (texts.length !== this.lastTexts.length || texts.some((text, index) => text !== this.lastTexts[index]) || terminal) {
+                    await this.write(replies, terminal || this.finished);
+                    this.lastTexts = texts;
+                }
+                this.lastReasoningChunks = chunks;
             }
             const answer = [...this.answers.values()].join("\n\n");
             if (answer && answer !== this.lastAnswer && this.writeAnswer) {

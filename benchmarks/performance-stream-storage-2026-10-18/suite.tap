@@ -1,0 +1,2236 @@
+$ tsx --test tests/**/*.test.ts
+TAP version 13
+# Subtest: cancel removes the original pending input when idle
+ok 1 - cancel removes the original pending input when idle
+  ---
+  duration_ms: 1.225666
+  type: 'test'
+  ...
+# Subtest: cancel removes the original pending input when busy
+ok 2 - cancel removes the original pending input when busy
+  ---
+  duration_ms: 0.159416
+  type: 'test'
+  ...
+# Subtest: cancel removes the original pending input when failed
+ok 3 - cancel removes the original pending input when failed
+  ---
+  duration_ms: 0.246916
+  type: 'test'
+  ...
+# Subtest: cancel removes the original pending input when replaced
+ok 4 - cancel removes the original pending input when replaced
+  ---
+  duration_ms: 0.063
+  type: 'test'
+  ...
+# Subtest: cancelling preparation leaves the previously bound session running
+ok 5 - cancelling preparation leaves the previously bound session running
+  ---
+  duration_ms: 0.141375
+  type: 'test'
+  ...
+# Subtest: cancel uses the native interruption result without a racy status preflight
+ok 6 - cancel uses the native interruption result without a racy status preflight
+  ---
+  duration_ms: 0.12875
+  type: 'test'
+  ...
+# Subtest: cancelling a bound session does not interrupt a request started during the binding lookup
+ok 7 - cancelling a bound session does not interrupt a request started during the binding lookup
+  ---
+  duration_ms: 0.107417
+  type: 'test'
+  ...
+# Subtest: cancel releases the local wait when the remote interruption request fails
+ok 8 - cancel releases the local wait when the remote interruption request fails
+  ---
+  duration_ms: 0.116333
+  type: 'test'
+  ...
+# Subtest: AbortPromptUseCase reports no_session when the chat has no bound session
+ok 9 - AbortPromptUseCase reports no_session when the chat has no bound session
+  ---
+  duration_ms: 0.252333
+  type: 'test'
+  ...
+# Subtest: AbortPromptUseCase reports not_running when the current session is idle
+ok 10 - AbortPromptUseCase reports not_running when the current session is idle
+  ---
+  duration_ms: 31.509
+  type: 'test'
+  ...
+# Subtest: AbortPromptUseCase aborts busy sessions
+ok 11 - AbortPromptUseCase aborts busy sessions
+  ---
+  duration_ms: 0.425916
+  type: 'test'
+  ...
+# Subtest: AbortPromptUseCase aborts the active foreground child session before the bound main session
+ok 12 - AbortPromptUseCase aborts the active foreground child session before the bound main session
+  ---
+  duration_ms: 0.358875
+  type: 'test'
+  ...
+# Subtest: handleCancelCommand maps abort statuses and presents normalized errors
+ok 13 - handleCancelCommand maps abort statuses and presents normalized errors
+  ---
+  duration_ms: 5.205583
+  type: 'test'
+  ...
+# Subtest: handleCancelCommand cancels pending session rename before aborting
+ok 14 - handleCancelCommand cancels pending session rename before aborting
+  ---
+  duration_ms: 2.634167
+  type: 'test'
+  ...
+# Subtest: ListAgentsUseCase filters hidden agents and subagents while keeping primary and all agents
+ok 15 - ListAgentsUseCase filters hidden agents and subagents while keeping primary and all agents
+  ---
+  duration_ms: 4.647416
+  type: 'test'
+  ...
+# Subtest: ListAgentsUseCase keeps the explicitly selected agent when present
+ok 16 - ListAgentsUseCase keeps the explicitly selected agent when present
+  ---
+  duration_ms: 1.607292
+  type: 'test'
+  ...
+# Subtest: ListAgentsUseCase clears stale selected agents and falls back to the default
+ok 17 - ListAgentsUseCase clears stale selected agents and falls back to the default
+  ---
+  duration_ms: 0.427333
+  type: 'test'
+  ...
+# Subtest: ListAgentsUseCase clears selected subagents and falls back to the default
+ok 18 - ListAgentsUseCase clears selected subagents and falls back to the default
+  ---
+  duration_ms: 0.196542
+  type: 'test'
+  ...
+# Subtest: /agents only shows selectable agents without mode suffixes
+ok 19 - /agents only shows selectable agents without mode suffixes
+  ---
+  duration_ms: 1.070458
+  type: 'test'
+  ...
+# Subtest: agent selection callbacks use the filtered index and show plain agent names
+ok 20 - agent selection callbacks use the filtered index and show plain agent names
+  ---
+  duration_ms: 0.601166
+  type: 'test'
+  ...
+# Subtest: handleAgentsCallback falls back to the default locale when chat state lookup fails
+ok 21 - handleAgentsCallback falls back to the default locale when chat state lookup fails
+  ---
+  duration_ms: 1.433167
+  type: 'test'
+  ...
+# Subtest: createPluginSdkClient binds authenticated requests to the plugin location
+ok 22 - createPluginSdkClient binds authenticated requests to the plugin location
+  ---
+  duration_ms: 135.391083
+  type: 'test'
+  ...
+# Subtest: createPluginSdkClient rejects an unavailable shared service
+ok 23 - createPluginSdkClient rejects an unavailable shared service
+  ---
+  duration_ms: 0.5745
+  type: 'test'
+  ...
+# Subtest: createPluginSdkClient rejects a service owned by another host process
+ok 24 - createPluginSdkClient rejects a service owned by another host process
+  ---
+  duration_ms: 91.618583
+  type: 'test'
+  ...
+# Subtest: language labels use endonyms consistently across all UI languages
+ok 25 - language labels use endonyms consistently across all UI languages
+  ---
+  duration_ms: 1.3685
+  type: 'test'
+  ...
+# Subtest: agent terminology is standardized in Chinese and Japanese menu copy
+ok 26 - agent terminology is standardized in Chinese and Japanese menu copy
+  ---
+  duration_ms: 0.245417
+  type: 'test'
+  ...
+# Success.
+# Subtest: installPlugin writes the OpenCode config and runtime config
+ok 27 - installPlugin writes the OpenCode config and runtime config
+  ---
+  duration_ms: 125.271958
+  type: 'test'
+  ...
+# Success.
+# Success.
+# Subtest: installPlugin preserves unrelated plugin config keys and is idempotent
+ok 28 - installPlugin preserves unrelated plugin config keys and is idempotent
+  ---
+  duration_ms: 20.716292
+  type: 'test'
+  ...
+# Success.
+# Subtest: installPlugin tolerates UTF-8 BOM in existing OpenCode and plugin config files
+ok 29 - installPlugin tolerates UTF-8 BOM in existing OpenCode and plugin config files
+  ---
+  duration_ms: 7.820708
+  type: 'test'
+  ...
+# Success.
+# Subtest: installPlugin keeps existing OpenCode package-manager files untouched
+ok 30 - installPlugin keeps existing OpenCode package-manager files untouched
+  ---
+  duration_ms: 95.909167
+  type: 'test'
+  ...
+# Subtest: installPlugin fails without writing config when Telegram rejects the token
+ok 31 - installPlugin fails without writing config when Telegram rejects the token
+  ---
+  duration_ms: 4.586041
+  type: 'test'
+  ...
+# Subtest: installPlugin fails without writing config when the Telegram API root is unreachable
+ok 32 - installPlugin fails without writing config when the Telegram API root is unreachable
+  ---
+  duration_ms: 7009.896333
+  type: 'test'
+  ...
+# Subtest: installPlugin rejects conflicting local file plugins without modifying other files
+ok 33 - installPlugin rejects conflicting local file plugins without modifying other files
+  ---
+  duration_ms: 16.818208
+  type: 'test'
+  ...
+# Success.
+# Subtest: installPlugin merges existing OpenCode npm plugins and normalizes opencode-tbot
+ok 34 - installPlugin merges existing OpenCode npm plugins and normalizes opencode-tbot
+  ---
+  duration_ms: 19.385959
+  type: 'test'
+  ...
+# Success.
+# Subtest: runCli defaults to install mode
+ok 35 - runCli defaults to install mode
+  ---
+  duration_ms: 26.377916
+  type: 'test'
+  ...
+# 0.2.0
+# Subtest: runCli install prints only a minimal success message
+ok 36 - runCli install prints only a minimal success message
+  ---
+  duration_ms: 285.519541
+  type: 'test'
+  ...
+# Subtest: runCli returns success for --version
+ok 37 - runCli returns success for --version
+  ---
+  duration_ms: 0.120292
+  type: 'test'
+  ...
+# Success.
+# Subtest: runCli update refreshes the OpenCode config without modifying plugin config
+ok 38 - runCli update refreshes the OpenCode config without modifying plugin config
+  ---
+  duration_ms: 13.585167
+  type: 'test'
+  ...
+# Success.
+# Subtest: runCli update rewrites the OpenCode config without changing the bot config
+ok 39 - runCli update rewrites the OpenCode config without changing the bot config
+  ---
+  duration_ms: 16.822417
+  type: 'test'
+  ...
+# Success.
+# Success.
+# Subtest: runCli update migrates legacy plugin entries and preserves V2 options without duplicates
+ok 40 - runCli update migrates legacy plugin entries and preserves V2 options without duplicates
+  ---
+  duration_ms: 31.804916
+  type: 'test'
+  ...
+# Subtest: runCli update rejects conflicting plugin options without rewriting the config
+ok 41 - runCli update rejects conflicting plugin options without rewriting the config
+  ---
+  duration_ms: 20.698125
+  type: 'test'
+  ...
+# Subtest: runCli update rejects invalid plugin registrations without rewriting the config
+ok 42 - runCli update rejects invalid plugin registrations without rewriting the config
+  ---
+  duration_ms: 75.536625
+  type: 'test'
+  ...
+# Success.
+# Subtest: uninstallPlugin removes opencode-tbot from the OpenCode config and keeps plugin config
+ok 43 - uninstallPlugin removes opencode-tbot from the OpenCode config and keeps plugin config
+  ---
+  duration_ms: 27.021875
+  type: 'test'
+  ...
+# Success.
+# Subtest: runCli uninstall removes the sole plugin entry and preserves plugin config
+ok 44 - runCli uninstall removes the sole plugin entry and preserves plugin config
+  ---
+  duration_ms: 20.300125
+  type: 'test'
+  ...
+# Success.
+# Subtest: uninstallPlugin removes legacy and V2 bot registrations while migrating other plugin options
+ok 45 - uninstallPlugin removes legacy and V2 bot registrations while migrating other plugin options
+  ---
+  duration_ms: 15.658167
+  type: 'test'
+  ...
+# Subtest: runCli uninstall prints only a minimal success message
+ok 46 - runCli uninstall prints only a minimal success message
+  ---
+  duration_ms: 248.358125
+  type: 'test'
+  ...
+# Subtest: createPromptSession masks secret input with stars and supports backspace
+ok 47 - createPromptSession masks secret input with stars and supports backspace
+  ---
+  duration_ms: 0.531167
+  type: 'test'
+  ...
+# Subtest: createPromptSession aborts masked input on Ctrl+C
+ok 48 - createPromptSession aborts masked input on Ctrl+C
+  ---
+  duration_ms: 0.129083
+  type: 'test'
+  ...
+# Subtest: context capacity formatting preserves compact rounding across languages and changing capacities
+ok 49 - context capacity formatting preserves compact rounding across languages and changing capacities
+  ---
+  duration_ms: 3.232667
+  type: 'test'
+  ...
+# Subtest: the final footer formats request duration in seconds, minutes and hours without changing command context output
+ok 50 - the final footer formats request duration in seconds, minutes and hours without changing command context output
+  ---
+  duration_ms: 0.336583
+  type: 'test'
+  ...
+# Subtest: context uses the latest assistant step including cache rather than accumulated session usage
+ok 51 - context uses the latest assistant step including cache rather than accumulated session usage
+  ---
+  duration_ms: 0.680625
+  type: 'test'
+  ...
+# Subtest: context starts history and catalog requests before session metadata finishes
+ok 52 - context starts history and catalog requests before session metadata finishes
+  ---
+  duration_ms: 5.852458
+  type: 'test'
+  ...
+# Subtest: parallel context reads preserve default and selected models and propagate request failures
+ok 53 - parallel context reads preserve default and selected models and propagate request failures
+  ---
+  duration_ms: 1.729083
+  type: 'test'
+  ...
+# Subtest: context reads share metadata for five seconds while session selections and token usage remain live
+ok 54 - context reads share metadata for five seconds while session selections and token usage remain live
+  ---
+  duration_ms: 2.009458
+  type: 'test'
+  ...
+# Subtest: failed metadata requests are retried and an agent fallback is never cached as an empty catalog
+ok 55 - failed metadata requests are retried and an agent fallback is never cached as an empty catalog
+  ---
+  duration_ms: 0.773125
+  type: 'test'
+  ...
+# Subtest: session footer uses the latest assistant agent when session metadata has no explicit agent
+ok 56 - session footer uses the latest assistant agent when session metadata has no explicit agent
+  ---
+  duration_ms: 0.354333
+  type: 'test'
+  ...
+# Subtest: session footer has a compact localized layout with escaped metadata and safe unavailable values
+ok 57 - session footer has a compact localized layout with escaped metadata and safe unavailable values
+  ---
+  duration_ms: 1.910708
+  type: 'test'
+  ...
+# Subtest: model, reasoning, agent and workspace refreshes preserve the reply duration and do not reuse pre-compression usage
+ok 58 - model, reasoning, agent and workspace refreshes preserve the reply duration and do not reuse pre-compression usage
+  ---
+  duration_ms: 2.201625
+  type: 'test'
+  ...
+# Subtest: switching models recomputes the remaining ratio against the selected model capacity
+ok 59 - switching models recomputes the remaining ratio against the selected model capacity
+  ---
+  duration_ms: 1.052375
+  type: 'test'
+  ...
+# Subtest: completed compression across a page boundary invalidates all earlier usage until a new step reports tokens
+ok 60 - completed compression across a page boundary invalidates all earlier usage until a new step reports tokens
+  ---
+  duration_ms: 0.7085
+  type: 'test'
+  ...
+# Subtest: reverted and failed compression records do not pick usage from outside the active context
+ok 61 - reverted and failed compression records do not pick usage from outside the active context
+  ---
+  duration_ms: 0.378125
+  type: 'test'
+  ...
+# Subtest: the context footer shows only percentage left and capacity with safe unknown values
+ok 62 - the context footer shows only percentage left and capacity with safe unknown values
+  ---
+  duration_ms: 0.223458
+  type: 'test'
+  ...
+# Subtest: the last reply refreshes after a model switch and compression without editing replies for another session
+ok 63 - the last reply refreshes after a model switch and compression without editing replies for another session
+  ---
+  duration_ms: 0.998708
+  type: 'test'
+  ...
+# Subtest: a slow refresh cannot overwrite a newer reply and failures do not break subsequent refreshes
+ok 64 - a slow refresh cannot overwrite a newer reply and failures do not break subsequent refreshes
+  ---
+  duration_ms: 16.099709
+  type: 'test'
+  ...
+# Subtest: a burst of ten footer refreshes shares one read and refreshes again for changes during that read
+ok 65 - a burst of ten footer refreshes shares one read and refreshes again for changes during that read
+  ---
+  duration_ms: 51.338542
+  type: 'test'
+  ...
+# Subtest: clearing footer watches discards in-flight and queued refreshes
+ok 66 - clearing footer watches discards in-flight and queued refreshes
+  ---
+  duration_ms: 1.426416
+  type: 'test'
+  ...
+# Subtest: changing sessions while metadata is loading cannot write that metadata into the old status message
+ok 67 - changing sessions while metadata is loading cannot write that metadata into the old status message
+  ---
+  duration_ms: 0.15325
+  type: 'test'
+  ...
+# Subtest: context changes edit only the separate context message and preserve the duration of the whole request
+ok 68 - context changes edit only the separate context message and preserve the duration of the whole request
+  ---
+  duration_ms: 51.426292
+  type: 'test'
+  ...
+# Subtest: a failed context message does not turn a successful answer into an error reply
+ok 69 - a failed context message does not turn a successful answer into an error reply
+  ---
+  duration_ms: 7.895208
+  type: 'test'
+  ...
+# Subtest: formatted footer rejection falls back to plain text and refreshes only the same status message
+ok 70 - formatted footer rejection falls back to plain text and refreshes only the same status message
+  ---
+  duration_ms: 4.420416
+  type: 'test'
+  ...
+# Subtest: presentError adds a tool-calling compatibility hint for thinking-mode API errors
+ok 71 - presentError adds a tool-calling compatibility hint for thinking-mode API errors
+  ---
+  duration_ms: 1.25875
+  type: 'test'
+  ...
+# Subtest: presentError keeps generic API error details without adding the thinking-mode hint
+ok 72 - presentError keeps generic API error details without adding the thinking-mode hint
+  ---
+  duration_ms: 0.23675
+  type: 'test'
+  ...
+# Subtest: native V2 provider errors keep localized messages and status without exposing response bodies
+ok 73 - native V2 provider errors keep localized messages and status without exposing response bodies
+  ---
+  duration_ms: 0.243666
+  type: 'test'
+  ...
+# Subtest: real V2 SDK tagged HTTP failures render validation and not-found details
+ok 74 - real V2 SDK tagged HTTP failures render validation and not-found details
+  ---
+  duration_ms: 16.150083
+  type: 'test'
+  ...
+# Subtest: handleImageMessage forwards image captions and file parts to OpenCode
+ok 75 - handleImageMessage forwards image captions and file parts to OpenCode
+  ---
+  duration_ms: 4.184
+  type: 'test'
+  ...
+# Subtest: handleImageMessage ignores non-image Telegram documents
+ok 76 - handleImageMessage ignores non-image Telegram documents
+  ---
+  duration_ms: 0.391
+  type: 'test'
+  ...
+# Subtest: handleImageMessage presents localized image errors
+ok 77 - handleImageMessage presents localized image errors
+  ---
+  duration_ms: 1.475541
+  type: 'test'
+  ...
+# Subtest: handleImageMessage blocks image prompts while waiting for a session rename
+ok 78 - handleImageMessage blocks image prompts while waiting for a session rename
+  ---
+  duration_ms: 0.13
+  type: 'test'
+  ...
+# Subtest: concurrent updates use bounded atomic batches while failed mutators leave no partial changes
+ok 79 - concurrent updates use bounded atomic batches while failed mutators leave no partial changes
+  ---
+  duration_ms: 28.654792
+  type: 'test'
+  ...
+# Subtest: updates arriving during a write form a later batch and resolve only after their durable commit
+ok 80 - updates arriving during a write form a later batch and resolve only after their durable commit
+  ---
+  duration_ms: 15.816833
+  type: 'test'
+  ...
+# Subtest: a failed batch rejects every pending update without committing drafts and later writes recover
+ok 81 - a failed batch rejects every pending update without committing drafts and later writes recover
+  ---
+  duration_ms: 4.331041
+  type: 'test'
+  ...
+# Subtest: batched updates let event-loop work run between state mutations
+ok 82 - batched updates let event-loop work run between state mutations
+  ---
+  duration_ms: 4.695709
+  type: 'test'
+  ...
+# Subtest: non-serializable updates reject individually without poisoning other updates in the batch
+ok 83 - non-serializable updates reject individually without poisoning other updates in the batch
+  ---
+  duration_ms: 14.4785
+  type: 'test'
+  ...
+# Subtest: state updates serialize the draft and file without cloning an unused return value
+ok 84 - state updates serialize the draft and file without cloning an unused return value
+  ---
+  duration_ms: 4.895791
+  type: 'test'
+  ...
+# Subtest: queued updates preserve atomic commits and recover after mutator and disk failures
+ok 85 - queued updates preserve atomic commits and recover after mutator and disk failures
+  ---
+  duration_ms: 17.894541
+  type: 'test'
+  ...
+# Subtest: failed initial state loads recover after the file is repaired without resetting stored data
+ok 86 - failed initial state loads recover after the file is repaired without resetting stored data
+  ---
+  duration_ms: 16.159792
+  type: 'test'
+  ...
+# Subtest: failed atomic renames remove temporary files without committing drafts and later writes recover
+ok 87 - failed atomic renames remove temporary files without committing drafts and later writes recover
+  ---
+  duration_ms: 38.217917
+  type: 'test'
+  ...
+# Subtest: /language shows the current language and syncs chat commands
+ok 88 - /language shows the current language and syncs chat commands
+  ---
+  duration_ms: 9.966208
+  type: 'test'
+  ...
+# Subtest: language callbacks switch the stored language and localize the menu
+ok 89 - language callbacks switch the stored language and localize the menu
+  ---
+  duration_ms: 18.371375
+  type: 'test'
+  ...
+# Subtest: language callbacks can switch the stored language to Japanese
+ok 90 - language callbacks can switch the stored language to Japanese
+  ---
+  duration_ms: 0.65875
+  type: 'test'
+  ...
+# Subtest: createOpenCodeAppLogger sends redacted structured entries to the host console
+ok 91 - createOpenCodeAppLogger sends redacted structured entries to the host console
+  ---
+  duration_ms: 4.836292
+  type: 'test'
+  ...
+# Subtest: createOpenCodeAppLogger writes metadata-only JSONL file logs
+ok 92 - createOpenCodeAppLogger writes metadata-only JSONL file logs
+  ---
+  duration_ms: 10.498917
+  type: 'test'
+  ...
+# Subtest: createOpenCodeAppLogger keeps only the newest retained file logs
+ok 93 - createOpenCodeAppLogger keeps only the newest retained file logs
+  ---
+  duration_ms: 39.00325
+  type: 'test'
+  ...
+# Subtest: createOpenCodeAppLogger keeps host logging alive when the file sink cannot write
+ok 94 - createOpenCodeAppLogger keeps host logging alive when the file sink cannot write
+  ---
+  duration_ms: 3.717125
+  type: 'test'
+  ...
+# Subtest: buildIncomingUpdateLogFields redacts sensitive values and keeps only a preview
+ok 95 - buildIncomingUpdateLogFields redacts sensitive values and keeps only a preview
+  ---
+  duration_ms: 12.646166
+  type: 'test'
+  ...
+# Subtest: buildIncomingUpdateLogFields omits text content fields when no text exists
+ok 96 - buildIncomingUpdateLogFields omits text content fields when no text exists
+  ---
+  duration_ms: 0.0755
+  type: 'test'
+  ...
+# Subtest: ListLspUseCase returns the current project and sorts statuses
+ok 97 - ListLspUseCase returns the current project and sorts statuses
+  ---
+  duration_ms: 16.332125
+  type: 'test'
+  ...
+# Subtest: ListLspUseCase clears a stale saved project binding and falls back to the current project
+ok 98 - ListLspUseCase clears a stale saved project binding and falls back to the current project
+  ---
+  duration_ms: 16.451583
+  type: 'test'
+  ...
+# Subtest: ListMcpUseCase returns the current project and sorts statuses
+ok 99 - ListMcpUseCase returns the current project and sorts statuses
+  ---
+  duration_ms: 26.267625
+  type: 'test'
+  ...
+# Subtest: ListMcpUseCase clears a stale saved project binding and falls back to the current project
+ok 100 - ListMcpUseCase clears a stale saved project binding and falls back to the current project
+  ---
+  duration_ms: 1.220833
+  type: 'test'
+  ...
+# Subtest: handleTextMessage sends Markdown replies with metrics and deletes the processing placeholder
+ok 101 - handleTextMessage sends Markdown replies with metrics and deletes the processing placeholder
+  ---
+  duration_ms: 5.85925
+  type: 'test'
+  ...
+# Subtest: handleTextMessage falls back to plain text when the preferred Telegram markdown reply fails
+ok 102 - handleTextMessage falls back to plain text when the preferred Telegram markdown reply fails
+  ---
+  duration_ms: 1.243834
+  type: 'test'
+  ...
+# Subtest: handleTextMessage keeps answer text and context statistics in separate messages
+ok 103 - handleTextMessage keeps answer text and context statistics in separate messages
+  ---
+  duration_ms: 0.388125
+  type: 'test'
+  ...
+# Subtest: handleTextMessage shows recovered assistant text instead of the empty-response copy when markdown is unavailable
+ok 104 - handleTextMessage shows recovered assistant text instead of the empty-response copy when markdown is unavailable
+  ---
+  duration_ms: 2.128291
+  type: 'test'
+  ...
+# Subtest: handleTextMessage also deletes the processing placeholder after sending an error reply
+ok 105 - handleTextMessage also deletes the processing placeholder after sending an error reply
+  ---
+  duration_ms: 1.08225
+  type: 'test'
+  ...
+# Subtest: handleTextMessage releases the active chat lock and deletes the placeholder after a prompt timeout
+ok 106 - handleTextMessage releases the active chat lock and deletes the placeholder after a prompt timeout
+  ---
+  duration_ms: 0.761958
+  type: 'test'
+  ...
+# Subtest: handleTextMessage rejects a second plain-text prompt while one is already running
+ok 107 - handleTextMessage rejects a second plain-text prompt while one is already running
+  ---
+  duration_ms: 6.122667
+  type: 'test'
+  ...
+# Subtest: handleTextMessage renders assistant-side prompt errors without inline statistics and deletes the processing placeholder
+ok 108 - handleTextMessage renders assistant-side prompt errors without inline statistics and deletes the processing placeholder
+  ---
+  duration_ms: 0.597625
+  type: 'test'
+  ...
+# Subtest: handleTextMessage shows assistant-side prompt errors even when text parts were present
+ok 109 - handleTextMessage shows assistant-side prompt errors even when text parts were present
+  ---
+  duration_ms: 0.487583
+  type: 'test'
+  ...
+# Subtest: handleTextMessage localizes bot-generated status text and reply body for Chinese chats
+ok 110 - handleTextMessage localizes bot-generated status text and reply body for Chinese chats
+  ---
+  duration_ms: 1.3765
+  type: 'test'
+  ...
+# Subtest: handleTextMessage consumes pending session rename input, renames the session, and restores the session list
+ok 111 - handleTextMessage consumes pending session rename input, renames the session, and restores the session list
+  ---
+  duration_ms: 37.080625
+  type: 'test'
+  ...
+# Subtest: handleTextMessage keeps pending session rename mode on empty titles
+ok 112 - handleTextMessage keeps pending session rename mode on empty titles
+  ---
+  duration_ms: 1.252542
+  type: 'test'
+  ...
+# Subtest: handleTextMessage falls back to the default locale when chat state lookup fails before prompting
+ok 113 - handleTextMessage falls back to the default locale when chat state lookup fails before prompting
+  ---
+  duration_ms: 11.235792
+  type: 'test'
+  ...
+# Subtest: /model only shows configured models with numeric inline buttons
+ok 114 - /model only shows configured models with numeric inline buttons
+  ---
+  duration_ms: 8.165666
+  type: 'test'
+  ...
+# Subtest: model page callbacks re-render the requested page
+ok 115 - model page callbacks re-render the requested page
+  ---
+  duration_ms: 1.021708
+  type: 'test'
+  ...
+# Subtest: picking a model with variants opens a second numeric choice list
+ok 116 - picking a model with variants opens a second numeric choice list
+  ---
+  duration_ms: 0.878709
+  type: 'test'
+  ...
+# Subtest: picking a model without variants switches immediately
+ok 117 - picking a model without variants switches immediately
+  ---
+  duration_ms: 6.143333
+  type: 'test'
+  ...
+# Subtest: variant selection updates the binding and later prompts use the selected model
+ok 118 - variant selection updates the binding and later prompts use the selected model
+  ---
+  duration_ms: 1.102083
+  type: 'test'
+  ...
+# Subtest: ListModelsUseCase clears stale model selections during listing
+ok 119 - ListModelsUseCase clears stale model selections during listing
+  ---
+  duration_ms: 10.362875
+  type: 'test'
+  ...
+# Subtest: model buttons preserve identity after the catalog order changes and reject legacy numbers
+ok 120 - model buttons preserve identity after the catalog order changes and reject legacy numbers
+  ---
+  duration_ms: 1.632458
+  type: 'test'
+  ...
+# Subtest: model catalogs group providers without mutating cached order or reordering models within a provider
+ok 121 - model catalogs group providers without mutating cached order or reordering models within a provider
+  ---
+  duration_ms: 0.395917
+  type: 'test'
+  ...
+# Subtest: model menus localize hierarchy, escape names, and mark only the selected provider and model
+ok 122 - model menus localize hierarchy, escape names, and mark only the selected provider and model
+  ---
+  duration_ms: 1.357583
+  type: 'test'
+  ...
+# Subtest: model keyboards use three columns and mark the current button without changing its callback
+ok 123 - model keyboards use three columns and mark the current button without changing its callback
+  ---
+  duration_ms: 5.732334
+  type: 'test'
+  ...
+# Subtest: initial and paginated model menus fall back to plain text while retaining their keyboard
+ok 124 - initial and paginated model menus fall back to plain text while retaining their keyboard
+  ---
+  duration_ms: 5.718541
+  type: 'test'
+  ...
+# (node:14767) ExperimentalWarning: The MockTimers API is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: native answer streams preserve separate thinking and status when completed
+ok 125 - native answer streams preserve separate thinking and status when completed
+  ---
+  duration_ms: 17.429083
+  type: 'test'
+  ...
+# Subtest: native answer streams preserve separate thinking and status when stopped
+ok 126 - native answer streams preserve separate thinking and status when stopped
+  ---
+  duration_ms: 56.739
+  type: 'test'
+  ...
+# Subtest: native answer streams preserve separate thinking and status when failed
+ok 127 - native answer streams preserve separate thinking and status when failed
+  ---
+  duration_ms: 24.267167
+  type: 'test'
+  ...
+# Subtest: native answer streams preserve separate thinking and status when provider-error
+ok 128 - native answer streams preserve separate thinking and status when provider-error
+  ---
+  duration_ms: 8.677667
+  type: 'test'
+  ...
+# Subtest: native answer streams preserve separate thinking and status when group
+ok 129 - native answer streams preserve separate thinking and status when group
+  ---
+  duration_ms: 2.81125
+  type: 'test'
+  ...
+# Subtest: native answer streams preserve separate thinking and status when rejected-draft
+ok 130 - native answer streams preserve separate thinking and status when rejected-draft
+  ---
+  duration_ms: 11.721583
+  type: 'test'
+  ...
+# Subtest: native answer streams preserve separate thinking and status when draft-network-error
+ok 131 - native answer streams preserve separate thinking and status when draft-network-error
+  ---
+  duration_ms: 0.807709
+  type: 'test'
+  ...
+# Subtest: draft formatting rejection falls back literally and ambiguous final sends are never retried
+ok 132 - draft formatting rejection falls back literally and ambiguous final sends are never retried
+  ---
+  duration_ms: 18.3425
+  type: 'test'
+  ...
+# Subtest: /new creates a session in the current project, keeps prior selections, and switches the binding
+ok 133 - /new creates a session in the current project, keeps prior selections, and switches the binding
+  ---
+  duration_ms: 2.312417
+  type: 'test'
+  ...
+# Subtest: CreateSessionUseCase creates an untitled session when /new has no extra text
+ok 134 - CreateSessionUseCase creates an untitled session when /new has no extra text
+  ---
+  duration_ms: 0.241709
+  type: 'test'
+  ...
+# Subtest: OpenCode v2 loads the locally built plugin, handles Telegram commands, and disposes polling
+ok 135 - OpenCode v2 loads the locally built plugin, handles Telegram commands, and disposes polling # SKIP
+  ---
+  duration_ms: 0.854375
+  type: 'test'
+  ...
+# Subtest: status, inbox cancellation, and interruption time out so cancelling a stalled host can finish
+ok 136 - status, inbox cancellation, and interruption time out so cancelling a stalled host can finish
+  ---
+  duration_ms: 22.490625
+  type: 'test'
+  ...
+# Subtest: cancelSessionInput forwards the original V2 inbox identity and preserves its void response
+ok 137 - cancelSessionInput forwards the original V2 inbox identity and preserves its void response
+  ---
+  duration_ms: 0.749042
+  type: 'test'
+  ...
+# Subtest: buildOpenCodeSdkConfig forwards trimmed V2 bearer tokens and omits blank tokens
+ok 138 - buildOpenCodeSdkConfig forwards trimmed V2 bearer tokens and omits blank tokens
+  ---
+  duration_ms: 0.179125
+  type: 'test'
+  ...
+# Subtest: getHealth reads the V2 server info endpoint
+ok 139 - getHealth reads the V2 server info endpoint
+  ---
+  duration_ms: 36.66875
+  type: 'test'
+  ...
+# Subtest: session and permission helpers preserve V2 void responses and location-based sessions
+ok 140 - session and permission helpers preserve V2 void responses and location-based sessions
+  ---
+  duration_ms: 1.139
+  type: 'test'
+  ...
+# Subtest: getSession reads one session and only treats a session-not-found response as missing
+ok 141 - getSession reads one session and only treats a session-not-found response as missing
+  ---
+  duration_ms: 0.300916
+  type: 'test'
+  ...
+# Subtest: concurrent project reads share only the pending request and later calls observe fresh projects
+ok 142 - concurrent project reads share only the pending request and later calls observe fresh projects
+  ---
+  duration_ms: 0.302792
+  type: 'test'
+  ...
+# Subtest: project request sharing releases failed requests and remains scoped to one client
+ok 143 - project request sharing releases failed requests and remains scoped to one client
+  ---
+  duration_ms: 0.160667
+  type: 'test'
+  ...
+# Subtest: a stalled shared project request times out and a later query can recover
+ok 144 - a stalled shared project request times out and a later query can recover
+  ---
+  duration_ms: 42.933166
+  type: 'test'
+  ...
+# Subtest: listSessions follows V2 cursors instead of truncating the catalog to its default page
+ok 145 - listSessions follows V2 cursors instead of truncating the catalog to its default page
+  ---
+  duration_ms: 3.19075
+  type: 'test'
+  ...
+# Subtest: project-scoped session listings preserve the native project filter on every cursor page
+ok 146 - project-scoped session listings preserve the native project filter on every cursor page
+  ---
+  duration_ms: 0.140625
+  type: 'test'
+  ...
+# Subtest: listLspStatuses reports the missing V2 capability and listMcpStatuses preserves pending status
+ok 147 - listLspStatuses reports the missing V2 capability and listMcpStatuses preserves pending status
+  ---
+  duration_ms: 0.176416
+  type: 'test'
+  ...
+# Subtest: listConfiguredPlugins reads enabled V2 plugin sources without inventing builtin package specs
+ok 148 - listConfiguredPlugins reads enabled V2 plugin sources without inventing builtin package specs
+  ---
+  duration_ms: 0.085042
+  type: 'test'
+  ...
+# Subtest: listModels uses the V2 enabled inventory, preserves variant settings, and shares cached refreshes
+ok 149 - listModels uses the V2 enabled inventory, preserves variant settings, and shares cached refreshes
+  ---
+  duration_ms: 2.343875
+  type: 'test'
+  ...
+# Subtest: listModels retries after a failed refresh
+ok 150 - listModels retries after a failed refresh
+  ---
+  duration_ms: 0.212125
+  type: 'test'
+  ...
+# Subtest: promptSession selects the V2 agent and model, sends URI attachments, and waits for the final reply
+ok 151 - promptSession selects the V2 agent and model, sends URI attachments, and waits for the final reply
+  ---
+  duration_ms: 5.901875
+  type: 'test'
+  ...
+# Subtest: promptSession uses an already resolved agent ID without listing agents and still switches the shared session
+ok 152 - promptSession uses an already resolved agent ID without listing agents and still switches the shared session
+  ---
+  duration_ms: 0.8565
+  type: 'test'
+  ...
+# Subtest: promptSession uses the installed V2 transport paths and serialized payload
+ok 153 - promptSession uses the installed V2 transport paths and serialized payload
+  ---
+  duration_ms: 6.541625
+  type: 'test'
+  ...
+# Subtest: promptSession pages to its own user message and excludes later unrelated turns
+ok 154 - promptSession pages to its own user message and excludes later unrelated turns
+  ---
+  duration_ms: 0.273
+  type: 'test'
+  ...
+# Subtest: promptSession preserves native V2 assistant messages and structured errors without projecting V1 fields
+ok 155 - promptSession preserves native V2 assistant messages and structured errors without projecting V1 fields
+  ---
+  duration_ms: 0.173458
+  type: 'test'
+  ...
+# Subtest: promptSession reports an empty completed assistant reply without returning previous history
+ok 156 - promptSession reports an empty completed assistant reply without returning previous history
+  ---
+  duration_ms: 0.10175
+  type: 'test'
+  ...
+# Subtest: promptSession maps a completed wait without its own assistant reply to MessageAbortedError
+ok 157 - promptSession maps a completed wait without its own assistant reply to MessageAbortedError
+  ---
+  duration_ms: 0.11225
+  type: 'test'
+  ...
+# Subtest: promptSession recovers a transport failure while waiting without sending the prompt twice
+ok 158 - promptSession recovers a transport failure while waiting without sending the prompt twice
+  ---
+  duration_ms: 0.235709
+  type: 'test'
+  ...
+# Subtest: promptSession preserves declared wait errors instead of polling failed authorization
+ok 159 - promptSession preserves declared wait errors instead of polling failed authorization
+  ---
+  duration_ms: 0.173417
+  type: 'test'
+  ...
+# Subtest: promptSession honors an external abort even when the V2 wait ignores its signal
+ok 160 - promptSession honors an external abort even when the V2 wait ignores its signal
+  ---
+  duration_ms: 0.341583
+  type: 'test'
+  ...
+# Subtest: promptSession times out and aborts stalled V2 prompt and wait requests
+ok 161 - promptSession times out and aborts stalled V2 prompt and wait requests
+  ---
+  duration_ms: 64.580125
+  type: 'test'
+  ...
+# Subtest: promptSession rejects empty input and pre-aborted requests before sending
+ok 162 - promptSession rejects empty input and pre-aborted requests before sending
+  ---
+  duration_ms: 6.767583
+  type: 'test'
+  ...
+# Subtest: promptSession recovers a transport failure during its final message scan
+ok 163 - promptSession recovers a transport failure during its final message scan
+  ---
+  duration_ms: 1.065791
+  type: 'test'
+  ...
+# Subtest: promptSession stops recovery when the V2 session stays active without progressing
+ok 164 - promptSession stops recovery when the V2 session stays active without progressing
+  ---
+  duration_ms: 25.792459
+  type: 'test'
+  ...
+# Subtest: promptSession does not send after the configured total deadline has expired
+ok 165 - promptSession does not send after the configured total deadline has expired
+  ---
+  duration_ms: 0.411334
+  type: 'test'
+  ...
+# Subtest: promptSession preserves a shared final response when another user steers the same turn
+ok 166 - promptSession preserves a shared final response when another user steers the same turn
+  ---
+  duration_ms: 0.508625
+  type: 'test'
+  ...
+# Subtest: promptSession preserves a shared steered response after a continuing tool-calls step
+ok 167 - promptSession preserves a shared steered response after a continuing tool-calls step
+  ---
+  duration_ms: 0.614417
+  type: 'test'
+  ...
+# Subtest: promptSession preserves a shared steered response after a continuing stop step
+ok 168 - promptSession preserves a shared steered response after a continuing stop step
+  ---
+  duration_ms: 0.209292
+  type: 'test'
+  ...
+# Subtest: promptSession preserves a shared steered response after a continuing length step
+ok 169 - promptSession preserves a shared steered response after a continuing length step
+  ---
+  duration_ms: 0.477625
+  type: 'test'
+  ...
+# Subtest: promptSession keeps its completed reply when a later independent turn fails in the same busy period
+ok 170 - promptSession keeps its completed reply when a later independent turn fails in the same busy period
+  ---
+  duration_ms: 0.305041
+  type: 'test'
+  ...
+# Subtest: promptSession preserves execution failures that happen before an assistant message exists
+ok 171 - promptSession preserves execution failures that happen before an assistant message exists
+  ---
+  duration_ms: 0.264833
+  type: 'test'
+  ...
+# Subtest: promptSession treats an interrupted V2 execution as cancellation even when it contains partial text
+ok 172 - promptSession treats an interrupted V2 execution as cancellation even when it contains partial text
+  ---
+  duration_ms: 0.210584
+  type: 'test'
+  ...
+# Subtest: promptSession returns an empty successful final step after an earlier retried assistant failure
+ok 173 - promptSession returns an empty successful final step after an earlier retried assistant failure
+  ---
+  duration_ms: 0.2125
+  type: 'test'
+  ...
+# Subtest: promptSession preserves a shared steered reply after an earlier failed step is retried
+ok 174 - promptSession preserves a shared steered reply after an earlier failed step is retried
+  ---
+  duration_ms: 0.316583
+  type: 'test'
+  ...
+# Subtest: package.json exposes publishable plugin entrypoints
+ok 175 - package.json exposes publishable plugin entrypoints
+  ---
+  duration_ms: 1.456083
+  type: 'test'
+  ...
+# Subtest: runtime source does not depend on .env-based configuration
+ok 176 - runtime source does not depend on .env-based configuration
+  ---
+  duration_ms: 9.04575
+  type: 'test'
+  ...
+# Subtest: package root entry only exposes the plugin function
+ok 177 - package root entry only exposes the plugin function
+  ---
+  duration_ms: 1382.987583
+  type: 'test'
+  ...
+# Subtest: vite build keeps both npm and explicit plugin entrypoints
+ok 178 - vite build keeps both npm and explicit plugin entrypoints
+  ---
+  duration_ms: 211.245958
+  type: 'test'
+  ...
+# Subtest: a pending footer refresh does not block subsequent plugin events and logs refresh failures
+ok 179 - a pending footer refresh does not block subsequent plugin events and logs refresh failures
+  ---
+  duration_ms: 2.237458
+  type: 'test'
+  ...
+# Subtest: permission.asked sends Telegram approval messages and persists them
+ok 180 - permission.asked sends Telegram approval messages and persists them
+  ---
+  duration_ms: 2.672791
+  type: 'test'
+  ...
+# Subtest: permission buttons remain hidden until persistence completes and stay hidden when it fails
+ok 181 - permission buttons remain hidden until persistence completes and stay hidden when it fails
+  ---
+  duration_ms: 0.453292
+  type: 'test'
+  ...
+# Subtest: permission delivery recovers from explicit rate limits in both text formats and keyboard activation
+ok 182 - permission delivery recovers from explicit rate limits in both text formats and keyboard activation
+  ---
+  duration_ms: 14.498083
+  type: 'test'
+  ...
+# Subtest: permission delivery bounds rate-limit retries and never repeats an ambiguous send
+ok 183 - permission delivery bounds rate-limit retries and never repeats an ambiguous send
+  ---
+  duration_ms: 9.264417
+  type: 'test'
+  ...
+# Subtest: permission.asked deduplicates requests received more than once
+ok 184 - permission.asked deduplicates requests received more than once
+  ---
+  duration_ms: 0.552208
+  type: 'test'
+  ...
+# Subtest: permission.asked also routes foreground child-session approvals back to the active Telegram chat
+ok 185 - permission.asked also routes foreground child-session approvals back to the active Telegram chat
+  ---
+  duration_ms: 0.565041
+  type: 'test'
+  ...
+# Subtest: permission.asked retries with plain text when Telegram rejects the Markdown payload
+ok 186 - permission.asked retries with plain text when Telegram rejects the Markdown payload
+  ---
+  duration_ms: 0.485458
+  type: 'test'
+  ...
+# Subtest: permission.replied updates existing Telegram approval messages
+ok 187 - permission.replied updates existing Telegram approval messages
+  ---
+  duration_ms: 0.800625
+  type: 'test'
+  ...
+# Subtest: permission callback replies through the OpenCode client and updates local state
+ok 188 - permission callback replies through the OpenCode client and updates local state
+  ---
+  duration_ms: 1.00275
+  type: 'test'
+  ...
+# Subtest: permission callback keeps local state pending when the OpenCode host rejects the reply
+ok 189 - permission callback keeps local state pending when the OpenCode host rejects the reply
+  ---
+  duration_ms: 0.620833
+  type: 'test'
+  ...
+# Subtest: session.execution.failed suppresses foreground child-session notifications and clears tracking
+ok 190 - session.execution.failed suppresses foreground child-session notifications and clears tracking
+  ---
+  duration_ms: 1.882291
+  type: 'test'
+  ...
+# Subtest: session.execution.failed preserves a plain-object message for foreground child sessions without a named error
+ok 191 - session.execution.failed preserves a plain-object message for foreground child sessions without a named error
+  ---
+  duration_ms: 0.886709
+  type: 'test'
+  ...
+# Subtest: session.idle suppresses foreground child-session notifications and clears tracking
+ok 192 - session.idle suppresses foreground child-session notifications and clears tracking
+  ---
+  duration_ms: 0.311083
+  type: 'test'
+  ...
+# Subtest: session.idle does not send a completion message to bound chats
+ok 193 - session.idle does not send a completion message to bound chats
+  ---
+  duration_ms: 3.14475
+  type: 'test'
+  ...
+# Subtest: session.status idle does not send a completion message to bound chats
+ok 194 - session.status idle does not send a completion message to bound chats
+  ---
+  duration_ms: 0.510334
+  type: 'test'
+  ...
+# Subtest: session.execution.failed still notifies bound chats when the session is not foreground
+ok 195 - session.execution.failed still notifies bound chats when the session is not foreground
+  ---
+  duration_ms: 0.864875
+  type: 'test'
+  ...
+# Subtest: V2 event handlers ignore malformed permission requests and replies
+ok 196 - V2 event handlers ignore malformed permission requests and replies
+  ---
+  duration_ms: 0.607542
+  type: 'test'
+  ...
+# Subtest: interrupted sessions remove pending permission controls without changing other sessions
+ok 197 - interrupted sessions remove pending permission controls without changing other sessions
+  ---
+  duration_ms: 1.594875
+  type: 'test'
+  ...
+# Subtest: loadAppConfig resolves plugin configuration from the config file shape
+ok 198 - loadAppConfig resolves plugin configuration from the config file shape
+  ---
+  duration_ms: 9.123708
+  type: 'test'
+  ...
+# Subtest: loadAppConfig applies prompt timeout defaults and overrides
+ok 199 - loadAppConfig applies prompt timeout defaults and overrides
+  ---
+  duration_ms: 2.09225
+  type: 'test'
+  ...
+# Subtest: loadAppConfig maps the structured logging section
+ok 200 - loadAppConfig maps the structured logging section
+  ---
+  duration_ms: 4.79225
+  type: 'test'
+  ...
+# Subtest: loadAppConfig applies the default token breakdown visibility
+ok 201 - loadAppConfig applies the default token breakdown visibility
+  ---
+  duration_ms: 2.846541
+  type: 'test'
+  ...
+# Subtest: loadAppConfig reads token breakdown visibility from the structured config
+ok 202 - loadAppConfig reads token breakdown visibility from the structured config
+  ---
+  duration_ms: 0.584125
+  type: 'test'
+  ...
+# Subtest: loadAppConfig ignores deprecated token total includes settings
+ok 203 - loadAppConfig ignores deprecated token total includes settings
+  ---
+  duration_ms: 0.304417
+  type: 'test'
+  ...
+# Subtest: mergePluginConfigSources merges prompt configuration by key
+ok 204 - mergePluginConfigSources merges prompt configuration by key
+  ---
+  duration_ms: 0.585792
+  type: 'test'
+  ...
+# Subtest: mergePluginConfigSources merges logging configuration by key
+ok 205 - mergePluginConfigSources merges logging configuration by key
+  ---
+  duration_ms: 0.095333
+  type: 'test'
+  ...
+# Subtest: mergePluginConfigSources merges token configuration by key
+ok 206 - mergePluginConfigSources merges token configuration by key
+  ---
+  duration_ms: 0.240292
+  type: 'test'
+  ...
+# Subtest: preparePluginConfiguration loads telegram.botToken from the global config file
+ok 207 - preparePluginConfiguration loads telegram.botToken from the global config file
+  ---
+  duration_ms: 10.478333
+  type: 'test'
+  ...
+# Subtest: preparePluginConfiguration accepts a global config file with a UTF-8 BOM
+ok 208 - preparePluginConfiguration accepts a global config file with a UTF-8 BOM
+  ---
+  duration_ms: 4.597458
+  type: 'test'
+  ...
+# Subtest: preparePluginConfiguration merges explicit overrides on top of the global config file
+ok 209 - preparePluginConfiguration merges explicit overrides on top of the global config file
+  ---
+  duration_ms: 1.880167
+  type: 'test'
+  ...
+# Subtest: preparePluginConfiguration keeps missing tokens unresolved for the installer flow
+ok 210 - preparePluginConfiguration keeps missing tokens unresolved for the installer flow
+  ---
+  duration_ms: 0.719583
+  type: 'test'
+  ...
+# Subtest: package root only exports the plugin entrypoint at runtime
+ok 211 - package root only exports the plugin entrypoint at runtime
+  ---
+  duration_ms: 0.279792
+  type: 'test'
+  ...
+# Subtest: ensureTelegramBotPluginRuntime starts the Telegram runtime only once per worktree
+ok 212 - ensureTelegramBotPluginRuntime starts the Telegram runtime only once per worktree
+  ---
+  duration_ms: 0.826542
+  type: 'test'
+  ...
+# Subtest: ensureTelegramBotPluginRuntime reuses the active runtime when a later plugin call omits context
+ok 213 - ensureTelegramBotPluginRuntime reuses the active runtime when a later plugin call omits context
+  ---
+  duration_ms: 0.264125
+  type: 'test'
+  ...
+# Subtest: ensureTelegramBotPluginRuntime starts when only directory is provided
+ok 214 - ensureTelegramBotPluginRuntime starts when only directory is provided
+  ---
+  duration_ms: 0.297416
+  type: 'test'
+  ...
+# Subtest: ensureTelegramBotPluginRuntime throws a readable error when the first runtime call lacks context and client
+ok 215 - ensureTelegramBotPluginRuntime throws a readable error when the first runtime call lacks context and client
+  ---
+  duration_ms: 3.833833
+  type: 'test'
+  ...
+# Subtest: TelegramBotPlugin logs a non-fatal startup failure without registering hooks
+ok 216 - TelegramBotPlugin logs a non-fatal startup failure without registering hooks
+  ---
+  duration_ms: 7.106583
+  type: 'test'
+  ...
+# Subtest: ensureTelegramBotPluginRuntime clears the singleton and disposes the container when startup fails
+ok 217 - ensureTelegramBotPluginRuntime clears the singleton and disposes the container when startup fails
+  ---
+  duration_ms: 0.474875
+  type: 'test'
+  ...
+# Subtest: ensureTelegramBotPluginRuntime rebuilds the runtime when the worktree changes
+ok 218 - ensureTelegramBotPluginRuntime rebuilds the runtime when the worktree changes
+  ---
+  duration_ms: 0.682625
+  type: 'test'
+  ...
+# Subtest: resetTelegramBotPluginRuntimeForTests disposes the active runtime
+ok 219 - resetTelegramBotPluginRuntimeForTests disposes the active runtime
+  ---
+  duration_ms: 0.207792
+  type: 'test'
+  ...
+# Subtest: TelegramBotPlugin registers V2 permission and event handlers and releases them when the worktree changes
+ok 220 - TelegramBotPlugin registers V2 permission and event handlers and releases them when the worktree changes
+  ---
+  duration_ms: 2.697
+  type: 'test'
+  ...
+# Subtest: TelegramBotPlugin releases resources when permission registration is delayed or fails
+ok 221 - TelegramBotPlugin releases resources when permission registration is delayed or fails
+  ---
+  duration_ms: 0.787834
+  type: 'test'
+  ...
+# Subtest: current session summaries preserve binding validation and transport errors without listing other sessions
+ok 222 - current session summaries preserve binding validation and transport errors without listing other sessions
+  ---
+  duration_ms: 5.597917
+  type: 'test'
+  ...
+# Subtest: lsp validates an external worktree by reading only its saved session
+ok 223 - lsp validates an external worktree by reading only its saved session
+  ---
+  duration_ms: 0.993917
+  type: 'test'
+  ...
+# Subtest: mcp validates an external worktree by reading only its saved session
+ok 224 - mcp validates an external worktree by reading only its saved session
+  ---
+  duration_ms: 0.816292
+  type: 'test'
+  ...
+# Subtest: sessions preserves a saved session in a registered V2 worktree
+ok 225 - sessions preserves a saved session in a registered V2 worktree
+  ---
+  duration_ms: 3.11825
+  type: 'test'
+  ...
+# Subtest: sessions preserves a saved session in an external V2 worktree
+ok 226 - sessions preserves a saved session in an external V2 worktree
+  ---
+  duration_ms: 0.782583
+  type: 'test'
+  ...
+# Subtest: lsp preserves a saved session in a registered V2 worktree
+ok 227 - lsp preserves a saved session in a registered V2 worktree
+  ---
+  duration_ms: 1.262125
+  type: 'test'
+  ...
+# Subtest: lsp preserves a saved session in an external V2 worktree
+ok 228 - lsp preserves a saved session in an external V2 worktree
+  ---
+  duration_ms: 2.721208
+  type: 'test'
+  ...
+# Subtest: mcp preserves a saved session in a registered V2 worktree
+ok 229 - mcp preserves a saved session in a registered V2 worktree
+  ---
+  duration_ms: 0.361458
+  type: 'test'
+  ...
+# Subtest: mcp preserves a saved session in an external V2 worktree
+ok 230 - mcp preserves a saved session in an external V2 worktree
+  ---
+  duration_ms: 0.588208
+  type: 'test'
+  ...
+# Subtest: prompt preserves a saved session in a registered V2 worktree
+ok 231 - prompt preserves a saved session in a registered V2 worktree
+  ---
+  duration_ms: 1.903375
+  type: 'test'
+  ...
+# Subtest: prompt preserves a saved session in an external V2 worktree
+ok 232 - prompt preserves a saved session in an external V2 worktree
+  ---
+  duration_ms: 39.376959
+  type: 'test'
+  ...
+# Subtest: ListSessionsUseCase rejects a sandbox belonging to a different saved project
+ok 233 - ListSessionsUseCase rejects a sandbox belonging to a different saved project
+  ---
+  duration_ms: 0.357917
+  type: 'test'
+  ...
+# Subtest: prompt validation preserves an existing session moved within its registered project
+ok 234 - prompt validation preserves an existing session moved within its registered project
+  ---
+  duration_ms: 0.366
+  type: 'test'
+  ...
+# Subtest: prompt validation reads only its saved session and rejects missing, external directory mismatches and cross-project sessions
+ok 235 - prompt validation reads only its saved session and rejects missing, external directory mismatches and cross-project sessions
+  ---
+  duration_ms: 2.372542
+  type: 'test'
+  ...
+# Subtest: ListSessionsUseCase rejects a saved directory that disagrees with its session
+ok 236 - ListSessionsUseCase rejects a saved directory that disagrees with its session
+  ---
+  duration_ms: 1.326666
+  type: 'test'
+  ...
+# Subtest: sessions keeps a saved external worktree binding when session lookup fails
+ok 237 - sessions keeps a saved external worktree binding when session lookup fails
+  ---
+  duration_ms: 0.630291
+  type: 'test'
+  ...
+# Subtest: lsp keeps a saved external worktree binding when session lookup fails
+ok 238 - lsp keeps a saved external worktree binding when session lookup fails
+  ---
+  duration_ms: 1.304417
+  type: 'test'
+  ...
+# Subtest: mcp keeps a saved external worktree binding when session lookup fails
+ok 239 - mcp keeps a saved external worktree binding when session lookup fails
+  ---
+  duration_ms: 0.361125
+  type: 'test'
+  ...
+# Subtest: prompt keeps a saved external worktree binding when session lookup fails
+ok 240 - prompt keeps a saved external worktree binding when session lookup fails
+  ---
+  duration_ms: 1.120209
+  type: 'test'
+  ...
+# (node:14800) ExperimentalWarning: The MockTimers API is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: answer updates reuse thinking segmentation while replacements and new reasoning parts invalidate it
+ok 241 - answer updates reuse thinking segmentation while replacements and new reasoning parts invalidate it
+  ---
+  duration_ms: 62.623083
+  type: 'test'
+  ...
+# Subtest: thinking refreshes retry failed writes and retain changes arriving during an awaited write
+ok 242 - thinking refreshes retry failed writes and retain changes arriving during an awaited write
+  ---
+  duration_ms: 3.238916
+  type: 'test'
+  ...
+# Subtest: slow progress delivery coalesces refreshes and finish waits for the newest terminal output
+ok 243 - slow progress delivery coalesces refreshes and finish waits for the newest terminal output
+  ---
+  duration_ms: 2.2485
+  type: 'test'
+  ...
+# Subtest: thinking uses localized expandable quotes and escapes provider text without changing the plain fallback
+ok 244 - thinking uses localized expandable quotes and escapes provider text without changing the plain fallback
+  ---
+  duration_ms: 1.510792
+  type: 'test'
+  ...
+# Subtest: long thinking preserves every part in expandable messages without leaking secrets or breaking Unicode
+ok 245 - long thinking preserves every part in expandable messages without leaking secrets or breaking Unicode
+  ---
+  duration_ms: 1.412625
+  type: 'test'
+  ...
+# Subtest: streaming thinking reuses unchanged messages, replaces final text and removes surplus cards
+ok 246 - streaming thinking reuses unchanged messages, replaces final text and removes surplus cards
+  ---
+  duration_ms: 7.317417
+  type: 'test'
+  ...
+# Subtest: appending to one of one hundred thinking chunks reads only the changed chunk and finalizes every chunk
+ok 247 - appending to one of one hundred thinking chunks reads only the changed chunk and finalizes every chunk
+  ---
+  duration_ms: 20.960709
+  type: 'test'
+  ...
+# Subtest: a failed thinking edit is retried even when the next flush has identical thinking content
+ok 248 - a failed thinking edit is retried even when the next flush has identical thinking content
+  ---
+  duration_ms: 1.214792
+  type: 'test'
+  ...
+# Subtest: session compression reaches waiting requests before input delivery without leaking other sessions
+ok 249 - session compression reaches waiting requests before input delivery without leaking other sessions
+  ---
+  duration_ms: 0.339458
+  type: 'test'
+  ...
+# Subtest: context compression is localized, keeps existing output and never sends its summary as an answer
+ok 250 - context compression is localized, keeps existing output and never sends its summary as an answer
+  ---
+  duration_ms: 1.020542
+  type: 'test'
+  ...
+# Subtest: compression failure and cancellation do not leave a misleading running status
+ok 251 - compression failure and cancellation do not leave a misleading running status
+  ---
+  duration_ms: 0.2945
+  type: 'test'
+  ...
+# Subtest: progress accepts only the admitted input and its assistant messages
+ok 252 - progress accepts only the admitted input and its assistant messages
+  ---
+  duration_ms: 0.121458
+  type: 'test'
+  ...
+# Subtest: progress streams reasoning and answers without displaying tool details or a request per token
+ok 253 - progress streams reasoning and answers without displaying tool details or a request per token
+  ---
+  duration_ms: 0.460334
+  type: 'test'
+  ...
+# Subtest: stopped progress keeps partial output and hides tool failures
+ok 254 - stopped progress keeps partial output and hides tool failures
+  ---
+  duration_ms: 0.093541
+  type: 'test'
+  ...
+# Subtest: long Telegram replies preserve every character and keep Unicode intact
+ok 255 - long Telegram replies preserve every character and keep Unicode intact
+  ---
+  duration_ms: 1.852375
+  type: 'test'
+  ...
+# Subtest: Telegram requests retry only explicit rate limit rejections
+ok 256 - Telegram requests retry only explicit rate limit rejections
+  ---
+  duration_ms: 1.367292
+  type: 'test'
+  ...
+# Subtest: an old stop button cannot cancel a newer request
+ok 257 - an old stop button cannot cancel a newer request
+  ---
+  duration_ms: 0.587333
+  type: 'test'
+  ...
+# Subtest: a stop callback rechecks request identity after acknowledging the button
+ok 258 - a stop callback rechecks request identity after acknowledging the button
+  ---
+  duration_ms: 0.249583
+  type: 'test'
+  ...
+# Subtest: expandable thinking stays separate from the streamed answer and context with a safe format fallback
+ok 259 - expandable thinking stays separate from the streamed answer and context with a safe format fallback
+  ---
+  duration_ms: 2.638583
+  type: 'test'
+  ...
+# Subtest: disposing or aborting an old lease leaves its successor running
+ok 260 - disposing or aborting an old lease leaves its successor running
+  ---
+  duration_ms: 0.095375
+  type: 'test'
+  ...
+# Subtest: compression has a separate message and survives cleanup when the model returns no thinking
+ok 261 - compression has a separate message and survives cleanup when the model returns no thinking
+  ---
+  duration_ms: 1.286167
+  type: 'test'
+  ...
+# Subtest: redactSensitiveText masks common secret formats
+ok 262 - redactSensitiveText masks common secret formats
+  ---
+  duration_ms: 1.542375
+  type: 'test'
+  ...
+# Subtest: createRedactedPreview truncates long text after redaction
+ok 263 - createRedactedPreview truncates long text after redaction
+  ---
+  duration_ms: 1.6865
+  type: 'test'
+  ...
+# Subtest: literal fallback requires an explicit Telegram formatting rejection
+ok 264 - literal fallback requires an explicit Telegram formatting rejection
+  ---
+  duration_ms: 1.669333
+  type: 'test'
+  ...
+# Subtest: all text sends become Rich Messages while literal text and delivery options remain intact
+ok 265 - all text sends become Rich Messages while literal text and delivery options remain intact
+  ---
+  duration_ms: 0.807166
+  type: 'test'
+  ...
+# Subtest: native Markdown tables and HTML details reach the Rich API without legacy entity parsing
+ok 266 - native Markdown tables and HTML details reach the Rich API without legacy entity parsing
+  ---
+  duration_ms: 0.381667
+  type: 'test'
+  ...
+# Subtest: edits preserve the message identity, inline buttons, and abort signal and can accept native rich payloads
+ok 267 - edits preserve the message identity, inline buttons, and abort signal and can accept native rich payloads
+  ---
+  duration_ms: 0.403042
+  type: 'test'
+  ...
+# Subtest: grammY context replies inherit rich delivery and callback helpers edit rich messages
+ok 268 - grammY context replies inherit rich delivery and callback helpers edit rich messages
+  ---
+  duration_ms: 2.347459
+  type: 'test'
+  ...
+# Subtest: an ambiguous rich send network failure propagates without an ordinary-message fallback or duplicate send
+ok 269 - an ambiguous rich send network failure propagates without an ordinary-message fallback or duplicate send
+  ---
+  duration_ms: 0.804833
+  type: 'test'
+  ...
+# Subtest: runtime shutdown cancels foreground waits before stopping the runner
+ok 270 - runtime shutdown cancels foreground waits before stopping the runner
+  ---
+  duration_ms: 48.554791
+  type: 'test'
+  ...
+# Subtest: disposing after stop waits for the same runner stop before disposing the container
+ok 271 - disposing after stop waits for the same runner stop before disposing the container
+  ---
+  duration_ms: 51.651334
+  type: 'test'
+  ...
+# Subtest: startTelegramBotRuntime starts polling before command sync and only warns when command sync fails
+ok 272 - startTelegramBotRuntime starts polling before command sync and only warns when command sync fails
+  ---
+  duration_ms: 1.762167
+  type: 'test'
+  ...
+# Subtest: startTelegramBotRuntime reuses the active runtime for the same Telegram bot within one process
+ok 273 - startTelegramBotRuntime reuses the active runtime for the same Telegram bot within one process
+  ---
+  duration_ms: 0.456041
+  type: 'test'
+  ...
+# Subtest: startTelegramBotRuntime logs getUpdates failures through the app logger
+ok 274 - startTelegramBotRuntime logs getUpdates failures through the app logger
+  ---
+  duration_ms: 1.154333
+  type: 'test'
+  ...
+# Subtest: startTelegramBotRuntime throws a readable error when telegram token validation fails
+ok 275 - startTelegramBotRuntime throws a readable error when telegram token validation fails
+  ---
+  duration_ms: 1.000041
+  type: 'test'
+  ...
+# Subtest: plugin polling waits for event registration and cannot restart after disposal
+ok 276 - plugin polling waits for event registration and cannot restart after disposal
+  ---
+  duration_ms: 0.222458
+  type: 'test'
+  ...
+# (node:14803) ExperimentalWarning: The MockTimers API is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: a startup network outage keeps the runtime available for polling to validate after reconnecting
+ok 277 - a startup network outage keeps the runtime available for polling to validate after reconnecting
+  ---
+  duration_ms: 1.421792
+  type: 'test'
+  ...
+# Subtest: polling resumes on the same runner after retry exhaustion and never restarts after disposal
+ok 278 - polling resumes on the same runner after retry exhaustion and never restarts after disposal
+  ---
+  duration_ms: 2.08025
+  type: 'test'
+  ...
+# Subtest: polling stops on invalid tokens or competing pollers instead of restarting forever
+ok 279 - polling stops on invalid tokens or competing pollers instead of restarting forever
+  ---
+  duration_ms: 1.693167
+  type: 'test'
+  ...
+# Subtest: the real runner recovers after a dropped HTTP connection without replaying consumed updates
+ok 280 - the real runner recovers after a dropped HTTP connection without replaying consumed updates
+  ---
+  duration_ms: 5071.973125
+  type: 'test'
+  ...
+# Subtest: SendPromptUseCase forwards the agent ID it already resolved
+ok 281 - SendPromptUseCase forwards the agent ID it already resolved
+  ---
+  duration_ms: 1.491542
+  type: 'test'
+  ...
+# Subtest: SendPromptUseCase creates a session in the current project when the chat is unbound
+ok 282 - SendPromptUseCase creates a session in the current project when the chat is unbound
+  ---
+  duration_ms: 0.494416
+  type: 'test'
+  ...
+# Subtest: SendPromptUseCase preserves a selected model when it needs to create a session later
+ok 283 - SendPromptUseCase preserves a selected model when it needs to create a session later
+  ---
+  duration_ms: 1.097958
+  type: 'test'
+  ...
+# Subtest: SendPromptUseCase clears a stale model selection before prompting
+ok 284 - SendPromptUseCase clears a stale model selection before prompting
+  ---
+  duration_ms: 0.327125
+  type: 'test'
+  ...
+# Subtest: SendPromptUseCase recreates the session when the saved session context is stale
+ok 285 - SendPromptUseCase recreates the session when the saved session context is stale
+  ---
+  duration_ms: 0.158959
+  type: 'test'
+  ...
+# Subtest: SendPromptUseCase clears stale selected agents before prompting
+ok 286 - SendPromptUseCase clears stale selected agents before prompting
+  ---
+  duration_ms: 0.186875
+  type: 'test'
+  ...
+# Subtest: SendPromptUseCase clears selected subagents before prompting
+ok 287 - SendPromptUseCase clears selected subagents before prompting
+  ---
+  duration_ms: 0.108
+  type: 'test'
+  ...
+# Subtest: SendPromptUseCase forks a temporary child session for image prompts and keeps the main binding
+ok 288 - SendPromptUseCase forks a temporary child session for image prompts and keeps the main binding
+  ---
+  duration_ms: 0.35425
+  type: 'test'
+  ...
+# Subtest: SendPromptUseCase creates and keeps a main session when the first prompt is an image
+ok 289 - SendPromptUseCase creates and keeps a main session when the first prompt is an image
+  ---
+  duration_ms: 1.291917
+  type: 'test'
+  ...
+# Subtest: SendPromptUseCase returns to the main session after an image turn
+ok 290 - SendPromptUseCase returns to the main session after an image turn
+  ---
+  duration_ms: 1.128292
+  type: 'test'
+  ...
+# Subtest: SendPromptUseCase deletes the temporary image session even when the prompt fails
+ok 291 - SendPromptUseCase deletes the temporary image session even when the prompt fails
+  ---
+  duration_ms: 0.828167
+  type: 'test'
+  ...
+# Subtest: SendPromptUseCase logs a warning when temporary image session cleanup fails
+ok 292 - SendPromptUseCase logs a warning when temporary image session cleanup fails
+  ---
+  duration_ms: 0.635417
+  type: 'test'
+  ...
+# Subtest: SendPromptUseCase forwards the execution session id when promptSession times out
+ok 293 - SendPromptUseCase forwards the execution session id when promptSession times out
+  ---
+  duration_ms: 0.255084
+  type: 'test'
+  ...
+# Subtest: selected reads clone their result without serializing unrelated state and recover from selector failures
+ok 294 - selected reads clone their result without serializing unrelated state and recover from selector failures
+  ---
+  duration_ms: 11.65275
+  type: 'test'
+  ...
+# Subtest: selected repository results cannot mutate stored bindings, actions or permissions
+ok 295 - selected repository results cannot mutate stored bindings, actions or permissions
+  ---
+  duration_ms: 69.321
+  type: 'test'
+  ...
+# Subtest: FileSessionRepository persists bindings across repository instances
+ok 296 - FileSessionRepository persists bindings across repository instances
+  ---
+  duration_ms: 35.397458
+  type: 'test'
+  ...
+# Subtest: FileSessionRepository touch only updates the timestamp
+ok 297 - FileSessionRepository touch only updates the timestamp
+  ---
+  duration_ms: 17.55925
+  type: 'test'
+  ...
+# Subtest: FilePendingActionRepository persists and clears pending rename actions
+ok 298 - FilePendingActionRepository persists and clears pending rename actions
+  ---
+  duration_ms: 32.68625
+  type: 'test'
+  ...
+# Subtest: FilePermissionApprovalRepository persists approval prompts
+ok 299 - FilePermissionApprovalRepository persists approval prompts
+  ---
+  duration_ms: 24.928708
+  type: 'test'
+  ...
+# Subtest: bound session menus request only their project while keeping sessions from its other worktrees
+ok 300 - bound session menus request only their project while keeping sessions from its other worktrees
+  ---
+  duration_ms: 3.75075
+  type: 'test'
+  ...
+# Subtest: filtered session menus reload the current project when a saved project or session is gone
+ok 301 - filtered session menus reload the current project when a saved project or session is gone
+  ---
+  duration_ms: 0.626292
+  type: 'test'
+  ...
+# Subtest: /sessions shows the first page of sessions for the current project
+ok 302 - /sessions shows the first page of sessions for the current project
+  ---
+  duration_ms: 1.32475
+  type: 'test'
+  ...
+# Subtest: session page callbacks re-render the requested page
+ok 303 - session page callbacks re-render the requested page
+  ---
+  duration_ms: 0.65175
+  type: 'test'
+  ...
+# Subtest: session pick callbacks open the second-level action menu
+ok 304 - session pick callbacks open the second-level action menu
+  ---
+  duration_ms: 3.510917
+  type: 'test'
+  ...
+# Subtest: session switch callbacks switch the binding within the current project
+ok 305 - session switch callbacks switch the binding within the current project
+  ---
+  duration_ms: 2.421375
+  type: 'test'
+  ...
+# Subtest: session rename callbacks enter pending rename mode
+ok 306 - session rename callbacks enter pending rename mode
+  ---
+  duration_ms: 0.722167
+  type: 'test'
+  ...
+# Subtest: invalid session actions ask the user to rerun /sessions
+ok 307 - invalid session actions ask the user to rerun /sessions
+  ---
+  duration_ms: 0.124083
+  type: 'test'
+  ...
+# Subtest: switching and renaming validate one session without listing the catalog
+ok 308 - switching and renaming validate one session without listing the catalog
+  ---
+  duration_ms: 0.4245
+  type: 'test'
+  ...
+# Subtest: ListSessionsUseCase clears stale saved session context and falls back to the current project
+ok 309 - ListSessionsUseCase clears stale saved session context and falls back to the current project
+  ---
+  duration_ms: 0.819291
+  type: 'test'
+  ...
+# Subtest: /start sends the simplified quick-start welcome message with Markdown
+ok 310 - /start sends the simplified quick-start welcome message with Markdown
+  ---
+  duration_ms: 2.0015
+  type: 'test'
+  ...
+# Subtest: /start falls back to plain text when the markdown reply cannot be sent
+ok 311 - /start falls back to plain text when the markdown reply cannot be sent
+  ---
+  duration_ms: 0.39325
+  type: 'test'
+  ...
+# Subtest: /start falls back to the default copy when chat localization state cannot be loaded
+ok 312 - /start falls back to the default copy when chat localization state cannot be loaded
+  ---
+  duration_ms: 0.212083
+  type: 'test'
+  ...
+# Subtest: /status reads only the bound session and observes later title changes without a catalog scan
+ok 313 - /status reads only the bound session and observes later title changes without a catalog scan
+  ---
+  duration_ms: 2.4545
+  type: 'test'
+  ...
+# Subtest: /status retains workspace fallbacks and the saved binding when its session lookup is unavailable
+ok 314 - /status retains workspace fallbacks and the saved binding when its session lookup is unavailable
+  ---
+  duration_ms: 1.176875
+  type: 'test'
+  ...
+# Subtest: MCP pending connections show localized progress in all supported languages
+ok 315 - MCP pending connections show localized progress in all supported languages
+  ---
+  duration_ms: 0.456208
+  type: 'test'
+  ...
+# Subtest: /status distinguishes unavailable LSP data from empty catalogs and genuine errors in every language
+ok 316 - /status distinguishes unavailable LSP data from empty catalogs and genuine errors in every language
+  ---
+  duration_ms: 17.782083
+  type: 'test'
+  ...
+# Subtest: /status aggregates health, path, plugins, LSP, and MCP into one reply
+ok 317 - /status aggregates health, path, plugins, LSP, and MCP into one reply
+  ---
+  duration_ms: 17.944166
+  type: 'test'
+  ...
+# Subtest: /status keeps successful sections when one section fails
+ok 318 - /status keeps successful sections when one section fails
+  ---
+  duration_ms: 1.078041
+  type: 'test'
+  ...
+# Subtest: /status uses the selected chat language
+ok 319 - /status uses the selected chat language
+  ---
+  duration_ms: 1.696834
+  type: 'test'
+  ...
+# Subtest: /status returns a default-language error instead of going silent when chat state lookup fails
+ok 320 - /status returns a default-language error instead of going silent when chat state lookup fails
+  ---
+  duration_ms: 0.44975
+  type: 'test'
+  ...
+# Subtest: TELEGRAM_COMMANDS only advertises implemented commands
+ok 321 - TELEGRAM_COMMANDS only advertises implemented commands
+  ---
+  duration_ms: 1.610416
+  type: 'test'
+  ...
+# Subtest: syncTelegramCommands pushes the command list to Telegram
+ok 322 - syncTelegramCommands pushes the command list to Telegram
+  ---
+  duration_ms: 1.102084
+  type: 'test'
+  ...
+# Subtest: syncTelegramCommandsForChat applies localized command descriptions to one chat
+ok 323 - syncTelegramCommandsForChat applies localized command descriptions to one chat
+  ---
+  duration_ms: 0.645166
+  type: 'test'
+  ...
+# Subtest: getTelegramCommands returns Japanese descriptions when requested
+ok 324 - getTelegramCommands returns Japanese descriptions when requested
+  ---
+  duration_ms: 0.476667
+  type: 'test'
+  ...
+# Subtest: getTelegramCommands returns standardized Chinese descriptions when requested
+ok 325 - getTelegramCommands returns standardized Chinese descriptions when requested
+  ---
+  duration_ms: 0.249417
+  type: 'test'
+  ...
+# Subtest: readable chunks allow a sentence to finish on either side of the target and keep closing quotes
+ok 326 - readable chunks allow a sentence to finish on either side of the target and keep closing quotes
+  ---
+  duration_ms: 0.846458
+  type: 'test'
+  ...
+# Subtest: readable chunks prefer a paragraph boundary and preserve blank lines and CRLF
+ok 327 - readable chunks prefer a paragraph boundary and preserve blank lines and CRLF
+  ---
+  duration_ms: 0.084083
+  type: 'test'
+  ...
+# Subtest: paragraph chunks skip sentence scanning and mixed text scans only once when needed
+ok 328 - paragraph chunks skip sentence scanning and mixed text scans only once when needed
+  ---
+  duration_ms: 0.803417
+  type: 'test'
+  ...
+# Subtest: numbered list markers stay with their sentence instead of forming a closer split point
+ok 329 - numbered list markers stay with their sentence instead of forming a closer split point
+  ---
+  duration_ms: 0.080417
+  type: 'test'
+  ...
+# Subtest: overlong sentences split at words while unbroken text stays bounded without losing Unicode
+ok 330 - overlong sentences split at words while unbroken text stays bounded without losing Unicode
+  ---
+  duration_ms: 0.311916
+  type: 'test'
+  ...
+# Subtest: readable chunks balance an otherwise tiny remainder and leave short replies intact
+ok 331 - readable chunks balance an otherwise tiny remainder and leave short replies intact
+  ---
+  duration_ms: 0.2825
+  type: 'test'
+  ...
+# Subtest: native Markdown keeps headings, lists, quotes, links and tables without legacy escapes
+ok 332 - native Markdown keeps headings, lists, quotes, links and tables without legacy escapes
+  ---
+  duration_ms: 0.137417
+  type: 'test'
+  ...
+# Subtest: Markdown wrapper fences are removed while actual code fences remain intact
+ok 333 - Markdown wrapper fences are removed while actual code fences remain intact
+  ---
+  duration_ms: 0.112291
+  type: 'test'
+  ...
+# Subtest: buildTelegramPromptReply falls back to plain text when markdown is unsupported
+ok 334 - buildTelegramPromptReply falls back to plain text when markdown is unsupported
+  ---
+  duration_ms: 0.245667
+  type: 'test'
+  ...
+# Subtest: buildTelegramPromptReply keeps context information out of markdown replies
+ok 335 - buildTelegramPromptReply keeps context information out of markdown replies
+  ---
+  duration_ms: 1.646917
+  type: 'test'
+  ...
+# Subtest: long replies use readable chunks without reserving space for context information
+ok 336 - long replies use readable chunks without reserving space for context information
+  ---
+  duration_ms: 0.380959
+  type: 'test'
+  ...
+# Subtest: table padding cannot expand a short reply into an oversized message
+ok 337 - table padding cannot expand a short reply into an oversized message
+  ---
+  duration_ms: 1.67775
+  type: 'test'
+  ...
+# Subtest: ordinary prose and fenced pipe expressions stay intact beside a real Markdown table
+ok 338 - ordinary prose and fenced pipe expressions stay intact beside a real Markdown table
+  ---
+  duration_ms: 0.174458
+  type: 'test'
+  ...
+# Subtest: long tables repeat their header and preserve every complete row alongside surrounding prose
+ok 339 - long tables repeat their header and preserve every complete row alongside surrounding prose
+  ---
+  duration_ms: 2.326791
+  type: 'test'
+  ...
+# Subtest: streaming tables buffer incomplete rows and final output includes the unterminated last row
+ok 340 - streaming tables buffer incomplete rows and final output includes the unterminated last row
+  ---
+  duration_ms: 0.582125
+  type: 'test'
+  ...
+# Subtest: an oversized table row stays intact above the soft target and uses literal chunks above the safe size
+ok 341 - an oversized table row stays intact above the soft target and uses literal chunks above the safe size
+  ---
+  duration_ms: 0.726208
+  type: 'test'
+  ...
+# Subtest: single-column tables repeat their header and escaped pipes do not create extra columns
+ok 342 - single-column tables repeat their header and escaped pipes do not create extra columns
+  ---
+  duration_ms: 1.093458
+  type: 'test'
+  ...
+# Subtest: punctuation stays readable without MarkdownV2 escape expansion
+ok 343 - punctuation stays readable without MarkdownV2 escape expansion
+  ---
+  duration_ms: 0.178041
+  type: 'test'
+  ...
+# Subtest: buildTelegramPromptReply keeps Markdown enabled for table content
+ok 344 - buildTelegramPromptReply keeps Markdown enabled for table content
+  ---
+  duration_ms: 0.248333
+  type: 'test'
+  ...
+# Subtest: buildTelegramPromptReply keeps context information out of localized replies
+ok 345 - buildTelegramPromptReply keeps context information out of localized replies
+  ---
+  duration_ms: 0.196375
+  type: 'test'
+  ...
+# Subtest: buildTelegramStaticReply prefers Markdown when the markdown is supported
+ok 346 - buildTelegramStaticReply prefers Markdown when the markdown is supported
+  ---
+  duration_ms: 0.19
+  type: 'test'
+  ...
+# Subtest: buildTelegramStaticReply falls back to plain text when markdown is unsupported
+ok 347 - buildTelegramStaticReply falls back to plain text when markdown is unsupported
+  ---
+  duration_ms: 0.101042
+  type: 'test'
+  ...
+# Subtest: long fenced code stays formatted across rich chunks and preserves the source in fallbacks
+ok 348 - long fenced code stays formatted across rich chunks and preserves the source in fallbacks
+  ---
+  duration_ms: 0.803375
+  type: 'test'
+  ...
+# (node:14853) ExperimentalWarning: The MockTimers API is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: read-only requests retry transient failures with a bounded backoff and safe logs
+ok 349 - read-only requests retry transient failures with a bounded backoff and safe logs
+  ---
+  duration_ms: 13.018917
+  type: 'test'
+  ...
+# Subtest: message sends retry only failures proven to happen before the request can be delivered
+ok 350 - message sends retry only failures proven to happen before the request can be delivered
+  ---
+  duration_ms: 1.072
+  type: 'test'
+  ...
+# Subtest: network retries stop at their limit and aborting a delay cancels further requests
+ok 351 - network retries stop at their limit and aborting a delay cancels further requests
+  ---
+  duration_ms: 1.438083
+  type: 'test'
+  ...
+# Subtest: invalid tokens and API errors are never treated as transient network failures
+ok 352 - invalid tokens and API errors are never treated as transient network failures
+  ---
+  duration_ms: 0.205417
+  type: 'test'
+  ...
+# Subtest: an edit applied before a lost response is accepted when Telegram says the message is unchanged
+ok 353 - an edit applied before a lost response is accepted when Telegram says the message is unchanged
+  ---
+  duration_ms: 1.102958
+  type: 'test'
+  ...
+# Subtest: compact thinking is one paragraph with a localized inline toggle and no hidden-body placeholder
+ok 354 - compact thinking is one paragraph with a localized inline toggle and no hidden-body placeholder
+  ---
+  duration_ms: 0.960583
+  type: 'test'
+  ...
+# Subtest: collapsed streams retain complete new content without redundant edits and expanded streams stay expanded
+ok 355 - collapsed streams retain complete new content without redundant edits and expanded streams stay expanded
+  ---
+  duration_ms: 1.161125
+  type: 'test'
+  ...
+# Subtest: queued clicks and streaming updates preserve the newest content and explicit actions are idempotent
+ok 356 - queued clicks and streaming updates preserve the newest content and explicit actions are idempotent
+  ---
+  duration_ms: 1.926166
+  type: 'test'
+  ...
+# Subtest: a failed edit is retried on a later update while the newest complete text remains saved
+ok 357 - a failed edit is retried on a later update while the newest complete text remains saved
+  ---
+  duration_ms: 0.540084
+  type: 'test'
+  ...
+# Subtest: format fallback preserves toggle and stop controls
+ok 358 - format fallback preserves toggle and stop controls
+  ---
+  duration_ms: 0.446292
+  type: 'test'
+  ...
+# Subtest: private per-message files survive restart and orphaned streaming messages remain readable without stale Stop controls
+ok 359 - private per-message files survive restart and orphaned streaming messages remain readable without stale Stop controls
+  ---
+  duration_ms: 82.700667
+  type: 'test'
+  ...
+# Subtest: callbacks edit the original message, reject missing chat data, and leave content intact on edit failure
+ok 360 - callbacks edit the original message, reject missing chat data, and leave content intact on edit failure
+  ---
+  duration_ms: 1.046833
+  type: 'test'
+  ...
+# Subtest: calculateDisplayedTokenTotal sums the displayed token metrics
+ok 361 - calculateDisplayedTokenTotal sums the displayed token metrics
+  ---
+  duration_ms: 0.418666
+  type: 'test'
+  ...
+# Subtest: calculateDisplayedTokenTotal returns null when every displayed metric is unavailable
+ok 362 - calculateDisplayedTokenTotal returns null when every displayed metric is unavailable
+  ---
+  duration_ms: 0.065125
+  type: 'test'
+  ...
+# Subtest: UploadFileUseCase downloads Telegram images and converts them into OpenCode file parts
+ok 363 - UploadFileUseCase downloads Telegram images and converts them into OpenCode file parts
+  ---
+  duration_ms: 0.973625
+  type: 'test'
+  ...
+# Subtest: UploadFileUseCase rejects non-image uploads
+ok 364 - UploadFileUseCase rejects non-image uploads
+  ---
+  duration_ms: 0.241541
+  type: 'test'
+  ...
+# Subtest: handleVoiceMessage rejects voice messages without entering the prompt flow
+ok 365 - handleVoiceMessage rejects voice messages without entering the prompt flow
+  ---
+  duration_ms: 1.168041
+  type: 'test'
+  ...
+# Subtest: handleVoiceMessage localizes the unsupported reply for Chinese chats
+ok 366 - handleVoiceMessage localizes the unsupported reply for Chinese chats
+  ---
+  duration_ms: 0.770834
+  type: 'test'
+  ...
+# Subtest: handleVoiceMessage keeps the rename-pending guard ahead of the unsupported reply
+ok 367 - handleVoiceMessage keeps the rename-pending guard ahead of the unsupported reply
+  ---
+  duration_ms: 0.156125
+  type: 'test'
+  ...
+1..367
+# tests 367
+# suites 0
+# pass 366
+# fail 0
+# cancelled 0
+# skipped 1
+# todo 0
+# duration_ms 8678.098958

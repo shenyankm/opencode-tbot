@@ -1,0 +1,100 @@
+TAP version 13
+# Subtest: concurrent updates use bounded atomic batches while failed mutators leave no partial changes
+not ok 1 - concurrent updates use bounded atomic batches while failed mutators leave no partial changes
+  ---
+  duration_ms: 20.834958
+  type: 'test'
+  location: '/private/var/folders/1b/b19xbzjx7xqc4kl0k9x_y4y80000gp/T/tbot-stream-baseline-wkv948w_/tests/json-state-store.test.ts:1:526'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    60 !== 4
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 4
+  actual: 60
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/private/var/folders/1b/b19xbzjx7xqc4kl0k9x_y4y80000gp/T/tbot-stream-baseline-wkv948w_/tests/json-state-store.test.ts:25:12)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: updates arriving during a write form a later batch and resolve only after their durable commit
+not ok 2 - updates arriving during a write form a later batch and resolve only after their durable commit
+  ---
+  duration_ms: 5.643042
+  type: 'test'
+  location: '/private/var/folders/1b/b19xbzjx7xqc4kl0k9x_y4y80000gp/T/tbot-stream-baseline-wkv948w_/tests/json-state-store.test.ts:1:1455'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    11 !== 2
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 2
+  actual: 11
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/private/var/folders/1b/b19xbzjx7xqc4kl0k9x_y4y80000gp/T/tbot-stream-baseline-wkv948w_/tests/json-state-store.test.ts:55:12)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: a failed batch rejects every pending update without committing drafts and later writes recover
+not ok 3 - a failed batch rejects every pending update without committing drafts and later writes recover
+  ---
+  duration_ms: 5.097083
+  type: 'test'
+  location: '/private/var/folders/1b/b19xbzjx7xqc4kl0k9x_y4y80000gp/T/tbot-stream-baseline-wkv948w_/tests/json-state-store.test.ts:1:2695'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    10 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 10
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/private/var/folders/1b/b19xbzjx7xqc4kl0k9x_y4y80000gp/T/tbot-stream-baseline-wkv948w_/tests/json-state-store.test.ts:72:12)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# (node:75215) ExperimentalWarning: The MockTimers API is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: answer updates reuse thinking segmentation while replacements and new reasoning parts invalidate it
+not ok 4 - answer updates reuse thinking segmentation while replacements and new reasoning parts invalidate it
+  ---
+  duration_ms: 6.91025
+  type: 'test'
+  location: '/private/var/folders/1b/b19xbzjx7xqc4kl0k9x_y4y80000gp/T/tbot-stream-baseline-wkv948w_/tests/prompt-progress.test.ts:1:1023'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    10 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 10
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/private/var/folders/1b/b19xbzjx7xqc4kl0k9x_y4y80000gp/T/tbot-stream-baseline-wkv948w_/tests/prompt-progress.test.ts:38:12)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 0
+# fail 4
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 190.409708

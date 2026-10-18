@@ -1,0 +1,3396 @@
+{
+  "date": "2026-10-18",
+  "timezone": "Asia/Singapore",
+  "baseline": {
+    "commit": "237d0679d7ba96c18237d9d66a48b583efd354d5",
+    "includesPreviousUncommittedFooterOptimization": true,
+    "footerOverlayPatch": "diff --git a/src/services/telegram/telegram-format.ts b/src/services/telegram/telegram-format.ts\nindex 42d56e3..a22547c 100644\n--- a/src/services/telegram/telegram-format.ts\n+++ b/src/services/telegram/telegram-format.ts\n@@ -11,6 +11,7 @@ const MAX_TELEGRAM_MESSAGE_LENGTH = 4096;\n export const TELEGRAM_MESSAGE_TARGET_LENGTH = 1024;\n const MESSAGE_LENGTH_TOLERANCE = 128;\n const SENTENCE_SEGMENTER = new Intl.Segmenter(undefined, { granularity: \"sentence\" });\n+const CONTEXT_NUMBER_FORMAT = new Intl.NumberFormat(\"en-US\", { notation: \"compact\", maximumFractionDigits: 1 });\n const TRUNCATED_SUFFIX = \"...\";\n export { stripMarkdownToPlainText } from \"../../infra/utils/markdown-text.js\";\n \n@@ -281,7 +282,7 @@ export function formatContextFooter(context: OpenCodeContextUsage | null | undef\n         ? copy.replyMetrics.remaining(Math.round(Math.max(0, Math.min(1, 1 - used / capacity)) * 100))\n         : copy.replyMetrics.notAvailable;\n     const length = validCapacity\n-        ? new Intl.NumberFormat(\"en-US\", { notation: \"compact\", maximumFractionDigits: 1 }).format(capacity)\n+        ? CONTEXT_NUMBER_FORMAT.format(capacity)\n         : copy.replyMetrics.notAvailable;\n     const contextText = `${copy.replyMetrics.contextLabel}: ${remaining} | ${length}`;\n     if (durationMs === undefined) {\n",
+    "sourceHashes": {
+      "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+      "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+      "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+      "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+      "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+    },
+    "reproduction": "Create a git archive checkout of the baseline commit, apply footerOverlayPatch, and symlink the local node_modules. The earlier footer optimization exists in both versions and is not counted as a gain in this report."
+  },
+  "sourceHashes": {
+    "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+    "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+    "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+    "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+    "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+  },
+  "benchmarkSha256": "b081fef9fe44f8a424919d737ebdbe392cd4c4b10c56fe43485a1328d24fc82e",
+  "changes": [
+    "Skip reasoning rendering and JSON comparison on answer-only flushes after a successful unchanged reasoning view; retry failed writes and force terminal views.",
+    "Commit queued updates in groups of at most twenty within one JsonStateStore. Yield between mutations; validate serialization independently, preserve mutator order, and acknowledge only after writeFile and atomic rename complete.",
+    "Preserve the original clone/serialization path for single updates. FileThinkingMessageRepository only needs an explicit state type argument."
+  ],
+  "method": {
+    "command": "pnpm exec tsx tests/stream-storage.bench.ts [source-checkout] [scenario]",
+    "execution": "Four separate processes for each scenario, in baseline, modified, modified, baseline order. No test/build jobs run during measurement. Other desktop activity is uncontrolled.",
+    "samples": "Seven timed samples per process; medians combine fourteen samples per version. I/O instrumentation runs separately after timing.",
+    "warmup": "Ten complete replays for long/changing streams, one thousand for the sub-millisecond short stream, one warmup for storage.",
+    "stream": "Sixty virtual one-second answer flushes, unchanged long (50000 UTF-16 units) or short reasoning, plus a control with reasoning changing on every tick. Timers are virtual; elapsedMs measures local replay processing, not sixty seconds of real service time.",
+    "storage": "Three bursts of twenty repository updates, twenty or five thousand permission entries; sequential large-state control; real temporary per-message files for expanded/collapsed streams and cold creation. Temporary files are removed after each process.",
+    "equivalence": "All full stream reply/answer sequences, final state contents, and thinking-message edits have equal baseline/modified SHA-256 fingerprints across all nine scenarios.",
+    "hashes": "Raw source file bytes use SHA-256. Output fingerprints hash JSON.stringify(output)."
+  },
+  "summary": {
+    "stream-long": {
+      "beforeMedianMs": 11.011333000000008,
+      "afterMedianMs": 2.883729500000001,
+      "wallTimeReductionPercent": 73.81125881852815,
+      "beforeCpuMs": 10.462499999999999,
+      "afterCpuMs": 2.3070000000000004,
+      "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d",
+      "renders": {
+        "before": 61,
+        "after": 2
+      }
+    },
+    "stream-short": {
+      "beforeMedianMs": 1.013833499999805,
+      "afterMedianMs": 1.4201255000001538,
+      "wallTimeReductionPercent": -40.07482490965497,
+      "beforeCpuMs": 0.35550000000000004,
+      "afterCpuMs": 0.4125,
+      "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe",
+      "renders": {
+        "before": 61,
+        "after": 2
+      }
+    },
+    "stream-changing": {
+      "beforeMedianMs": 3.4258130000000193,
+      "afterMedianMs": 2.4604579999999885,
+      "wallTimeReductionPercent": 28.178858565836062,
+      "beforeCpuMs": 1.6905000000000001,
+      "afterCpuMs": 1.4405000000000001,
+      "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0",
+      "renders": {
+        "before": 61,
+        "after": 61
+      }
+    },
+    "storage-batch-small": {
+      "beforeMedianMs": 50.988313000000005,
+      "afterMedianMs": 6.980479000000017,
+      "wallTimeReductionPercent": 86.30964903663313,
+      "beforeCpuMs": 41.2445,
+      "afterCpuMs": 5.2005,
+      "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6",
+      "io": {
+        "before": {
+          "writes": 60,
+          "renames": 60,
+          "bytesWritten": 226644
+        },
+        "after": {
+          "writes": 3,
+          "renames": 3,
+          "bytesWritten": 11334
+        }
+      },
+      "writeBytesReductionPercent": 94.99920580293323
+    },
+    "storage-batch-large": {
+      "beforeMedianMs": 548.0458335000001,
+      "afterMedianMs": 264.24397899999997,
+      "wallTimeReductionPercent": 51.78432845434634,
+      "beforeCpuMs": 506.44500000000005,
+      "afterCpuMs": 244.6295,
+      "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb",
+      "io": {
+        "before": {
+          "writes": 60,
+          "renames": 60,
+          "bytesWritten": 57939564
+        },
+        "after": {
+          "writes": 3,
+          "renames": 3,
+          "bytesWritten": 2896980
+        }
+      },
+      "writeBytesReductionPercent": 94.99999689331456
+    },
+    "storage-serial-large": {
+      "beforeMedianMs": 584.6692499999999,
+      "afterMedianMs": 525.1508124999999,
+      "wallTimeReductionPercent": 10.179847409454146,
+      "beforeCpuMs": 459.562,
+      "afterCpuMs": 463.282,
+      "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb",
+      "io": {
+        "before": {
+          "writes": 60,
+          "renames": 60,
+          "bytesWritten": 57939564
+        },
+        "after": {
+          "writes": 60,
+          "renames": 60,
+          "bytesWritten": 57939564
+        }
+      }
+    },
+    "storage-expanded": {
+      "beforeMedianMs": 387.9676875000001,
+      "afterMedianMs": 441.4965625,
+      "wallTimeReductionPercent": -13.797250834194763,
+      "beforeCpuMs": 55.795,
+      "afterCpuMs": 61.911,
+      "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727",
+      "io": {
+        "before": {
+          "mkdir": 60,
+          "reads": 90,
+          "writes": 60,
+          "renames": 60
+        },
+        "after": {
+          "mkdir": 60,
+          "reads": 90,
+          "writes": 60,
+          "renames": 60
+        }
+      }
+    },
+    "storage-collapsed": {
+      "beforeMedianMs": 31.67035399999999,
+      "afterMedianMs": 30.17108299999998,
+      "wallTimeReductionPercent": 4.733988764382014,
+      "beforeCpuMs": 24.314500000000002,
+      "afterCpuMs": 24.921,
+      "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4",
+      "io": {
+        "before": {
+          "mkdir": 30,
+          "reads": 60,
+          "writes": 30,
+          "renames": 30
+        },
+        "after": {
+          "mkdir": 30,
+          "reads": 60,
+          "writes": 30,
+          "renames": 30
+        }
+      }
+    },
+    "storage-cold": {
+      "beforeMedianMs": 16.93635400000001,
+      "afterMedianMs": 16.08152100000001,
+      "wallTimeReductionPercent": 5.047326006530084,
+      "beforeCpuMs": 16.295,
+      "afterCpuMs": 15.4375,
+      "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5",
+      "io": {
+        "before": {
+          "mkdir": 30,
+          "reads": 30,
+          "writes": 30,
+          "renames": 30
+        },
+        "after": {
+          "mkdir": 30,
+          "reads": 30,
+          "writes": 30,
+          "renames": 30
+        }
+      }
+    }
+  },
+  "acceptance": {
+    "targetWorkReduction": "passed: unchanged reasoning renders 61 -> 2; concurrent shared-state commits 60 -> 3; write bytes reduced about 95%.",
+    "targetTiming": "Long reasoning replay about 74% lower wall time; concurrent small/large state updates about 86%/52% lower wall time in this run.",
+    "outputEquivalence": "passed for all nine scenarios",
+    "controlInterpretation": "No whole-plugin or all-workload speedup claim. Short stream replay was 0.406 ms slower across sixty flushes (CPU +0.057 ms); expanded thinking storage was 13.8% slower in wall time and 11.0% higher CPU. Serial large-state CPU differed by less than 1%. Control variability remains a limit; the per-message file I/O counts are unchanged.",
+    "allWorkloadLatencyNonRegression": "not established; recorded controls include slower samples"
+  },
+  "verification": {
+    "typecheck": {
+      "command": "pnpm typecheck",
+      "log": "performance-stream-storage-2026-10-18/typecheck.txt",
+      "logSha256": "4c53d754020facacb23b77f44a7c9ebd5dfa5fd8bb2d30e1f33c24dcf8a37c78"
+    },
+    "focusedTests": {
+      "passed": 37,
+      "failed": 0,
+      "command": "pnpm exec tsx --test tests/json-state-store.test.ts tests/prompt-progress.test.ts tests/thinking-messages.test.ts",
+      "log": "performance-stream-storage-2026-10-18/focused.tap",
+      "logSha256": "50addef6298aefdad53b73133f2e7341a8c2813b0b192796e75c7429de7624b8"
+    },
+    "defaultSuite": {
+      "passed": 366,
+      "failed": 0,
+      "skipped": 1,
+      "command": "pnpm test",
+      "log": "performance-stream-storage-2026-10-18/suite.tap",
+      "logSha256": "092a8af05571f96a7d9ae05ddfd9b73d243fdb7d3fadfd3f991231e9108e61c8"
+    },
+    "hostIntegration": {
+      "passed": 1,
+      "failed": 0,
+      "opencodeVersion": "2.0.29",
+      "telegram": "isolated local stub",
+      "includesBuildAndPack": true,
+      "command": "OPENCODE_HOST_E2E=1 pnpm exec tsx --test tests/opencode-host.integration.test.ts",
+      "log": "performance-stream-storage-2026-10-18/host.tap",
+      "logSha256": "991d7db441abb944c76b85d447195028c575f6d8e72f2ea532436553cfeeff90"
+    },
+    "baselinePerformanceRegressions": {
+      "passed": 0,
+      "failedAsExpected": 4,
+      "command": "Run the four new render/batching regressions against the pre-change source snapshot",
+      "log": "performance-stream-storage-2026-10-18/baseline-regressions.tap",
+      "logSha256": "a87df0a62b5c9125617e1bf8f6e6ea04a6c86f85a1ea450a613c9c702e91917f"
+    },
+    "diffCheck": "passed",
+    "remoteCI": "not run; changes remain local",
+    "docs": "No commands, configuration, translations or persisted schemas changed. README translations need no update."
+  },
+  "coveredInvariants": [
+    "Same text replacement and new-part invalidation",
+    "Write failure retries without losing newer events during awaits",
+    "Forced completed/stopped/failed terminal updates",
+    "Ordered and bounded batches",
+    "Event-loop work between batched mutations",
+    "No acknowledgement before file replacement",
+    "Mutation and serialization failure isolation",
+    "All failed batch updates reject after disk failure; later writes recover",
+    "Failed initial loads retain malformed files and recover after repair",
+    "Atomic rename failure cleanup, restart reads and private thinking files"
+  ],
+  "limits": [
+    "The benefit to state I/O requires overlapping updates on the same store instance. Sequential per-message thinking files still perform the same reads/writes.",
+    "A failed shared write rejects every otherwise-valid update in that batch. Invalid mutators/serialization reject only their own update.",
+    "A read during an uncommitted batch sees the previous committed state. Concurrent updates may be acknowledged at the same final state.",
+    "Batch size is twenty; each mutation yields so cloning many states does not monopolize the streaming event loop. One individual large-state clone remains synchronous.",
+    "Atomic file write/rename is preserved; no fsync or power-loss guarantee is added.",
+    "No actual Telegram/model latency, production traffic, cross-process shared-file writes, or remote CI was measured."
+  ],
+  "discardedExperiment": {
+    "change": "Attempt writeFile before mkdir and create parents only on ENOENT",
+    "decision": "Reverted: no stable measured I/O latency benefit and an extra failed open on first creation. Atomic writer behavior remains unchanged.",
+    "evidence": "performance-stream-storage-2026-10-18/experiments.json"
+  },
+  "runs": {
+    "stream-long": {
+      "before": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+            "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+            "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "stream-long",
+          "warmups": 10,
+          "samples": [
+            {
+              "elapsedMs": 16.748125000000016,
+              "cpuMs": 13.468,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            },
+            {
+              "elapsedMs": 19.528625000000034,
+              "cpuMs": 14.605,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            },
+            {
+              "elapsedMs": 15.613917000000015,
+              "cpuMs": 13.749,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            },
+            {
+              "elapsedMs": 18.08354200000008,
+              "cpuMs": 12.735,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            },
+            {
+              "elapsedMs": 12.587916000000064,
+              "cpuMs": 11.463,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            },
+            {
+              "elapsedMs": 11.789582999999993,
+              "cpuMs": 10.663,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            },
+            {
+              "elapsedMs": 11.03245800000002,
+              "cpuMs": 10.543,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            }
+          ],
+          "medianMs": 15.613917000000015,
+          "ioSample": null
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+            "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+            "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "stream-long",
+          "warmups": 10,
+          "samples": [
+            {
+              "elapsedMs": 10.913542000000007,
+              "cpuMs": 10.266,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            },
+            {
+              "elapsedMs": 10.990207999999996,
+              "cpuMs": 10.382,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            },
+            {
+              "elapsedMs": 10.461292000000014,
+              "cpuMs": 9.702,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            },
+            {
+              "elapsedMs": 10.403292000000022,
+              "cpuMs": 9.848,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            },
+            {
+              "elapsedMs": 10.58966700000002,
+              "cpuMs": 9.883,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            },
+            {
+              "elapsedMs": 10.54849999999999,
+              "cpuMs": 9.972,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            },
+            {
+              "elapsedMs": 10.656333999999958,
+              "cpuMs": 10.295,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            }
+          ],
+          "medianMs": 10.58966700000002,
+          "ioSample": null
+        }
+      ],
+      "after": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+            "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+            "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "stream-long",
+          "warmups": 10,
+          "samples": [
+            {
+              "elapsedMs": 2.6560409999999877,
+              "cpuMs": 1.902,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            },
+            {
+              "elapsedMs": 3.003167000000019,
+              "cpuMs": 2.731,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            },
+            {
+              "elapsedMs": 3.092542000000009,
+              "cpuMs": 2.317,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            },
+            {
+              "elapsedMs": 3.193290999999988,
+              "cpuMs": 2.401,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            },
+            {
+              "elapsedMs": 3.533459000000022,
+              "cpuMs": 3.519,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            },
+            {
+              "elapsedMs": 3.2475829999999917,
+              "cpuMs": 2.554,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            },
+            {
+              "elapsedMs": 2.8018340000000137,
+              "cpuMs": 2.297,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            }
+          ],
+          "medianMs": 3.092542000000009,
+          "ioSample": null
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+            "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+            "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "stream-long",
+          "warmups": 10,
+          "samples": [
+            {
+              "elapsedMs": 2.7290419999999926,
+              "cpuMs": 2.009,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            },
+            {
+              "elapsedMs": 2.9656249999999886,
+              "cpuMs": 2.765,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            },
+            {
+              "elapsedMs": 2.655583000000007,
+              "cpuMs": 2,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            },
+            {
+              "elapsedMs": 2.671500000000009,
+              "cpuMs": 1.977,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            },
+            {
+              "elapsedMs": 3.1110000000000184,
+              "cpuMs": 3.035,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            },
+            {
+              "elapsedMs": 2.4486249999999927,
+              "cpuMs": 1.822,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            },
+            {
+              "elapsedMs": 2.609375,
+              "cpuMs": 2.218,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50000,
+              "answerUpdates": 60,
+              "fingerprint": "6208681ff2cd3b0239affdc497b144b1939100b2679b7b727245e9d6b8d5830d"
+            }
+          ],
+          "medianMs": 2.671500000000009,
+          "ioSample": null
+        }
+      ]
+    },
+    "stream-short": {
+      "before": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+            "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+            "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "stream-short",
+          "warmups": 1000,
+          "samples": [
+            {
+              "elapsedMs": 0.9334999999998672,
+              "cpuMs": 0.252,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            },
+            {
+              "elapsedMs": 0.8054580000000442,
+              "cpuMs": 0.152,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            },
+            {
+              "elapsedMs": 0.9225830000000315,
+              "cpuMs": 0.227,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            },
+            {
+              "elapsedMs": 0.8324999999999818,
+              "cpuMs": 0.17,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            },
+            {
+              "elapsedMs": 0.8162500000000819,
+              "cpuMs": 0.159,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            },
+            {
+              "elapsedMs": 0.8625419999998485,
+              "cpuMs": 0.19,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            },
+            {
+              "elapsedMs": 0.8800830000000133,
+              "cpuMs": 0.2,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            }
+          ],
+          "medianMs": 0.8625419999998485,
+          "ioSample": null
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+            "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+            "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "stream-short",
+          "warmups": 1000,
+          "samples": [
+            {
+              "elapsedMs": 1.094166999999743,
+              "cpuMs": 0.459,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            },
+            {
+              "elapsedMs": 1.4620420000001104,
+              "cpuMs": 0.574,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            },
+            {
+              "elapsedMs": 1.2280000000000655,
+              "cpuMs": 0.544,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            },
+            {
+              "elapsedMs": 1.5609160000003612,
+              "cpuMs": 0.694,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            },
+            {
+              "elapsedMs": 1.6320000000000618,
+              "cpuMs": 0.704,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            },
+            {
+              "elapsedMs": 1.3191249999999854,
+              "cpuMs": 0.604,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            },
+            {
+              "elapsedMs": 1.5623750000004293,
+              "cpuMs": 0.678,
+              "renders": 61,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            }
+          ],
+          "medianMs": 1.4620420000001104,
+          "ioSample": null
+        }
+      ],
+      "after": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+            "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+            "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "stream-short",
+          "warmups": 1000,
+          "samples": [
+            {
+              "elapsedMs": 0.7737499999998363,
+              "cpuMs": 0.136,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            },
+            {
+              "elapsedMs": 0.7654999999999745,
+              "cpuMs": 0.125,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            },
+            {
+              "elapsedMs": 0.7726250000000618,
+              "cpuMs": 0.12,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            },
+            {
+              "elapsedMs": 0.793999999999869,
+              "cpuMs": 0.127,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            },
+            {
+              "elapsedMs": 0.8410840000001372,
+              "cpuMs": 0.162,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            },
+            {
+              "elapsedMs": 0.8258749999999964,
+              "cpuMs": 0.148,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            },
+            {
+              "elapsedMs": 0.965167000000065,
+              "cpuMs": 0.239,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            }
+          ],
+          "medianMs": 0.793999999999869,
+          "ioSample": null
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+            "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+            "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "stream-short",
+          "warmups": 1000,
+          "samples": [
+            {
+              "elapsedMs": 2.0074580000000424,
+              "cpuMs": 0.704,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            },
+            {
+              "elapsedMs": 2.1216660000000047,
+              "cpuMs": 0.713,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            },
+            {
+              "elapsedMs": 1.9451670000003105,
+              "cpuMs": 0.68,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            },
+            {
+              "elapsedMs": 2.262540999999601,
+              "cpuMs": 0.618,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            },
+            {
+              "elapsedMs": 1.8750840000002427,
+              "cpuMs": 0.586,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            },
+            {
+              "elapsedMs": 3.5272500000000946,
+              "cpuMs": 0.923,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            },
+            {
+              "elapsedMs": 3.4184589999999844,
+              "cpuMs": 0.825,
+              "renders": 2,
+              "writes": 2,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "2ab389d14fa4305f33d8ae57a5c96f268165806bef45f91c160826aa50d645fe"
+            }
+          ],
+          "medianMs": 2.1216660000000047,
+          "ioSample": null
+        }
+      ]
+    },
+    "stream-changing": {
+      "before": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+            "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+            "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "stream-changing",
+          "warmups": 10,
+          "samples": [
+            {
+              "elapsedMs": 3.294042000000019,
+              "cpuMs": 1.537,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            },
+            {
+              "elapsedMs": 3.55758400000002,
+              "cpuMs": 1.683,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            },
+            {
+              "elapsedMs": 3.7799589999999625,
+              "cpuMs": 1.741,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            },
+            {
+              "elapsedMs": 3.8457919999999604,
+              "cpuMs": 1.75,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            },
+            {
+              "elapsedMs": 3.88066699999996,
+              "cpuMs": 1.721,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            },
+            {
+              "elapsedMs": 4.6628749999999854,
+              "cpuMs": 4.44,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            },
+            {
+              "elapsedMs": 3.2136669999999867,
+              "cpuMs": 1.966,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            }
+          ],
+          "medianMs": 3.7799589999999625,
+          "ioSample": null
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+            "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+            "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "stream-changing",
+          "warmups": 10,
+          "samples": [
+            {
+              "elapsedMs": 4.957417000000021,
+              "cpuMs": 4.006,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            },
+            {
+              "elapsedMs": 2.2784580000000005,
+              "cpuMs": 1.443,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            },
+            {
+              "elapsedMs": 2.617500000000007,
+              "cpuMs": 1.444,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            },
+            {
+              "elapsedMs": 3.101416000000029,
+              "cpuMs": 1.582,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            },
+            {
+              "elapsedMs": 3.56983299999996,
+              "cpuMs": 1.625,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            },
+            {
+              "elapsedMs": 2.350999999999999,
+              "cpuMs": 1.277,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            },
+            {
+              "elapsedMs": 2.1763750000000073,
+              "cpuMs": 1.698,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            }
+          ],
+          "medianMs": 2.617500000000007,
+          "ioSample": null
+        }
+      ],
+      "after": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+            "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+            "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "stream-changing",
+          "warmups": 10,
+          "samples": [
+            {
+              "elapsedMs": 1.884916999999973,
+              "cpuMs": 1.141,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            },
+            {
+              "elapsedMs": 1.7210000000000036,
+              "cpuMs": 1.025,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            },
+            {
+              "elapsedMs": 2.600791000000015,
+              "cpuMs": 1.21,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            },
+            {
+              "elapsedMs": 2.0659160000000156,
+              "cpuMs": 1.245,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            },
+            {
+              "elapsedMs": 1.8385830000000283,
+              "cpuMs": 1.129,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            },
+            {
+              "elapsedMs": 2.206792000000007,
+              "cpuMs": 1.478,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            },
+            {
+              "elapsedMs": 2.030208000000016,
+              "cpuMs": 1.548,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            }
+          ],
+          "medianMs": 2.030208000000016,
+          "ioSample": null
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+            "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+            "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "stream-changing",
+          "warmups": 10,
+          "samples": [
+            {
+              "elapsedMs": 2.669625000000025,
+              "cpuMs": 1.493,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            },
+            {
+              "elapsedMs": 5.468333000000001,
+              "cpuMs": 1.952,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            },
+            {
+              "elapsedMs": 2.4441249999999854,
+              "cpuMs": 1.403,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            },
+            {
+              "elapsedMs": 2.4767909999999915,
+              "cpuMs": 1.339,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            },
+            {
+              "elapsedMs": 3.490666000000033,
+              "cpuMs": 1.699,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            },
+            {
+              "elapsedMs": 3.8752079999999864,
+              "cpuMs": 1.62,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            },
+            {
+              "elapsedMs": 3.42025000000001,
+              "cpuMs": 2.045,
+              "renders": 61,
+              "writes": 61,
+              "reasoningCharacters": 50,
+              "answerUpdates": 60,
+              "fingerprint": "96243165f9a33264bae344974c45047fc910bd421e299ac5382a98d0d315d3a0"
+            }
+          ],
+          "medianMs": 3.42025000000001,
+          "ioSample": null
+        }
+      ]
+    },
+    "storage-batch-small": {
+      "before": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+            "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+            "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "storage-batch-small",
+          "warmups": 1,
+          "samples": [
+            {
+              "elapsedMs": 90.84349999999995,
+              "cpuMs": 51.314,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            },
+            {
+              "elapsedMs": 97.44487499999997,
+              "cpuMs": 52.148,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            },
+            {
+              "elapsedMs": 57.064707999999996,
+              "cpuMs": 53.826,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            },
+            {
+              "elapsedMs": 66.8789999999999,
+              "cpuMs": 52.556,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            },
+            {
+              "elapsedMs": 52.47395800000004,
+              "cpuMs": 41.973,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            },
+            {
+              "elapsedMs": 62.83812499999999,
+              "cpuMs": 48.794,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            },
+            {
+              "elapsedMs": 36.10887500000001,
+              "cpuMs": 35.788,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            }
+          ],
+          "medianMs": 62.83812499999999,
+          "ioSample": {
+            "elapsedMs": 38.379999999999995,
+            "cpuMs": 39.352,
+            "updates": 60,
+            "permissions": 20,
+            "stateBytes": 3781,
+            "io": {
+              "writes": 60,
+              "renames": 60,
+              "bytesWritten": 226644
+            },
+            "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+          }
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+            "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+            "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "storage-batch-small",
+          "warmups": 1,
+          "samples": [
+            {
+              "elapsedMs": 44.11750000000001,
+              "cpuMs": 40.867,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            },
+            {
+              "elapsedMs": 31.465958,
+              "cpuMs": 31.258,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            },
+            {
+              "elapsedMs": 44.133249999999975,
+              "cpuMs": 40.241,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            },
+            {
+              "elapsedMs": 36.66404200000005,
+              "cpuMs": 36.484,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            },
+            {
+              "elapsedMs": 50.25916700000005,
+              "cpuMs": 37.31,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            },
+            {
+              "elapsedMs": 51.71745899999996,
+              "cpuMs": 41.622,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            },
+            {
+              "elapsedMs": 37.22866700000009,
+              "cpuMs": 35.962,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            }
+          ],
+          "medianMs": 44.11750000000001,
+          "ioSample": {
+            "elapsedMs": 51.32520899999997,
+            "cpuMs": 43.473,
+            "updates": 60,
+            "permissions": 20,
+            "stateBytes": 3781,
+            "io": {
+              "writes": 60,
+              "renames": 60,
+              "bytesWritten": 226644
+            },
+            "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+          }
+        }
+      ],
+      "after": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+            "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+            "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "storage-batch-small",
+          "warmups": 1,
+          "samples": [
+            {
+              "elapsedMs": 7.788250000000005,
+              "cpuMs": 4.713,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            },
+            {
+              "elapsedMs": 8.776332999999966,
+              "cpuMs": 5.549,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            },
+            {
+              "elapsedMs": 16.965666,
+              "cpuMs": 5.162,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            },
+            {
+              "elapsedMs": 6.4020419999999945,
+              "cpuMs": 5.281,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            },
+            {
+              "elapsedMs": 9.434000000000026,
+              "cpuMs": 5.374,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            },
+            {
+              "elapsedMs": 7.475250000000017,
+              "cpuMs": 5.242,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            },
+            {
+              "elapsedMs": 6.2910420000000045,
+              "cpuMs": 4.968,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            }
+          ],
+          "medianMs": 7.788250000000005,
+          "ioSample": {
+            "elapsedMs": 5.6690830000000005,
+            "cpuMs": 4.676,
+            "updates": 60,
+            "permissions": 20,
+            "stateBytes": 3781,
+            "io": {
+              "writes": 3,
+              "renames": 3,
+              "bytesWritten": 11334
+            },
+            "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+          }
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+            "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+            "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "storage-batch-small",
+          "warmups": 1,
+          "samples": [
+            {
+              "elapsedMs": 4.517291999999998,
+              "cpuMs": 4,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            },
+            {
+              "elapsedMs": 4.7955829999999935,
+              "cpuMs": 3.953,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            },
+            {
+              "elapsedMs": 6.744541999999996,
+              "cpuMs": 6.267,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            },
+            {
+              "elapsedMs": 6.862167000000028,
+              "cpuMs": 5.407,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            },
+            {
+              "elapsedMs": 7.371667000000002,
+              "cpuMs": 5.239,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            },
+            {
+              "elapsedMs": 7.098791000000006,
+              "cpuMs": 5.134,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            },
+            {
+              "elapsedMs": 5.226374999999962,
+              "cpuMs": 4.404,
+              "updates": 60,
+              "permissions": 20,
+              "stateBytes": 3781,
+              "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+            }
+          ],
+          "medianMs": 6.744541999999996,
+          "ioSample": {
+            "elapsedMs": 8.010917000000006,
+            "cpuMs": 7.106,
+            "updates": 60,
+            "permissions": 20,
+            "stateBytes": 3781,
+            "io": {
+              "writes": 3,
+              "renames": 3,
+              "bytesWritten": 11334
+            },
+            "fingerprint": "60838550397c7d9e440716c4935e30074a1c78bc294ecc1860aa09018548afb6"
+          }
+        }
+      ]
+    },
+    "storage-batch-large": {
+      "before": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+            "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+            "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "storage-batch-large",
+          "warmups": 1,
+          "samples": [
+            {
+              "elapsedMs": 614.4075409999999,
+              "cpuMs": 599.682,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 623.038125,
+              "cpuMs": 567.064,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 608.6060830000001,
+              "cpuMs": 580.877,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 547.6844169999999,
+              "cpuMs": 520.837,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 522.556,
+              "cpuMs": 510.374,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 548.4072500000002,
+              "cpuMs": 553.848,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 552.8943340000005,
+              "cpuMs": 527.042,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            }
+          ],
+          "medianMs": 552.8943340000005,
+          "ioSample": {
+            "elapsedMs": 555.4305420000001,
+            "cpuMs": 547.271,
+            "updates": 60,
+            "permissions": 5000,
+            "stateBytes": 965663,
+            "io": {
+              "writes": 60,
+              "renames": 60,
+              "bytesWritten": 57939564
+            },
+            "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+          }
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+            "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+            "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "storage-batch-large",
+          "warmups": 1,
+          "samples": [
+            {
+              "elapsedMs": 1132.5332919999998,
+              "cpuMs": 502.516,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 701.7776250000002,
+              "cpuMs": 468.44,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 504.5789170000003,
+              "cpuMs": 403.151,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 458.20745799999986,
+              "cpuMs": 448.345,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 387.15350000000035,
+              "cpuMs": 392.621,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 339.88766699999996,
+              "cpuMs": 347.451,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 349.6887080000006,
+              "cpuMs": 354.85,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            }
+          ],
+          "medianMs": 458.20745799999986,
+          "ioSample": {
+            "elapsedMs": 354.88525000000027,
+            "cpuMs": 380.068,
+            "updates": 60,
+            "permissions": 5000,
+            "stateBytes": 965663,
+            "io": {
+              "writes": 60,
+              "renames": 60,
+              "bytesWritten": 57939564
+            },
+            "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+          }
+        }
+      ],
+      "after": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+            "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+            "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "storage-batch-large",
+          "warmups": 1,
+          "samples": [
+            {
+              "elapsedMs": 250.170167,
+              "cpuMs": 232.758,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 266.99074999999993,
+              "cpuMs": 245.318,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 309.6742919999999,
+              "cpuMs": 291.741,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 232.57633299999998,
+              "cpuMs": 214.904,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 327.56116699999984,
+              "cpuMs": 318.938,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 309.80758300000025,
+              "cpuMs": 288.898,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 252.39620800000012,
+              "cpuMs": 243.941,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            }
+          ],
+          "medianMs": 266.99074999999993,
+          "ioSample": {
+            "elapsedMs": 265.22495800000024,
+            "cpuMs": 244.709,
+            "updates": 60,
+            "permissions": 5000,
+            "stateBytes": 965663,
+            "io": {
+              "writes": 3,
+              "renames": 3,
+              "bytesWritten": 2896980
+            },
+            "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+          }
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+            "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+            "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "storage-batch-large",
+          "warmups": 1,
+          "samples": [
+            {
+              "elapsedMs": 261.497208,
+              "cpuMs": 256.528,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 291.16987499999993,
+              "cpuMs": 255.326,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 240.97354100000007,
+              "cpuMs": 216.29,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 242.32629199999997,
+              "cpuMs": 207.099,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 248.293584,
+              "cpuMs": 233.181,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 283.73354099999983,
+              "cpuMs": 246.728,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 272.03866700000026,
+              "cpuMs": 232.276,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            }
+          ],
+          "medianMs": 261.497208,
+          "ioSample": {
+            "elapsedMs": 232.62570899999992,
+            "cpuMs": 216.38,
+            "updates": 60,
+            "permissions": 5000,
+            "stateBytes": 965663,
+            "io": {
+              "writes": 3,
+              "renames": 3,
+              "bytesWritten": 2896980
+            },
+            "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+          }
+        }
+      ]
+    },
+    "storage-serial-large": {
+      "before": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+            "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+            "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "storage-serial-large",
+          "warmups": 1,
+          "samples": [
+            {
+              "elapsedMs": 400.82112499999994,
+              "cpuMs": 404.533,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 408.4592080000001,
+              "cpuMs": 412.017,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 662.3584169999999,
+              "cpuMs": 550.016,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 571.252583,
+              "cpuMs": 536.891,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 562.5304169999999,
+              "cpuMs": 519.614,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 579.2840420000002,
+              "cpuMs": 506.96,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 663.6957910000001,
+              "cpuMs": 585.821,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            }
+          ],
+          "medianMs": 571.252583,
+          "ioSample": {
+            "elapsedMs": 640.6581659999993,
+            "cpuMs": 569.168,
+            "updates": 60,
+            "permissions": 5000,
+            "stateBytes": 965663,
+            "io": {
+              "writes": 60,
+              "renames": 60,
+              "bytesWritten": 57939564
+            },
+            "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+          }
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+            "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+            "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "storage-serial-large",
+          "warmups": 1,
+          "samples": [
+            {
+              "elapsedMs": 813.620458,
+              "cpuMs": 420.534,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 758.0883329999999,
+              "cpuMs": 415.248,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 744.6632499999996,
+              "cpuMs": 423.882,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 570.4937089999999,
+              "cpuMs": 440.59,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 522.5986250000001,
+              "cpuMs": 478.534,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 614.4673750000002,
+              "cpuMs": 544.973,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 590.0544579999996,
+              "cpuMs": 435.195,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            }
+          ],
+          "medianMs": 614.4673750000002,
+          "ioSample": {
+            "elapsedMs": 658.0660839999991,
+            "cpuMs": 429.224,
+            "updates": 60,
+            "permissions": 5000,
+            "stateBytes": 965663,
+            "io": {
+              "writes": 60,
+              "renames": 60,
+              "bytesWritten": 57939564
+            },
+            "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+          }
+        }
+      ],
+      "after": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+            "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+            "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "storage-serial-large",
+          "warmups": 1,
+          "samples": [
+            {
+              "elapsedMs": 634.1322090000001,
+              "cpuMs": 458.017,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 541.1873749999997,
+              "cpuMs": 443.579,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 541.9890829999999,
+              "cpuMs": 470.241,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 558.153417,
+              "cpuMs": 459.309,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 547.2329579999996,
+              "cpuMs": 479.177,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 556.5678330000001,
+              "cpuMs": 480.07,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 702.0055840000005,
+              "cpuMs": 536.108,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            }
+          ],
+          "medianMs": 556.5678330000001,
+          "ioSample": {
+            "elapsedMs": 611.3787910000001,
+            "cpuMs": 563.26,
+            "updates": 60,
+            "permissions": 5000,
+            "stateBytes": 965663,
+            "io": {
+              "writes": 60,
+              "renames": 60,
+              "bytesWritten": 57939564
+            },
+            "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+          }
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+            "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+            "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "storage-serial-large",
+          "warmups": 1,
+          "samples": [
+            {
+              "elapsedMs": 490.09225000000004,
+              "cpuMs": 462.813,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 478.17049999999995,
+              "cpuMs": 466.151,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 509.1142500000001,
+              "cpuMs": 507.956,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 479.4528329999998,
+              "cpuMs": 463.751,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 457.6439580000001,
+              "cpuMs": 442.034,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 457.2122089999998,
+              "cpuMs": 462.534,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            },
+            {
+              "elapsedMs": 470.7370420000002,
+              "cpuMs": 426.797,
+              "updates": 60,
+              "permissions": 5000,
+              "stateBytes": 965663,
+              "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+            }
+          ],
+          "medianMs": 478.17049999999995,
+          "ioSample": {
+            "elapsedMs": 535.9694589999999,
+            "cpuMs": 436.359,
+            "updates": 60,
+            "permissions": 5000,
+            "stateBytes": 965663,
+            "io": {
+              "writes": 60,
+              "renames": 60,
+              "bytesWritten": 57939564
+            },
+            "fingerprint": "a6d0bcccc71ffaa53fb7d017df4078816dbe3e58fbf7df563b28422898fbb5fb"
+          }
+        }
+      ]
+    },
+    "storage-expanded": {
+      "before": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+            "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+            "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "storage-expanded",
+          "warmups": 1,
+          "samples": [
+            {
+              "elapsedMs": 401.60241700000006,
+              "cpuMs": 58.21,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            },
+            {
+              "elapsedMs": 382.63633300000015,
+              "cpuMs": 52.312,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            },
+            {
+              "elapsedMs": 393.2990420000001,
+              "cpuMs": 58.867,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            },
+            {
+              "elapsedMs": 428.79174999999987,
+              "cpuMs": 61.416,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            },
+            {
+              "elapsedMs": 239.460916,
+              "cpuMs": 64.134,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            },
+            {
+              "elapsedMs": 411.65733299999965,
+              "cpuMs": 51.888,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            },
+            {
+              "elapsedMs": 408.81516599999986,
+              "cpuMs": 55.888,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            }
+          ],
+          "medianMs": 401.60241700000006,
+          "ioSample": {
+            "elapsedMs": 429.708709,
+            "cpuMs": 58.091,
+            "updates": 30,
+            "edits": 30,
+            "io": {
+              "mkdir": 60,
+              "reads": 90,
+              "writes": 60,
+              "renames": 60
+            },
+            "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+          }
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+            "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+            "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "storage-expanded",
+          "warmups": 1,
+          "samples": [
+            {
+              "elapsedMs": 379.9664170000001,
+              "cpuMs": 48.973,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            },
+            {
+              "elapsedMs": 352.17662499999983,
+              "cpuMs": 55.072,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            },
+            {
+              "elapsedMs": 460.626542,
+              "cpuMs": 57.45,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            },
+            {
+              "elapsedMs": 526.2555000000002,
+              "cpuMs": 60.335,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            },
+            {
+              "elapsedMs": 253.167375,
+              "cpuMs": 55.702,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            },
+            {
+              "elapsedMs": 126.09516600000006,
+              "cpuMs": 45.265,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            },
+            {
+              "elapsedMs": 108.93545799999993,
+              "cpuMs": 45.268,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            }
+          ],
+          "medianMs": 352.17662499999983,
+          "ioSample": {
+            "elapsedMs": 46.83945799999992,
+            "cpuMs": 46.8,
+            "updates": 30,
+            "edits": 30,
+            "io": {
+              "mkdir": 60,
+              "reads": 90,
+              "writes": 60,
+              "renames": 60
+            },
+            "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+          }
+        }
+      ],
+      "after": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+            "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+            "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "storage-expanded",
+          "warmups": 1,
+          "samples": [
+            {
+              "elapsedMs": 413.44975,
+              "cpuMs": 58.026,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            },
+            {
+              "elapsedMs": 325.91100000000006,
+              "cpuMs": 55.936,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            },
+            {
+              "elapsedMs": 293.44679199999996,
+              "cpuMs": 60.961,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            },
+            {
+              "elapsedMs": 415.43833299999983,
+              "cpuMs": 65.585,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            },
+            {
+              "elapsedMs": 340.200875,
+              "cpuMs": 62.459,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            },
+            {
+              "elapsedMs": 425.02683300000035,
+              "cpuMs": 53.146,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            },
+            {
+              "elapsedMs": 408.13891699999976,
+              "cpuMs": 55.518,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            }
+          ],
+          "medianMs": 408.13891699999976,
+          "ioSample": {
+            "elapsedMs": 501.44425,
+            "cpuMs": 65.38,
+            "updates": 30,
+            "edits": 30,
+            "io": {
+              "mkdir": 60,
+              "reads": 90,
+              "writes": 60,
+              "renames": 60
+            },
+            "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+          }
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+            "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+            "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "storage-expanded",
+          "warmups": 1,
+          "samples": [
+            {
+              "elapsedMs": 594.8760420000001,
+              "cpuMs": 63.605,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            },
+            {
+              "elapsedMs": 494.63924999999995,
+              "cpuMs": 62.951,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            },
+            {
+              "elapsedMs": 544.465666,
+              "cpuMs": 61.811,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            },
+            {
+              "elapsedMs": 651.8878329999998,
+              "cpuMs": 67.162,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            },
+            {
+              "elapsedMs": 528.5701669999999,
+              "cpuMs": 62.011,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            },
+            {
+              "elapsedMs": 457.9662919999996,
+              "cpuMs": 58.327,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            },
+            {
+              "elapsedMs": 594.8462919999993,
+              "cpuMs": 79.085,
+              "updates": 30,
+              "edits": 30,
+              "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+            }
+          ],
+          "medianMs": 544.465666,
+          "ioSample": {
+            "elapsedMs": 628.7257079999999,
+            "cpuMs": 70.864,
+            "updates": 30,
+            "edits": 30,
+            "io": {
+              "mkdir": 60,
+              "reads": 90,
+              "writes": 60,
+              "renames": 60
+            },
+            "fingerprint": "512c6f2e1869627314ed118ae5832214a5c4ad218f956c3c70ea43ba8c2e5727"
+          }
+        }
+      ]
+    },
+    "storage-collapsed": {
+      "before": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+            "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+            "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "storage-collapsed",
+          "warmups": 1,
+          "samples": [
+            {
+              "elapsedMs": 32.62575000000001,
+              "cpuMs": 29.027,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            },
+            {
+              "elapsedMs": 56.51791700000001,
+              "cpuMs": 27.314,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            },
+            {
+              "elapsedMs": 30.714957999999967,
+              "cpuMs": 26.446,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            },
+            {
+              "elapsedMs": 33.476958000000025,
+              "cpuMs": 30.368,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            },
+            {
+              "elapsedMs": 45.552707999999996,
+              "cpuMs": 27.554,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            },
+            {
+              "elapsedMs": 23.674166000000014,
+              "cpuMs": 25.434,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            },
+            {
+              "elapsedMs": 68.06620799999996,
+              "cpuMs": 22.31,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            }
+          ],
+          "medianMs": 33.476958000000025,
+          "ioSample": {
+            "elapsedMs": 86.09124999999995,
+            "cpuMs": 29.165,
+            "updates": 30,
+            "edits": 0,
+            "io": {
+              "mkdir": 30,
+              "reads": 60,
+              "writes": 30,
+              "renames": 30
+            },
+            "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+          }
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+            "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+            "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "storage-collapsed",
+          "warmups": 1,
+          "samples": [
+            {
+              "elapsedMs": 22.411749999999984,
+              "cpuMs": 21.992,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            },
+            {
+              "elapsedMs": 45.87254100000001,
+              "cpuMs": 22.524,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            },
+            {
+              "elapsedMs": 19.113,
+              "cpuMs": 18.818,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            },
+            {
+              "elapsedMs": 29.158000000000015,
+              "cpuMs": 26.507,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            },
+            {
+              "elapsedMs": 20.64575000000002,
+              "cpuMs": 21.122,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            },
+            {
+              "elapsedMs": 19.210083999999995,
+              "cpuMs": 23.195,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            },
+            {
+              "elapsedMs": 34.38904100000002,
+              "cpuMs": 19.038,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            }
+          ],
+          "medianMs": 22.411749999999984,
+          "ioSample": {
+            "elapsedMs": 32.698916999999994,
+            "cpuMs": 28.035,
+            "updates": 30,
+            "edits": 0,
+            "io": {
+              "mkdir": 30,
+              "reads": 60,
+              "writes": 30,
+              "renames": 30
+            },
+            "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+          }
+        }
+      ],
+      "after": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+            "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+            "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "storage-collapsed",
+          "warmups": 1,
+          "samples": [
+            {
+              "elapsedMs": 25.760999999999996,
+              "cpuMs": 23.83,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            },
+            {
+              "elapsedMs": 96.21216700000002,
+              "cpuMs": 28.331,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            },
+            {
+              "elapsedMs": 59.5025,
+              "cpuMs": 28.38,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            },
+            {
+              "elapsedMs": 31.426207999999974,
+              "cpuMs": 30.158,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            },
+            {
+              "elapsedMs": 28.91595799999999,
+              "cpuMs": 28.653,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            },
+            {
+              "elapsedMs": 101.60049999999995,
+              "cpuMs": 32.011,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            },
+            {
+              "elapsedMs": 23.374000000000024,
+              "cpuMs": 22.28,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            }
+          ],
+          "medianMs": 31.426207999999974,
+          "ioSample": {
+            "elapsedMs": 40.82766700000002,
+            "cpuMs": 26.83,
+            "updates": 30,
+            "edits": 0,
+            "io": {
+              "mkdir": 30,
+              "reads": 60,
+              "writes": 30,
+              "renames": 30
+            },
+            "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+          }
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+            "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+            "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "storage-collapsed",
+          "warmups": 1,
+          "samples": [
+            {
+              "elapsedMs": 33.0325,
+              "cpuMs": 21.882,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            },
+            {
+              "elapsedMs": 21.978250000000003,
+              "cpuMs": 21.142,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            },
+            {
+              "elapsedMs": 19.10066599999999,
+              "cpuMs": 19.367,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            },
+            {
+              "elapsedMs": 45.52579099999997,
+              "cpuMs": 25.086,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            },
+            {
+              "elapsedMs": 26.130875000000003,
+              "cpuMs": 24.756,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            },
+            {
+              "elapsedMs": 23.119790999999964,
+              "cpuMs": 25.778,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            },
+            {
+              "elapsedMs": 38.009792000000004,
+              "cpuMs": 21.55,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+            }
+          ],
+          "medianMs": 26.130875000000003,
+          "ioSample": {
+            "elapsedMs": 44.80508299999997,
+            "cpuMs": 26.088,
+            "updates": 30,
+            "edits": 0,
+            "io": {
+              "mkdir": 30,
+              "reads": 60,
+              "writes": 30,
+              "renames": 30
+            },
+            "fingerprint": "c73dd5c3c9b43f3669128800a42c917b144cf7b14643d99c1262deed213161a4"
+          }
+        }
+      ]
+    },
+    "storage-cold": {
+      "before": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+            "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+            "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "storage-cold",
+          "warmups": 1,
+          "samples": [
+            {
+              "elapsedMs": 17.78845800000002,
+              "cpuMs": 16.619,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            },
+            {
+              "elapsedMs": 16.230458,
+              "cpuMs": 15.971,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            },
+            {
+              "elapsedMs": 17.64225000000002,
+              "cpuMs": 16.787,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            },
+            {
+              "elapsedMs": 18.62620899999996,
+              "cpuMs": 16.701,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            },
+            {
+              "elapsedMs": 18.635875,
+              "cpuMs": 17.514,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            },
+            {
+              "elapsedMs": 28.70241699999997,
+              "cpuMs": 18.577,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            },
+            {
+              "elapsedMs": 20.612625000000037,
+              "cpuMs": 18.848,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            }
+          ],
+          "medianMs": 18.62620899999996,
+          "ioSample": {
+            "elapsedMs": 20.552291000000025,
+            "cpuMs": 19.808,
+            "updates": 30,
+            "edits": 0,
+            "io": {
+              "mkdir": 30,
+              "reads": 30,
+              "writes": 30,
+              "renames": 30
+            },
+            "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+          }
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "8a0431efabdd97ed54c9f3343895913c07fd7589e384cd0835b755a0b2b21bf9",
+            "src/services/storage/json-state-store.ts": "b320d8da01cf13e316801cdb8a683da8222d9f4d7f3e5a8475e48a5b7f101cf9",
+            "src/repositories/thinking-message.repo.ts": "c5574652c7d043a630dc62fa010123a92d9860fbe28d0fa6880ea2b507833b10",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "storage-cold",
+          "warmups": 1,
+          "samples": [
+            {
+              "elapsedMs": 15.56408300000001,
+              "cpuMs": 14.989,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            },
+            {
+              "elapsedMs": 18.010542000000015,
+              "cpuMs": 17.158,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            },
+            {
+              "elapsedMs": 12.816833000000003,
+              "cpuMs": 13.126,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            },
+            {
+              "elapsedMs": 12.879582999999997,
+              "cpuMs": 13.195,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            },
+            {
+              "elapsedMs": 12.212792000000036,
+              "cpuMs": 12.892,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            },
+            {
+              "elapsedMs": 12.931416000000013,
+              "cpuMs": 13.327,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            },
+            {
+              "elapsedMs": 12.565583000000004,
+              "cpuMs": 12.72,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            }
+          ],
+          "medianMs": 12.879582999999997,
+          "ioSample": {
+            "elapsedMs": 12.932833000000016,
+            "cpuMs": 13.329,
+            "updates": 30,
+            "edits": 0,
+            "io": {
+              "mkdir": 30,
+              "reads": 30,
+              "writes": 30,
+              "renames": 30
+            },
+            "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+          }
+        }
+      ],
+      "after": [
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+            "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+            "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "storage-cold",
+          "warmups": 1,
+          "samples": [
+            {
+              "elapsedMs": 16.835000000000008,
+              "cpuMs": 16.218,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            },
+            {
+              "elapsedMs": 15.72033300000001,
+              "cpuMs": 15.458,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            },
+            {
+              "elapsedMs": 16.688541999999984,
+              "cpuMs": 16.153,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            },
+            {
+              "elapsedMs": 15.48837499999999,
+              "cpuMs": 15.301,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            },
+            {
+              "elapsedMs": 16.04391700000002,
+              "cpuMs": 16.019,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            },
+            {
+              "elapsedMs": 17.934875000000034,
+              "cpuMs": 17.43,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            },
+            {
+              "elapsedMs": 18.625666000000024,
+              "cpuMs": 17.219,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            }
+          ],
+          "medianMs": 16.688541999999984,
+          "ioSample": {
+            "elapsedMs": 17.607917000000043,
+            "cpuMs": 17.752,
+            "updates": 30,
+            "edits": 0,
+            "io": {
+              "mkdir": 30,
+              "reads": 30,
+              "writes": 30,
+              "renames": 30
+            },
+            "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+          }
+        },
+        {
+          "environment": {
+            "node": "v22.23.2",
+            "platform": "darwin",
+            "arch": "arm64",
+            "cpu": "Apple M4"
+          },
+          "sourceHashes": {
+            "src/services/telegram/prompt-progress.ts": "f6002f5f9adc7bf10e0005eb178c0ba198642e5dec2762f4d21682f5ec84f667",
+            "src/services/storage/json-state-store.ts": "7eefc8fb824812d7a158e17df01c9bce52517dc027bc30b4f81cfa0649ff8769",
+            "src/repositories/thinking-message.repo.ts": "4fbb9584278c9441068830a06c6dba3f71e94ad1367766a32ebae799857396b1",
+            "src/services/telegram/thinking-messages.ts": "9efdbf75c124585c3daf4f82adf4b2adb821d313bbf50211d5b481f6b270e89e",
+            "src/services/telegram/telegram-format.ts": "3199d12d0cc1b90bec460186522ec74e300984277994411c9cc5f9e1d049e59f"
+          },
+          "scenario": "storage-cold",
+          "warmups": 1,
+          "samples": [
+            {
+              "elapsedMs": 16.13737500000002,
+              "cpuMs": 14.138,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            },
+            {
+              "elapsedMs": 16.809334000000007,
+              "cpuMs": 16.404,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            },
+            {
+              "elapsedMs": 15.927584000000024,
+              "cpuMs": 14.935,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            },
+            {
+              "elapsedMs": 16.119124999999997,
+              "cpuMs": 15.417,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            },
+            {
+              "elapsedMs": 12.544457999999992,
+              "cpuMs": 12.964,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            },
+            {
+              "elapsedMs": 13.432749999999999,
+              "cpuMs": 13.229,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            },
+            {
+              "elapsedMs": 13.153999999999996,
+              "cpuMs": 13.315,
+              "updates": 30,
+              "edits": 0,
+              "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+            }
+          ],
+          "medianMs": 15.927584000000024,
+          "ioSample": {
+            "elapsedMs": 19.447167000000036,
+            "cpuMs": 18.138,
+            "updates": 30,
+            "edits": 0,
+            "io": {
+              "mkdir": 30,
+              "reads": 30,
+              "writes": 30,
+              "renames": 30
+            },
+            "fingerprint": "72442e090c8fe0b867f797453dcd1f5ba14bfdf28072d7ca6711c84a60ded2a5"
+          }
+        }
+      ]
+    }
+  }
+}

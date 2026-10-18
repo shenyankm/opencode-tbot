@@ -25,6 +25,7 @@ test("answer updates reuse thinking segmentation while replacements and new reas
     const answers: string[] = [];
     const progress = new TelegramPromptProgress(getBotCopy("en"), async (replies) => { writes.push(replies); },
         (error) => { throw error; }, async (answer) => { answers.push(answer); });
+    const renders = t.mock.method(progress as unknown as { render(): TelegramProgressReply[] }, "render");
     const reasoning = "中文😀 paragraph.\n".repeat(200) + "token=syntheticsecret";
     const emit = (type: string, data: Record<string, unknown>) => progress.accept({ type, data: { assistantMessageID: "a", ordinal: 0, ...data } });
     emit("session.reasoning.ended", { text: reasoning });
@@ -34,21 +35,60 @@ test("answer updates reuse thinking segmentation while replacements and new reas
         await setImmediate();
     }
     assert.equal(segment.mock.callCount(), 1);
+    assert.equal(renders.mock.callCount(), 1);
     assert.equal(answers.at(-1), "answer".repeat(10));
     emit("session.reasoning.ended", { text: reasoning });
     t.mock.timers.tick(1_000);
     await setImmediate();
     assert.equal(segment.mock.callCount(), 1);
+    assert.equal(renders.mock.callCount(), 1);
     emit("session.reasoning.ended", { text: "replacement. ".repeat(200) });
     t.mock.timers.tick(1_000);
     await setImmediate();
     assert.equal(segment.mock.callCount(), 2);
+    assert.equal(renders.mock.callCount(), 2);
     emit("session.reasoning.delta", { assistantMessageID: "b", delta: "next step" });
     await progress.finish("stopped");
     assert.equal(segment.mock.callCount(), 3);
+    assert.equal(renders.mock.callCount(), 3);
     assert.equal(writes.at(-1)!.map((reply) => reply.thinking!.text).join(""), "replacement. ".repeat(200) + "\nnext step");
     assert.ok(writes.at(-1)!.every((reply) => reply.thinking!.phase === "stopped"));
     assert.doesNotMatch(JSON.stringify(writes), /syntheticsecret/);
+});
+
+test("thinking refreshes retry failed writes and retain changes arriving during an awaited write", async (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const writes: string[] = [];
+    const errors: unknown[] = [];
+    let fail = false;
+    let release!: () => void;
+    const blocked = new Promise<void>((resolve) => { release = resolve; });
+    const progress = new TelegramPromptProgress(getBotCopy("en"), async (replies) => {
+        const text = replies[0].thinking!.text;
+        writes.push(text);
+        if (fail) { fail = false; throw new Error("edit failed"); }
+        if (text === "third") await blocked;
+    }, (error) => { errors.push(error); });
+    const emit = (text: string) => progress.accept({ type: "session.reasoning.ended", data: { assistantMessageID: "a", ordinal: 0, text } });
+    const tick = async () => { t.mock.timers.tick(1_000); await setImmediate(); };
+    emit("first");
+    await tick();
+    fail = true;
+    emit("second");
+    await tick();
+    assert.equal(errors.length, 1);
+    progress.accept({ type: "session.text.delta", data: { assistantMessageID: "a", ordinal: 0, delta: "answer" } });
+    await tick();
+    assert.deepEqual(writes, ["first", "second", "second"]);
+    emit("third");
+    await tick();
+    emit("fourth");
+    await tick();
+    release();
+    await setImmediate();
+    assert.equal(writes.at(-1), "fourth");
+    await progress.finish("stopped");
+    assert.equal(writes.at(-1), "fourth");
 });
 
 test("slow progress delivery coalesces refreshes and finish waits for the newest terminal output", async (t) => {

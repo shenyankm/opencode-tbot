@@ -50,7 +50,7 @@ export class FileThinkingMessageRepository implements ThinkingMessageRepository 
     }
 
     private store(chatId: number, messageId: number): JsonStateStore<{ message: ThinkingMessage | null }> {
-        return new JsonStateStore({
+        return new JsonStateStore<{ message: ThinkingMessage | null }>({
             filePath: this.path(chatId, messageId),
             createDefaultState: () => ({ message: null }),
         });
