@@ -55,7 +55,7 @@
         "@opencode/client": "2.0.29",
         "@opencode/plugin": "2.0.29",
         "grammy": "^1.46.0",
-        "zod": "^3.23.8"
+        "zod": "^4.6.7"
     },
     "devDependencies": {
         "@types/node": "^22.7.4",
