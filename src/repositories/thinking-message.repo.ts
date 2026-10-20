@@ -1,6 +1,8 @@
-import { unlink } from "node:fs/promises";
+import { stat, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
+import type { AppLogger } from "../infra/logger/index.js";
+import { pruneThinkingHistory, HISTORY_MAX_AGE_MS } from "../services/storage/history-retention.js";
 import type { ThinkingMessage } from "../domain/thinking/thinking-message.entity.js";
 import type { ThinkingMessageRepository } from "../domain/thinking/thinking-message.repository.js";
 import { readStateFile, writeStateFile } from "../services/storage/json-state-store.js";
@@ -17,9 +19,18 @@ const messageSchema = z.object({
 });
 
 export class FileThinkingMessageRepository implements ThinkingMessageRepository {
-    constructor(private readonly directory: string) { }
+    private lastPrunedAt = 0;
+
+    constructor(private readonly directory: string, private readonly logger?: Pick<AppLogger, "warn">) { }
 
     async get(chatId: number, messageId: number): Promise<ThinkingMessage | null> {
+        const path = this.path(chatId, messageId);
+        const info = await stat(path).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return null; throw error; });
+        if (!info) return null;
+        if (Date.now() - info.mtimeMs > HISTORY_MAX_AGE_MS) {
+            await this.delete(chatId, messageId);
+            return null;
+        }
         const { message } = await this.read(chatId, messageId);
         if (message === null) return null;
         const parsed = messageSchema.parse(message);
@@ -34,6 +45,15 @@ export class FileThinkingMessageRepository implements ThinkingMessageRepository 
         const state = await this.read(parsed.chatId, parsed.messageId);
         state.message = parsed;
         await writeStateFile(this.path(parsed.chatId, parsed.messageId), state);
+        if (Date.now() - this.lastPrunedAt > 60_000) {
+            this.lastPrunedAt = Date.now();
+            try {
+                await pruneThinkingHistory(this.directory);
+            } catch (error) {
+                this.lastPrunedAt = 0;
+                this.logger?.warn({ error, event: "history.prune_failed" }, "failed to prune thinking history; retrying on the next write");
+            }
+        }
     }
 
     async delete(chatId: number, messageId: number): Promise<void> {

@@ -1,6 +1,7 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname } from "node:path";
+import { writeStateFile } from "../services/storage/json-state-store.js";
 import type { PluginConfigSource } from "./config.js";
 import {
     getDefaultPluginLogDirectory,
@@ -87,8 +88,12 @@ export async function writePluginConfigFile(
     configFilePath: string,
     config: PluginConfigSource,
 ): Promise<void> {
-    await mkdir(dirname(configFilePath), { recursive: true });
-    await writeFile(configFilePath, serializePluginConfig(config), "utf8");
+    const directory = dirname(configFilePath);
+    await mkdir(directory, { recursive: true, mode: 0o700 });
+    if (process.platform !== "win32") {
+        await chmod(directory, 0o700);
+    }
+    await writeStateFile(configFilePath, orderPluginConfig(config));
 }
 
 export function mergePluginConfigSources(
