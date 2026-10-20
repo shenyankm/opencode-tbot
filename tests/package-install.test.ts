@@ -44,7 +44,7 @@ test("package.json exposes publishable plugin entrypoints", () => {
     ]);
     assert.equal(
         packageJson.scripts?.prepublishOnly,
-        "pnpm build && pnpm typecheck && pnpm test",
+        "pnpm verify:release",
     );
     assert.ok(packageJson.keywords?.includes("opencode"));
     assert.ok(packageJson.keywords?.includes("plugin"));

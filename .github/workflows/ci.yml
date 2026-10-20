@@ -31,6 +31,8 @@ jobs:
           runtime: node@${{ matrix.node }}
           cache: true
           require-lockfile: true
+      - name: Check Promise handling
+        run: pnpm lint
       - name: Typecheck
         run: pnpm typecheck
       - name: Test
@@ -62,3 +64,40 @@ jobs:
         run: pnpm exec tsx --test tests/opencode-host.integration.test.ts
         env:
           OPENCODE_HOST_E2E: "1"
+
+  portability:
+    name: Portability / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/setup@7baa639cc3f69d4a4fbff1272f024a8393e12c21 # v3
+        with:
+          runtime: node@24
+          cache: true
+          require-lockfile: true
+      - run: pnpm typecheck
+      - run: pnpm exec tsx --test tests/cli.test.ts tests/session-repo.test.ts tests/optimization-regressions.test.ts
+      - run: pnpm build
+      - run: node bin/opencode-tbot.js --version
+
+  dependency-audit:
+    name: Production dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/setup@7baa639cc3f69d4a4fbff1272f024a8393e12c21 # v3
+        with:
+          runtime: node@24
+          cache: true
+          require-lockfile: true
+      - run: pnpm audit --prod --audit-level=high

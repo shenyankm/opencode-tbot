@@ -42,10 +42,13 @@
     },
     "scripts": {
         "build": "vite build",
-        "prepublishOnly": "pnpm build && pnpm typecheck && pnpm test",
+        "prepublishOnly": "pnpm verify:release",
         "test": "tsx --test tests/**/*.test.ts",
         "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
-        "audit": "pnpm audit"
+        "audit": "pnpm audit",
+        "lint": "node scripts/check-promises.mjs",
+        "verify:package": "pnpm build && node scripts/verify-package.mjs",
+        "verify:release": "pnpm typecheck && pnpm lint && pnpm test && pnpm build && node scripts/verify-package.mjs --release && node tests/verify-host.mjs"
     },
     "dependencies": {
         "@grammyjs/runner": "^2.0.3",
