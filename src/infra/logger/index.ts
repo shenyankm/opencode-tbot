@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { appendFile, mkdir, readdir, stat, unlink } from "node:fs/promises";
-import { join } from "node:path";
+import { createJsonlFileSink } from "./file-sink.js";
 import { redactSensitiveText } from "../utils/redact.js";
 
 export type AppLogLevel = "debug" | "info" | "warn" | "error";
@@ -120,8 +119,6 @@ interface PendingLogEvent {
 const DEFAULT_COMPONENT: LogComponent = "app";
 const DEFAULT_EVENT = "log";
 const DEFAULT_SERVICE_NAME = "opencode-tbot";
-const DEFAULT_MAX_LOG_FILES = 30;
-const DEFAULT_MAX_TOTAL_LOG_BYTES = 314_572_800;
 const CONTENT_OMITTED = "[OMITTED]";
 const REDACTED = "[REDACTED]";
 const LEVEL_PRIORITY: Record<AppLogLevel, number> = {
@@ -343,95 +340,6 @@ function createHostSink(): LogSink {
             console[event.level](JSON.stringify(event));
         },
     };
-}
-
-function createJsonlFileSink(options: FileLogSinkOptions): LogSink {
-    const maxFiles = options.maxFiles ?? DEFAULT_MAX_LOG_FILES;
-    const maxTotalBytes = options.maxTotalBytes ?? DEFAULT_MAX_TOTAL_LOG_BYTES;
-    const runtimeSegment = sanitizeFileSegment(options.runtimeId);
-    const timestampSegment = new Date().toISOString().replace(/:/gu, "-");
-    const filePath = join(
-        options.dir,
-        `${timestampSegment}.${process.pid}.${runtimeSegment}.jsonl`,
-    );
-    let initialized = false;
-    let writeCount = 0;
-
-    const initialize = async () => {
-        if (initialized) {
-            return;
-        }
-
-        await mkdir(options.dir, { recursive: true });
-        await cleanupLogDirectory(options.dir, maxFiles, maxTotalBytes);
-        initialized = true;
-    };
-
-    return {
-        async write(event) {
-            await initialize();
-            await appendFile(filePath, `${JSON.stringify(event)}\n`, "utf8");
-            writeCount += 1;
-
-            if (writeCount === 1 || writeCount % 100 === 0) {
-                await cleanupLogDirectory(options.dir, maxFiles, maxTotalBytes);
-            }
-        },
-    };
-}
-
-async function cleanupLogDirectory(
-    directory: string,
-    maxFiles: number,
-    maxTotalBytes: number,
-): Promise<void> {
-    let entries: Array<{ path: string; size: number; time: number }> = [];
-
-    try {
-        const names = await readdir(directory);
-
-        entries = await Promise.all(
-            names
-                .filter((name) => name.endsWith(".jsonl"))
-                .map(async (name) => {
-                    const entryPath = join(directory, name);
-                    const entryStat = await stat(entryPath);
-
-                    return {
-                        path: entryPath,
-                        size: entryStat.size,
-                        time: entryStat.mtimeMs,
-                    };
-                }),
-        );
-    } catch {
-        return;
-    }
-
-    entries.sort((left, right) => right.time - left.time);
-
-    let totalBytes = 0;
-    const retained: Array<{ path: string; size: number; time: number }> = [];
-    const deleted: Array<{ path: string; size: number; time: number }> = [];
-
-    for (const entry of entries) {
-        const canKeepByCount = retained.length < maxFiles;
-        const canKeepBySize = retained.length === 0 || totalBytes + entry.size <= maxTotalBytes;
-
-        if (canKeepByCount && canKeepBySize) {
-            retained.push(entry);
-            totalBytes += entry.size;
-            continue;
-        }
-
-        deleted.push(entry);
-    }
-
-    await Promise.allSettled(
-        deleted.map(async (entry) => {
-            await unlink(entry.path);
-        }),
-    );
 }
 
 function buildStructuredLogEvent(
@@ -852,10 +760,6 @@ function pickStringValue(record: Record<string, unknown>, keys: string[]): strin
     }
 
     return null;
-}
-
-function sanitizeFileSegment(value: string): string {
-    return value.replace(/[^a-z0-9._-]+/giu, "_");
 }
 
 function normalizeStructuredLogErrorRecord(value: Record<string, unknown>): StructuredLogError {
