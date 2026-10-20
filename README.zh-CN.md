@@ -9,14 +9,14 @@
 需要兼容 SDK `2.0.29` 的 OpenCode V2，以及 Node.js `>=22.12.0`。不支持 OpenCode V1。
 
 1. 在 Telegram 联系 `@BotFather`，执行 `/newbot` 创建机器人；通过 `@userinfobot` 获取自己的数字 ID，用于限制私聊访问。
-2. 安装 OpenCode 和插件，按提示输入 bot token：
+2. 安装 OpenCode 和插件，按提示输入 bot token 和 owner 的 Telegram 用户 ID：
 
    ```bash
    npm install -g @opencode/cli@2.0.29
    npm exec -- opencode-tbot@latest
    ```
 
-3. 在下方配置中设置 `telegram.allowedChatIds`，然后启动共享服务，并从项目目录加载工作区：
+3. 检查安装器保存的授权 ID，然后启动共享服务，并从项目目录加载工作区：
 
    ```bash
    opencode serve --service
@@ -41,7 +41,7 @@
 }
 ```
 
-`allowedChatIds` 为空或省略时允许所有聊天访问。安装器同时在 `~/.config/opencode/opencode.json` 注册 `"plugins": ["opencode-tbot"]`；插件 options 可覆盖文件配置。已有 V1 注册会保留 options 并迁移。运行时不读取 `.env`。
+`allowedChatIds` 为空或省略时拒绝所有聊天和回调。首次安装必须填写 owner ID（无人值守安装使用 `--owner-id <id>`），安装器会显示最终授权 ID；未指定替换 owner 时保留已有名单。不提供公开模式或首消息自动配对。授权群聊即信任**群内全部成员**，包含权限审批；仅限 owner 时请只授权私聊 ID。撤销聊天后执行 `opencode reload`，历史绑定和菜单也不能继续发送通知或审批。安装器同时在 `~/.config/opencode/opencode.json` 注册 `"plugins": ["opencode-tbot"]`；插件 options 可覆盖文件配置。已有 V1 注册会保留 options 并迁移。运行时不读取 `.env`。
 
 聊天偏好保存在 JSON 状态文件中。脱敏日志输出到主机控制台及 `~/.local/share/opencode/log/plugins/opencode-tbot/`。
 
@@ -101,3 +101,33 @@ pnpm build
 ```bash
 OPENCODE_HOST_E2E=1 pnpm exec tsx --test tests/opencode-host.integration.test.ts
 ```
+
+## 诊断、限制与历史保留
+
+在项目目录执行 `npm exec -- opencode-tbot@latest doctor`，只读检查 Node、授权、路径可写性、Telegram webhook、共享宿主与已加载的工作区。Telegram 没有不消费更新的竞争 poller 查询接口；诊断会明确显示未知并说明 409 冲突的处理方法。
+
+Token 配置通过临时文件原子替换；POSIX 文件权限为 `0600`，插件专用目录为 `0700`。Windows 使用当前用户继承的 ACL，数值权限不能证明 ACL 隔离；共享 Windows 主机需检查目录 ACL。更新时保留配置。
+
+| 配置项 | 默认值 |
+|---|---|
+| `telegram.botToken` | 必填 |
+| `telegram.allowedChatIds` | `[]`（拒绝全部） |
+| `telegram.apiRoot` | `https://api.telegram.org` |
+| `state.path` | `./data/opencode-tbot.state.json`，相对于工作区 |
+| `prompt.waitTimeoutMs` | `1800000` |
+| `prompt.pollRequestTimeoutMs` | `15000` |
+| `prompt.recoveryInactivityTimeoutMs` | `120000` |
+| `tokens.showBreakdown` | `false` |
+| `logging.level` | `info` |
+| `logging.sinks.host`、`logging.sinks.file` | `true` |
+| `logging.file.dir` | `~/.local/share/opencode/log/plugins/opencode-tbot/` |
+| `logging.file.retention.maxFiles` | `30` |
+| `logging.file.retention.maxTotalBytes` | `314572800` |
+
+准备阶段总截止时间为 60 秒；下载总超时 30 秒，按实际读取字节限制为 20 MiB。Stop 同时覆盖准备与执行阶段，晚返回的结果不能重新绑定聊天。临时会话删除使用独立 5 秒超时；失败时记录 session ID，供在 OpenCode 中删除。仅更新时间戳失败会记录警告并保留完整回答。结构错误或未知版本的状态文件会报错并保留原文件。
+
+思考历史保留 30 天，最多 2,000 个文件 / 32 MiB，写入时至多每分钟清理一次。权限历史保留 30 天、最多 1,000 条，过期的待审批按钮也会失效。立即清理：先停止插件，在其工作区执行 `npm exec -- opencode-tbot@latest prune`，然后重启。恢复或迁移前应备份状态文件。
+
+发布检查使用 `pnpm lint`、`pnpm verify:package`、`pnpm verify:release`（要求干净提交、匹配的版本 tag 与 CHANGELOG）；发布后运行 `node scripts/verify-package.mjs --registry <version>` 验证 npm 包。`main` 可以包含未发布内容，已发布版本以 `package.json` 和 release tag 为准。桌面端手工验收夹具：`pnpm exec tsx tests/telegram-desktop.manual.ts`，仅使用已授权聊天和可控 provider 事件。
+
+[优化与验收报告（2026-10-20）](docs/validation/2026-10-20-optimizations/README.md)

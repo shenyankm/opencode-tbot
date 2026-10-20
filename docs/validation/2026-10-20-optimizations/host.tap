@@ -1,0 +1,20 @@
+TAP version 13
+# (node:26028) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Authorized chats: 101
+# Success.
+# Subtest: OpenCode v2 loads the locally built plugin, handles Telegram commands, and disposes polling
+ok 1 - OpenCode v2 loads the locally built plugin, handles Telegram commands, and disposes polling
+  ---
+  duration_ms: 12512.147375
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 12677.969041
