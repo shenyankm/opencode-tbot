@@ -55,6 +55,7 @@ function createContainerStub(cwd = "E:/workspace") {
     };
     const container = {
         __cwd: cwd,
+        isChatAuthorized: () => true,
         sessionRepo: new InMemorySessionRepository(),
         permissionApprovalRepo: new InMemoryPermissionApprovalRepository(),
         foregroundSessionTracker: new ForegroundSessionTracker(),

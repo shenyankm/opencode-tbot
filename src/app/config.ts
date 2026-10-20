@@ -19,8 +19,8 @@ export const DEFAULT_LOG_RETENTION_MAX_FILES = 30;
 export const DEFAULT_LOG_RETENTION_MAX_TOTAL_BYTES = 314_572_800;
 
 const AllowedChatIdSchema = z.union([
-    z.number().int(),
-    z.string().regex(/^-?\d+$/u).transform((value) => Number(value)),
+    z.number().int().safe().refine((value) => value !== 0),
+    z.string().regex(/^-?\d+$/u).transform((value) => Number(value)).pipe(z.number().int().safe().refine((value) => value !== 0)),
 ]);
 
 const TelegramConfigSchema = z.preprocess(

@@ -1,3 +1,4 @@
+import { redactSensitiveText } from "../../infra/utils/redact.js";
 import { BOT_COPY, type BotCopy } from "../copy.js";
 
 interface PresentedError {
@@ -8,9 +9,9 @@ interface PresentedError {
 export function presentError(error: unknown, copy: BotCopy = BOT_COPY): string {
     const presented = normalizeError(error, copy);
 
-    return presented.cause
+    return redactSensitiveText(presented.cause
         ? `${presented.message}\n${copy.errors.causeLabel}: ${presented.cause}`
-        : presented.message;
+        : presented.message);
 }
 
 function normalizeError(error: unknown, copy: BotCopy): PresentedError {

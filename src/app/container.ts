@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { isChatAuthorized } from "../services/telegram/authorization.js";
 import { FileThinkingMessageRepository } from "../repositories/thinking-message.repo.js";
 import { TelegramThinkingMessages } from "../services/telegram/thinking-messages.js";
 import type { BotDependencies } from "../bot/types.js";
@@ -12,7 +13,7 @@ import {
     type OpenCodeClientLike,
     type OpenCodeSdkClientLike,
 } from "../services/opencode/opencode.client.js";
-import { createDefaultOpencodeTbotState } from "../services/storage/bot-state.js";
+import { createDefaultOpencodeTbotState, parseOpencodeTbotState } from "../services/storage/bot-state.js";
 import { JsonStateStore } from "../services/storage/json-state-store.js";
 import { TelegramFileClient } from "../services/telegram/telegram.client.js";
 import { ForegroundSessionTracker } from "../services/session-activity/foreground-session-tracker.js";
@@ -40,6 +41,7 @@ import { UploadFileUseCase } from "../use-cases/upload-file.usecase.js";
 import type { AppConfig } from "./config.js";
 
 export interface AppContainer extends BotDependencies {
+    isChatAuthorized(chatId: number): boolean;
     contextFooter: TelegramContextFooter;
     getHealthUseCase: GetHealthUseCase;
     getPathUseCase: GetPathUseCase;
@@ -130,7 +132,7 @@ function createContainer(
 ): AppContainer {
     const storageLogger = logger.child({ component: "storage" });
     const repositories = createContainerRepositories(config);
-    const runtimeServices = createContainerRuntimeServices(config);
+    const runtimeServices = createContainerRuntimeServices(config, logger);
     const useCases = createContainerUseCases({
         ...repositories,
         ...runtimeServices,
@@ -145,6 +147,7 @@ function createContainer(
     );
 
     return {
+        isChatAuthorized: (chatId) => isChatAuthorized(config.telegramAllowedChatIds, chatId),
         ...useCases,
         contextFooter,
         logger,
@@ -175,6 +178,7 @@ function createContainerRepositories(config: AppConfig): ContainerRepositories {
     const stateStore = new JsonStateStore({
         filePath: config.stateFilePath,
         createDefaultState: createDefaultOpencodeTbotState,
+        validate: parseOpencodeTbotState,
     });
 
     return {
@@ -184,7 +188,7 @@ function createContainerRepositories(config: AppConfig): ContainerRepositories {
     };
 }
 
-function createContainerRuntimeServices(config: AppConfig): ContainerRuntimeServices {
+function createContainerRuntimeServices(config: AppConfig, logger: ContainerLogger): ContainerRuntimeServices {
     const telegramFileClient = new TelegramFileClient({
         botToken: config.telegramBotToken,
         apiRoot: config.telegramApiRoot,
@@ -192,7 +196,7 @@ function createContainerRuntimeServices(config: AppConfig): ContainerRuntimeServ
 
     return {
         foregroundSessionTracker: new ForegroundSessionTracker(),
-        thinkingMessages: new TelegramThinkingMessages(new FileThinkingMessageRepository(`${config.stateFilePath}.thinking`)),
+        thinkingMessages: new TelegramThinkingMessages(new FileThinkingMessageRepository(`${config.stateFilePath}.thinking`, logger)),
         uploadFileUseCase: new UploadFileUseCase(telegramFileClient),
     };
 }
