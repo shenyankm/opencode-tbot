@@ -1,3 +1,4 @@
+import { beginBindingSelection, emptyBinding } from "./binding-update.js";
 import type { SessionRepository } from "../domain/session/session.repository.js";
 import type { AppLogger } from "../infra/logger/index.js";
 import type {
@@ -30,10 +31,8 @@ export class SwitchModelUseCase {
     ) { }
 
     async execute(input: SwitchModelInput): Promise<SwitchModelResult> {
-        const [binding, models] = await Promise.all([
-            this.sessionRepo.getByChatId(input.chatId),
-            this.opencodeClient.listModels(),
-        ]);
+        const assertCurrent = beginBindingSelection(this.sessionRepo, input.chatId, "model");
+        const models = await this.opencodeClient.listModels();
         const model = models.find((item) =>
             item.providerID === input.providerId && item.id === input.modelId,
         );
@@ -48,17 +47,15 @@ export class SwitchModelUseCase {
             return { found: false };
         }
 
-        await this.sessionRepo.setCurrent({
-            chatId: input.chatId,
-            sessionId: binding?.sessionId ?? null,
-            projectId: binding?.projectId ?? null,
-            directory: binding?.directory ?? null,
-            agentName: binding?.agentName ?? null,
-            modelProviderId: model.providerID,
-            modelId: model.id,
-            modelVariant: variant,
-            language: binding?.language ?? null,
-            updatedAt: new Date().toISOString(),
+        await this.sessionRepo.update(input.chatId, (current) => {
+            assertCurrent();
+            return {
+                ...(current ?? emptyBinding(input.chatId)),
+                modelProviderId: model.providerID,
+                modelId: model.id,
+                modelVariant: variant,
+                updatedAt: new Date().toISOString(),
+            };
         });
 
         this.logger.info(

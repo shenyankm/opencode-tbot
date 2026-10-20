@@ -13,7 +13,7 @@ import type {
 } from "./opencode.client.js";
 
 export interface OpenCodeAgentCatalog {
-    listAgents(): Promise<OpenCodeAgent[]>;
+    listAgents(signal?: AbortSignal): Promise<OpenCodeAgent[]>;
 }
 
 export interface OpenCodeConfiguredPluginCatalog {
@@ -21,7 +21,7 @@ export interface OpenCodeConfiguredPluginCatalog {
 }
 
 export interface OpenCodeCurrentProjectReader {
-    getCurrentProject(): Promise<OpenCodeProject>;
+    getCurrentProject(signal?: AbortSignal): Promise<OpenCodeProject>;
 }
 
 export interface OpenCodeHealthReader {
@@ -37,7 +37,7 @@ export interface OpenCodeMcpCatalog {
 }
 
 export interface OpenCodeModelCatalog {
-    listModels(): Promise<OpenCodeConfiguredModel[]>;
+    listModels(signal?: AbortSignal): Promise<OpenCodeConfiguredModel[]>;
 }
 
 export interface OpenCodePathReader {
@@ -53,7 +53,7 @@ export interface OpenCodePermissionResponder {
 }
 
 export interface OpenCodeProjectCatalog {
-    listProjects(): Promise<OpenCodeProject[]>;
+    listProjects(signal?: AbortSignal): Promise<OpenCodeProject[]>;
 }
 
 export interface OpenCodePromptExecutor {
@@ -61,7 +61,7 @@ export interface OpenCodePromptExecutor {
 }
 
 export interface OpenCodeSessionCatalog {
-    getSession(sessionId: string): Promise<OpenCodeSession | null>;
+    getSession(sessionId: string, signal?: AbortSignal): Promise<OpenCodeSession | null>;
     getSessionStatuses(): Promise<Record<string, OpenCodeSessionStatus>>;
     listSessions(projectId?: string): Promise<OpenCodeSession[]>;
 }
@@ -69,9 +69,9 @@ export interface OpenCodeSessionCatalog {
 export interface OpenCodeSessionManager {
     abortSession(sessionId: string): Promise<boolean>;
     cancelSessionInput(sessionId: string, messageId: string): Promise<void>;
-    createSessionForDirectory(directory: string, title?: string): Promise<OpenCodeSession>;
-    deleteSession(sessionId: string): Promise<boolean>;
-    forkSession(sessionId: string, messageId?: string): Promise<OpenCodeSession>;
+    createSessionForDirectory(directory: string, title?: string, signal?: AbortSignal): Promise<OpenCodeSession>;
+    deleteSession(sessionId: string, signal?: AbortSignal): Promise<boolean>;
+    forkSession(sessionId: string, messageId?: string, signal?: AbortSignal): Promise<OpenCodeSession>;
     renameSession(sessionId: string, title: string): Promise<OpenCodeSession>;
 }
 

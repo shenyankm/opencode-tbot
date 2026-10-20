@@ -6,6 +6,7 @@ import {
 
 export interface UploadFileInput {
     expectedType: "image";
+    signal?: AbortSignal;
     filePath: string;
     filename?: string | null;
     mimeType?: string | null;
@@ -44,6 +45,7 @@ export class UploadFileUseCase {
         try {
             download = await this.telegramFileClient.downloadFile({
                 filePath: input.filePath,
+                signal: input.signal,
             });
         } catch (error) {
             if (error instanceof TelegramFileDownloadError) {

@@ -1,4 +1,5 @@
 import type { Bot } from "grammy";
+import { abortable } from "../../infra/utils/abort.js";
 import { scopeDependenciesToTelegramContext } from "../logger-context.js";
 import type {
     BotDependencies,
@@ -9,8 +10,8 @@ import type {
 import { executePromptRequest, type PromptExecutionContext } from "./prompt.handler.js";
 import { replyIfSessionRenamePending } from "../session-rename.js";
 import { ImageMessageUnsupportedError } from "../../use-cases/upload-file.usecase.js";
+import { TELEGRAM_MAX_DOWNLOAD_BYTES } from "../../services/telegram/telegram.client.js";
 
-const TELEGRAM_MAX_DOWNLOAD_BYTES = 20 * 1024 * 1024;
 
 interface TelegramPhotoSize {
     file_id: string;
@@ -49,14 +50,14 @@ export async function handleImageMessage(ctx: FileContext, dependencies: FileHan
         return;
     }
 
-    await executePromptRequest(ctx, dependencies, async () => {
+    await executePromptRequest(ctx, dependencies, async (signal) => {
         if (typeof image.fileSize === "number" && image.fileSize > TELEGRAM_MAX_DOWNLOAD_BYTES) {
             throw new ImageMessageUnsupportedError(
                 `Image file size ${image.fileSize} exceeds the Telegram download limit of ${TELEGRAM_MAX_DOWNLOAD_BYTES} bytes.`,
             );
         }
 
-        const file = await ctx.getFile();
+        const file = await abortable(ctx.getFile(), signal);
         const filePath = file.file_path?.trim();
 
         if (!filePath) {
@@ -64,6 +65,7 @@ export async function handleImageMessage(ctx: FileContext, dependencies: FileHan
         }
 
         const promptFile = await dependencies.uploadFileUseCase.execute({
+            signal,
             expectedType: "image",
             filePath,
             filename: image.filename,

@@ -58,7 +58,7 @@ test("selected repository results cannot mutate stored bindings, actions or perm
         modelProviderId: null, modelId: null, modelVariant: null, language: "en", updatedAt: new Date(0).toISOString(),
     });
     await actions.set({ chatId: 1, kind: "session_rename", sessionId: "s", menuMessageId: 2, returnPage: 0, updatedAt: new Date(0).toISOString() });
-    await permissions.set({ chatId: 1, sessionId: "s", requestId: "r", messageId: 3, status: "pending", updatedAt: new Date(0).toISOString() });
+    await permissions.set({ chatId: 1, sessionId: "s", requestId: "r", messageId: 3, status: "pending", updatedAt: new Date().toISOString() });
     (await sessions.getByChatId(1))!.directory = "/changed";
     (await sessions.listBySessionId("s"))[0].language = "ja";
     (await actions.getByChatId(1))!.menuMessageId = 99;
@@ -199,13 +199,14 @@ test("FilePermissionApprovalRepository persists approval prompts", async () => {
     const tempState = createTempStateStore();
     const repository = new FilePermissionApprovalRepository(tempState.store);
 
+    const updatedAt = new Date().toISOString();
     await repository.set({
         requestId: "request-1",
         sessionId: "session-1",
         chatId: 42,
         messageId: 99,
         status: "pending",
-        updatedAt: new Date(0).toISOString(),
+        updatedAt,
     });
 
     const repositoryTwo = new FilePermissionApprovalRepository(new JsonStateStore({
@@ -219,7 +220,7 @@ test("FilePermissionApprovalRepository persists approval prompts", async () => {
         chatId: 42,
         messageId: 99,
         status: "pending",
-        updatedAt: new Date(0).toISOString(),
+        updatedAt,
     }]);
 
     tempState.cleanup();

@@ -1,3 +1,4 @@
+import { beginBindingSelection } from "./binding-update.js";
 import type { SessionRepository } from "../domain/session/session.repository.js";
 import type { AppLogger } from "../infra/logger/index.js";
 import type {
@@ -23,14 +24,14 @@ export class CreateSessionUseCase {
     ) { }
 
     async execute(input: CreateSessionInput): Promise<CreateSessionResult> {
-        const binding = await this.sessionRepo.getByChatId(input.chatId);
+        const assertCurrent = beginBindingSelection(this.sessionRepo, input.chatId, "session");
         const result = await createAndBindCurrentProjectSession(
             this.sessionRepo,
             this.opencodeClient,
             {
                 chatId: input.chatId,
                 title: input.title,
-                binding,
+                assertCurrent,
             },
         );
 

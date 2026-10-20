@@ -1,3 +1,5 @@
+import { abortable } from "../infra/utils/abort.js";
+import { beginBindingSelection } from "./binding-update.js";
 import type { ChatSessionBinding } from "../domain/session/session.entity.js";
 import type { SessionRepository } from "../domain/session/session.repository.js";
 import {
@@ -39,6 +41,7 @@ export interface ResolvedPromptContext {
 export interface ResolvePromptContextInput {
     chatId: number;
     files: PromptSessionFilePartInput[];
+    signal?: AbortSignal;
     text?: string | null;
 }
 
@@ -50,34 +53,42 @@ export class PromptContextResolver {
     ) { }
 
     async resolve(input: ResolvePromptContextInput): Promise<ResolvedPromptContext> {
+        input.signal?.throwIfAborted();
+        const assertCurrent = beginBindingSelection(this.sessionRepo, input.chatId, "session");
         const promptText = buildPromptText(input.text, input.files);
 
         if (!promptText && input.files.length === 0) {
             throw new Error("Prompt requires text or file attachments.");
         }
 
-        let binding = await this.sessionRepo.getByChatId(input.chatId);
+        let binding = await abortable(this.sessionRepo.getByChatId(input.chatId), input.signal);
         const session = binding?.sessionId && binding.projectId
-            ? await this.opencodeClient.getSession(binding.sessionId)
+            ? await abortable(this.opencodeClient.getSession(binding.sessionId, input.signal), input.signal)
             : null;
 
         if (binding?.projectId && binding.directory) {
-            const projects = await this.opencodeClient.listProjects();
-            if (!(await hasMatchingProject(projects, binding, this.opencodeClient, session ? [session] : []))) {
+            const projects = await abortable(this.opencodeClient.listProjects(input.signal), input.signal);
+            if (!(await abortable(hasMatchingProject(projects, binding, this.opencodeClient, session ? [session] : []), input.signal))) {
+                input.signal?.throwIfAborted();
+                assertCurrent();
                 binding = await this.clearInvalidSessionContext(
                     input.chatId,
                     binding,
                     "saved project is no longer available",
+                    input.signal,
                 );
             }
         }
 
         if (binding?.sessionId && binding.projectId) {
             if (!session || session.id !== binding.sessionId || session.projectID !== binding.projectId) {
+                input.signal?.throwIfAborted();
+                assertCurrent();
                 binding = await this.clearInvalidSessionContext(
                     input.chatId,
                     binding,
                     "saved session is no longer available",
+                    input.signal,
                 );
             }
         }
@@ -88,7 +99,8 @@ export class PromptContextResolver {
                 this.opencodeClient,
                 {
                     chatId: input.chatId,
-                    binding,
+                    signal: input.signal,
+                    assertCurrent,
                 },
             );
             binding = createdSession.binding;
@@ -106,13 +118,14 @@ export class PromptContextResolver {
         }
 
         if (binding?.modelProviderId && binding?.modelId) {
-            const availableModels = await this.opencodeClient.listModels();
+            const availableModels = await abortable(this.opencodeClient.listModels(input.signal), input.signal);
             const selectedModel = availableModels.find((model) =>
                 model.providerID === binding?.modelProviderId && model.id === binding?.modelId,
             );
 
             if (!selectedModel) {
-                binding = await clearStoredModelSelection(this.sessionRepo, binding);
+                input.signal?.throwIfAborted();
+                binding = await clearStoredModelSelection(this.sessionRepo, binding, input.signal);
                 this.logger.warn?.(
                     {
                         chatId: input.chatId,
@@ -121,7 +134,8 @@ export class PromptContextResolver {
                     "selected model is no longer available, falling back to OpenCode default",
                 );
             } else if (binding.modelVariant && !(binding.modelVariant in selectedModel.variants)) {
-                binding = await clearStoredModelVariant(this.sessionRepo, binding);
+                input.signal?.throwIfAborted();
+                binding = await clearStoredModelVariant(this.sessionRepo, binding, input.signal);
                 this.logger.warn?.(
                     {
                         chatId: input.chatId,
@@ -139,11 +153,12 @@ export class PromptContextResolver {
         }
 
         let activeBinding = binding as ActiveChatBinding;
-        const availableAgents = await this.opencodeClient.listAgents();
+        const availableAgents = await abortable(this.opencodeClient.listAgents(input.signal), input.signal);
         const selectedAgent = resolveSelectedAgent(availableAgents, activeBinding.agentName);
 
         if (activeBinding.agentName && selectedAgent?.name !== activeBinding.agentName) {
-            activeBinding = await clearStoredAgentSelection(this.sessionRepo, activeBinding) as ActiveChatBinding;
+            input.signal?.throwIfAborted();
+            activeBinding = await clearStoredAgentSelection(this.sessionRepo, activeBinding, input.signal) as ActiveChatBinding;
             this.logger.warn?.(
                 {
                     chatId: input.chatId,
@@ -153,6 +168,8 @@ export class PromptContextResolver {
             );
         }
 
+        input.signal?.throwIfAborted();
+        assertCurrent();
         return {
             activeBinding,
             model: activeBinding.modelProviderId && activeBinding.modelId
@@ -171,8 +188,9 @@ export class PromptContextResolver {
         chatId: number,
         binding: ChatSessionBinding,
         reason: string,
+        signal?: AbortSignal,
     ): Promise<ChatSessionBinding> {
-        const nextBinding = await clearStoredSessionContext(this.sessionRepo, binding);
+        const nextBinding = await clearStoredSessionContext(this.sessionRepo, binding, signal);
         this.logger.warn?.(
             {
                 chatId,
