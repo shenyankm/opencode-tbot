@@ -1,9 +1,16 @@
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { stderr, stdin, stdout } from "node:process";
 import { createInterface } from "node:readline/promises";
 import { isDeepStrictEqual } from "node:util";
+import { loadAppConfig } from "./app/config.js";
+import { pruneThinkingHistory, prunePermissionHistory } from "./services/storage/history-retention.js";
+import { JsonStateStore } from "./services/storage/json-state-store.js";
+import { createDefaultOpencodeTbotState, parseOpencodeTbotState } from "./services/storage/bot-state.js";
+import { writeStateFile } from "./services/storage/json-state-store.js";
+import { diagnoseInstallation } from "./app/doctor.js";
+import { redactSensitiveText } from "./infra/utils/redact.js";
 import {
     DEFAULT_TELEGRAM_API_ROOT,
     type PluginConfigSource,
@@ -23,12 +30,13 @@ import { validateTelegramBotAccess } from "./services/telegram/telegram-bot-acce
 
 export interface InstallCommandOptions {
     botToken?: string;
+    ownerId?: string;
     homeDir?: string;
     telegramApiRoot?: string;
 }
 
 interface CliOptions extends InstallCommandOptions {
-    command: "help" | "install" | "uninstall" | "update" | "version";
+    command: "help" | "install" | "uninstall" | "update" | "version" | "doctor" | "prune";
 }
 
 export interface PromptSessionLike {
@@ -88,6 +96,22 @@ export async function runCli(argv: string[]): Promise<number> {
         return 0;
     }
 
+    if (options.command === "prune") {
+        const path = getGlobalPluginConfigFilePath(options.homeDir ?? homedir());
+        const config = loadAppConfig(await readPluginConfigFile(path), { configFilePath: path });
+        const removed = await pruneThinkingHistory(`${config.stateFilePath}.thinking`);
+        const store = new JsonStateStore({ filePath: config.stateFilePath, createDefaultState: createDefaultOpencodeTbotState, validate: parseOpencodeTbotState });
+        await store.update((state) => prunePermissionHistory(state.pendingPermissions));
+        stdout.write(`Expired history pruned (${removed} thinking files removed).\n`);
+        return 0;
+    }
+
+    if (options.command === "doctor") {
+        const checks = await diagnoseInstallation(options);
+        for (const check of checks) stdout.write(`${check.status.toUpperCase()} ${check.name}: ${check.detail}\n`);
+        return checks.some((check) => check.status === "fail") ? 1 : 0;
+    }
+
     if (options.command === "update") {
         await updatePlugin(options);
         return 0;
@@ -120,17 +144,29 @@ export async function installPlugin(options: InstallCommandOptions = {}): Promis
             apiRoot: normalizeOptionalString(options.telegramApiRoot) ?? DEFAULT_TELEGRAM_API_ROOT,
             botToken,
         });
+        const ownerId = options.ownerId ?? (existingPluginConfig.telegram?.allowedChatIds?.length
+            ? undefined : await prompt.ask("Owner Telegram user ID: "));
+        if (ownerId !== undefined && !/^[1-9]\d*$/u.test(ownerId.trim())) {
+            throw new Error("A positive owner Telegram user ID is required (--owner-id <id>).");
+        }
+        const allowedChatIds = ownerId === undefined
+            ? existingPluginConfig.telegram!.allowedChatIds!
+            : [Number(ownerId.trim())];
+        if (!allowedChatIds.every((id) => Number.isSafeInteger(Number(id)) && Number(id) !== 0)) {
+            throw new Error("Authorized Telegram chat IDs must be safe nonzero integers.");
+        }
         const nextOpenCodeConfig = buildInstalledOpenCodeConfig(existingOpenCodeConfig);
         const nextPluginConfig = buildInstalledPluginConfig(
             existingPluginConfig,
             validatedAccess.botToken,
             validatedAccess.apiRoot,
+            allowedChatIds,
         );
 
         await writeOpenCodeConfigFile(openCodeConfigFilePath, nextOpenCodeConfig);
         await writePluginConfigFile(globalPluginConfigFilePath, nextPluginConfig);
 
-        stdout.write("Success.\n");
+        stdout.write(`Authorized chats: ${allowedChatIds.join(", ")}\nSuccess.\n`);
     } finally {
         prompt.close();
     }
@@ -141,6 +177,11 @@ export async function updatePlugin(options: Pick<InstallCommandOptions, "homeDir
     await assertNoConflictingLocalPluginFiles(homeDir);
     const openCodeConfigFilePath = getGlobalOpenCodeConfigFilePath(homeDir);
     const existingOpenCodeConfig = await readOpenCodeConfigFile(openCodeConfigFilePath);
+    const pluginConfigFilePath = getGlobalPluginConfigFilePath(homeDir);
+    const existingPluginConfig = await readPluginConfigFile(pluginConfigFilePath);
+    if (Object.keys(existingPluginConfig).length > 0) {
+        await writePluginConfigFile(pluginConfigFilePath, existingPluginConfig);
+    }
     await writeOpenCodeConfigFile(openCodeConfigFilePath, buildInstalledOpenCodeConfig(existingOpenCodeConfig));
     stdout.write("Success.\n");
 }
@@ -176,6 +217,10 @@ function parseCliOptions(argv: string[]): CliOptions {
                 ? "version"
                 : command === "uninstall"
                     ? "uninstall"
+                : command === "prune"
+                    ? "prune"
+                : command === "doctor"
+                    ? "doctor"
                 : command === "update"
                     ? "update"
                     : "install",
@@ -189,6 +234,10 @@ function parseCliOptions(argv: string[]): CliOptions {
         }
 
         switch (value) {
+            case "--owner-id":
+                options.ownerId = values[++index];
+                if (!options.ownerId) throw new Error("--owner-id requires a value.");
+                break;
             case "--bot-token":
                 options.botToken = values[++index];
                 break;
@@ -218,11 +267,13 @@ function buildInstalledPluginConfig(
     current: PluginConfigSource,
     botToken: string,
     telegramApiRoot: string,
+    allowedChatIds: Array<number | string>,
 ): PluginConfigSource {
     return mergePluginConfigSources(current, {
         telegram: {
             botToken,
             apiRoot: telegramApiRoot,
+            allowedChatIds,
         },
     });
 }
@@ -232,9 +283,8 @@ async function readPluginConfigFile(configFilePath: string): Promise<PluginConfi
         const content = await readFile(configFilePath, "utf8");
         const parsed = JSON.parse(stripUtf8ByteOrderMark(content)) as unknown;
 
-        return isPlainObject(parsed)
-            ? parsed as PluginConfigSource
-            : {};
+        if (!isPlainObject(parsed)) throw new Error("Plugin config root must be a JSON object.");
+        return parsed as PluginConfigSource;
     } catch (error) {
         if (isMissingFileError(error)) {
             return {};
@@ -243,18 +293,13 @@ async function readPluginConfigFile(configFilePath: string): Promise<PluginConfi
         throw error;
     }
 }
-async function ensureParentDirectory(filePath: string): Promise<void> {
-    await mkdir(dirname(filePath), { recursive: true });
-}
-
 async function readOpenCodeConfigFile(configFilePath: string): Promise<OpenCodeConfigSource> {
     try {
         const content = await readFile(configFilePath, "utf8");
         const parsed = JSON.parse(stripUtf8ByteOrderMark(content)) as unknown;
 
-        return isPlainObject(parsed)
-            ? parsed as OpenCodeConfigSource
-            : {};
+        if (!isPlainObject(parsed)) throw new Error("OpenCode config root must be a JSON object.");
+        return parsed as OpenCodeConfigSource;
     } catch (error) {
         if (isMissingFileError(error)) {
             return {};
@@ -269,9 +314,8 @@ async function readOpenCodeConfigFileIfPresent(configFilePath: string): Promise<
         const content = await readFile(configFilePath, "utf8");
         const parsed = JSON.parse(stripUtf8ByteOrderMark(content)) as unknown;
 
-        return isPlainObject(parsed)
-            ? parsed as OpenCodeConfigSource
-            : {};
+        if (!isPlainObject(parsed)) throw new Error("OpenCode config root must be a JSON object.");
+        return parsed as OpenCodeConfigSource;
     } catch (error) {
         if (isMissingFileError(error)) {
             return null;
@@ -285,12 +329,7 @@ async function writeOpenCodeConfigFile(
     configFilePath: string,
     config: OpenCodeConfigSource,
 ): Promise<void> {
-    await ensureParentDirectory(configFilePath);
-    await writeFile(
-        configFilePath,
-        `${JSON.stringify(config, null, 2)}\n`,
-        "utf8",
-    );
+    await writeStateFile(configFilePath, config);
 }
 
 function buildInstalledOpenCodeConfig(current: OpenCodeConfigSource): OpenCodeConfigSource {
@@ -630,7 +669,7 @@ async function listConflictingLocalPluginFiles(configDirectory: string): Promise
 
 function buildHelpText(): string {
     return [
-        "Usage: opencode-tbot [install|update|uninstall] [options]",
+        "Usage: opencode-tbot [install|update|uninstall|doctor|prune] [options]",
         "       opencode-tbot --version",
         "",
         "Recommended npm usage:",
@@ -643,9 +682,12 @@ function buildHelpText(): string {
         "  install",
         "  update",
         "  uninstall",
+        "  doctor (read-only diagnostics)",
+        "  prune (expire retained history; stop the plugin first)",
         "",
         "Options:",
         "  --bot-token <token>",
+        "  --owner-id <id>",
         "  --telegram-api-root <url>",
         "  --home-dir <path>",
         "  --version",
@@ -654,7 +696,7 @@ function buildHelpText(): string {
 }
 
 function formatCliError(error: unknown): string {
-    return error instanceof Error && error.message.trim().length > 0
+    return redactSensitiveText(error instanceof Error && error.message.trim().length > 0
         ? error.message.trim()
-        : String(error);
+        : String(error));
 }

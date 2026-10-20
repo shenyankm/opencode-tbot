@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -190,6 +190,7 @@ test("installPlugin writes the OpenCode config and runtime config", async () => 
 
     await withSuccessfulTelegramApi(async (telegramApiRoot) => {
         await installPlugin({
+            ownerId: "1",
             homeDir,
             botToken: TEST_TELEGRAM_BOT_TOKEN,
             telegramApiRoot,
@@ -230,11 +231,13 @@ test("installPlugin preserves unrelated plugin config keys and is idempotent", a
 
     await withSuccessfulTelegramApi(async (telegramApiRoot) => {
         await installPlugin({
+            ownerId: "1",
             homeDir,
             botToken: TEST_TELEGRAM_BOT_TOKEN,
             telegramApiRoot,
         });
         await installPlugin({
+            ownerId: "1",
             homeDir,
             botToken: TEST_TELEGRAM_BOT_TOKEN,
             telegramApiRoot,
@@ -277,6 +280,7 @@ test("installPlugin tolerates UTF-8 BOM in existing OpenCode and plugin config f
 
     await withSuccessfulTelegramApi(async (telegramApiRoot) => {
         await installPlugin({
+            ownerId: "1",
             homeDir,
             botToken: TEST_TELEGRAM_BOT_TOKEN,
             telegramApiRoot,
@@ -316,6 +320,7 @@ test("installPlugin keeps existing OpenCode package-manager files untouched", as
 
     await withSuccessfulTelegramApi(async (telegramApiRoot) => {
         await installPlugin({
+            ownerId: "1",
             homeDir,
             botToken: TEST_TELEGRAM_BOT_TOKEN,
             telegramApiRoot,
@@ -417,6 +422,7 @@ test("installPlugin merges existing OpenCode npm plugins and normalizes opencode
 
     await withSuccessfulTelegramApi(async (telegramApiRoot) => {
         await installPlugin({
+            ownerId: "1",
             homeDir,
             botToken: TEST_TELEGRAM_BOT_TOKEN,
             telegramApiRoot,
@@ -444,6 +450,7 @@ test("runCli defaults to install mode", async () => {
         const exitCode = await runCli([
             "--home-dir",
             homeDir,
+            "--owner-id", "1",
             "--bot-token",
             TEST_TELEGRAM_BOT_TOKEN,
             "--telegram-api-root",
@@ -477,6 +484,7 @@ test("runCli install prints only a minimal success message", async () => {
         const result = await runCliInSubprocess([
             "--home-dir",
             homeDir,
+            "--owner-id", "1",
             "--bot-token",
             TEST_TELEGRAM_BOT_TOKEN,
             "--telegram-api-root",
@@ -484,7 +492,7 @@ test("runCli install prints only a minimal success message", async () => {
         ]);
 
         assert.equal(result.status, 0, result.stderr);
-        assert.equal(result.stdout, "Success.\n");
+        assert.equal(result.stdout, "Authorized chats: 1\nSuccess.\n");
     });
 });
 
@@ -859,4 +867,36 @@ test("createPromptSession aborts masked input on Ctrl+C", async () => {
 
     input.destroy();
     output.destroy();
+});
+
+test("installPlugin rejects a missing owner before writing an unconfigured installation", async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-owner-"));
+    await withSuccessfulTelegramApi(async (telegramApiRoot) => {
+        await assert.rejects(installPlugin({ homeDir, botToken: TEST_TELEGRAM_BOT_TOKEN, telegramApiRoot }), /owner Telegram user ID/u);
+    });
+    assert.equal(existsSync(getGlobalPluginConfigFilePath(homeDir)), false);
+    assert.equal(existsSync(getGlobalOpenCodeConfigFilePath(homeDir)), false);
+});
+
+test("installPlugin preserves existing authorized chats when no replacement owner is supplied", async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-owner-preserve-"));
+    const path = getGlobalPluginConfigFilePath(homeDir);
+    mkdirSync(getOpenCodeConfigDirectory(homeDir) + "/opencode-tbot", { recursive: true });
+    writeFileSync(path, JSON.stringify({ telegram: { botToken: "old", allowedChatIds: [101, -202] } }));
+    await withSuccessfulTelegramApi(async (telegramApiRoot) => {
+        await installPlugin({ homeDir, botToken: TEST_TELEGRAM_BOT_TOKEN, telegramApiRoot });
+    });
+    assert.deepEqual(JSON.parse(readFileSync(path, "utf8")).telegram.allowedChatIds, [101, -202]);
+});
+
+test("update repairs legacy token-file permissions while retaining configuration", async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), "opencode-tbot-upgrade-mode-"));
+    const path = getGlobalPluginConfigFilePath(homeDir);
+    mkdirSync(getOpenCodeConfigDirectory(homeDir) + "/opencode-tbot", { recursive: true });
+    const previous = { telegram: { botToken: TEST_TELEGRAM_BOT_TOKEN, allowedChatIds: [101] }, custom: true };
+    writeFileSync(path, JSON.stringify(previous));
+    chmodSync(path, 0o644);
+    assert.equal(await runCli(["update", "--home-dir", homeDir]), 0);
+    assert.deepEqual(JSON.parse(readFileSync(path, "utf8")), previous);
+    if (process.platform !== "win32") assert.equal(statSync(path).mode & 0o777, 0o600);
 });
