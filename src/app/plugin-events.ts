@@ -1,4 +1,5 @@
 import type { OpenCodeEvent } from "@opencode/client";
+import { redactSensitiveText } from "../infra/utils/redact.js";
 import { isTelegramFormattingError } from "../services/telegram/rich-messages.js";
 import { retryTelegramRequest } from "../services/telegram/telegram-message-queue.js";
 import { getSafeChatCopy } from "../bot/i18n.js";
@@ -113,7 +114,7 @@ async function handlePermissionAsked(
     const approvedChatIds = new Set(approvals.map((approval) => approval.chatId));
 
     for (const chatId of chatIds) {
-        if (approvedChatIds.has(chatId)) {
+        if (!runtime.container.isChatAuthorized(chatId) || approvedChatIds.has(chatId)) {
             continue;
         }
 
@@ -167,6 +168,10 @@ async function handlePermissionReplied(
 
     await Promise.all(
         approvals.map(async (approval) => {
+            if (!runtime.container.isChatAuthorized(approval.chatId)) {
+                await runtime.container.permissionApprovalRepo.set(toResolvedApproval(approval, event.reply));
+                return;
+            }
             try {
                 const copy = await getSafeChatCopy(runtime.container.sessionRepo, approval.chatId, logger);
 
@@ -219,7 +224,7 @@ async function handleSessionError(
         const copy = await getSafeChatCopy(runtime.container.sessionRepo, chatId, logger);
         const message = extractSessionErrorMessage(event.error) ?? copy.sessionEvents.unknownError;
 
-        return copy.sessionEvents.failed(event.sessionId, message);
+        return copy.sessionEvents.failed(event.sessionId, redactSensitiveText(message));
     });
 }
 
@@ -229,6 +234,10 @@ async function handleSessionInterrupted(
 ): Promise<void> {
     const approvals = await runtime.container.permissionApprovalRepo.listBySessionId(event.sessionId);
     for (const approval of approvals.filter((item) => item.status === "pending")) {
+        if (!runtime.container.isChatAuthorized(approval.chatId)) {
+            await runtime.container.permissionApprovalRepo.set(toResolvedApproval(approval, "reject"));
+            continue;
+        }
         const copy = await getSafeChatCopy(runtime.container.sessionRepo, approval.chatId, runtime.container.logger);
         await runtime.container.permissionApprovalRepo.set(toResolvedApproval(approval, "reject"));
         try {
@@ -283,7 +292,7 @@ async function notifyBoundChats(
         sessionId,
     });
     const bindings = await runtime.container.sessionRepo.listBySessionId(sessionId);
-    const chatIds = [...new Set(bindings.map((binding) => binding.chatId))];
+    const chatIds = [...new Set(bindings.map((binding) => binding.chatId))].filter((chatId) => runtime.container.isChatAuthorized(chatId));
 
     await Promise.all(
         chatIds.map(async (chatId) => {

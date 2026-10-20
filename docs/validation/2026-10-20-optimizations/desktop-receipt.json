@@ -1,0 +1,41 @@
+{
+  "client": "Telegram macOS 12.10 (282985)",
+  "provider": "controlled synthetic events through real production handler and Telegram API",
+  "observed": [
+    "English completion with code/table/emoji/multilingual text",
+    "Chinese stopped state with retained partial answer",
+    "Japanese separate provider error with preserved answer"
+  ],
+  "human_confirmed": [
+    "Expand and Collapse work",
+    "Expanded reasoning continues to update; Stop retains answer"
+  ],
+  "events": [
+    {
+      "action": "/qa zh stop",
+      "at": "2026-10-20T05:47:01.563Z"
+    },
+    {
+      "action": "prompt:stop:2552732c-fa00-4d4a-abe2-6d929051fbcf",
+      "at": "2026-10-20T05:47:22.250Z"
+    },
+    {
+      "action": "/qa ja fail",
+      "at": "2026-10-20T05:48:24.625Z"
+    }
+  ],
+  "historical_expand_after_restart": "passed: user confirmed and native screenshot shows the retained synthetic reasoning",
+  "screenshots": {
+    "scope": "local only; sidebar contains non-test chats",
+    "stopped": ".codex-e2e/desktop-2026-10-20/stopped.png",
+    "japanese": ".codex-e2e/desktop-2026-10-20/japanese-failure.png",
+    "history_after_restart": ".codex-e2e/desktop-2026-10-20/history-after-restart.png"
+  },
+  "after_restart_events": [
+    {
+      "action": "thinking:expand",
+      "at": "2026-10-20T05:56:45.606Z"
+    }
+  ],
+  "test_poller": "stopped after acceptance"
+}

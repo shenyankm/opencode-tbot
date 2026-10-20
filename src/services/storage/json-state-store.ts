@@ -8,6 +8,7 @@ const STATE_UPDATE_BATCH_SIZE = 20;
 export interface JsonStateStoreOptions<TState> {
     createDefaultState: () => TState;
     filePath: string;
+    validate?: (state: unknown) => TState;
 }
 
 interface PendingUpdate<TState> {
@@ -19,6 +20,7 @@ interface PendingUpdate<TState> {
 export class JsonStateStore<TState> {
     private readonly createDefaultState: () => TState;
     private readonly filePath: string;
+    private readonly validate?: (state: unknown) => TState;
     private statePromise: Promise<TState> | null = null;
     private writeQueue = Promise.resolve();
     private readonly pendingUpdates: PendingUpdate<TState>[] = [];
@@ -26,6 +28,7 @@ export class JsonStateStore<TState> {
     constructor(options: JsonStateStoreOptions<TState>) {
         this.createDefaultState = options.createDefaultState;
         this.filePath = options.filePath;
+        this.validate = options.validate;
     }
 
     async read(): Promise<TState> {
@@ -83,7 +86,7 @@ export class JsonStateStore<TState> {
 
     private async loadState(): Promise<TState> {
         if (!this.statePromise) {
-            this.statePromise = readStateFile(this.filePath, this.createDefaultState).catch((error) => {
+            this.statePromise = readStateFile(this.filePath, this.createDefaultState).then((state) => this.validate ? this.validate(state) : state).catch((error) => {
                 this.statePromise = null;
                 throw error;
             });

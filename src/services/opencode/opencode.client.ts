@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-
 import {
     ClientError,
     isSessionNotFoundError,
@@ -17,9 +16,11 @@ import {
     type SessionMessageAssistant,
     type SessionMessageIdle,
 } from "@opencode/client";
-
+import { abortable } from "../../infra/utils/abort.js";
 import { calculateDisplayedTokenTotal } from "../../domain/token/token-settings.entity.js";
 import { stripMarkdownToPlainText } from "../../infra/utils/markdown-text.js";
+
+
 
 export interface OpenCodeClientOptions {
     baseUrl: string;
@@ -207,28 +208,28 @@ export interface OpenCodeClientLike {
     readonly client?: OpenCodeSdkClientLike;
     abortSession(sessionId: string): Promise<boolean>;
     cancelSessionInput(sessionId: string, messageId: string): Promise<void>;
-    deleteSession(sessionId: string): Promise<boolean>;
-    forkSession(sessionId: string, messageId?: string): Promise<OpenCodeSession>;
+    deleteSession(sessionId: string, signal?: AbortSignal): Promise<boolean>;
+    forkSession(sessionId: string, messageId?: string, signal?: AbortSignal): Promise<OpenCodeSession>;
     getHealth(): Promise<OpenCodeHealth>;
     getPath(): Promise<OpenCodePath>;
     listLspStatuses(directory?: string): Promise<OpenCodeLspStatus[] | null>;
     listMcpStatuses(directory?: string): Promise<Record<string, OpenCodeMcpStatus>>;
     getSessionStatuses(): Promise<Record<string, OpenCodeSessionStatus>>;
     getSessionContext(sessionId: string, model?: { providerID: string; id: string }): Promise<OpenCodeContextUsage>;
-    listProjects(): Promise<OpenCodeProject[]>;
+    listProjects(signal?: AbortSignal): Promise<OpenCodeProject[]>;
     listSessions(projectId?: string): Promise<OpenCodeSession[]>;
-    getSession(sessionId: string): Promise<OpenCodeSession | null>;
-    getCurrentProject(): Promise<OpenCodeProject>;
-    createSessionForDirectory(directory: string, title?: string): Promise<OpenCodeSession>;
+    getSession(sessionId: string, signal?: AbortSignal): Promise<OpenCodeSession | null>;
+    getCurrentProject(signal?: AbortSignal): Promise<OpenCodeProject>;
+    createSessionForDirectory(directory: string, title?: string, signal?: AbortSignal): Promise<OpenCodeSession>;
     renameSession(sessionId: string, title: string): Promise<OpenCodeSession>;
-    listAgents(): Promise<OpenCodeAgent[]>;
+    listAgents(signal?: AbortSignal): Promise<OpenCodeAgent[]>;
     replyToPermission(
         sessionId: string,
         requestId: string,
         reply: "once" | "always" | "reject",
     ): Promise<boolean>;
     listConfiguredPlugins(): Promise<string[]>;
-    listModels(): Promise<OpenCodeConfiguredModel[]>;
+    listModels(signal?: AbortSignal): Promise<OpenCodeConfiguredModel[]>;
     promptSession(input: PromptSessionInput): Promise<PromptSessionResult>;
 }
 
@@ -347,17 +348,17 @@ export class OpenCodeClient implements OpenCodeClientLike {
         });
     }
 
-    async deleteSession(sessionId: string): Promise<boolean> {
-        await this.client.session.remove({ sessionID: sessionId });
+    async deleteSession(sessionId: string, signal?: AbortSignal): Promise<boolean> {
+        await this.client.session.remove({ sessionID: sessionId }, { signal: signal ?? AbortSignal.timeout(5_000) });
 
         return true;
     }
 
-    async forkSession(sessionId: string, messageId?: string): Promise<OpenCodeSession> {
+    async forkSession(sessionId: string, messageId?: string, signal?: AbortSignal): Promise<OpenCodeSession> {
         return toOpenCodeSession(await this.client.session.fork({
             sessionID: sessionId,
             ...(messageId?.trim() ? { before: messageId.trim() } : {}),
-        }));
+        }, { signal }));
     }
 
     async getPath(): Promise<OpenCodePath> {
@@ -385,17 +386,18 @@ export class OpenCodeClient implements OpenCodeClientLike {
         return Object.fromEntries(Object.keys(active).map((sessionId) => [sessionId, { type: "busy" as const }]));
     }
 
-    async listProjects(): Promise<OpenCodeProject[]> {
+    async listProjects(signal?: AbortSignal): Promise<OpenCodeProject[]> {
+        signal?.throwIfAborted();
         this.projectRequest ??= this.client.project.list(undefined, {
             signal: AbortSignal.timeout(this.promptTimeoutPolicy.pollRequestTimeoutMs),
         }).finally(() => { this.projectRequest = null; });
 
-        return (await this.projectRequest).map(toOpenCodeProject);
+        return (await abortable(this.projectRequest, signal)).map(toOpenCodeProject);
     }
 
-    async getSession(sessionId: string): Promise<OpenCodeSession | null> {
+    async getSession(sessionId: string, signal?: AbortSignal): Promise<OpenCodeSession | null> {
         try {
-            return toOpenCodeSession(await this.client.session.get({ sessionID: sessionId }));
+            return toOpenCodeSession(await this.client.session.get({ sessionID: sessionId }, { signal }));
         } catch (error) {
             if (isSessionNotFoundError(error)) {
                 return null;
@@ -417,17 +419,17 @@ export class OpenCodeClient implements OpenCodeClientLike {
         return sessions;
     }
 
-    async getCurrentProject(): Promise<OpenCodeProject> {
-        const location = await this.client.location.get();
+    async getCurrentProject(signal?: AbortSignal): Promise<OpenCodeProject> {
+        const location = await this.client.location.get(undefined, { signal });
 
         return { id: location.project.id, worktree: location.project.directory };
     }
 
-    async createSessionForDirectory(directory: string, title?: string): Promise<OpenCodeSession> {
+    async createSessionForDirectory(directory: string, title?: string, signal?: AbortSignal): Promise<OpenCodeSession> {
         return toOpenCodeSession(await this.client.session.create({
             location: { directory },
             ...(title ? { title } : {}),
-        }));
+        }, { signal }));
     }
 
     async renameSession(sessionId: string, title: string): Promise<OpenCodeSession> {
@@ -436,8 +438,9 @@ export class OpenCodeClient implements OpenCodeClientLike {
         return toOpenCodeSession(await this.client.session.get({ sessionID: sessionId }));
     }
 
-    async listAgents(): Promise<OpenCodeAgent[]> {
-        return this.cachedAgents();
+    async listAgents(signal?: AbortSignal): Promise<OpenCodeAgent[]> {
+        signal?.throwIfAborted();
+        return abortable(this.cachedAgents(), signal);
     }
 
     async replyToPermission(
@@ -462,7 +465,8 @@ export class OpenCodeClient implements OpenCodeClientLike {
         }))];
     }
 
-    async listModels(): Promise<OpenCodeConfiguredModel[]> {
+    async listModels(signal?: AbortSignal): Promise<OpenCodeConfiguredModel[]> {
+        signal?.throwIfAborted();
         if (this.modelCache.value && this.modelCache.expiresAt > Date.now()) {
             return this.modelCache.value;
         }
@@ -473,7 +477,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
             });
         }
 
-        return this.modelCache.promise;
+        return abortable(this.modelCache.promise, signal);
     }
 
     async promptSession(input: PromptSessionInput): Promise<PromptSessionResult> {
@@ -584,7 +588,7 @@ export class OpenCodeClient implements OpenCodeClientLike {
     private async loadModels(): Promise<OpenCodeConfiguredModel[]> {
         const [models, providers] = await Promise.all([
             this.cachedModels(),
-            this.client.provider.list(),
+            this.client.provider.list(undefined, { signal: AbortSignal.timeout(this.promptTimeoutPolicy.pollRequestTimeoutMs) }),
         ]);
         const providerNames = new Map(providers.data.map((provider) => [provider.id, provider.name]));
         const value = models

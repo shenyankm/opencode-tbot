@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { execFileSync, spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -21,7 +21,7 @@ const SHOULD_RUN = process.env.OPENCODE_HOST_E2E === "1";
 
 test("OpenCode v2 loads the locally built plugin, handles Telegram commands, and disposes polling", {
     skip: !SHOULD_RUN,
-    timeout: 120_000,
+    timeout: 300_000,
 }, async (t) => {
     const { Host } = await import("@opencode/plugin/host");
     const temporaryDirectory = realpathSync(mkdtempSync(join(tmpdir(), "opencode-tbot-host-")));
@@ -41,9 +41,16 @@ test("OpenCode v2 loads the locally built plugin, handles Telegram commands, and
     mkdirSync(worktree, { recursive: true });
     let child: ChildProcessWithoutNullStreams | undefined;
     let server: ReturnType<typeof createServer> | undefined;
+    let provider: ReturnType<typeof createServer> | undefined;
+    let providerMode: "complete" | "fail" | "stop" = "complete";
+    let failedStream = false;
     t.after(async () => {
         if (child) {
             await terminateChildProcess(child);
+        }
+        if (provider?.listening) {
+            provider.closeAllConnections();
+            await new Promise<void>((resolve, reject) => provider!.close((error) => error ? reject(error) : resolve()));
         }
         if (server?.listening) {
             server.closeAllConnections();
@@ -61,8 +68,11 @@ test("OpenCode v2 loads the locally built plugin, handles Telegram commands, and
     ], { cwd: repositoryRoot, env, encoding: "utf8" })) as Array<{ filename: string }>;
     execFileSync("tar", ["-xf", join(temporaryDirectory, packed[0]!.filename), "-C", temporaryDirectory]);
     const pluginDirectory = join(temporaryDirectory, "package");
-    // shortcut: Dependencies reuse the local install; verify registry installation when publishing.
-    symlinkSync(join(repositoryRoot, "node_modules"), join(pluginDirectory, "node_modules"), "junction");
+    execFileSync(process.platform === "win32" ? "npm.cmd" : "npm", [
+        "install", "--omit=dev", "--ignore-scripts", "--no-audit", "--no-fund", "--prefer-offline",
+        "--cache", join(tmpdir(), "opencode-tbot-npm-cache"),
+    ], { cwd: pluginDirectory, env, stdio: "pipe", timeout: 180_000 });
+    execFileSync(process.execPath, [join(pluginDirectory, "bin", "opencode-tbot.js"), "--version"], { cwd: pluginDirectory });
     mkdirSync(join(temporaryDirectory, "node_modules"));
     symlinkSync(pluginDirectory, join(temporaryDirectory, "node_modules", "opencode-tbot"), "junction");
     const entrypoints = Host.resolve({ directory: temporaryDirectory, name: "opencode-tbot" });
@@ -114,7 +124,7 @@ test("OpenCode v2 loads the locally built plugin, handles Telegram commands, and
             const message = replyMessages[(body.message_id ?? 0) - 1];
             assert.ok(message);
             message.reply_markup = body.reply_markup;
-        } else if (method === "sendRichMessage" || method === "editMessageText") {
+        } else if (method === "sendRichMessage" || method === "editMessageText" || method === "sendRichMessageDraft") {
             body.text = body.rich_message?.markdown ?? body.rich_message?.html ?? body.rich_message?.blocks?.map((block) => block.text ?? "").join("\n") ?? "";
             if (method === "sendRichMessage") {
                 replies.push(body.text ?? "");
@@ -142,11 +152,45 @@ test("OpenCode v2 loads the locally built plugin, handles Telegram commands, and
     assert.ok(address && typeof address !== "string");
 
     await installPlugin({
+        ownerId: "101",
         homeDir,
         botToken: "123456:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghi",
         telegramApiRoot: `http://127.0.0.1:${address.port}`,
     });
-    writeFileSync(getGlobalOpenCodeConfigFilePath(homeDir), JSON.stringify({ plugins: [join(pluginDirectory, "dist")] }));
+    provider = createServer(async (request, response) => {
+        for await (const _chunk of request) { /* drain the provider request */ }
+        if (providerMode === "fail" && failedStream) {
+            response.writeHead(400, { "content-type": "application/json" });
+            response.end(JSON.stringify({ error: { message: "deterministic provider failure", type: "invalid_request_error" } }));
+            return;
+        }
+        if (providerMode === "fail") failedStream = true;
+        response.writeHead(200, { "content-type": "text/event-stream" });
+        const send = (delta: Record<string, string>, finish: string | null = null) => response.write(`data: ${JSON.stringify({ id: "chat-test", object: "chat.completion.chunk", created: 1, model: "test", choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`);
+        send({ role: "assistant", reasoning_content: "Deterministic local reasoning." });
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        send({ content: `HOST_PARTIAL_${providerMode}` });
+        if (providerMode === "complete") {
+            await new Promise((resolve) => setTimeout(resolve, 300));
+            send({ content: " HOST_FINAL" });
+            send({}, "stop");
+            response.end("data: [DONE]\n\n");
+        } else if (providerMode === "fail") {
+            await new Promise((resolve) => setTimeout(resolve, 300));
+            response.write(`data: ${JSON.stringify({ error: { message: "deterministic provider failure", type: "server_error" } })}\n\n`);
+            response.end();
+        }
+    });
+    await new Promise<void>((resolve) => provider!.listen(0, "127.0.0.1", resolve));
+    const providerAddress = provider.address();
+    assert.ok(providerAddress && typeof providerAddress !== "string");
+    writeFileSync(getGlobalOpenCodeConfigFilePath(homeDir), JSON.stringify({
+        plugins: [join(pluginDirectory, "dist")],
+        model: "local-test/test",
+        providers: { "local-test": { package: "@opencode/ai/providers/openai-compatible",
+            settings: { baseURL: `http://127.0.0.1:${providerAddress.port}/v1`, apiKey: "local-test-key" },
+            models: { test: { name: "Deterministic test", limit: { context: 32768, output: 1024 }, capabilities: { tools: false }, compatibility: { reasoningField: "reasoning_content" } } } } },
+    }));
     writeFileSync(join(worktree, "README.md"), "# opencode-tbot integration\n", "utf8");
 
     child = spawn(process.platform === "win32" ? "opencode.cmd" : "opencode", [
@@ -292,6 +336,32 @@ test("OpenCode v2 loads the locally built plugin, handles Telegram commands, and
     lease.dispose();
     assert.ok((await client.session.inbox.list({ sessionID: session.id }))
         .every((entry) => entry.id !== messageId));
+
+    for (const mode of ["complete", "fail", "stop"] as const) {
+        providerMode = mode;
+        const previous = replyMessages.length;
+        updates.push({ update_id: nextUpdateId++, message: {
+            message_id: nextUpdateId, date: Math.floor(Date.now() / 1000),
+            chat: { id: 101, type: "private" }, from: { id: 101, is_bot: false, first_name: "Test" },
+            text: `Generate deterministic ${mode} response`,
+        } });
+        await waitFor(() => [...replies, ...editedReplies].some((reply) => reply.includes(`HOST_PARTIAL_${mode}`)), 20_000, failureContext);
+        if (mode === "stop") {
+            const processing = replyMessages.slice(previous).find((message) => message.reply_markup?.inline_keyboard.flat().some((button) => button.callback_data.startsWith("prompt:stop:")));
+            assert.ok(processing);
+            const stop = processing.reply_markup!.inline_keyboard.flat().find((button) => button.callback_data.startsWith("prompt:stop:"))!;
+            updates.push({ update_id: nextUpdateId++, callback_query: { id: "stop-local-provider", chat_instance: "integration-chat", data: stop.callback_data,
+                from: { id: 101, is_bot: false, first_name: "Test" }, message: { message_id: replyMessages.indexOf(processing) + 1, date: 1, chat: { id: 101, type: "private" }, text: "Processing" } } });
+        }
+        await waitFor(() => replyMessages.slice(previous).some((message) => mode === "complete"
+            ? message.text?.includes("HOST_FINAL") : message.text?.includes(mode === "fail" ? "deterministic provider failure" : BOT_COPY.errors.requestAborted)), 20_000, failureContext);
+        assert.ok(replyMessages.slice(previous).some((message) => message.text?.includes(`HOST_PARTIAL_${mode}`)), failureContext());
+        assert.ok(requests.includes("sendRichMessageDraft"), failureContext());
+        await client.session.wait({ sessionID: session.id }, { signal: AbortSignal.timeout(10_000) });
+        const persisted = JSON.parse(readFileSync(join(worktree, "data", "opencode-tbot.state.json"), "utf8"));
+        assert.equal(persisted.sessions["101"].sessionId, session.id);
+        assert.ok(Number.isFinite(Date.parse(persisted.sessions["101"].updatedAt)));
+    }
 
     await client.debug.location.evict({ location });
     const pollCount = requests.filter((method) => method === "getUpdates").length;

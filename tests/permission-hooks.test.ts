@@ -1,6 +1,6 @@
-import { GrammyError } from "grammy";
 import assert from "node:assert/strict";
 import test from "node:test";
+import { GrammyError } from "grammy";
 import { handlePermissionApprovalCallback } from "../src/bot/handlers/callback.handler.js";
 import type { AppContainer } from "../src/app/container.js";
 import { handleTelegramBotPluginEvent } from "../src/app/plugin-events.js";
@@ -48,6 +48,7 @@ function createRuntime() {
             },
         },
         container: {
+            isChatAuthorized: () => true,
             logger,
             sessionRepo,
             permissionApprovalRepo,
@@ -717,4 +718,22 @@ test("interrupted sessions remove pending permission controls without changing o
     assert.equal(edits[0].text, "Stopped");
     assert.equal((await permissionApprovalRepo.listByRequestId("session-1"))[0].status, "reject");
     assert.equal((await permissionApprovalRepo.listByRequestId("session-other"))[0].status, "pending");
+});
+
+test("revoking a historical chat blocks permission requests, resolved edits and session errors", async () => {
+    const { runtime, sessionRepo, messages, edits } = createRuntime();
+    const allowed = new Set([101, 202]);
+    runtime.container.isChatAuthorized = (id) => allowed.has(id);
+    for (const chatId of allowed) await sessionRepo.setCurrent({ chatId, sessionId: "s", projectId: "p", directory: "/repo",
+        agentName: null, modelProviderId: null, modelId: null, modelVariant: null, language: "en", updatedAt: new Date().toISOString() });
+    await handleTelegramBotPluginEvent(runtime, { type: "permission.asked", data: { id: "r", sessionID: "s", action: "read", resources: ["private"] } });
+    assert.deepEqual(messages.map((message) => message.chatId), [101, 202]);
+    allowed.delete(101);
+    messages.length = 0;
+    await handleTelegramBotPluginEvent(runtime, { type: "permission.replied", data: { requestID: "r", sessionID: "s", reply: "once" } });
+    assert.deepEqual(edits.map((edit) => edit.chatId), [202]);
+    await handleTelegramBotPluginEvent(runtime, { type: "permission.asked", data: { id: "new", sessionID: "s", action: "read", resources: ["secret"] } });
+    await handleTelegramBotPluginEvent(runtime, { type: "session.error", data: { sessionID: "s", error: { message: "private failure" } } });
+    assert.ok(messages.length > 0);
+    assert.ok(messages.every((message) => message.chatId === 202));
 });

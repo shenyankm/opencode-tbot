@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { GrammyError, HttpError } from "grammy";
 import { setImmediate } from "node:timers/promises";
 import { createServer } from "node:http";
+import { GrammyError, HttpError } from "grammy";
 import { run } from "@grammyjs/runner";
 import {
     resetTelegramBotRuntimeRegistryForTests,
@@ -37,7 +37,7 @@ function createConfig(): AppConfig {
         tokenShowBreakdown: DEFAULT_TOKEN_SHOW_BREAKDOWN,
         pluginConfigFilePath: "E:/Users/demo/.config/opencode/opencode-tbot/config.json",
         stateFilePath: "E:/repo/data/opencode-tbot.state.json",
-        telegramAllowedChatIds: [],
+        telegramAllowedChatIds: [1],
         telegramApiRoot: "https://api.telegram.org",
         telegramBotToken: "telegram-token",
         worktreePath: "E:/repo",

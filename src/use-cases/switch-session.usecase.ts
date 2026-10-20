@@ -1,3 +1,4 @@
+import { beginBindingSelection, emptyBinding } from "./binding-update.js";
 import type { SessionRepository } from "../domain/session/session.repository.js";
 import type { AppLogger } from "../infra/logger/index.js";
 import type { OpenCodeSession } from "../services/opencode/opencode.client.js";
@@ -25,6 +26,7 @@ export class SwitchSessionUseCase {
     ) { }
 
     async execute(input: SwitchSessionInput): Promise<SwitchSessionResult> {
+        const assertCurrent = beginBindingSelection(this.sessionRepo, input.chatId, "session");
         const [binding, session] = await Promise.all([
             this.sessionRepo.getByChatId(input.chatId),
             this.opencodeClient.getSession(input.sessionId),
@@ -34,17 +36,15 @@ export class SwitchSessionUseCase {
             return { found: false };
         }
 
-        await this.sessionRepo.setCurrent({
-            chatId: input.chatId,
-            sessionId: session.id,
-            projectId: session.projectID,
-            directory: session.directory,
-            agentName: binding?.agentName ?? null,
-            modelProviderId: binding?.modelProviderId ?? null,
-            modelId: binding?.modelId ?? null,
-            modelVariant: binding?.modelVariant ?? null,
-            language: binding?.language ?? null,
-            updatedAt: new Date().toISOString(),
+        await this.sessionRepo.update(input.chatId, (current) => {
+            assertCurrent();
+            return {
+                ...(current ?? emptyBinding(input.chatId)),
+                sessionId: session.id,
+                projectId: session.projectID,
+                directory: session.directory,
+                updatedAt: new Date().toISOString(),
+            };
         });
 
         this.logger.info(

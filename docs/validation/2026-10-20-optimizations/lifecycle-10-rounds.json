@@ -1,0 +1,95 @@
+{
+  "kind": "local deterministic handler + real disk benchmark",
+  "node": "v22.23.2",
+  "platform": "darwin",
+  "limits": "Telegram RTT is simulated at 1 ms; provider tokens arrive every 180 ms. This is a short lifecycle stress baseline, not real network or long-running soak proof. No speedup claim.",
+  "samples": [
+    {
+      "chats": 1,
+      "rounds": 10,
+      "requests": 10,
+      "durationMs": 16365.863374999999,
+      "firstFeedbackQueueMs": {
+        "p50": 0.14108399999895482,
+        "p95": 0.46674999999999045
+      },
+      "simulatedTelegramRttMs": {
+        "p50": 1.206916999999521,
+        "p95": 1.3568750000013097
+      },
+      "draftIntervalMs": {
+        "p50": 95.9295830000001,
+        "p95": 1082.9179170000007
+      },
+      "localCancelReleaseMs": {
+        "p50": 8.325333000000228,
+        "p95": 18.993916999999783
+      },
+      "apiCalls": 65,
+      "writes": 50,
+      "bytesWritten": 21461,
+      "eventLoopP95Ms": 11.206655,
+      "heapDeltaBytes": 1305328,
+      "errors": 0,
+      "activeRequestsAfter": 0
+    },
+    {
+      "chats": 5,
+      "rounds": 10,
+      "requests": 50,
+      "durationMs": 16390.388750000002,
+      "firstFeedbackQueueMs": {
+        "p50": 0.18845800000053714,
+        "p95": 0.32204099999944447
+      },
+      "simulatedTelegramRttMs": {
+        "p50": 1.4465830000008282,
+        "p95": 1.7620420000021113
+      },
+      "draftIntervalMs": {
+        "p50": 85.76608300000225,
+        "p95": 1082.9540420000012
+      },
+      "localCancelReleaseMs": {
+        "p50": 9.295249999999214,
+        "p95": 10.628292000001238
+      },
+      "apiCalls": 325,
+      "writes": 235,
+      "bytesWritten": 113390,
+      "eventLoopP95Ms": 11.173887,
+      "heapDeltaBytes": 2556184,
+      "errors": 0,
+      "activeRequestsAfter": 0
+    },
+    {
+      "chats": 20,
+      "rounds": 10,
+      "requests": 200,
+      "durationMs": 16407.441416,
+      "firstFeedbackQueueMs": {
+        "p50": 0.22470800000155577,
+        "p95": 0.5247499999968568
+      },
+      "simulatedTelegramRttMs": {
+        "p50": 1.5849170000001322,
+        "p95": 2.2056250000023283
+      },
+      "draftIntervalMs": {
+        "p50": 83.17220899999666,
+        "p95": 1078.3672089999964
+      },
+      "localCancelReleaseMs": {
+        "p50": 10.245332999998936,
+        "p95": 11.727041999998619
+      },
+      "apiCalls": 1300,
+      "writes": 910,
+      "bytesWritten": 452115,
+      "eventLoopP95Ms": 11.182079,
+      "heapDeltaBytes": 16243208,
+      "errors": 0,
+      "activeRequestsAfter": 0
+    }
+  ]
+}

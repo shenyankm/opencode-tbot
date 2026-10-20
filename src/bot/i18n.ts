@@ -1,3 +1,4 @@
+import { emptyBinding } from "../use-cases/binding-update.js";
 import type { SessionRepository } from "../domain/session/session.repository.js";
 import type { AppLogger } from "../infra/logger/index.js";
 import {
@@ -72,18 +73,9 @@ export async function setChatLanguage(
     chatId: number,
     language: BotLanguage,
 ): Promise<void> {
-    const binding = await sessionRepo.getByChatId(chatId);
-
-    await sessionRepo.setCurrent({
-        chatId,
-        sessionId: binding?.sessionId ?? null,
-        projectId: binding?.projectId ?? null,
-        directory: binding?.directory ?? null,
-        agentName: binding?.agentName ?? null,
-        modelProviderId: binding?.modelProviderId ?? null,
-        modelId: binding?.modelId ?? null,
-        modelVariant: binding?.modelVariant ?? null,
+    await sessionRepo.update(chatId, (current) => ({
+        ...(current ?? emptyBinding(chatId)),
         language,
         updatedAt: new Date().toISOString(),
-    });
+    }));
 }

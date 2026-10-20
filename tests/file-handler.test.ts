@@ -45,6 +45,7 @@ function createDependencies(options: {
     }) => Promise<{ assistantReply: PromptSessionResult }>;
     uploadFile?: (input: {
         expectedType: "image";
+        signal?: AbortSignal;
         filePath: string;
         filename?: string | null;
         mimeType?: string | null;
@@ -95,7 +96,9 @@ test("handleImageMessage forwards image captions and file parts to OpenCode", as
     let nextMessageId = 1500;
     const { dependencies } = createDependencies({
         uploadFile: async (input) => {
-            assert.deepEqual(input, {
+            assert.ok(input.signal instanceof AbortSignal);
+            const { signal: _signal, ...upload } = input;
+            assert.deepEqual(upload, {
                 expectedType: "image",
                 filePath: "photos/file_42.jpg",
                 filename: null,

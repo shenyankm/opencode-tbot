@@ -9,14 +9,14 @@ Control [OpenCode](https://opencode.ai/v2/docs) from Telegram: chat, images, ses
 Requires OpenCode V2 compatible with SDK `2.0.29` and Node.js `>=22.12.0`. OpenCode V1 is unsupported.
 
 1. Create a bot with Telegram’s `@BotFather` using `/newbot`. Get your numeric user ID from `@userinfobot` to restrict access to your private chat.
-2. Install OpenCode and the plugin, then enter the bot token when prompted:
+2. Install OpenCode and the plugin, then enter the bot token and owner Telegram user ID when prompted:
 
    ```bash
    npm install -g @opencode/cli@2.0.29
    npm exec -- opencode-tbot@latest
    ```
 
-3. Set `telegram.allowedChatIds` in the config below, then start the shared host and load your project location from its directory:
+3. Review the authorized IDs saved by the installer, then start the shared host and load your project location from its directory:
 
    ```bash
    opencode serve --service
@@ -41,7 +41,7 @@ The installer validates the token before writing `~/.config/opencode/opencode-tb
 }
 ```
 
-An empty or omitted `allowedChatIds` allows every chat. The installer also registers `"plugins": ["opencode-tbot"]` in `~/.config/opencode/opencode.json`; plugin options can override file settings. Existing V1 registrations are migrated without dropping options. Runtime configuration does not use `.env`.
+An empty or omitted `allowedChatIds` denies all chats, including callbacks. The installer requires an owner ID (`--owner-id <id>` for unattended installs), prints the authorized IDs, and preserves an existing list when no replacement owner is supplied. There is no public mode or first-message pairing. An authorized group trusts **every member**, including for approvals; authorize private chat IDs for owner-only access. After revoking a chat, run `opencode reload`; historical bindings and menus cannot send notifications or approve requests under the new policy. The installer also registers `"plugins": ["opencode-tbot"]` in `~/.config/opencode/opencode.json`; plugin options can override file settings. Existing V1 registrations are migrated without dropping options. Runtime configuration does not use `.env`.
 
 Chat preferences persist in a JSON state file. Thinking content and expansion state use private per-message files in `<state path>.thinking/`; keep these files to reopen older thinking after restarting. Redacted logs go to the host console and `~/.local/share/opencode/log/plugins/opencode-tbot/`.
 
@@ -99,3 +99,33 @@ To run the host test locally with the matching OpenCode CLI on `PATH`:
 ```bash
 OPENCODE_HOST_E2E=1 pnpm exec tsx --test tests/opencode-host.integration.test.ts
 ```
+
+## Diagnostics, limits and retention
+
+Run `npm exec -- opencode-tbot@latest doctor` from the project directory for read-only checks of Node, authorization, writable paths, Telegram webhooks, shared host and loaded location. A competing poller cannot be detected without consuming updates; `doctor` reports this as unknown and explains 409 recovery.
+
+The token config uses an atomic replacement with file mode `0600` and plugin directory mode `0700` on POSIX. Windows uses the current user's inherited ACL; numeric POSIX modes do not establish ACL isolation there. Upgrades retain configuration; review the ACL on shared Windows hosts.
+
+| Configuration | Default |
+|---|---|
+| `telegram.botToken` | Required |
+| `telegram.allowedChatIds` | `[]` (deny all) |
+| `telegram.apiRoot` | `https://api.telegram.org` |
+| `state.path` | `./data/opencode-tbot.state.json`, relative to the worktree |
+| `prompt.waitTimeoutMs` | `1800000` |
+| `prompt.pollRequestTimeoutMs` | `15000` |
+| `prompt.recoveryInactivityTimeoutMs` | `120000` |
+| `tokens.showBreakdown` | `false` |
+| `logging.level` | `info` |
+| `logging.sinks.host`, `logging.sinks.file` | `true` |
+| `logging.file.dir` | `~/.local/share/opencode/log/plugins/opencode-tbot/` |
+| `logging.file.retention.maxFiles` | `30` |
+| `logging.file.retention.maxTotalBytes` | `314572800` |
+
+Preparation has a 60-second deadline; downloads have a 30-second total timeout and a 20 MiB actual-byte limit. Stop cancels preparation as well as execution. A late response cannot rebind the chat. Temporary-session deletion has an independent 5-second timeout; failures log the session ID for removal in OpenCode. Timestamp-only save failures warn without losing a completed answer. Invalid or unknown state versions fail without replacing the original file.
+
+Thinking history expires after 30 days and is capped at 2,000 files / 32 MiB (cleanup at most once per minute during writes). Permission history expires after 30 days and is capped at 1,000 records, including old pending buttons. Expired buttons cannot approve. To prune immediately, stop the plugin, run `npm exec -- opencode-tbot@latest prune` from its worktree, then restart it. Keep state files backed up before recovery or migration.
+
+Release checks: `pnpm lint`, `pnpm verify:package`, and `pnpm verify:release` (requires a clean commit, matching version tag and changelog). After publishing, run `node scripts/verify-package.mjs --registry <version>`. `main` may contain unreleased changes; `package.json` and the release tag identify the published version. The manual desktop fixture is `pnpm exec tsx tests/telegram-desktop.manual.ts`; it uses only configured authorized chats and controlled provider events.
+
+[Optimization and validation report (2026-10-20)](docs/validation/2026-10-20-optimizations/README.md)

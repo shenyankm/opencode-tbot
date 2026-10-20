@@ -1,4 +1,4 @@
-import type { ChatSessionBinding } from "../domain/session/session.entity.js";
+import { abortable } from "../infra/utils/abort.js";
 import type { SessionRepository } from "../domain/session/session.repository.js";
 import {
     logOpenCodeRequest,
@@ -11,12 +11,12 @@ import type {
 import type { OpenCodePromptGateway } from "../services/opencode/opencode.ports.js";
 import {
     PromptContextResolver,
-    type ActiveChatBinding,
 } from "./prompt-context.js";
 import { TemporaryImageSessionManager } from "./temporary-image-session-manager.js";
 
 export interface SendPromptInput {
     chatId: number;
+    requestId?: string;
     files?: PromptSessionFilePartInput[];
     onInputReady?: (messageId: string) => void;
     onExecutionSession?: (sessionId: string) => void;
@@ -46,22 +46,27 @@ export class SendPromptUseCase {
     }
 
     async execute(input: SendPromptInput): Promise<SendPromptResult> {
+        input.signal?.throwIfAborted();
         const files = input.files ?? [];
         const context = await this.promptContextResolver.resolve({
             chatId: input.chatId,
             files,
             text: input.text,
+            signal: input.signal,
         });
         const result = await this.temporaryImageSessionManager.withExecutionSession(
             {
                 chatId: input.chatId,
                 isolate: context.shouldIsolateImageTurn,
+                signal: input.signal,
                 sessionId: context.activeBinding.sessionId,
             },
             async (executionSessionId) => {
+                input.signal?.throwIfAborted();
                 input.onExecutionSession?.(executionSessionId);
                 logOpenCodeRequest(this.logger, {
                     chatId: input.chatId,
+                    requestId: input.requestId,
                     event: "opencode.prompt.submit",
                     projectId: context.activeBinding.projectId,
                     sessionId: executionSessionId,
@@ -69,7 +74,7 @@ export class SendPromptUseCase {
                     status: "started",
                 }, "submitting OpenCode prompt");
 
-                const assistantReply = await this.opencodeClient.promptSession({
+                const assistantReply = await abortable(this.opencodeClient.promptSession({
                     sessionId: executionSessionId,
                     prompt: context.promptText,
                     ...(input.onInputReady ? { onInputReady: input.onInputReady } : {}),
@@ -79,10 +84,11 @@ export class SendPromptUseCase {
                     ...(context.model ? { model: context.model } : {}),
                     ...(input.signal ? { signal: input.signal } : {}),
                     ...(context.activeBinding.modelVariant ? { variant: context.activeBinding.modelVariant } : {}),
-                });
+                }), input.signal);
 
                 logPromptLifecycle(this.logger, {
                     chatId: input.chatId,
+                    requestId: input.requestId,
                     event: "prompt.completed",
                     projectId: context.activeBinding.projectId,
                     sessionId: executionSessionId,
@@ -93,7 +99,12 @@ export class SendPromptUseCase {
             },
         );
 
-        await this.sessionRepo.touch(input.chatId);
+        try {
+            await this.sessionRepo.touch(input.chatId);
+        } catch (error) {
+            this.logger.warn({ error, chatId: input.chatId, sessionId: context.activeBinding.sessionId,
+                requestId: input.requestId, event: "prompt.timestamp.save_failed" }, "answer completed but timestamp persistence failed");
+        }
 
         return {
             assistantReply: result,

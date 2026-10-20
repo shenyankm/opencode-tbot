@@ -7,15 +7,21 @@ export class InMemorySessionRepository implements SessionRepository {
     private readonly sessionsByChatId = new Map<number, ChatSessionBinding>();
 
     async getByChatId(chatId: number): Promise<ChatSessionBinding | null> {
-        return this.sessionsByChatId.get(chatId) ?? null;
+        return structuredClone(this.sessionsByChatId.get(chatId) ?? null);
     }
 
     async listBySessionId(sessionId: string): Promise<ChatSessionBinding[]> {
         return [...this.sessionsByChatId.values()].filter((binding) => binding.sessionId === sessionId);
     }
 
+    async update(chatId: number, updater: (current: ChatSessionBinding | null) => ChatSessionBinding): Promise<ChatSessionBinding> {
+        const next = updater(structuredClone(this.sessionsByChatId.get(chatId) ?? null));
+        this.sessionsByChatId.set(chatId, structuredClone(next));
+        return next;
+    }
+
     async setCurrent(binding: ChatSessionBinding): Promise<void> {
-        this.sessionsByChatId.set(binding.chatId, binding);
+        this.sessionsByChatId.set(binding.chatId, structuredClone(binding));
     }
 
     async touch(chatId: number): Promise<void> {
@@ -41,6 +47,15 @@ export class FileSessionRepository implements SessionRepository {
 
     async listBySessionId(sessionId: string): Promise<ChatSessionBinding[]> {
         return this.store.select((state) => Object.values(state.sessions).filter((binding) => binding.sessionId === sessionId));
+    }
+
+    async update(chatId: number, updater: (current: ChatSessionBinding | null) => ChatSessionBinding): Promise<ChatSessionBinding> {
+        let next!: ChatSessionBinding;
+        await this.store.update((state) => {
+            next = updater(state.sessions[String(chatId)] ?? null);
+            state.sessions[String(chatId)] = next;
+        });
+        return structuredClone(next);
     }
 
     async setCurrent(binding: ChatSessionBinding): Promise<void> {

@@ -9,14 +9,14 @@ Telegram から [OpenCode](https://opencode.ai/v2/docs) を操作するプラグ
 SDK `2.0.29` と互換性のある OpenCode V2、および Node.js `>=22.12.0` が必要です。OpenCode V1 には対応しません。
 
 1. Telegram の `@BotFather` で `/newbot` を実行して bot を作成します。`@userinfobot` で自分の数値 ID を取得し、プライベートチャットのアクセス制限に使います。
-2. OpenCode とプラグインをインストールし、案内に従って bot token を入力します。
+2. OpenCode とプラグインをインストールし、案内に従って bot token と owner の Telegram ユーザー ID を入力します。
 
    ```bash
    npm install -g @opencode/cli@2.0.29
    npm exec -- opencode-tbot@latest
    ```
 
-3. 下記の設定で `telegram.allowedChatIds` を指定し、共有サービスを起動してプロジェクトの場所を読み込みます。
+3. インストーラーが保存した許可 ID を確認し、共有サービスを起動してプロジェクトの場所を読み込みます。
 
    ```bash
    opencode serve --service
@@ -41,7 +41,7 @@ SDK `2.0.29` と互換性のある OpenCode V2、および Node.js `>=22.12.0` �
 }
 ```
 
-`allowedChatIds` が空または省略された場合は、すべてのチャットを許可します。`~/.config/opencode/opencode.json` への `"plugins": ["opencode-tbot"]` の登録も自動です。プラグインの options はファイル設定より優先されます。既存の V1 登録は options を保持して移行します。実行時に `.env` は読み込みません。
+`allowedChatIds` が空または省略された場合は、チャットとコールバックをすべて拒否します。初回インストールは owner ID が必須です（無人実行は `--owner-id <id>`）。許可 ID を表示し、owner を指定しなければ既存リストを保持します。公開モードと最初のメッセージによる自動ペアリングはありません。許可したグループは承認を含む**全メンバー**を信頼します。owner のみに限定する場合は個人チャット ID を指定してください。許可を取り消したら `opencode reload` を実行します。履歴のバインドとメニューも通知や承認に使用できなくなります。`~/.config/opencode/opencode.json` への `"plugins": ["opencode-tbot"]` の登録も自動です。プラグインの options はファイル設定より優先されます。既存の V1 登録は options を保持して移行します。実行時に `.env` は読み込みません。
 
 チャット設定は JSON 状態ファイルに保存します。機密情報をマスクしたログはホストコンソールと `~/.local/share/opencode/log/plugins/opencode-tbot/` に出力します。
 
@@ -101,3 +101,33 @@ pnpm build
 ```bash
 OPENCODE_HOST_E2E=1 pnpm exec tsx --test tests/opencode-host.integration.test.ts
 ```
+
+## 診断、制限と履歴保持
+
+プロジェクトディレクトリで `npm exec -- opencode-tbot@latest doctor` を実行すると、Node、許可 ID、書き込み権限、Telegram webhook、共有ホスト、読み込み済みの場所を読み取り専用で確認します。更新を消費せずに競合 poller を検出する API はないため、不明と表示し 409 の対処方法を案内します。
+
+Token 設定はアトミックに置換し、POSIX のファイルは `0600`、専用ディレクトリは `0700` に制限します。Windows は現在のユーザーの継承 ACL を使用します。数値モードだけでは ACL 分離を証明できないため、共有 Windows ホストでは ACL を確認してください。
+
+| 設定 | 初期値 |
+|---|---|
+| `telegram.botToken` | 必須 |
+| `telegram.allowedChatIds` | `[]`（すべて拒否） |
+| `telegram.apiRoot` | `https://api.telegram.org` |
+| `state.path` | `./data/opencode-tbot.state.json`、ワークツリー相対 |
+| `prompt.waitTimeoutMs` | `1800000` |
+| `prompt.pollRequestTimeoutMs` | `15000` |
+| `prompt.recoveryInactivityTimeoutMs` | `120000` |
+| `tokens.showBreakdown` | `false` |
+| `logging.level` | `info` |
+| `logging.sinks.host`, `logging.sinks.file` | `true` |
+| `logging.file.dir` | `~/.local/share/opencode/log/plugins/opencode-tbot/` |
+| `logging.file.retention.maxFiles` | `30` |
+| `logging.file.retention.maxTotalBytes` | `314572800` |
+
+準備の期限は 60 秒、ダウンロードの合計タイムアウトは 30 秒、実際に読み込む上限は 20 MiB です。Stop は準備にも適用され、遅れて届いた結果でチャットを再設定しません。一時セッション削除の期限は独立した 5 秒です。失敗時は記録した session ID を OpenCode で削除してください。タイムスタンプ保存失敗は警告に留め、完成した回答を保持します。不正な状態や未知のバージョンは元のファイルを保持してエラーにします。
+
+思考履歴は 30 日、最大 2,000 ファイル / 32 MiB で、書き込み時に最大 1 分に 1 回整理します。承認履歴は 30 日、最大 1,000 件で、期限切れの保留ボタンも無効です。即時整理するにはプラグインを停止し、ワークツリーで `npm exec -- opencode-tbot@latest prune` を実行して再起動します。復旧や移行の前に状態をバックアップしてください。
+
+公開前は `pnpm lint`、`pnpm verify:package`、`pnpm verify:release`（クリーンなコミット、一致するバージョン tag と CHANGELOG が必要）を使用します。公開後は `node scripts/verify-package.mjs --registry <version>` で npm パッケージを検証します。`main` には未公開の変更があり得ます。公開済みバージョンは `package.json` と release tag で確認してください。デスクトップの手動検証は `pnpm exec tsx tests/telegram-desktop.manual.ts` で、許可済みチャットと制御した provider イベントだけを使用します。
+
+[最適化と検証結果（2026-10-20）](docs/validation/2026-10-20-optimizations/README.md)

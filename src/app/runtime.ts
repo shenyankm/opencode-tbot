@@ -7,6 +7,7 @@ import type { AppConfig } from "./config.js";
 import type { AppContainer } from "./container.js";
 import { TelegramStartupError, validateTelegramBotAccessWithBot } from "../services/telegram/telegram-bot-access.js";
 import { telegramNetworkCode, telegramNetworkRecovery } from "../services/telegram/network-recovery.js";
+import { telegramAuthorization } from "../services/telegram/authorization.js";
 import { telegramRichMessages } from "../services/telegram/rich-messages.js";
 
 export interface StartTelegramBotRuntimeInput {
@@ -103,6 +104,10 @@ async function startTelegramBotRuntimeInternal(
         component: "runtime",
     });
 
+    if (!input.config.telegramAllowedChatIds.length) {
+        runtimeLogger.warn({ event: "runtime.authorization.empty" }, "No authorized chats: set telegram.allowedChatIds and reload the plugin.");
+    }
+    bot.api.config?.use(telegramAuthorization(input.config.telegramAllowedChatIds));
     bot.api.config?.use(telegramNetworkRecovery(runtimeLogger));
     bot.api.config?.use(telegramRichMessages());
     await verifyTelegramBotAccess(bot, input.config.telegramApiRoot, runtimeKey, runtimeLogger);

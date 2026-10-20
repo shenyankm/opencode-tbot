@@ -1,3 +1,4 @@
+import { prunePermissionHistory } from "../services/storage/history-retention.js";
 import type { PendingPermissionApproval } from "../domain/permission/approval.entity.js";
 import type { PermissionApprovalRepository } from "../domain/permission/approval.repository.js";
 import type { OpencodeTbotState } from "../services/storage/bot-state.js";
@@ -27,16 +28,25 @@ export class FilePermissionApprovalRepository implements PermissionApprovalRepos
     constructor(private readonly store: JsonStateStore<OpencodeTbotState>) { }
 
     async listBySessionId(sessionId: string): Promise<PendingPermissionApproval[]> {
-        return this.store.select((state) => Object.values(state.pendingPermissions).filter((approval) => approval.sessionId === sessionId));
+        return this.store.select((state) => {
+            const records = { ...state.pendingPermissions };
+            prunePermissionHistory(records);
+            return Object.values(records).filter((approval) => approval.sessionId === sessionId);
+        });
     }
 
     async listByRequestId(requestId: string): Promise<PendingPermissionApproval[]> {
-        return this.store.select((state) => Object.values(state.pendingPermissions).filter((approval) => approval.requestId === requestId));
+        return this.store.select((state) => {
+            const records = { ...state.pendingPermissions };
+            prunePermissionHistory(records);
+            return Object.values(records).filter((approval) => approval.requestId === requestId);
+        });
     }
 
     async set(approval: PendingPermissionApproval): Promise<void> {
         await this.store.update((state) => {
             state.pendingPermissions[buildApprovalKey(approval.requestId, approval.chatId)] = approval;
+            prunePermissionHistory(state.pendingPermissions);
         });
     }
 }

@@ -1,6 +1,7 @@
 import { randomInt } from "node:crypto";
 import { InlineKeyboard } from "grammy";
 import type { InputRichMessage } from "grammy/types";
+import { abortable } from "../../infra/utils/abort.js";
 import { isTelegramFormattingError } from "../../services/telegram/rich-messages.js";
 import type { ThinkingContent } from "../../domain/thinking/thinking-message.entity.js";
 import { retryTelegramRequest } from "../../services/telegram/telegram-message-queue.js";
@@ -33,8 +34,9 @@ export interface PromptExecutionInput {
 export async function executePromptRequest(
     ctx: PromptExecutionContext,
     dependencies: ForegroundPromptDependencies,
-    resolvePrompt: () => Promise<PromptExecutionInput>,
+    resolvePrompt: (signal: AbortSignal) => Promise<PromptExecutionInput>,
 ) {
+    const receivedAt = performance.now();
     const copy = await getSafeChatCopy(dependencies.sessionRepo, ctx.chat.id, dependencies.logger);
     let progress: TelegramPromptProgress | null = null;
     const foregroundRequest = dependencies.foregroundSessionTracker.acquire(ctx.chat.id, (event) => progress?.accept(event));
@@ -44,6 +46,10 @@ export async function executePromptRequest(
         return;
     }
 
+    const preparation = new AbortController();
+    const preparationTimer = setTimeout(() => preparation.abort(new DOMException("Prompt preparation timed out.", "TimeoutError")), 60_000);
+    preparationTimer.unref();
+    const signal = AbortSignal.any([foregroundRequest.signal, preparation.signal]);
     const answerMessages: Array<SentMessage & TelegramReplyPayload> = [];
     const draftId = randomInt(1, 2_147_483_647);
     const nativeStream = ctx.chat.type === "private" && Boolean(ctx.api.sendRichMessageDraft);
@@ -102,7 +108,10 @@ export async function executePromptRequest(
 
     try {
         const keyboard = new InlineKeyboard().text(copy.status.stop, `prompt:stop:${foregroundRequest.id}`);
+        const feedbackAt = performance.now();
         processingMessage = await ctx.reply(copy.status.processing, { reply_markup: keyboard });
+        dependencies.logger.info?.({ event: "prompt.first_feedback", requestId: foregroundRequest.id, chatId: ctx.chat.id,
+            queueMs: feedbackAt - receivedAt, networkMs: performance.now() - feedbackAt }, "first Telegram feedback delivered");
         const thinkingMessages: Array<SentMessage & TelegramReplyPayload<"HTML"> & { terminal: boolean; thinking?: ThinkingContent }> = [
             { ...processingMessage, text: copy.status.processing, terminal: false },
         ];
@@ -172,16 +181,19 @@ export async function executePromptRequest(
             }
         });
 
-        const promptInput = await resolvePrompt();
+        const promptInput = await abortable(resolvePrompt(signal), signal);
+        signal.throwIfAborted();
         const startedAt = performance.now();
         const result = await dependencies.sendPromptUseCase.execute({
             chatId: ctx.chat.id,
+            requestId: foregroundRequest.id,
             files: promptInput.files,
             onInputReady: (messageId) => foregroundRequest.attachInput(messageId),
             onExecutionSession: (sessionId: string) => {
+                clearTimeout(preparationTimer);
                 foregroundRequest.attachSession(sessionId);
             },
-            signal: foregroundRequest.signal,
+            signal,
             text: promptInput.text,
         });
         const durationMs = performance.now() - startedAt;
@@ -250,8 +262,11 @@ export async function executePromptRequest(
         await ctx.reply(presentError(error, copy));
         sentTerminalReply = true;
     } finally {
+        clearTimeout(preparationTimer);
         await progress?.finish(terminalStatus);
         foregroundRequest.dispose();
+        dependencies.logger.info?.({ event: "prompt.released", requestId: foregroundRequest.id, chatId: ctx.chat.id,
+            durationMs: performance.now() - receivedAt, status: terminalStatus }, "local prompt released");
         if (processingMessage && sentTerminalReply && !progress?.hasContent) {
             try {
                 await dependencies.thinkingMessages.remove(ctx.chat.id, processingMessage.message_id, () => ctx.api.deleteMessage(ctx.chat.id, processingMessage!.message_id));
